@@ -21,7 +21,8 @@
  *   res: string,
  *   size: string,
  *   tag: string,
- *   desc: string
+ *   desc: string,
+ *   short?: string
  * }} GardenTier
  */
 
@@ -31,10 +32,10 @@ export const GARDEN_TOTAL = 209;
 /** Quality tiers — each hosted on its own GitHub release.
  *  @type {GardenTier[]} */
 export const GARDEN_TIERS = [
-  { id: "mobile",   label: "Mobile",   res: "2160px", size: "~110 MB", tag: "garden-mobile",   desc: "Screen-native; light on cell data" },
-  { id: "standard", label: "Standard", res: "2880px", size: "~180 MB", tag: "garden-standard", desc: "Balanced default — great at 1× and 1.5× zoom" },
-  { id: "native",   label: "Native",   res: "3600px", size: "~320 MB", tag: "garden-native",   desc: "Full source detail; no upscaling" },
-  { id: "ultra",    label: "Ultra",    res: "4600px", size: "~680 MB", tag: "garden-ultra",    desc: "Maximum quality — for pixel-peepers" },
+  { id: "mobile",   label: "Mobile",   res: "2160px", size: "~110 MB", tag: "garden-mobile",   desc: "Screen-native; light on cell data", short: "Light on mobile data" },
+  { id: "standard", label: "Standard", res: "2880px", size: "~180 MB", tag: "garden-standard", desc: "Balanced default — great at 1× and 1.5× zoom", short: "Balanced default" },
+  { id: "native",   label: "Native",   res: "3600px", size: "~320 MB", tag: "garden-native",   desc: "Full source detail; no upscaling", short: "Full source detail" },
+  { id: "ultra",    label: "Ultra",    res: "4600px", size: "~680 MB", tag: "garden-ultra",    desc: "Maximum quality — for pixel-peepers", short: "Maximum quality" },
 ];
 
 /** Default tier id when no user preference is set. */

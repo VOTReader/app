@@ -241,6 +241,8 @@ export const TourController = {
   getVersion() { return version; },
   /** @returns {{active:boolean,index:number,step:any,from:string|null,ready:boolean,promptDismissed:boolean,pressed:boolean}} */
   getState() { return { ...state, step: TOUR_STEPS[state.index] }; },
+  /** The stop `ahead` places after the current one, or null past the end (WS5 tour: Next names it). */
+  peek(ahead) { return TOUR_STEPS[state.index + (ahead || 1)] || null; },
 
   /** True only while next() is pressing the ringed control itself. */
   isPressing() { return pressing; },

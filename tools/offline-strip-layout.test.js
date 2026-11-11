@@ -75,10 +75,10 @@ describe("the offline-library strip's controls take a finger (b5c)", () => {
   });
 
   it('the X is a real 44x44 box, and its overlay (which reached into Retry) is off', () => {
-    const x = blocks(S + ' .sh-banner-dismiss')[0] || '';
+    const x = blocks(S + ' .ui-notice-x')[0] || '';
     expect(x).toMatch(/width:\s*44px/);
     expect(x).toMatch(/height:\s*44px/);
-    expect(blocks(S + ' .sh-banner-dismiss::after')[0] || '').toMatch(/display:\s*none/);
+    // WS6: the x is the Notice's own 44px button now; there is no ::after overlay to switch off.
   });
 
   it('the two sit at least 8px apart', () => {

@@ -4,7 +4,7 @@
    Pure composer + a thin delivery shim for the "Share as text" action on
    the Notes index (a notebook's drilled header + the All Notes tab).
    The output is a human-readable markdown/plain-text ARTIFACT — it is
-   NOT a backup format (Settings → Your Data owns backup; no importer
+   NOT a backup format (Settings → Your data owns backup; no importer
    exists or should exist for this).
 
    composeNotesExport / notesExportFilename are pure (notes + resolver

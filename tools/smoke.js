@@ -295,6 +295,14 @@
   async function goHome() {
     for (var attempt = 0; attempt < 5; attempt++) {
       if (onHome()) return true;
+      // First run (WS4 welcome, 2026-11-11) has no bar and no Home: a person leaves it by Continue, then
+      // Begin reading (which opens Letter 1, where the tab bar shows). Tap what they tap.
+      var fr = document.querySelector('.ws4-fr');
+      if (fr) {
+        var go = fr.querySelector('button[aria-label="Begin Reading"]') ||
+          [].slice.call(fr.querySelectorAll('button')).find(function (b) { return (b.textContent || '').trim() === 'Continue'; });
+        if (go) { go.click(); await sleep(450); continue; }
+      }
       // The three tabs (2026-11-10): the Read tab is the way home wherever the bar shows.
       if (openTab('Read')) { await sleep(300); continue; }
       var btns = [].slice.call(document.querySelectorAll('button'));
@@ -372,7 +380,7 @@
         there: function () { return /Recordings and songs you starred/.test(document.body.textContent || ''); } },
       { screen: 'settings', label: 'the gear → Settings',
         open: async function () { await goHome(); return openSettings(); },
-        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
+        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Your data/.test(document.body.textContent || ''); } },
       { screen: 'scripture-web', label: 'Read › Explore → Scripture Web',
         open: async function () { await goHome(); return clickByText(/Scripture Web/); },
         there: function () { return !!document.querySelector('.sw-root'); } },
@@ -616,6 +624,8 @@
       if (help && !document.querySelector('[data-settings-group="help"].open')) { help.click(); await sleep(200); }
       if (!clickByText(/About VOTReader/)) return false;
       await sleep(400);
+      // WS3 settings (ab-credits): About from Settings keeps the credits on their own page, one row down.
+      if (clickByText(/^Credits and privacy\s*$/)) await sleep(400);
       const credit = document.querySelector('.about-credit');
       const text = (credit && credit.textContent) || '';
       return /OpenBible\.info/.test(text) && /CC-BY/.test(text);
@@ -633,7 +643,7 @@
     });
     await step('Settings', async function () {
       openSettings(); await sleep(360);
-      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');
+      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Your data/.test(document.body.textContent || '');
     });
     await goHome();
     return out;

@@ -10,7 +10,7 @@
    sanitization; on web there was nothing. This module fills that gap so
    store write failures, quota events, lazy-load timings, service-worker
    events, and render crashes are retrievable from inside the app on every
-   platform — surfaced in Settings → Your Data and folded into Export JSON.
+   platform — surfaced in Settings → Your data and folded into Export JSON.
 
    Parity with BoundedLogTree (deliberate, so the two merge cleanly):
      - Capacity: 200 entries, FIFO eviction (oldest dropped on overflow).

@@ -89,38 +89,33 @@ export class ErrorBoundary extends React.Component {
     // explicit null is honored.
     if (this.props.fallback !== undefined) return this.props.fallback;
     var looping = this.state.crashCount >= 2;
-    // s01.2: theme tokens (each with the old dark colour as its fallback, for a crash before app.css applies),
-    // so the panel reads in the light theme too; it was gold-on-parchment there.
+    // WS6 (mock sy-crash): the empty-state pattern. It must draw when the app is half broken, so it names only
+    // app.css classes (render-blocking, always loaded), draws its icons inline, and keeps a dark fallback colour
+    // on the panel itself for a crash before app.css applies. Reload app first; after a second crash, the Read tab.
+    /** @type {any} */
+    var svg = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
     return (
-      <div className="vot-crash-panel" style={{ padding: "2rem", textAlign: "center", color: "var(--gold, #e0c97f)", background: "var(--bg, #0b0a08)", fontFamily: "Georgia, serif" }}>
-        <h2 style={{ marginBottom: "1rem" }}>Something went wrong</h2>
-        <p style={{ color: "var(--cream-muted, #b0a080)", fontSize: "var(--fs-14)", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
-          {/* Wave-0: was String(this.state.error) — raw stack text facing the
-              user. The technical detail is already in DiagnosticLog
-              (componentDidCatch); the panel speaks human. */}
-          This page hit an unexpected problem and could not finish loading. Your notes and data are safe.
-        </p>
-        <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={() => location.reload()}
-            style={{ padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid var(--gold, #e0c97f)", color: "var(--gold, #e0c97f)", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Reload App
+      <div className="vot-crash-panel" style={{ minHeight: '100vh', boxSizing: 'border-box', paddingTop: '22vh', color: 'var(--text-1, #ece6da)', background: 'var(--bg, #0b0a08)', textAlign: 'center' }}>
+        <div className="ui-empty" role="alert">
+          <span className="ui-empty-icon" aria-hidden="true"><svg {...svg}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg></span>
+          <h2 className="ui-empty-title">Something went wrong</h2>
+          {/* Wave-0: the technical detail is in DiagnosticLog (componentDidCatch); the panel speaks human. */}
+          <p className="ui-empty-text">This page hit an unexpected problem and could not finish loading. Your notes and data are safe.</p>
+          <button type="button" className="ui-btn is-primary" onClick={() => location.reload()}>
+            <svg {...svg} className="ui-i"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4" /></svg>Reload app
           </button>
           {looping && (
-            <button
-              onClick={() => { try { sessionStorage.setItem(CRASH_RECOVER_KEY, '1'); } catch (_e) { /* non-fatal */ } location.reload(); }}
-              style={{ padding: "0.6rem 1.6rem", background: "var(--gold, #e0c97f)", border: "1px solid var(--gold, #e0c97f)", color: "var(--bg, #1a1408)", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit", fontWeight: "bold" }}
-            >
-              Reset to Home
+            <button type="button" className="ui-btn vot-crash-home" style={{ marginTop: 10 }}
+              onClick={() => { try { sessionStorage.setItem(CRASH_RECOVER_KEY, '1'); } catch (_e) { /* non-fatal */ } location.reload(); }}>
+              <svg {...svg} className="ui-i"><path d="M4 11l8-7 8 7M6 10v10h12V10" /></svg>Go to the Read tab
             </button>
           )}
+          {looping && (
+            <p className="ui-empty-text" style={{ marginTop: 22 }}>
+              This screen keeps failing. Going to the Read tab does not affect your saved notes and data.
+            </p>
+          )}
         </div>
-        {looping && (
-          <p style={{ color: "var(--cream-muted, #8a7a55)", fontSize: "var(--fs-12)", maxWidth: "360px", margin: "1rem auto 0" }}>
-            This screen keeps failing. Use Reset to Home to return to the home screen — your saved notes and data are not affected.
-          </p>
-        )}
       </div>
     );
   }

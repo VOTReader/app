@@ -20,6 +20,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { OfflineLibrary } from '../../utils/offline-library.js';
+import { Notice } from './UiParts.jsx';
 
 /**
  * A strip under the top nav takes layout room while it shows: it declares body.offline-strip-open and its measured
@@ -96,24 +97,11 @@ export function OfflineLibraryBanner() {
   if (!view) return null;
 
   return (
-    <div className="sh-banner sh-banner-gold offline-library-banner" role="status" ref={ref}>
-      <div className="sh-banner-text">
-        <strong>{view.lead}</strong>{view.detail ? ' ' + view.detail : ''}
-      </div>
-      {(view.retry || view.close) && (
-        <div className="sh-banner-actions">
-          {view.retry && (
-            <button type="button" className="sh-banner-btn sh-banner-btn-primary" onClick={() => { OfflineLibrary.retry(); }}>
-              Retry
-            </button>
-          )}
-          {view.close && (
-            <button type="button" className="sh-banner-dismiss" onClick={() => OfflineLibrary.dismiss()} aria-label="Dismiss">
-              {'✕'}
-            </button>
-          )}
-        </div>
-      )}
+    // WS6 (mock sy-notices): the one notice style, Retry at its right, the x only while it can go.
+    <div className="sh-banner sh-banner-gold offline-library-banner" ref={ref}>
+      <Notice icon="dl" inline title={view.lead.replace(/\.$/, '')} text={view.detail}
+        actions={view.retry ? [{ label: 'Retry', onClick: () => { OfflineLibrary.retry(); }, className: 'sh-banner-btn sh-banner-btn-primary' }] : []}
+        onDismiss={view.close ? () => OfflineLibrary.dismiss() : undefined} />
     </div>
   );
 }

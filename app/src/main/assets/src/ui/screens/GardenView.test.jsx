@@ -157,7 +157,7 @@ describe('GardenView — image failure retry (Wave 0)', () => {
     setupGardenGlobals(mkPos());
     renderGarden({ page: 5 });
     failCurrentPage();
-    expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    expect(screen.getByText(/did not load/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
@@ -173,7 +173,7 @@ describe('GardenView — image failure retry (Wave 0)', () => {
     expect(globalThis.gardenImageCache['std:5']).toBeUndefined();
     const after = document.querySelector('.garden-page-img');
     expect(after).not.toBe(before); // remounted via key → fresh request for the same URL
-    expect(screen.queryByText(/Failed to load/)).toBeNull();
+    expect(screen.queryByText(/did not load/)).toBeNull();
     expect(screen.getByText('Loading page 5...')).toBeTruthy();
   });
 
@@ -183,12 +183,24 @@ describe('GardenView — image failure retry (Wave 0)', () => {
     failCurrentPage();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     failCurrentPage();
-    expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    expect(screen.getByText(/did not load/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 });
 
 describe('GardenView — accessible names (Wave 0)', () => {
+  it('the zoom buttons and full screen are named, and full screen has a way back (WS6, mock g-page)', () => {
+    setupGardenGlobals(mkPos());
+    renderGarden({ page: 5 });
+    screen.getByRole('button', { name: 'Zoom in' });
+    screen.getByRole('button', { name: 'Zoom out' });
+    expect(screen.getByRole('heading', { name: 'A Return to The Garden' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+    expect(document.querySelector('.garden-fullscreen.is-bare')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Leave full screen' }));
+    expect(document.querySelector('.garden-fullscreen.is-bare')).toBeNull();
+  });
+
   it('every icon-only button has an accessible name', () => {
     setupGardenGlobals(mkPos());
     renderGarden({ page: 5 });
@@ -207,7 +219,7 @@ describe('GardenView — accessible names (Wave 0)', () => {
   it('the jump-to-page number input is labeled', () => {
     setupGardenGlobals(mkPos());
     renderGarden({ page: 5 });
-    fireEvent.click(screen.getByRole('button', { name: '5 / 209: jump to a page' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Page 5 of 209: go to a page' }));
     expect(screen.getByRole('spinbutton', { name: 'Jump to page' })).toBeTruthy();
   });
 
@@ -216,7 +228,7 @@ describe('GardenView — accessible names (Wave 0)', () => {
     setupGardenGlobals(mkPos());
     const onPageChange = vi.fn();
     renderGarden({ page: 5, onPageChange });
-    const pill = screen.getByRole('button', { name: /^5 \/ 209/ });
+    const pill = screen.getByRole('button', { name: /^Page 5 of 209/ });
     expect(pill.querySelector('.garden-page-chevron')).toBeTruthy();
     fireEvent.click(pill);
     const field = screen.getByRole('spinbutton', { name: 'Jump to page' });
@@ -233,7 +245,7 @@ describe('GardenView — accessible names (Wave 0)', () => {
     setupGardenGlobals(mkPos());
     const onPageChange = vi.fn();
     renderGarden({ page: 5, onPageChange });
-    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Page 5 of 209/ }));
     const scrub = screen.getByRole('slider', { name: 'Page' });
     expect(scrub.value).toBe('5');
     expect(scrub.getAttribute('max')).toBe('209');
@@ -247,18 +259,18 @@ describe('GardenView — accessible names (Wave 0)', () => {
     expect(onPageChange).toHaveBeenCalledWith(150);
   });
 
-  it('the scrubber: Enter goes, a walk away closes', () => {
+  it('the scrubber: Enter goes; the sheet closes by its scrim (WS6: a labelled sheet, mock g-jump)', () => {
     setupGardenGlobals(mkPos());
     const onPageChange = vi.fn();
     renderGarden({ page: 5, onPageChange });
-    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Page 5 of 209/ }));
     let scrub = screen.getByRole('slider', { name: 'Page' });
     fireEvent.change(scrub, { target: { value: '42' } });
     fireEvent.keyDown(scrub, { key: 'Enter' });
     expect(onPageChange).toHaveBeenCalledWith(42);
-    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Page 5 of 209/ }));
     scrub = screen.getByRole('slider', { name: 'Page' });
-    fireEvent.blur(scrub, { relatedTarget: document.body });
+    fireEvent.click(document.querySelector('.select-sheet-backdrop'));
     expect(screen.queryByRole('slider', { name: 'Page' })).toBeNull();
   });
 });

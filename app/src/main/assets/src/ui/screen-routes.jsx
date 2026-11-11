@@ -68,6 +68,7 @@ import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
+import { openYourData } from '../utils/your-data-link.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1191,6 +1192,10 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
         onAbout={goAbout}
+        onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+        onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
+        onOpenGarden={() => handleVolumeSelect('garden')}
+        onOpenProgress={() => { setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('my-progress'); }}
       />
     ),
     'search': () => (
@@ -1253,6 +1258,11 @@ export function buildScreenRoutes({
           setScreen(first.screen);
         }}
         onBack={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
+        firstRun={!navOrigin && !AboutSeenFlagStore.is()}
+        /* WS4 settings (fr-2): "Show me around first" ends the welcome and starts the tour, whose first stop opens
+           its own place (as the Read tab's offer does). */
+        onTour={() => { AboutSeenFlagStore.set(); goHome(); TourController.start('prompt'); }}
+        onYourData={() => { openYourData(); goSettings(); }}
         onSearch={goSearch}
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}

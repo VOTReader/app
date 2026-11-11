@@ -69,11 +69,12 @@ describe('TourOverlay — dialog', () => {
     expect(dlg.contains(document.activeElement)).toBe(true);
   });
 
-  it('Skip and Back are on the card; Back is disabled on the welcome card; the primary says Start', () => {
+  // WS5 tour (tr-welcome): the welcome card says Not now | Start, with no Back and no Skip tour.
+  it('the welcome card leaves by Not now, has no Back, and the primary says Start', () => {
     startAt('welcome');
     render(<TourOverlay />);
-    expect(screen.getByRole('button', { name: /leave the tour/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /previous stop/i }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: /leave the tour/i }).textContent).toBe('Not now');
+    expect(screen.queryByRole('button', { name: /previous stop/i })).toBeNull();
     expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy();
   });
 
@@ -185,7 +186,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
   it('a target past the bottom edge: the card is clamped inside the viewport, Skip and Next reachable', () => {
     // The Export button, the stop that found this on a 699 px phone (Listen stops dock now, so the
     // clamp is exercised on a beside-the-ring stop).
-    document.body.innerHTML = '<div id="app"><div data-settings-group="data"><button>Export</button></div></div>';
+    document.body.innerHTML = '<div id="app"><div data-settings-group="data"><button>Back up now</button></div></div>';
     const pill = document.querySelector('[data-settings-group="data"] button');
     pill.getBoundingClientRect = rect(60, vh() + 120, 94, 25);      // below the fold, as Export was
     startAt('backup');
@@ -262,7 +263,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     // arrival (a Settings group finishing its mount, emulator at 1.8, 2026-09-04): the target leaves
     // the screen while scrollTop has not moved. A reader's scroll moves scrollTop; that is left alone.
     vi.useFakeTimers();
-    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><div data-settings-group="data"><button>Export</button></div></div></div>';
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><div data-settings-group="data"><button>Back up now</button></div></div></div>';
     const scroller = /** @type {any} */ (document.querySelector('.screen-scroll'));
     Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
     Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
@@ -292,11 +293,11 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     document.body.innerHTML = '<div id="app"><button class="hero-play-pill">Listen</button></div>';
     startAt('listen');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(TourController.getState().step.id).toBe('listen');
     expect(screen.getByText(/light up/i)).toBeTruthy();
     expect(screen.queryByText(/press Next and I will do it/i)).toBeNull();
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(TourController.getState().step.id).toBe('highlight');
   });
 });
@@ -614,7 +615,7 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     expect(parseFloat(card.style.bottom)).toBe(12);
     // Before the demonstration the paragraph is still ringed; the ring goes once the colour is on.
     expect(document.querySelector('.tour-ring')).toBeTruthy();
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(document.querySelector('.tour-ring')).toBeNull();
     expect(document.querySelectorAll('.tour-dim').length).toBe(4);
   });
@@ -625,7 +626,7 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     expect(on.classList.contains('hl-mark')).toBe(false);
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(TourController.getState().step.id).toBe('highlight');
     expect(on.classList.contains('hl-mark')).toBe(true);
     expect(on.classList.contains('hl-yellow')).toBe(true);
@@ -641,9 +642,9 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     const before = annCount();
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(on.classList.contains('hl-mark')).toBe(true);
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(TourController.getState().step.id).toBe('scripture-web');
     expect(on.classList.contains('hl-mark')).toBe(false);
     expect(on.classList.contains('hl-yellow')).toBe(false);
@@ -658,14 +659,14 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     expect(screen.getByRole('button', { name: /^Back\b/ }).textContent).toBe('Back');
-    expect(screen.getByRole('button', { name: /^Skip\b/ }).textContent).toBe('Skip');
+    expect(screen.getByRole('button', { name: /^Skip\b/ }).textContent).toBe('Skip tour');
   });
 
   it('Back takes the colour with it too', () => {
     const { on } = letterWithParas();
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(on.classList.contains('hl-mark')).toBe(true);
     fireEvent.click(screen.getByText('Back'));
     expect(TourController.getState().step.id).toBe('listen');
@@ -677,9 +678,9 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     const before = annCount();
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(on.classList.contains('hl-mark')).toBe(true);
-    fireEvent.click(screen.getByText('Skip'));
+    fireEvent.click(screen.getByText('Skip tour'));
     expect(TourController.getState().active).toBe(false);
     expect(on.classList.contains('hl-mark')).toBe(false);
     expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);
@@ -713,8 +714,8 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     const before = annCount();
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));            // paint
-    fireEvent.click(screen.getByText('Next'));            // on to the Bible stop
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));            // paint
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));            // on to the Bible stop
     for (let i = 0; i < 13 && TourController.getState().active; i++) TourController.targetPressed();
     expect(TourController.getState().active).toBe(false);
     expect(annCount()).toBe(before);
@@ -745,7 +746,7 @@ describe('TourOverlay — the demonstration leaves by every door', () => {
     const before = annCount();
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(on.classList.contains('hl-mark')).toBe(true);
     act(() => { modalRegistry.peek().dismiss(); });
     expect(TourController.getState().active).toBe(false);
@@ -761,7 +762,7 @@ describe('TourOverlay — the demonstration leaves by every door', () => {
     const before = annCount();
     startAt('highlight');
     const r = render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(on.classList.contains('hl-mark')).toBe(true);
     r.unmount();
     expect(on.classList.contains('hl-mark')).toBe(false);

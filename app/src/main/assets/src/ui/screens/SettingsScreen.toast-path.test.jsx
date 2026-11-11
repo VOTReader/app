@@ -14,7 +14,7 @@ afterEach(() => { cleanup(); teardownSettingsGlobals(); });
 
 describe('the write-failure toast names the Settings path the screen really has', () => {
   it('Settings → <group> → <button>: the group label and its button both exist', () => {
-    const m = /Settings → ([^→]+?) → ([A-Za-z]+)/.exec(WRITE_FAIL_TOAST_TEXT);
+    const m = /Settings → ([^→]+?) → ([A-Za-z ]+?)\./.exec(WRITE_FAIL_TOAST_TEXT);
     expect(m, 'the toast names a Settings path').toBeTruthy();
     const [, group, button] = m;
     renderSettings();

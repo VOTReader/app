@@ -78,7 +78,7 @@ describe('settings writers outside the hook record touched', () => {
     expect(seen.gardenTier).toBe('standard');
     expect(seen.touched).toEqual({});
 
-    fireEvent.click(screen.getByRole('button', { name: /^Native/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Native/ }));
     expect(seen.gardenTier).toBe('native');            // the control: the click landed
     expect(seen.touched.gardenTier).toBe(true);         // the claim
   });

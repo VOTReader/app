@@ -100,6 +100,9 @@ async function stripGeometry(page, note) {
   await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]));
   const g = await page.evaluate(() => {
     const p = document.querySelector('.tour-prompt'); if (!p) return null;
+    // The offer is a card at the END of the Read tab (U section 4, the UI pass), in the page's flow: a reader scrolls
+    // down to it, so the walk does too before it asks whether the card and its x sit inside the frame.
+    p.scrollIntoView({ block: 'end' });
     const r = p.getBoundingClientRect();
     const never = p.querySelector('.tour-never'); const nr = never ? never.getBoundingClientRect() : null;
     const row = p.querySelector('.tour-row');
@@ -279,7 +282,7 @@ async function run(browser, { width, height, label, light }) {
     // usePersistedState writes it. Until 2026-09-04 this wrote StateStore directly, and the next
     // effect tick from the hook wrote the old settings back: every "1.8" walk here had run at 1
     // (the var read 1.8 for 400 ms, then hydration and the hook put 1 back). The stops re-check.
-    await clickLabel('App Configuration'); await sleep(500);
+    await clickLabel('Settings'); await sleep(500);
     await page.evaluate(() => { const head = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent)); if (head && head.getAttribute('aria-expanded') !== 'true') head.click(); });
     await sleep(400);
     const slid = await page.evaluate((sc) => {
@@ -327,9 +330,8 @@ async function run(browser, { width, height, label, light }) {
   f = await facts();
   if (f.prompt || !f.tourDone) fail("Don't show this again did not survive a reload"); else ok("Don't show this again is durable");
 
-  // Start from Settings › Help.
-  await clickLabel('App Configuration'); await sleep(500);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); h && h.click(); });
+  // Start from the Settings root: Show me around is a row of its own there (WS2 settings, st-root).
+  await clickLabel('Settings'); await sleep(500);
   await sleep(400);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
@@ -340,7 +342,8 @@ async function run(browser, { width, height, label, light }) {
     if (f.step !== id) { fail(`expected stop ${id}, the tour is at ${f.step} (${f.title})`); break; }
     if (!f.dialog || !f.labelled) fail(`${id}: the card is not a labelled modal dialog`);
     if (!f.skip) fail(`${id}: Skip is not on the card`);
-    if (f.back !== (id === 'welcome' ? 'disabled' : 'enabled')) fail(`${id}: Back is ${f.back}`);
+    // WS5 tour (tr-welcome, mock settings.html): the welcome card has Not now | Start and no Back; every stop after it has Back.
+    if (f.back !== (id === 'welcome' ? 'missing' : 'enabled')) fail(`${id}: Back is ${f.back}`);
     /* Focus lives in the card — or, on a stop that opens with the listening sheet up (back-to-words:
        the sheet the player stop opened), in the sheet, whose own trap is the topmost: the card's ‹
        words point INTO the sheet, and Escape or ‹ closes it and hands focus back (asserted below). */
@@ -549,8 +552,7 @@ async function run(browser, { width, height, label, light }) {
   else ok('the strip stays away');
 
   // Escape means Skip (through the registry), from a fresh start.
-  await clickLabel('App Configuration'); await sleep(400);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); });
+  await clickLabel('Settings'); await sleep(400);
   await sleep(300);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
@@ -564,8 +566,7 @@ async function run(browser, { width, height, label, light }) {
      saves nothing; a reader who leaves while the colour is on the page is the other half, and
      it is the half where an undo would have to run. Skip, not Escape, because Skip is the
      button on the card and Escape is already covered above. */
-  await clickLabel('App Configuration'); await sleep(400);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); });
+  await clickLabel('Settings'); await sleep(400);
   await sleep(300);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });

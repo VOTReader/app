@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════
    ES module. Bundled into bundle-b via _entry-b.js.
 
-   Two storage numbers are surfaced in Settings → Your Data:
+   Two storage numbers are surfaced in Settings → Your data:
 
      1. TOTAL APP DATA — navigator.storage.estimate().usage (via
         StorageHealth / useStorageInfo). This is what the OS shows under

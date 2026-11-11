@@ -60,15 +60,15 @@ const MANIFEST = {
 let votbak;
 
 const btn = (text) => [...document.querySelectorAll('button')]
-  .find((b) => (b.textContent || '').trim() === text);
+  .find((b) => (b.getAttribute('aria-label') || b.textContent || '').trim() === text);
 
 /** Open the type-DELETE dialog and confirm it — the cheapest path that
  *  schedules a reload (clearAllPersonalData, SettingsScreen.jsx:1750). */
 async function wipeEverything() {
-  await act(async () => { btn('Clear All My Data').click(); });
+  await act(async () => { btn('Delete all my data').click(); });
   const input = screen.getByLabelText('Type DELETE to confirm');
   await act(async () => { fireEvent.change(input, { target: { value: 'DELETE' } }); });
-  await act(async () => { btn('Delete Everything').click(); });
+  await act(async () => { btn('Delete everything').click(); });
   // let the async operation settle so the reload is actually scheduled
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 }
@@ -171,9 +171,9 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
       }),
     });
     const { unmount } = renderSettings();
-    await act(async () => { btn('Import').click(); });
+    await act(async () => { btn('Restore from a backup').click(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    const confirm = btn('Import & Overwrite');
+    const confirm = btn('Restore and overwrite');
     expect(confirm, 'the import confirm sheet did not open — this case measured nothing').toBeTruthy();
     await act(async () => { confirm.click(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });

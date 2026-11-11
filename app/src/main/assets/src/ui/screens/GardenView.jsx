@@ -3,6 +3,12 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useNoAudioHere } from '../components/AudioPlayerBar.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { EmptyState, UiButton } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+
+/** The − and + buttons (WS6, mock g-page): one step of zoom about the picture's centre. */
+const ZOOM_STEP = 1.5;
 
 export const GARDEN_PRELOAD_AHEAD = 5; // default; the EFFECTIVE per-tier value is gardenTierLimits(tier).ahead (PERF-2)
 export const GARDEN_CRAWL_DELAY = 500;
@@ -215,11 +221,11 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     setRetryTick((t) => t + 1);
   };
 
-  /** The jump form closes when focus walks out of it; Go, the number and the scrubber are all inside. */
-  const closeIfLeaving = (/** @type {any} */ e) => {
-    if (e.currentTarget.form && e.currentTarget.form.contains(/** @type {Node} */ (e.relatedTarget))) return;
-    setJumpMode(false);setJumpInput("");
-  };
+  // WS6 (mock g-jump): "Go to a page" is a labelled sheet; it opens on this page and closes by Go, its x, Back or the scrim.
+  const openJump = () => { setJumpInput(String(page)); setJumpMode(true); };
+  const closeJump = React.useCallback(() => { setJumpMode(false); setJumpInput(""); }, []);
+  // Full screen (mock g-page): the bars step aside for the picture; one small button brings them back.
+  const [bare, setBare] = React.useState(false);
 
   const handleJump = () => {
     const n = parseInt(jumpInput, 10);
@@ -417,72 +423,48 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     };
   }, [applyZoom, clampZoom]);
 
+  // The − and + buttons: the pinch's own zoom, about the centre, in steps.
+  const zoomBy = (/** @type {number} */ f) => {
+    const z = zoomState.current;
+    const ns = Math.max(1, Math.min(MAX_ZOOM, z.scale * f));
+    if (ns === z.scale) return;
+    z.tx *= ns / z.scale; z.ty *= ns / z.scale; z.scale = ns < 1.02 ? 1 : ns;
+    clampZoom();
+    applyZoom();
+  };
+  const failed = loading && error;
+  const scrubValue = jumpInput === "" ? page : Math.min(GARDEN_TOTAL, Math.max(1, parseInt(jumpInput, 10) || page));
+
   return (
     /* NOT LibraryNav (documented exception): this is the one screen that bypasses
-       ScreenLayout entirely — its own immersive .garden-top-bar chrome, not a
-       .top-nav. Adopting the shared nav would be a rewrite, not a consolidation. */
-    <div className="garden-fullscreen">
+       ScreenLayout entirely: its own immersive bars over a black page (WS6, mock g-page:
+       a titled bar with full screen; the page pill, previous and next, − and + below). */
+    <div className={"garden-fullscreen" + (bare ? " is-bare" : "")}>
       <div className="garden-top-bar">
         <button className="garden-back-btn" onClick={onBack} title="Back" aria-label="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+          <UiIcon name="back" />
         </button>
-        {jumpMode ? (
-          <form className="garden-jump-form" onSubmit={(e) => {e.preventDefault();handleJump();}}>
-            <input
-              ref={jumpRef}
-              type="number"
-              min="1"
-              max={GARDEN_TOTAL}
-              className="garden-jump-input"
-              value={jumpInput}
-              onChange={(e) => setJumpInput(e.target.value)}
-              onKeyDown={(e) => {if (e.key === "Escape") {e.stopPropagation();setJumpMode(false);setJumpInput("");}}}
-              onBlur={closeIfLeaving}
-              placeholder={`1–${GARDEN_TOTAL}`}
-              aria-label="Jump to page"
-            />
-            <span className="garden-jump-hint">/ {GARDEN_TOTAL}</span>
-            <button type="submit" className="garden-jump-go">Go</button>
-            {/* The scrubber (10-22 sweep, Discovery views 2): drag across the 209 pages and the number follows;
-                Go goes there, so a drag fetches no page on the way. */}
-            <input type="range" className="garden-jump-scrub" min="1" max={GARDEN_TOTAL} step="1"
-              value={jumpInput === "" ? page : Math.min(GARDEN_TOTAL, Math.max(1, parseInt(jumpInput, 10) || page))}
-              onChange={(e) => setJumpInput(e.target.value)}
-              onKeyDown={(e) => {if (e.key === "Enter") {e.preventDefault();handleJump();} else if (e.key === "Escape") {e.stopPropagation();setJumpMode(false);setJumpInput("");}}}
-              onBlur={closeIfLeaving}
-              aria-label="Page" aria-valuetext={`Page ${jumpInput || page} of ${GARDEN_TOTAL}`} />
-          </form>
-        ) : (
-          // a pill with a chevron, so the counter reads as the way to another page (ideas audit A10.2)
-          <button className="garden-page-counter" onClick={() => setJumpMode(true)}
-            aria-label={`${page} / ${GARDEN_TOTAL}: jump to a page`}>
-            {page} / {GARDEN_TOTAL}
-            <svg className="garden-page-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        )}
+        <h1 className="garden-title">A Return to The Garden</h1>
+        <button className="garden-back-btn garden-full-btn" onClick={() => setBare(true)} title="Full screen" aria-label="Full screen">
+          <UiIcon name="full" />
+        </button>
       </div>
+      {bare ? (
+        <button className="garden-unbare-btn" onClick={() => setBare(false)} title="Leave full screen" aria-label="Leave full screen">
+          <UiIcon name="full" size="sm" />
+        </button>
+      ) : null}
 
       <div className="garden-image-area" ref={imgAreaRef}>
         {loading && (
           <div className="garden-loading">
             {error ? (
-              // Error surface mirrors the StudiesHome lazy-corpus convention:
-              // human copy + a pill "Try again" — never a dead-end.
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "var(--fs-14)" }}>
-                {/* U09.6: offline, say why (a page not seen before is not on the phone), not just "failed". */}
-                <div role="alert">{typeof navigator !== "undefined" && navigator.onLine === false
-                  ? "No connection. This page isn\u2019t on your phone yet: the pictures you have seen stay here."
-                  : "Failed to load — check your connection"}</div>
-                <button type="button" onClick={retryImage} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
-              </div>
+              // WS6 (mock g-fail): the one failed-page state, an empty state with Try again; the bars stay.
+              <EmptyState icon="img" title={`Page ${page} did not load`}
+                text="Check your connection. Pages you have already seen stay on this phone."
+                action={{ label: "Try again", onClick: retryImage }} />
             ) : (
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "var(--fs-14)" }}>
-                {`Loading page ${page}...`}
-              </div>
+              <div className="garden-loading-text">{`Loading page ${page}...`}</div>
             )}
           </div>
         )}
@@ -499,17 +481,56 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
       </div>
 
       <div className="garden-bottom-bar">
-        <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1} title="Previous page" aria-label="Previous page">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL} title="Next page" aria-label="Next page">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <polyline points="9 6 15 12 9 18" />
-          </svg>
-        </button>
+        <div className="garden-ctl">
+          <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1} title="Previous page" aria-label="Previous page">
+            <UiIcon name="prev" />
+          </button>
+          <button className="garden-page-counter" onClick={openJump} aria-label={`Page ${page} of ${GARDEN_TOTAL}: go to a page`}>
+            {`Page ${page} of ${GARDEN_TOTAL}`}
+            <UiIcon name="down" size="sm" className="garden-page-chevron" />
+          </button>
+          <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL} title="Next page" aria-label="Next page">
+            <UiIcon name="next" />
+          </button>
+          <span className="garden-ctl-gap" />
+          <button className="garden-arrow-btn" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={failed} title="Zoom out" aria-label="Zoom out">
+            <UiIcon name="minus" />
+          </button>
+          <button className="garden-arrow-btn" onClick={() => zoomBy(ZOOM_STEP)} disabled={failed} title="Zoom in" aria-label="Zoom in">
+            <UiIcon name="plus" />
+          </button>
+        </div>
       </div>
+
+      <ActionSheet open={jumpMode} onClose={closeJump} title="Go to a page" className="garden-jump-sheet">
+        <form className="garden-jump-form" onSubmit={(e) => {e.preventDefault();handleJump();}}>
+          <div className="garden-jump-row">
+            <label className="ui-field is-square garden-jump-field">
+              <input
+                ref={jumpRef}
+                type="number"
+                min="1"
+                max={GARDEN_TOTAL}
+                className="garden-jump-input"
+                value={jumpInput}
+                onChange={(e) => setJumpInput(e.target.value)}
+                placeholder={String(page)}
+                aria-label="Jump to page"
+              />
+              <span className="garden-jump-hint">of {GARDEN_TOTAL}</span>
+            </label>
+            <UiButton kind="primary" type="submit" className="garden-jump-go">Go</UiButton>
+          </div>
+          {/* The scrubber (10-22 sweep, Discovery views 2): drag across the 209 pages and the number follows;
+              Go goes there, so a drag fetches no page on the way. */}
+          <input type="range" className="garden-jump-scrub" min="1" max={GARDEN_TOTAL} step="1"
+            value={scrubValue}
+            onChange={(e) => setJumpInput(e.target.value)}
+            onKeyDown={(e) => {if (e.key === "Enter") {e.preventDefault();handleJump();}}}
+            aria-label="Page" aria-valuetext={`Page ${scrubValue} of ${GARDEN_TOTAL}`} />
+          <div className="garden-jump-ends" aria-hidden="true"><span>1</span><span>Drag to flip through</span><span>{GARDEN_TOTAL}</span></div>
+        </form>
+      </ActionSheet>
     </div>
   );
 }

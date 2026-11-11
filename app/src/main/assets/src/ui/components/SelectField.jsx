@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ListRow, UiButton } from './UiParts.jsx';
+import { useSettingsFind } from './settings-find.jsx';
 
 /* Options are { id, label, desc? } plus optional presentation fields
    added for the Reading Font picker (2026-07-31), ignored elsewhere:
@@ -12,40 +13,48 @@ import { ListRow, UiButton } from './UiParts.jsx';
    - group: a heading drawn above the first option of each run (A09.4);
    - sample / sampleStyle: a sample line under the description, in its own style (A09.4).
    `valueStyle` does the same for the closed row's current-value span. */
-export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null, valueLabel = null }) {
+export function SelectField({ eyebrow, title, label, desc, line = null, value, options, onChange, valueStyle = null, valueLabel = null,
+  find = '', moreTitle = null, moreLabel = null, sheetSub = null, sheetFoot = null, sheetTop = null }) {
   const [open, setOpen] = React.useState(false);
-  const [showDesc, setShowDesc] = React.useState(false);
+  // WS1 settings (st-restored): a long description (a node, not a sentence) waits behind "More" under its one plain line.
+  // WS2 settings (st-restored): with a moreTitle, More opens it as a readable page in a sheet of its own.
+  const long = desc != null && typeof desc !== 'string';
+  const [more, setMore] = React.useState(false);
   const fieldId = React.useId();
   const sheetId = `select-sheet-${fieldId}`;
   const descId = `select-desc-${fieldId}`;
   const selected = options.find((o) => o.id === value) || options[0];
   // valueLabel: the closed row may say more than the option's own label (U09.2: "WEB · NKJV until it downloads").
   const shown = valueLabel || selected.label;
+  // WS2 settings (st-find): the row is found by its name, its line, its options' names and its synonyms.
+  const f = useSettingsFind([label, typeof desc === 'string' ? desc : '', line || '', find, ...options.map((o) => o.label)].join(' '));
+  if (!f.show) return null;
 
+  // WS1 settings (U 8.7): name, its plain line always shown (no "i" to open), then the value and a chevron.
   return (
-    <div className="settings-row">
+    <div className="settings-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-label">{label}</span>
-        {desc && (
-          <button
-            type="button"
-            className="settings-info-btn"
-            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
-            aria-expanded={showDesc}
-            aria-controls={showDesc ? descId : undefined}
-            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
-          >i</button>
-        )}
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          {f.place ? <span className="ws2-place">{f.place}</span> : null}
+          <span className="settings-row-label">{label}</span>
+          {desc && !long && <span className="settings-row-desc" id={descId}>{desc}</span>}
+          {long && line ? <span className="settings-row-desc" id={descId}>{line}</span> : null}
+          {long ? <button type="button" className="ws1-more" aria-expanded={more} aria-haspopup={moreTitle ? 'dialog' : undefined} onClick={() => setMore((v) => !v)}>{more && !moreTitle ? 'Less' : 'More'}</button> : null}
+        </span>
         <button type="button" className="settings-select-trigger" aria-label={label + ': ' + shown} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? sheetId : undefined}
-          aria-describedby={showDesc && desc ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+          aria-describedby={desc && (!long || line) ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{shown}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>
       </div>
-      {showDesc && desc && <div className="settings-row-desc" id={descId}>{desc}</div>}
+      {long && more && !moreTitle ? <div className="settings-row-desc ws1-more-body">{desc}</div> : null}
+      {long && moreTitle ? (
+        <ActionSheet open={more} onClose={() => setMore(false)} title={moreTitle} label={moreLabel} className="ws2-more-sheet" cancelLabel="Close">
+          <div className="ws2-more-page">{desc}</div>
+        </ActionSheet>
+      ) : null}
       <SelectSheet id={sheetId} open={open} onClose={() => setOpen(false)} eyebrow={eyebrow} title={title || label}
-        value={value} options={options} onChange={onChange} />
+        value={value} options={options} onChange={onChange} sub={sheetSub} top={sheetTop}>{sheetFoot}</SelectSheet>
     </div>
   );
 }
@@ -56,9 +65,9 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
    Renders nothing while closed; picking an option calls onChange, then
    onClose. `portal` moves it to <body> for callers inside the top bar. */
 /** @param {{ id?: string, open: boolean, onClose: () => void, eyebrow?: string, title: string, value: string,
-     options: any[], onChange: (v: string) => void, portal?: boolean, note?: string }} props
+     options: any[], onChange: (v: string) => void, portal?: boolean, note?: string, sub?: any, top?: any, children?: any }} props
    `note`: one muted line under the options (listen.html au-voicepref: "Your pick is used wherever that reading exists."). */
-export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false, note = '' }) {
+export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false, note = '', sub = null, top = null, children = null }) {
   const ownId = React.useId();
   const sheetId = id || `select-sheet-${ownId}`;
   const titleId = `select-sheet-title-${ownId}`;
@@ -94,6 +103,9 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
         <SheetHandle onClose={onClose} />
         {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
         <div className="select-sheet-title" id={titleId}>{title}</div>
+        {/* WS2 settings (st-quality, st-font): a plain line under the title, and one preview above the options. */}
+        {sub ? <div className="ui-sheet-sub ws2-sheet-sub">{sub}</div> : null}
+        {top}
         <div className="select-sheet-options" role="radiogroup" aria-labelledby={titleId} onKeyDown={moveFocus}>
           {options.map((opt, i) => {
             const isSelected = opt.id === value;
@@ -105,7 +117,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
               {heading}
               <button
                 type="button"
-                className={`select-sheet-option${isSelected ? " selected" : ""}${opt.code ? " has-code" : ""}`}
+                className={`select-sheet-option${isSelected ? " selected" : ""}${opt.code ? " has-code" : ""}${opt.lead ? " has-lead" : ""}`}
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => { onChange(opt.id); onClose(); }}
@@ -113,6 +125,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                 {/* r-trans (W2h): an option may lead with a short code ("NKJV") in its own column */}
                 {opt.code ? <span className="select-sheet-option-code">{opt.code}</span> : null}
                 <div className="select-sheet-option-main">
+                  {opt.lead ? <span className="ws2-opt-lead" aria-hidden="true">{opt.lead}</span> : null}
                   <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
                   {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
                   {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
@@ -126,6 +139,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
           })}
         </div>
         {note ? <p className="select-sheet-note">{note}</p> : null}
+        {children ? <div className="ws2-sheet-foot">{children}</div> : null}
       </div>
     </>
   );

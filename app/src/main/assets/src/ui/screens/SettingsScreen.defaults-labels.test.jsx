@@ -5,7 +5,7 @@
    sent here by the tour ("the Surprise Me button on Home") would not find it. And "Reading Position
    Dot — a pulsing gold dot" describes the marker's shape, which the resume-icon branch changes to a
    bookmark ribbon; the row now names what it DOES and fits both. The Find box must still reach the
-   marker row by its new word. */
+   marker row by its new word. WS2 settings (U 8.7): the names are sentence case now. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, screen } from '@testing-library/react';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings, row, rowLabels } from './settings-harness.jsx';
@@ -14,41 +14,40 @@ beforeEach(() => { setupSettingsGlobals(); });
 afterEach(() => { cleanup(); teardownSettingsGlobals(); });
 
 describe('SettingsScreen — the dice and the reading marker rows carry their on-screen names', () => {
-  it('the dice row is "Surprise Me Button", the name the Home button shows; "Random Letter Button" is gone', () => {
+  it('the dice row is "Surprise me button", the name the Home button shows; "Random Letter Button" is gone', () => {
     renderSettings();
-    expect(row('Surprise Me Button')).toBeTruthy();
+    expect(row('Surprise me button')).toBeTruthy();
     expect(rowLabels()).not.toContain('Random Letter Button');
   });
 
-  it('the marker row is "Reading Position Marker" and says what it does, not what shape it is', () => {
+  it('the marker row is "Reading position marker" and says what it does, not what shape it is', () => {
     renderSettings();
-    const r = row('Reading Position Marker');
+    const r = row('Reading position marker');
     expect(r).toBeTruthy();
     expect(rowLabels()).not.toContain('Reading Position Dot');
-    fireEvent.click(r.querySelector('.settings-info-btn'));
     const desc = r.querySelector('.settings-row-desc').textContent;
-    expect(desc).toMatch(/where you left off reading/);
+    expect(desc).toMatch(/where you left off/);
     expect(desc).toMatch(/top bar/);
     expect(desc).not.toMatch(/\bdot\b/i);
   });
 
   /* search200 UX D7: the row said the marker "follows you the moment you open any chapter or letter", but one
-     opened from a search is a look and moves nothing until the reader reads it: their own scroll on the page,
-     or a stay of 8 seconds (utils/search-visit.js SEARCH_LOOK_MS). */
-  it('D7: the marker row says a place opened from a search counts once you read it, by your scroll or 8 seconds', () => {
+     opened from a search is a look and moves nothing until the reader reads it (utils/search-visit.js
+     SEARCH_LOOK_MS). */
+  it('D7: the marker row no longer promises it follows the moment you open a page', () => {
     renderSettings();
-    const r = row('Reading Position Marker');
-    fireEvent.click(r.querySelector('.settings-info-btn'));
+    const r = row('Reading position marker');
     const desc = r.querySelector('.settings-row-desc').textContent;
     expect(desc).not.toMatch(/the moment you open/);
-    expect(desc).toMatch(/search/);
-    expect(desc).toMatch(/scroll/);
-    expect(desc).toMatch(/8 seconds/);
+    // WS2 settings: the row carries the design's short line (U 8.7)
+    expect(desc).toBe('Shows where you left off, in the top bar. Tap it to go back.');
   });
 
-  it('typing "marker" into Find settings still reaches the row', () => {
+  it('typing "marker" into Find settings still reaches the row, with its place', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'marker' } });
-    expect(row('Reading Position Marker')).toBeTruthy();
+    const r = row('Reading position marker');
+    expect(r).toBeTruthy();
+    expect(r.querySelector('.ws2-place').textContent).toBe('Reading · Your place');
   });
 });

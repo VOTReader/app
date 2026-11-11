@@ -20,17 +20,15 @@ const OPTIONS = [
   { id: 'b', label: 'Beta', desc: 'second option' },
 ];
 
-describe('SelectField — ⓘ description', () => {
-  it('reveals and hides a plain string desc on ⓘ taps', () => {
+// WS1 settings (U 8.7): the row's plain line is always shown, with no "i" button.
+describe('SelectField — description', () => {
+  it('shows a plain string desc under the name', () => {
     render(<SelectField eyebrow="Test" title="Row" label="Row" desc="plain string desc" value="a" options={OPTIONS} onChange={() => {}} />);
-    expect(screen.queryByText('plain string desc')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description for Row'));
     expect(screen.getByText('plain string desc')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description for Row'));
-    expect(screen.queryByText('plain string desc')).toBeNull();
+    expect(screen.queryByLabelText('Show description for Row')).toBeNull();
   });
 
-  it('renders a React-node desc (paragraphs + list) behind the same toggle', () => {
+  it('renders a React-node desc (paragraphs + list)', () => {
     const node = (
       <>
         lead sentence
@@ -38,13 +36,12 @@ describe('SelectField — ⓘ description', () => {
         <ul><li>rule one</li><li>rule two</li></ul>
       </>
     );
-    render(<SelectField eyebrow="Test" title="Row" label="Row" desc={node} value="a" options={OPTIONS} onChange={() => {}} />);
+    render(<SelectField eyebrow="Test" title="Row" label="Row" desc={node} line="one plain line" value="a" options={OPTIONS} onChange={() => {}} />);
+    expect(screen.getByText('one plain line')).toBeTruthy();
     expect(screen.queryByText(/AI assistance/)).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description for Row'));
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByText(/AI assistance/)).toBeTruthy();
     expect(screen.getByText('rule one')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description for Row'));
-    expect(screen.queryByText(/AI assistance/)).toBeNull();
   });
 });
 
@@ -99,17 +96,12 @@ describe('SelectField radio group keys and links (s15.4, s15.9)', () => {
     expect(document.activeElement).toBe(beta);
   });
 
-  it('the trigger controls the sheet only while it is open, and a shown description describes it', () => {
+  it('the trigger controls the sheet only while it is open, and the description describes it', () => {
     const { container } = render(<SelectField eyebrow="Test" title="Choose" label="Row" desc="what it does" value="a" options={OPTIONS} onChange={() => {}} />);
     const trigger = /** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger'));
     expect(trigger.hasAttribute('aria-controls')).toBe(false);
-    expect(trigger.hasAttribute('aria-describedby')).toBe(false);
-    const info = screen.getByLabelText('Show description for Row');
-    expect(info.hasAttribute('aria-controls')).toBe(false);
-    fireEvent.click(info);
     const descId = trigger.getAttribute('aria-describedby');
     expect(document.getElementById(descId).textContent).toBe('what it does');
-    expect(screen.getByLabelText('Hide description for Row').getAttribute('aria-controls')).toBe(descId);
     fireEvent.click(trigger);
     expect(document.getElementById(trigger.getAttribute('aria-controls'))).toBeTruthy();
   });

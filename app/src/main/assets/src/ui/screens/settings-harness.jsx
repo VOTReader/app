@@ -26,7 +26,7 @@
    is what lets it live outside the test-file glob. Callers pass their own
    spies as props to renderSettings. */
 
-import { render, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { SettingsScreen } from './SettingsScreen.jsx';
 import { SettingsRow } from '../components/SettingsRow.jsx';
 import { SelectField } from '../components/SelectField.jsx';
@@ -103,8 +103,11 @@ export function setupSettingsGlobals(overrides = {}) {
   put('readingFontById', readingFontById);
 
   // Chrome the screen renders around its cards.
-  put('ScreenLayout', ({ children, navChildren }) => (
-    <div data-testid="screen-layout">{navChildren}{children}</div>
+  // WS1 settings: the utility bar's Back is the one control the screens need from it (each group is a screen).
+  put('ScreenLayout', ({ children, navChildren, utility }) => (
+    <div data-testid="screen-layout">{navChildren}
+      {utility && utility.onBack ? <button type="button" aria-label={utility.backLabel || 'Back'} onClick={utility.onBack} /> : null}
+      {children}</div>
   ));
   put('HomeBtn', () => null);
   put('ThemeBtn', () => null);
@@ -229,12 +232,9 @@ export const groupRowLabels = (label) => {
     : [];
 };
 
-/** Open every collapsed group (the redesign mounts group bodies lazily). */
-function expandAllGroups() {
-  for (const head of groupHeads()) {
-    if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
-  }
-}
+/** Every group id. WS1 settings (2026-11-11): each group is its own screen, so "all open" is the screen
+ * mounted with every group open at once (initialGroups), not a click on each root row. */
+export const ALL_GROUPS = ['appearance', 'reading', 'listening', 'autoscroll', 'features', 'share', 'garden', 'data', 'progress', 'help'];
 
 /**
  * Mount SettingsScreen with `settings` merged over sane defaults. Pass
@@ -259,10 +259,10 @@ export function renderSettings(settings = {}, props = {}, { expandGroups = true 
       onClearAll={() => {}}
       onClearHistory={() => {}}
       historyCount={0}
+      initialGroups={expandGroups ? ALL_GROUPS : null}
       {...props}
     />
   );
-  if (expandGroups) expandAllGroups();
   return result;
 }
 

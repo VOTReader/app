@@ -28,7 +28,7 @@ import { BIBLE_AUDIO_EDITIONS } from '../../utils/audio-track.js';
 /** Open the Bible Audio sheet and return every option's label, in order. */
 async function optionLabels() {
   const trigger = [...document.querySelectorAll('.settings-select-trigger')]
-    .find((b) => (b.getAttribute('aria-label') || '').indexOf('Bible Audio: ') === 0);
+    .find((b) => (b.getAttribute('aria-label') || '').indexOf('Bible audio: ') === 0);
   expect(trigger, 'the Bible Audio field must be on screen — nothing below is about it otherwise').toBeTruthy();
   await act(async () => { trigger.click(); });
   const sheet = [...document.querySelectorAll('.select-sheet')].pop();

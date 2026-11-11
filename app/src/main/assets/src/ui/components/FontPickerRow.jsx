@@ -27,8 +27,6 @@ export function FontPickerRow({ value, onSelect }) {
     group,
     // 'classic' has no family — the system serif IS its own preview.
     labelStyle: { fontFamily: def.css || 'serif', fontSize: 'var(--fs-18)', letterSpacing: 0 },
-    sample: FONT_SAMPLE,
-    sampleStyle: { fontFamily: def.css || 'serif' },
   });
   const options = [
     ...READING_FONTS.filter((def) => def.easy).map((def) => toOption(def, 'Easy to read')),
@@ -37,9 +35,17 @@ export function FontPickerRow({ value, onSelect }) {
   return (
     <SelectField
       eyebrow="Appearance"
-      title="Reading Font"
-      label="Reading Font"
-      desc="The typeface for reading text everywhere in the app. Headings keep the app’s own style, except with System Serif — the original all-device look. Every font is built in and works offline."
+      title="Reading font"
+      label="Reading font"
+      desc="Every font is built in and works offline"
+      find="typeface font letters serif sans"
+      /* WS2 settings (st-font): one preview on top, in the face now chosen, instead of the same line under every name. */
+      sheetTop={(
+        <div className="ws2-font-preview">
+          <p className="ws2-font-sample" style={{ fontFamily: current.css || 'serif' }}>{FONT_SAMPLE}</p>
+          <p className="ws2-font-name">{current.label + ' · ' + (current.sub || '')}</p>
+        </div>
+      )}
       value={current.id}
       options={options}
       onChange={(id) => { if (id !== value && readingFontById(id)) onSelect(id); }}

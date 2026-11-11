@@ -6,12 +6,10 @@
    under test are the REAL SettingsRow / SelectField components, so this
    fails if their markup or wiring rots — not just if the gate does.
 
-   WHAT IT PINS: auto-scroll's sub-settings are COLLAPSED (unmounted), not
-   merely disabled, until the feature is on, and Auto-Continue Pause nests
-   one level deeper under Auto-Continue. Unmounting is the load-bearing
-   part of the owner's ask — a disabled row still occupies the page, still
-   reads as maybe-usable, and is still in tab and screen-reader order.
-   "Invisible and uninteractable" means GONE. */
+   WHAT IT PINS: the screen's rows, their writes, the find, and the
+   dependency gates that still unmount (Search's sub-settings, Restored
+   names, Follow the voice). WS2 settings (st-auto): auto-scroll's rows
+   are always shown now, so its old collapse contract is gone. */
 
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -43,14 +41,14 @@ describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
     window.buildProgressGroups = () => (window.BIBLE_STUDIES ? [STUDIES] : []);
     try {
       renderSettings({ markAsRead: true }, {}, { expandGroups: false });
-      fireEvent.click(groupHead('Mark as Read'));
+      fireEvent.click(groupHead('Reading progress'));
       expect(window.loadBibleStudies).toHaveBeenCalledTimes(1);
       expect(window.__loadMatthewCorpus).toHaveBeenCalledTimes(1);
       const studiesSection = () => [...document.querySelectorAll('.progress-section-toggle')].find((t) => /Studies/.test(t.textContent));
       expect(studiesSection()).toBeUndefined();
       window.BIBLE_STUDIES = [{ slug: 'purity' }];
       await act(async () => { landStudies(); });
-      await waitFor(() => expect(studiesSection().textContent).toMatch(/0\s*\/\s*7/));
+      await waitFor(() => expect(studiesSection().textContent).toMatch(/0 of 7/));
     } finally {
       delete window.loadBibleStudies;
       delete window.__loadMatthewCorpus;
@@ -59,41 +57,73 @@ describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
   });
 });
 
+/* WS2 settings (st-find): the find draws only the ROWS that match every typed word (by the start of a word), each
+   with its place above its name; no group heads while finding. */
+const foundPlaces = () => [...document.querySelectorAll('[data-found] .ws2-place')].map((p) => p.textContent);
+const findSettings = (value) => fireEvent.change(screen.getByLabelText('Find settings'), { target: { value } });
+
 describe('settings filter and lazy progress', () => {
-  it('finds and expands backup settings, then restores the previous accordion state', () => {
+  it('finds backup settings as rows with their place, then the clear restores the root', () => {
     renderSettings({}, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Appearance'));
-    fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'backup' } });
-    expect(groupHeads()).toHaveLength(1);
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Verify a Backup')).toBeTruthy();
-    fireEvent.click(groupHead('Your Data'));
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
+    findSettings('backup');
+    expect(groupHeads()).toHaveLength(0);
+    expect(row('Check a backup file')).toBeTruthy();
+    for (const place of foundPlaces()) expect(place).toMatch(/^Your data/);
+    expect(screen.getByRole('status').textContent).toBe(foundPlaces().length + ' settings');
+    // The Also section offers the backup itself, and the big backup card stays out of the found rows (WS5, mock st-find).
+    expect(screen.getByRole('button', { name: /^Keep a backup/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back up now' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(groupHeads()).toHaveLength(11);   // ten plus the tour's Help group
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
+    expect(groupHeads()).toHaveLength(8);   // the root's eight group rows
+    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
   });
 
-  it('finds the Help group by "tour", so a lost reader can get the tour back through the find box', () => {
+  it('"a" does not match every row; "keep" and "marker" find their rows', () => {
+    renderSettings();
+    const all = rowLabels().length;
+    cleanup();
+    renderSettings({}, {}, { expandGroups: false });
+    findSettings('a');
+    expect(rowLabels().length).toBeGreaterThan(0);
+    expect(rowLabels().length).toBeLessThan(all);
+    findSettings('keep');
+    expect(row('Keep screen on while reading')).toBeTruthy();
+    expect(row('Keep screen on while reading').querySelector('.ws2-place').textContent).toBe('Reading · The page');
+    expect(row('Chapter titles')).toBeUndefined();
+    findSettings('marker');
+    expect(row('Reading position marker')).toBeTruthy();
+    expect(row('Bible translation')).toBeUndefined();
+  });
+
+  it('finds the Show me around door by "tour", so a lost reader can get the tour back through the find box', () => {
     // RED on 47355cc1: matchesGroup('help') threw on SETTINGS_TOPICS['help'] for any query; the
     // defensive `|| []` would have hidden Help from every search instead.
     renderSettings({}, {}, { expandGroups: false });
-    fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'tour' } });
-    expect(groupHeads()).toHaveLength(1);
-    expect(groupHead('Help')).toBeTruthy();
-    expect(screen.getAllByText(/Show me around/).length).toBeGreaterThanOrEqual(1);
+    findSettings('tour');
+    expect(groupHeads()).toHaveLength(0);
+    expect(foundPlaces()).toEqual(['Help']);
+    expect(screen.getByRole('button', { name: 'Show me around' })).toBeTruthy();
   });
 
   it('handles hyphenated queries and explains no results', () => {
     renderSettings({}, {}, { expandGroups: false });
-    const input = screen.getByLabelText('Find settings');
-    fireEvent.change(input, { target: { value: 'read-along' } });
-    expect(groupHead('Listening')).toBeTruthy();
-    expect(groupHeads()).toHaveLength(1);
-    fireEvent.change(input, { target: { value: 'nothing-matches-this' } });
-    expect(groupHeads()).toHaveLength(0);
+    findSettings('read-along');
+    expect(row('Highlight the words')).toBeTruthy();
+    expect(row('Follow the voice')).toBeTruthy();
+    for (const place of foundPlaces()) expect(place).toMatch(/^Listening · /);
+    expect(foundPlaces().filter((p) => p === 'Listening · Read-along')).toHaveLength(3);
+    findSettings('nothing-matches-this');
+    expect(foundPlaces()).toHaveLength(0);
     expect(screen.getByRole('status').textContent).toContain('No matching settings');
+  });
+
+  it('offers to search the library for the typed words when the screen can', () => {
+    const onSearchLibrary = vi.fn();
+    renderSettings({}, { onSearchLibrary }, { expandGroups: false });
+    findSettings('mercy');
+    fireEvent.click(screen.getByRole('button', { name: /^Search the library for “mercy”/ }));
+    expect(onSearchLibrary).toHaveBeenCalledWith('mercy');
   });
 
   it('does not load corpora for Appearance; opens them for Mark as Read', () => {
@@ -104,7 +134,8 @@ describe('settings filter and lazy progress', () => {
       fireEvent.click(groupHead('Appearance'));
       expect(window.__loadVotCorpus).not.toHaveBeenCalled();
       expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
-      fireEvent.click(groupHead('Mark as Read'));
+      fireEvent.click(screen.getByRole('button', { name: 'Back to Settings' }));
+      fireEvent.click(groupHead('Reading progress'));
       expect(window.__loadVotCorpus).toHaveBeenCalledTimes(1);
       expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
     } finally {
@@ -118,7 +149,7 @@ describe('harness', () => {
   it('renders the whole screen with the real row components', () => {
     renderSettings();
     expect(screen.getByTestId('screen-layout')).toBeTruthy();
-    expect(rowLabels()).toContain('Auto-Scroll');
+    expect(rowLabels()).toContain('Auto-scroll pill on reading pages');
     expect(rowLabels().length).toBeGreaterThan(10);
   });
 });
@@ -147,75 +178,71 @@ describe('settings preference folio', () => {
 
   it('connects each expanded group header to its mounted body', () => {
     renderSettings({}, {}, { expandGroups: false });
-    const head = groupHead('Appearance');
-    fireEvent.click(head);
-    const controlledId = head.getAttribute('aria-controls');
+    fireEvent.click(groupHead('Appearance'));
+    const controlledId = groupHead('Appearance').getAttribute('aria-controls');
     expect(controlledId).toBe('settings-group-appearance');
     expect(document.getElementById(controlledId)).toBeTruthy();
   });
 });
 
-describe('auto-scroll settings disclosure', () => {
-  const SUB_ROWS = ['Scroll Speed', 'Auto-Continue', 'Auto-Continue Pause'];
+/* WS2 settings (st-auto): the auto-scroll rows NO LONGER vanish while auto-scroll is off. The pill switch, the speed,
+   Go on to the next page and Wait before going on are always shown, and each control writes its own key. */
+describe('auto-scroll settings (every row always shown)', () => {
+  const speedRow = () => document.querySelector('.ws2-speed');
 
-  it('COLLAPSES every sub-setting while auto-scroll is off', () => {
-    renderSettings({ autoScroll: false });
-    expect(rowLabels()).toContain('Auto-Scroll');
-    for (const label of SUB_ROWS) expect(row(label)).toBeUndefined();
+  it('shows every auto-scroll row whatever the switches say', () => {
+    for (const settings of [{ autoScroll: false }, { autoScroll: true }, { autoScroll: false, autoScrollNext: true }, { autoScroll: true, autoScrollNext: true }]) {
+      renderSettings(settings);
+      expect(row('Auto-scroll pill on reading pages')).toBeTruthy();
+      expect(speedRow()).toBeTruthy();
+      expect(row('Go on to the next page')).toBeTruthy();
+      expect(row('Wait before going on')).toBeTruthy();
+      cleanup();
+    }
   });
 
-  it('collapsed means UNMOUNTED, not disabled — nothing is left to interact with', () => {
-    const { container } = renderSettings({ autoScroll: false });
-    expect(container.querySelector('input[aria-label*="Auto-scroll speed"]')).toBeNull();
-    expect(container.querySelector('input[aria-label*="Pause before continuing"]')).toBeNull();
-    expect(screen.queryByText(/lines\/min/)).toBeNull();
+  it('the row count does not change with the switches', () => {
+    const seen = [];
+    renderSettings({ autoScroll: false }); seen.push(rowLabels().length); cleanup();
+    renderSettings({ autoScroll: true }); seen.push(rowLabels().length); cleanup();
+    renderSettings({ autoScroll: true, autoScrollNext: true }); seen.push(rowLabels().length);
+    expect(seen[1]).toBe(seen[0]);
+    expect(seen[2]).toBe(seen[0]);
   });
 
-  it('reveals speed + auto-continue when auto-scroll is enabled', () => {
-    renderSettings({ autoScroll: true });
-    expect(row('Scroll Speed')).toBeTruthy();
-    expect(row('Auto-Continue')).toBeTruthy();
-    // …but the pause is meaningless until auto-continue is on.
-    expect(row('Auto-Continue Pause')).toBeUndefined();
-  });
-
-  it('reveals the pause only when auto-continue is on', () => {
-    renderSettings({ autoScroll: true, autoScrollNext: true });
-    for (const label of SUB_ROWS) expect(row(label)).toBeTruthy();
+  it('each control writes its own key, even with auto-scroll off', () => {
+    const onToggle = vi.fn();
+    const onSetting = vi.fn();
+    renderSettings({ autoScroll: false, autoScrollLpm: '16', autoScrollEndMs: '2500' }, { onToggle, onSetting });
+    fireEvent.click(within(row('Auto-scroll pill on reading pages')).getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith('autoScroll');
+    fireEvent.click(within(row('Go on to the next page')).getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith('autoScrollNext');
+    fireEvent.change(slider('Auto-scroll speed'), { target: { value: '24' } });
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollLpm', '24');
+    fireEvent.click(screen.getByRole('button', { name: 'Faster' }));
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollLpm', '17');
+    fireEvent.click(screen.getByRole('button', { name: 'Slower' }));
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollLpm', '15');
+    fireEvent.click(within(row('Wait before going on')).getByRole('button', { name: 'Longer wait' }));
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollEndMs', '3000');
+    fireEvent.click(within(row('Wait before going on')).getByRole('button', { name: 'Shorter wait' }));
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollEndMs', '2000');
   });
 
   // Sweep low (mw10): the pause slider's name said "in seconds" while it announced 3000 (ms), and
-  // Text Size announced 1.5 where the row shows 150%.
-  it('the pause and text-size sliders announce what their rows show', () => {
-    const { container } = renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '3000', fontScale: '1.5' });
-    const pause = container.querySelector('input[aria-label^="Pause before continuing"]');
-    expect(pause.getAttribute('aria-valuetext')).toBe('3 seconds');
-    expect(pause.getAttribute('aria-label')).not.toContain('in seconds');
+  // Text Size announced 1.5 where the row shows 150%. The pause is a stepper now, showing seconds.
+  it('the pause stepper and the text-size slider show what they hold', () => {
+    const { container } = renderSettings({ autoScrollEndMs: '3000', fontScale: '1.5' });
+    expect(row('Wait before going on').querySelector('.ws2-step-value').textContent).toBe('3 s');
     expect(container.querySelector('input[aria-label="Text size"]').getAttribute('aria-valuetext')).toBe('150 percent');
   });
 
   // Sweep low (mw10): the Tabs row promised 999 reading places; the cap is 50 (use-tab-actions MAX_TABS).
   it('the Tabs row states the real tab cap', () => {
     renderSettings({});
-    fireEvent.click(screen.getByRole('button', { name: 'Show description for Tabs' }));
     expect(screen.queryByText(/up to 999/)).toBeNull();
-    expect(screen.getByText(/Run up to 50 independent reading places/)).toBeTruthy();
-  });
-
-  it('never leaks the nested row when the parent feature is off', () => {
-    // A profile imported with autoScrollNext:true must still collapse fully.
-    renderSettings({ autoScroll: false, autoScrollNext: true });
-    expect(row('Auto-Continue')).toBeUndefined();
-    expect(row('Auto-Continue Pause')).toBeUndefined();
-  });
-
-  it('discloses progressively — each step adds rows, never removes one', () => {
-    const seen = [];
-    renderSettings({ autoScroll: false }); seen.push(rowLabels().length); cleanup();
-    renderSettings({ autoScroll: true }); seen.push(rowLabels().length); cleanup();
-    renderSettings({ autoScroll: true, autoScrollNext: true }); seen.push(rowLabels().length);
-    expect(seen[1]).toBe(seen[0] + 2);  // speed + auto-continue
-    expect(seen[2]).toBe(seen[1] + 1);  // + pause
+    expect(row('Tabs').querySelector('.settings-row-desc').textContent).toMatch(/^Up to 50 reading places/);
   });
 });
 
@@ -228,31 +255,31 @@ describe('auto-scroll settings disclosure', () => {
 describe('read-along settings disclosure', () => {
   it('shows both rows checked when the settings have never been touched', () => {
     renderSettings();
-    expect(row('Read-Along Highlight')).toBeTruthy();
-    expect(row('Follow the Voice')).toBeTruthy();
-    for (const label of ['Read-Along Highlight', 'Follow the Voice']) {
+    expect(row('Highlight the words')).toBeTruthy();
+    expect(row('Follow the voice')).toBeTruthy();
+    for (const label of ['Highlight the words', 'Follow the voice']) {
       expect(within(row(label)).getByRole('switch').getAttribute('aria-checked')).toBe('true');
     }
   });
 
   it('COLLAPSES the follow row while the wash is off — even if follow was saved on', () => {
     renderSettings({ readAlongHighlight: false, readAlongFollow: true });
-    expect(row('Read-Along Highlight')).toBeTruthy();
-    expect(row('Follow the Voice')).toBeUndefined();
+    expect(row('Highlight the words')).toBeTruthy();
+    expect(row('Follow the voice')).toBeUndefined();
   });
 
   it('keeps the wash while only the follow-scroll is switched off', () => {
     renderSettings({ readAlongHighlight: true, readAlongFollow: false });
-    expect(within(row('Read-Along Highlight')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
-    expect(within(row('Follow the Voice')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
+    expect(within(row('Highlight the words')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
+    expect(within(row('Follow the voice')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
   });
 
   it('writes through the settings keys the reading views read', () => {
     const onToggle = vi.fn();
     renderSettings({}, { onToggle });
-    fireEvent.click(within(row('Follow the Voice')).getByRole('switch'));
+    fireEvent.click(within(row('Follow the voice')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('readAlongFollow');
-    fireEvent.click(within(row('Read-Along Highlight')).getByRole('switch'));
+    fireEvent.click(within(row('Highlight the words')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('readAlongHighlight');
   });
 });
@@ -261,28 +288,37 @@ describe('read-along settings disclosure', () => {
    without a long press ("on PC and others"), and a website link that highlights the
    copied words is "an option, not the default". */
 describe('Copy & Share group', () => {
-  it('holds Share Includes (the website link by default, share-fn 2026-10-25) and Highlight the Passage (off by default)', () => {
+  // WS2 settings (st-share): the link choice is an on-screen radiogroup, "Links I share point to", website first.
+  const linkGroup = () => screen.getByRole('radiogroup', { name: 'Links I share point to' });
+
+  it('holds Links I share point to (the website link by default, share-fn 2026-10-25) and Highlight the passage (off by default)', () => {
     renderSettings();
-    const labels = groupRowLabels('Copy & Share');
-    expect(labels).toContain('Share Includes');
-    expect(labels).toContain('Highlight the Passage');
-    expect(within(row('Highlight the Passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
-    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight off');
+    const labels = groupRowLabels('Sharing');
+    expect(labels).toEqual(expect.arrayContaining(['The website', 'The app', 'Highlight the passage']));
+    const radios = within(linkGroup()).getAllByRole('radio');
+    expect(radios.map((r) => r.querySelector('.settings-row-label').textContent)).toEqual(['The website', 'The app']);
+    expect(within(linkGroup()).getByRole('radio', { name: /^The website/ }).getAttribute('aria-checked')).toBe('true');
+    expect(within(linkGroup()).getByRole('radio', { name: /^The app/ }).getAttribute('aria-checked')).toBe('false');
+    expect(within(row('Highlight the passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
+    expect(groupHead('Sharing').textContent).toContain('Links point to the website · Highlight off');
   });
 
   it('writes through the keys Copy and Share read', () => {
     const onToggle = vi.fn();
-    renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle });
-    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight on');
-    fireEvent.click(within(row('Highlight the Passage')).getByRole('switch'));
+    const onSetting = vi.fn();
+    renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle, onSetting });
+    expect(groupHead('Sharing').textContent).toContain('Links point to the website · Highlight on');
+    fireEvent.click(within(row('Highlight the passage')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('linkHighlight');
+    fireEvent.click(within(linkGroup()).getByRole('radio', { name: /^The app/ }));
+    expect(onSetting).toHaveBeenCalledWith('shareLink', 'app');
   });
 
   it('is found by "share", "link" and "highlight"', () => {
     renderSettings({}, {}, { expandGroups: false });
     for (const word of ['share', 'link', 'highlight']) {
-      fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: word } });
-      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Copy & Share')]));
+      findSettings(word);
+      expect(foundPlaces(), word).toEqual(expect.arrayContaining([expect.stringMatching(/^Sharing · /)]));
     }
   });
 });
@@ -293,8 +329,8 @@ describe('Copy & Share group', () => {
    Default Speed is the one row with no settings key — it reads and writes
    AudioLibraryStore.rate, the same preference the listening desk writes. */
 describe('Listening group', () => {
-  const LISTENING_ROWS = ['Bible Audio', 'Letter Voice', 'Default Speed',
-    'Read-Along Highlight', 'Follow the Voice'];
+  const LISTENING_ROWS = ['Bible audio', 'Letter voice', 'Speed',
+    'Highlight the words', 'Follow the voice'];
 
   it('houses every listening row, and Reading houses none of them', () => {
     renderSettings();
@@ -305,21 +341,21 @@ describe('Listening group', () => {
       expect(reading).not.toContain(label);
     }
     // Reading kept its own rows — this was a move, not a transplant of the group.
-    expect(reading).toContain('Bible Translation');
-    expect(reading).toContain('Chapter Titles');
+    expect(reading).toContain('Bible translation');
+    expect(reading).toContain('Chapter titles');
   });
 
-  it('sits between Reading and Auto-Scroll', () => {
+  it('sits between Reading and Buttons and tools', () => {
     renderSettings({}, {}, { expandGroups: false });
     const labels = groupHeads().map((h) => h.querySelector('.settings-section-label').textContent.trim());
     expect(labels.indexOf('Listening')).toBe(labels.indexOf('Reading') + 1);
-    expect(labels.indexOf('Auto-Scroll')).toBe(labels.indexOf('Listening') + 1);
+    expect(labels.indexOf('Buttons and tools')).toBe(labels.indexOf('Listening') + 1);
   });
 
   it('keeps the read-along disclosure discipline inside its new group', () => {
     renderSettings({ readAlongHighlight: false });
-    expect(groupRowLabels('Listening')).toContain('Read-Along Highlight');
-    expect(groupRowLabels('Listening')).not.toContain('Follow the Voice');
+    expect(groupRowLabels('Listening')).toContain('Highlight the words');
+    expect(groupRowLabels('Listening')).not.toContain('Follow the voice');
   });
 
   it('Songs kept on this phone: how many and how big, and Manage opens the Kept list (K1)', () => {
@@ -348,11 +384,9 @@ describe('Listening group', () => {
     });
     renderSettings();
     await act(async () => { await Promise.resolve(); });
-    const value = (label) => [...document.querySelectorAll('.settings-row')]
-      .find((r) => r.querySelector('.settings-row-label') && r.querySelector('.settings-row-label').textContent === label)
-      .querySelector('.settings-data-value').textContent;
-    expect(value('Total app data')).toContain('songs kept on this phone');
-    expect(value('Your data')).toContain('Kept songs are not in it');
+    // WS3 settings (st-data2): the storage card counts kept songs; Your data's line does not claim them.
+    expect(document.querySelector('.ws3-meter').textContent).toContain('songs kept on this phone');
+    expect(row('Your data').querySelector('.settings-row-desc').textContent).not.toContain('songs');
   });
 
   // ra6 (Corbin 2026-10-14, brief design-10, the mock's place): under Songs kept on this phone, off by default.
@@ -363,7 +397,9 @@ describe('Listening group', () => {
       renderSettings({}, { onToggle });
       const labels = groupRowLabels('Listening');
       expect(labels).toContain('Download only on Wi-Fi');
-      expect(labels.indexOf('Download only on Wi-Fi')).toBe(labels.indexOf('Turn the Page with the Audio') - 2);   // dl-d5's row between
+      // WS2 settings (st-listen): in Songs and downloads, under the songs rows (no kept-songs store and no
+      // Downloads screen in this harness, so those two rows are not drawn).
+      expect(labels.indexOf('Download only on Wi-Fi')).toBe(labels.indexOf('Show songs on letter pages') + 1);
       const sw = within(row('Download only on Wi-Fi')).getByRole('switch');
       expect(sw.getAttribute('aria-checked')).toBe('false');
       fireEvent.click(sw);
@@ -391,12 +427,12 @@ describe('Listening group', () => {
 
   // player-1025 (Corbin 10-25): "Make the 15s forward/backward button 10s by default, adjustable in settings (typed
   // number, or incremented)". Under Default Speed; − and + move by 5, a typed number is kept to 5-60.
-  it('Skip Buttons: 10 s by default, a stepper and a typed number, writing its own key', () => {
+  it('Skip length: 10 s by default, a stepper and a typed number, writing its own key', () => {
     const onSetting = vi.fn();
     renderSettings({}, { onSetting });
     const labels = groupRowLabels('Listening');
-    expect(labels.indexOf('Skip Buttons')).toBe(labels.indexOf('Default Speed') + 1);
-    const r = row('Skip Buttons');
+    expect(labels.indexOf('Skip length')).toBe(labels.indexOf('Speed') + 1);
+    const r = row('Skip length');
     const box = within(r).getByRole('spinbutton', { name: 'Skip seconds' });
     expect(box.value).toBe('10');
     fireEvent.click(within(r).getByRole('button', { name: 'Longer skip' }));
@@ -413,7 +449,7 @@ describe('Listening group', () => {
     expect(onSetting).toHaveBeenLastCalledWith('skipSeconds', 60);
     cleanup();
     renderSettings({ skipSeconds: 60 });
-    expect(within(row('Skip Buttons')).getByRole('button', { name: 'Longer skip' }).disabled).toBe(true);
+    expect(within(row('Skip length')).getByRole('button', { name: 'Longer skip' }).disabled).toBe(true);
   });
 
   // Downloads brief section 7 item 10: where the browser cannot tell Wi-Fi from mobile data the switch did nothing.
@@ -428,16 +464,17 @@ describe('Listening group', () => {
     expect(groupRowLabels('Listening')).not.toContain('Download only on Wi-Fi');
   });
 
-  // Downloads brief 3a, picture 18: Downloads & storage, with what is on the phone, opens On this phone.
-  it('Downloads & storage says what is on the phone and opens On this phone', () => {
+  // Downloads brief 3a, picture 18: the Downloads row, with what is on the phone, opens On this phone.
+  it('Downloads says what is on the phone and opens On this phone', () => {
     window.AndroidBridge = { offlineAudioState: () => JSON.stringify({ items: [{ url: 'https://x.test/a.mp3', key: 'one:a', title: 'A', bytes: 251e6, savedAt: 1 }], totalBytes: 251e6, freeBytes: 10.7e9 }), offlineAudioWifiOnly: vi.fn() };
     window.__openDownloads = vi.fn();
     try {
       OfflineAudio._reset();
       renderSettings();
       const labels = groupRowLabels('Listening');
-      expect(labels.indexOf('Downloads & storage')).toBe(labels.indexOf('Download only on Wi-Fi') - 1);
-      const btn = screen.getByRole('button', { name: /^Downloads and storage: 1 recording · 251 MB · 10.7 GB free/ });
+      expect(labels.indexOf('Downloads')).toBe(labels.indexOf('Download only on Wi-Fi') - 1);
+      expect(row('Downloads').querySelector('.settings-row-desc').textContent).toBe('1 recording · 251 MB · 10.7 GB free');
+      const btn = within(row('Downloads')).getByRole('button');
       fireEvent.click(btn);
       expect(window.__openDownloads).toHaveBeenCalledWith({ tab: 'phone' }, 'Settings');
     } finally { delete window.AndroidBridge; delete window.__openDownloads; }
@@ -452,7 +489,7 @@ describe('Listening group', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ AudioLibraryStore: fakeAudioLibrary(1.5) });
     renderSettings();   // settings object carries NO audioRate — deliberately
-    expect(within(row('Default Speed')).getByRole('button', { name: /1.5/ })).toBeTruthy();
+    expect(within(row('Speed')).getByRole('button', { name: /1.5/ })).toBeTruthy();
   });
 
   it('writes the chosen speed THROUGH to the library store', () => {
@@ -461,11 +498,11 @@ describe('Listening group', () => {
     setupSettingsGlobals({ AudioLibraryStore: library });
     const onSetting = vi.fn();
     renderSettings({}, { onSetting });
-    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1×/ }));
+    fireEvent.click(within(row('Speed')).getByRole('button', { name: /1×/ }));
     fireEvent.click(screen.getByText('1.25×'));
     expect(library.getPlaybackRate()).toBe(1.25);
     // The row re-reads the store it just wrote — one source of truth, live.
-    expect(within(row('Default Speed')).getByRole('button', { name: /1.25/ })).toBeTruthy();
+    expect(within(row('Speed')).getByRole('button', { name: /1.25/ })).toBeTruthy();
     // …and no parallel settings key was invented for it.
     expect(onSetting).not.toHaveBeenCalled();
   });
@@ -481,7 +518,7 @@ describe('Listening group', () => {
       AudioPlayer: { setPlaybackRate: (r) => { applied.push(r); library.setPlaybackRate(r); } },
     });
     renderSettings();
-    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1×/ }));
+    fireEvent.click(within(row('Speed')).getByRole('button', { name: /1×/ }));
     fireEvent.click(screen.getByText('2×'));
     expect(applied).toEqual([2]);
     expect(library.getPlaybackRate()).toBe(2);
@@ -491,7 +528,7 @@ describe('Listening group', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ AudioLibraryStore: fakeAudioLibrary(1.37) });
     renderSettings();
-    fireEvent.click(within(row('Default Speed')).getByRole('button', { name: /1\.37×/ }));
+    fireEvent.click(within(row('Speed')).getByRole('button', { name: /1\.37×/ }));
     // Presets still offered; the odd value is listed once, not lost or rounded away.
     expect(screen.getAllByText('1.37×').length).toBeGreaterThan(0);
     expect(screen.getByText('1.25×')).toBeTruthy();
@@ -502,8 +539,8 @@ describe('Listening group', () => {
     setupSettingsGlobals({ AudioLibraryStore: undefined });
     renderSettings();
     // Hidden, not a lying "1×": with no store there is nothing to read or write.
-    expect(row('Default Speed')).toBeUndefined();
-    expect(row('Bible Audio')).toBeTruthy();
+    expect(row('Speed')).toBeUndefined();
+    expect(row('Bible audio')).toBeTruthy();
   });
 });
 
@@ -518,7 +555,7 @@ describe('mark-as-read section disclosure', () => {
     });
     renderSettings({ markAsRead: true });
 
-    const toggle = screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ });
+    const toggle = screen.getByRole('button', { name: /Scriptures\s*0 of 50/ });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
@@ -539,7 +576,7 @@ describe('mark-as-read section disclosure', () => {
     });
     const onClearBook = vi.fn();
     renderSettings({ markAsRead: true }, { onClearBook });
-    fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 of 50/ }));
     // Each Clear is named for what it clears (a11y pass 2026-11-01): the section's, then the book's.
     const clears = [screen.getByRole('button', { name: 'Clear Scriptures' }), screen.getByRole('button', { name: 'Clear Genesis' })];
     expect(clears.every((button) => !button.disabled)).toBe(true);
@@ -559,24 +596,33 @@ describe('auto-scroll controls', () => {
     expect(s.value).toBe('16');
   });
 
-  it('the dwell slider spans no-pause to a long sit, in half seconds', () => {
-    renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '2500' });
-    const s = slider('Pause before continuing');
-    expect(s.min).toBe('0');
-    expect(s.max).toBe('15000');
-    expect(s.step).toBe('500');
-    expect(row('Auto-Continue Pause').querySelector('.settings-row-value').textContent).toBe('2.5s');
+  // WS2 settings (st-auto): the wait is a "− 2.5 s +" stepper, half a second a step, 0 to 15 s.
+  const waitValue = () => row('Wait before going on').querySelector('.ws2-step-value').textContent;
+  const waitBtn = (name) => within(row('Wait before going on')).getByRole('button', { name });
+
+  it('the wait stepper spans no wait to a long sit, in half seconds', () => {
+    const onSetting = vi.fn();
+    renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '2500' }, { onSetting });
+    expect(waitValue()).toBe('2.5 s');
+    fireEvent.click(waitBtn('Longer wait'));
+    expect(onSetting).toHaveBeenLastCalledWith('autoScrollEndMs', '3000');
+    cleanup();
+    renderSettings({ autoScrollEndMs: '15000' });
+    expect(waitBtn('Longer wait').disabled).toBe(true);
+    expect(waitBtn('Shorter wait').disabled).toBe(false);
+    cleanup();
+    renderSettings({ autoScrollEndMs: '0' });
+    expect(waitBtn('Shorter wait').disabled).toBe(true);
   });
 
-  it('reads 0 as "None" rather than "0s"', () => {
+  it('reads 0 as "None" rather than "0 s"', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '0' });
-    expect(row('Auto-Continue Pause').querySelector('.settings-row-value').textContent).toBe('None');
+    expect(waitValue()).toBe('None');
   });
 
   it('still renders a legacy preset dwell value from before the slider', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '6000' });
-    expect(slider('Pause before continuing').value).toBe('6000');
-    expect(row('Auto-Continue Pause').querySelector('.settings-row-value').textContent).toBe('6s');
+    expect(waitValue()).toBe('6 s');
   });
 
   it('clamps a corrupt persisted speed instead of rendering it', () => {
@@ -593,24 +639,39 @@ describe('auto-scroll controls', () => {
 
   it('writes dwell changes back through onSetting', () => {
     const onSetting = vi.fn();
-    renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '2500' }, { onSetting });
-    fireEvent.change(slider('Pause before continuing'), { target: { value: '9000' } });
-    expect(onSetting).toHaveBeenCalledWith('autoScrollEndMs', '9000');
+    renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '9000' }, { onSetting });
+    fireEvent.click(waitBtn('Shorter wait'));
+    expect(onSetting).toHaveBeenCalledWith('autoScrollEndMs', '8500');
   });
 
   it('toggling auto-scroll goes through onToggle so the key stays canonical', () => {
     const onToggle = vi.fn();
     renderSettings({ autoScroll: false }, { onToggle });
-    fireEvent.click(row('Auto-Scroll').querySelector('.settings-toggle input[type="checkbox"]'));
+    fireEvent.click(row('Auto-scroll pill on reading pages').querySelector('.settings-toggle input[type="checkbox"]'));
     expect(onToggle).toHaveBeenCalledWith('autoScroll');
   });
 
+  // WS2 settings (st-auto): the speed row reads "16 lines a minute"; Reset appears only off 16.
   it('offers Reset only when the value has moved off standard', () => {
+    const onSetting = vi.fn();
     renderSettings({ autoScroll: true, autoScrollLpm: '16' });
-    expect(row('Scroll Speed').querySelector('.txtsize-reset').disabled).toBe(true);
+    expect(row('16 lines a minute')).toBeTruthy();
+    expect(row('16 lines a minute').querySelector('.txtsize-reset')).toBeNull();
     cleanup();
-    renderSettings({ autoScroll: true, autoScrollLpm: '30' });
-    expect(row('Scroll Speed').querySelector('.txtsize-reset').disabled).toBe(false);
+    renderSettings({ autoScroll: true, autoScrollLpm: '30' }, { onSetting });
+    const reset = row('30 lines a minute').querySelector('.txtsize-reset');
+    expect(reset).toBeTruthy();
+    fireEvent.click(reset);
+    expect(onSetting).toHaveBeenCalledWith('autoScrollLpm', '16');
+  });
+
+  it('the − and + around the speed slider stop at the transport’s ends', () => {
+    renderSettings({ autoScrollLpm: '40' });
+    expect(screen.getByRole('button', { name: 'Faster' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Slower' }).disabled).toBe(false);
+    cleanup();
+    renderSettings({ autoScrollLpm: '4' });
+    expect(screen.getByRole('button', { name: 'Slower' }).disabled).toBe(true);
   });
 });
 
@@ -667,20 +728,19 @@ describe('P1-9 — every settings toggle has an accessible name', () => {
 describe('export/import copy names the real .votbak artifact', () => {
   const descOf = (label) => {
     const r = row(label);
-    fireEvent.click(within(r).getByLabelText('Show description for ' + label));
     return r.querySelector('.settings-row-desc').textContent;
   };
 
   it('Export no longer promises a "single JSON file" the user will never find', () => {
     renderSettings();
-    const desc = descOf('Export Your Data');
+    const desc = document.querySelector('.ws3-backup-line').textContent;
     expect(desc).toContain('.votbak');
     expect(desc).not.toContain('single JSON');
   });
 
   it('Import tells the user to pick the .votbak backup', () => {
     renderSettings();
-    const desc = descOf('Import from Backup');
+    const desc = descOf('Restore from a backup');
     expect(desc).toContain('.votbak');
   });
 });
@@ -706,7 +766,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     expect(openExportSink).not.toHaveBeenCalled();
@@ -735,7 +795,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     return toast;
   };
@@ -777,16 +837,16 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
 
   const openWipeDialog = (props) => {
     renderSettings({}, props);
-    fireEvent.click(screen.getByText('Clear All My Data'));
-    expect(screen.getByText('Delete All Personal Data')).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'Delete All Personal Data' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
+    expect(screen.getByText('Delete all your data?')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Delete all your data?' })).toBeTruthy();
   };
 
   it('registers while open and unregisters on Cancel', () => {
     openWipeDialog();
     expect(modalRegistry.peek() && modalRegistry.peek().id).toBe('settings-wipe-dialog');
     fireEvent.click(screen.getByText('Cancel'));
-    expect(screen.queryByText('Delete All Personal Data')).toBeNull();
+    expect(screen.queryByText('Delete all your data?')).toBeNull();
     expect(modalRegistry.isAnyOpen()).toBe(false);
   });
 
@@ -798,7 +858,7 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     // NEITHER dismissal system, so Back navigated away underneath it.
     // (act(): the dismiss setState happens outside a React event.)
     act(() => { modalRegistry.peek().dismiss(); });
-    expect(screen.queryByText('Delete All Personal Data')).toBeNull();
+    expect(screen.queryByText('Delete all your data?')).toBeNull();
     expect(screen.getByTestId('screen-layout')).toBeTruthy();
     expect(onBack).not.toHaveBeenCalled();
   });
@@ -809,9 +869,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ showToast: toastSpy });
     renderSettings();
-    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
     fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-    fireEvent.click(screen.getByText('Delete Everything'));
+    fireEvent.click(screen.getByText('Delete everything'));
     await vi.waitFor(() => {
       expect(toastSpy).toHaveBeenCalledWith(
         expect.objectContaining({ text: 'All personal data cleared. Reloading…' })
@@ -839,9 +899,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       teardownSettingsGlobals();
       setupSettingsGlobals({ showToast: toastSpy });
       renderSettings();
-      fireEvent.click(screen.getByText('Clear All My Data'));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
       fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-      fireEvent.click(screen.getByText('Delete Everything'));
+      fireEvent.click(screen.getByText('Delete everything'));
 
       await vi.waitFor(() => {
         expect(toastSpy).toHaveBeenCalledWith(
@@ -876,9 +936,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       DiagnosticLog: { warn: diagWarnSpy, error: () => {}, all: () => [], clear: () => {} },
     });
     renderSettings();
-    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
     fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-    fireEvent.click(screen.getByText('Delete Everything'));
+    fireEvent.click(screen.getByText('Delete everything'));
 
     // The wipe still succeeds — vot-thumbs is a regenerable cache, not user
     // data, so Clear All must not fail loud over it.
@@ -948,28 +1008,28 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('asks via a registered sheet and applies NOTHING until Import is tapped', async () => {
     const { confirmSpy, applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     const sheet = await findImportSheet();
     // The destructive semantics are intact — a real choice, in-app…
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(applySpy).not.toHaveBeenCalled();
     // …and Back/Escape would dismiss the sheet, not navigate underneath it.
     expect(sheet.id).toBe('settings-import-confirm');
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
   });
 
   it('dismissing the sheet (Cancel OR the Back/Escape registry path) applies nothing', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
     expect(applySpy).not.toHaveBeenCalled();
 
     // Re-open and take the registry dismiss route this time.
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
-    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     const sheet = await findImportSheet();
     act(() => { sheet.dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
@@ -978,29 +1038,29 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('locks all backup actions until the active picker and confirmation settle', async () => {
     const { pickImportFile } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
 
-    for (const name of ['Export', 'Import', 'Verify']) {
+    for (const name of ['Back up now', 'Restore from a backup', 'Check a backup file']) {
       expect(screen.getByRole('button', { name }).disabled).toBe(true);
     }
-    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    expect(screen.getByRole('button', { name: 'Delete all my data' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     expect(pickImportFile).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByText('Cancel'));
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(false));
   });
 
   it('keeps destructive data actions locked after import until the scheduled reload', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Delete all my data' }).disabled).toBe(true);
   });
 
   it('brackets the apply with the restore-inflight marker (a crash mid-apply must warn at next boot)', async () => {
@@ -1011,9 +1071,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
       return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
     });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     expect(flagDuringApply).not.toBeNull();   // set BEFORE the first mutation
@@ -1025,9 +1085,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     localStorage.removeItem('vot-restore-inflight');
     const applySpy = vi.fn(async () => { throw new Error('corrupt payload'); });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     // The marker survives a handled failure — the boot guard must warn, because
@@ -1039,9 +1099,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   it('does not erase another tab\'s restore marker when the import lock is busy', async () => {
     localStorage.setItem('vot-restore-inflight', 'active-tab-marker');
     setupImport({ applyImportPayload: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => {
       expect(localStorage.getItem('vot-restore-inflight')).toBe('active-tab-marker');
@@ -1053,9 +1113,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     const toastSpy = vi.fn();
     const pendingAnnotations = { ...globalThis.AnnotationStore, getState: () => 'pending' };
     const { applySpy } = setupImport({ AnnotationStore: pendingAnnotations, showToast: toastSpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'Storage is temporarily unavailable. Please try again in a moment.' })
@@ -1115,7 +1175,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
     expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
   });
@@ -1140,7 +1200,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CHECKSUM));
     expect(textsOf(toastSpy)).not.toMatch(CUT);
   });
@@ -1168,9 +1228,9 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
     expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
@@ -1222,19 +1282,19 @@ describe('Android v3 import — native stream not closed until the confirm settl
 
   it('holds v3ImportClose until AFTER apply — never while the sheet is up', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
     // THE REGRESSION: pre-fix the finally fired here, before the user chose.
     expect(closeSpy).not.toHaveBeenCalled();
     expect(applySpy).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled()); // closed only after apply consumed the stream
   });
 
   it('cancelling still closes the native stream and applies nothing', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
     expect(closeSpy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Cancel'));
@@ -1249,48 +1309,53 @@ describe('Android v3 import — native stream not closed until the confirm settl
    a closed group's body is UNMOUNTED, not hidden — out of tab order and
    screen-reader order, same discipline as the auto-scroll disclosure.
    ─────────────────────────────────────────────────────────────────────── */
-describe('settings groups — collapsible accordion', () => {
-  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top bar',
-    'Search, Tabs & History', 'Copy & Share', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
+describe('settings groups — each group is its own screen (WS1 st-root)', () => {
+  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Buttons and tools', 'Sharing', 'A Return to The Garden',
+    'Your data', 'Reading progress'];
+  const back = () => fireEvent.click(screen.getByRole('button', { name: 'Back to Settings' }));
 
-  it('renders all 11 group headers, every one collapsed on entry', () => {
-    renderSettings({}, {}, { expandGroups: false });
-    expect(groupHeads().length).toBe(GROUPS.length);
-    for (const label of GROUPS) {
-      const head = groupHead(label);
-      expect(head).toBeTruthy();
-      expect(head.getAttribute('aria-expanded')).toBe('false');
-    }
-    // Collapsed means UNMOUNTED — zero setting rows exist yet.
+  it('the root shows the eight groups as rows, then Show me around and About as rows of their own', () => {
+    renderSettings({}, { onAbout: () => {} }, { expandGroups: false });
+    expect(groupHeads().map((h) => h.querySelector('.settings-section-label').textContent)).toEqual(GROUPS);
+    for (const label of GROUPS) expect(groupHead(label).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /^Show me around/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^About VOTReader/ })).toBeTruthy();
+    // The root mounts no setting rows.
     expect(rowLabels().length).toBe(0);
     expect(document.querySelectorAll('.settings-card').length).toBe(0);
   });
 
-  it('opening a group mounts its rows; closing unmounts them again', () => {
+  it('a row opens its group as a screen; Back returns to the root', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.click(groupHead('Appearance'));
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Light Theme')).toBeTruthy();
-    expect(row('Reading Position Marker')).toBeUndefined(); // other groups stay closed
+    expect(screen.getByRole('radio', { name: 'Light' })).toBeTruthy();
+    expect(groupHead('Reading')).toBeUndefined();
+    expect(row('Reading position marker')).toBeUndefined();
+    expect(screen.queryByLabelText('Find settings')).toBeNull();
+    back();
+    expect(groupHeads()).toHaveLength(GROUPS.length);
+    expect(screen.queryByRole('radio', { name: 'Light' })).toBeNull();
+  });
+
+  it('Theme is Dark | Light and writes through onThemeChange', () => {
+    const onThemeChange = vi.fn();
+    renderSettings({}, { onThemeChange }, { expandGroups: false });
     fireEvent.click(groupHead('Appearance'));
-    expect(row('Light Theme')).toBeUndefined();
+    expect(screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+    expect(onThemeChange).toHaveBeenCalledWith('light');
   });
 
-  it('groups open independently', () => {
-    renderSettings({}, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Reading'));
-    fireEvent.click(groupHead('Your Data'));
-    expect(row('Chapter Titles')).toBeTruthy();
-    expect(row('Export Your Data')).toBeTruthy();
-    expect(row('Light Theme')).toBeUndefined();
-  });
-
-  it('Auto-Scroll lives in its own group and keeps its nested disclosure', () => {
+  it('Auto-scroll is a screen inside Reading, and Back goes to Reading', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true }, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Auto-Scroll'));
-    expect(row('Auto-Scroll')).toBeTruthy();
-    expect(row('Scroll Speed')).toBeTruthy();
-    expect(row('Auto-Continue Pause')).toBeTruthy();
+    fireEvent.click(groupHead('Reading'));
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-scroll/ }));
+    expect(row('Auto-scroll pill on reading pages')).toBeTruthy();
+    expect(row('16 lines a minute')).toBeTruthy();
+    expect(row('Wait before going on')).toBeTruthy();
+    expect(row('Chapter titles')).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Reading' }));
+    expect(row('Chapter titles')).toBeTruthy();
   });
 });
 
@@ -1314,11 +1379,10 @@ describe('settings folio summary', () => {
 
   it('links each accordion header to its mounted body', () => {
     renderSettings({}, {}, { expandGroups: false });
-    const appearance = groupHead('Appearance');
     // s23.4: closed, the body is not mounted, so the header points at nothing.
-    expect(appearance.hasAttribute('aria-controls')).toBe(false);
-    fireEvent.click(appearance);
-    expect(appearance.getAttribute('aria-controls')).toBe('settings-group-appearance');
+    expect(groupHead('Appearance').hasAttribute('aria-controls')).toBe(false);
+    fireEvent.click(groupHead('Appearance'));
+    expect(groupHead('Appearance').getAttribute('aria-controls')).toBe('settings-group-appearance');
     expect(document.getElementById('settings-group-appearance')).toBeTruthy();
   });
 });
@@ -1329,34 +1393,34 @@ describe('dependency-gated rows unmount with their dependency', () => {
   it('search sub-settings vanish while Search is off', () => {
     renderSettings({ searchEnabled: false });
     expect(row('Search')).toBeTruthy();
-    expect(row('Synonym Search')).toBeUndefined();
-    expect(row('Filter Stop Words in Search')).toBeUndefined();
+    expect(row('Synonym search')).toBeUndefined();
+    expect(row('Leave out filler words')).toBeUndefined();
     cleanup();
     renderSettings({ searchEnabled: true });
-    expect(row('Synonym Search')).toBeTruthy();
-    expect(row('Filter Stop Words in Search')).toBeTruthy();
+    expect(row('Synonym search')).toBeTruthy();
+    expect(row('Leave out filler words')).toBeTruthy();
   });
 
-  it('Restored Names vanishes only when BOTH title surfaces are off', () => {
+  it('Restored names vanishes only when BOTH title surfaces are off', () => {
     renderSettings({ showChapterTitle: false, showSectionHeadings: false });
-    expect(row('Restored Names')).toBeUndefined();
+    expect(row('Restored names')).toBeUndefined();
     cleanup();
     renderSettings({ showChapterTitle: false, showSectionHeadings: true });
-    expect(row('Restored Names')).toBeTruthy();
+    expect(row('Restored names')).toBeTruthy();
     cleanup();
     renderSettings({});
-    expect(row('Restored Names')).toBeTruthy();
+    expect(row('Restored names')).toBeTruthy();
   });
 
   // The three tabs (2026-11-10): one top bar everywhere, so the Compact | Icons choice and the gear, History and theme
   // chips changed nothing and left Settings (their stored keys stay); the bookmark is the one icon left to choose.
-  it('the Top bar group holds the reading page’s bookmark switch and nothing that does nothing', () => {
+  it('Buttons and tools holds the reading page’s bookmark switch and nothing that does nothing', () => {
     const onToggle = vi.fn();
     renderSettings({}, { onToggle });
     expect(screen.queryByRole('radiogroup', { name: 'Top Bar' })).toBeNull();
     for (const name of ['Settings Gear', 'Theme', 'Compact Top Bar']) expect(screen.queryByRole('switch', { name })).toBeNull();
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
-    fireEvent.click(screen.getByRole('switch', { name: 'Bookmark' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Bookmark button' }));
     expect(onToggle).toHaveBeenCalledWith('showBookmarkNav');
   });
 });
@@ -1365,7 +1429,7 @@ describe('fullscreen gesture setting', () => {
   it('keeps the fullscreen shortcut enabled by default and wires its switch to the canonical key', () => {
     const onToggle = vi.fn();
     renderSettings({}, { onToggle });
-    const fullscreen = row('Double-Tap / Click Fullscreen');
+    const fullscreen = row('Double-tap for full screen');
     expect(fullscreen).toBeTruthy();
     expect(fullscreen.querySelector('input[role="switch"]').checked).toBe(true);
     fireEvent.click(fullscreen.querySelector('input[role="switch"]'));
@@ -1379,13 +1443,13 @@ describe('Reading Font picker wiring', () => {
   it('replaces the old Modern Fonts toggle inside Appearance', () => {
     renderSettings();
     expect(row('Modern Fonts')).toBeUndefined();
-    expect(row('Reading Font')).toBeTruthy();
+    expect(row('Reading font')).toBeTruthy();
   });
 
   it('is a dropdown: the trigger opens the standard select sheet with all fonts', () => {
     renderSettings({ fontStyle: 'classic' });
     expect(document.querySelector('.select-sheet')).toBeNull();
-    fireEvent.click(within(row('Reading Font')).getByText('System Serif'));
+    fireEvent.click(within(row('Reading font')).getByText('System Serif'));
     expect(document.querySelector('.select-sheet')).toBeTruthy();
     expect(document.querySelectorAll('.select-sheet-option').length).toBeGreaterThan(10);
   });
@@ -1393,7 +1457,7 @@ describe('Reading Font picker wiring', () => {
   it('selecting a built-in font writes settings.fontStyle through onSetting', async () => {
     const onSetting = vi.fn();
     renderSettings({ fontStyle: 'classic' }, { onSetting });
-    fireEvent.click(within(row('Reading Font')).getByText('System Serif'));
+    fireEvent.click(within(row('Reading font')).getByText('System Serif'));
     const eb = [...document.querySelectorAll('.select-sheet-option')]
       .find((o) => o.querySelector('.select-sheet-option-label').textContent === 'EB Garamond');
     fireEvent.click(eb);
@@ -1467,7 +1531,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     return { build, captured };
   };
 
@@ -1492,7 +1556,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     const el = await vi.waitFor(() => {
       const found = document.getElementById('vot-toast-export-escape');
@@ -1544,11 +1608,11 @@ describe('Your Data: the last backup and the automatic snapshots (datasafe 10-05
   it('says when this device last exported, or that it has not', () => {
     localStorage.removeItem('vot-last-export');      // an earlier case's export stamped it
     renderSettings();
-    expect(document.body.textContent).toContain('Not exported from this device yet');
+    expect(document.body.textContent).toContain('Not backed up from this phone yet');
     cleanup();
     localStorage.setItem('vot-last-export', String(Date.now()));
     renderSettings();
-    expect(document.body.textContent).toContain('Exported today');
+    expect(document.body.textContent).toContain('Backed up today');
   });
 
   it('shows the newest automatic snapshot and where it is kept', async () => {

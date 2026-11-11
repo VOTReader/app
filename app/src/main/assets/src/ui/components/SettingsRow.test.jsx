@@ -23,24 +23,16 @@ import { SettingsRow } from './SettingsRow.jsx';
 afterEach(cleanup);
 
 describe('SettingsRow (compact + ⓘ reveal)', () => {
-  it('hides the description until the ⓘ button is tapped', () => {
+  // WS1 settings (U 8.7, 2026-11-11): a row is its name, its plain line and the control; no "i" to open.
+  it('shows the description under the name, always', () => {
     render(<SettingsRow label="Modern Fonts" desc="Use Cinzel headings." checked={false} onToggle={() => {}} />);
-    expect(screen.queryByText('Use Cinzel headings.')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Show description for Modern Fonts'));
     expect(screen.getByText('Use Cinzel headings.')).toBeTruthy();
+    expect(screen.queryByLabelText('Show description for Modern Fonts')).toBeNull();
   });
 
-  it('collapses the description again on a second tap', () => {
-    render(<SettingsRow label="X" desc="Hello desc." checked={false} onToggle={() => {}} />);
-    fireEvent.click(screen.getByLabelText('Show description for X'));
-    expect(screen.getByText('Hello desc.')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Hide description for X'));
-    expect(screen.queryByText('Hello desc.')).toBeNull();
-  });
-
-  it('renders no ⓘ button when there is no description', () => {
-    render(<SettingsRow label="Bare" checked={false} onToggle={() => {}} />);
-    expect(screen.queryByLabelText('Show description for Bare')).toBeNull();
+  it('renders no description line when there is none', () => {
+    const { container } = render(<SettingsRow label="Bare" checked={false} onToggle={() => {}} />);
+    expect(container.querySelector('.settings-row-desc')).toBeNull();
   });
 
   it('fires onToggle when the switch is changed', () => {
@@ -92,15 +84,9 @@ describe('SettingsRow — P1-9 named switch (TalkBack)', () => {
 
 // s15.9: a shown description is tied to the ⓘ that opened it and describes the switch; hidden, nothing points at it.
 describe('SettingsRow — description links', () => {
-  it('links the description to the info button and the switch only while it is shown', () => {
+  it('the description describes the switch', () => {
     render(<SettingsRow label="Tabs" desc="Run many places at once." checked={false} onToggle={() => {}} />);
-    const sw = screen.getByRole('switch', { name: 'Tabs' });
-    const info = screen.getByLabelText('Show description for Tabs');
-    expect(info.hasAttribute('aria-controls')).toBe(false);
-    expect(sw.hasAttribute('aria-describedby')).toBe(false);
-    fireEvent.click(info);
-    const id = sw.getAttribute('aria-describedby');
+    const id = screen.getByRole('switch', { name: 'Tabs' }).getAttribute('aria-describedby');
     expect(document.getElementById(id).textContent).toBe('Run many places at once.');
-    expect(screen.getByLabelText('Hide description for Tabs').getAttribute('aria-controls')).toBe(id);
   });
 });

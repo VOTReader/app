@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    format-bytes — human-readable byte size formatter
    ═══════════════════════════════════════════════════════════════════════
-   Pure helper. Used by W2.5's storage display in Settings → Your Data
+   Pure helper. Used by W2.5's storage display in Settings → Your data
    and by the W2.5 export payload's storageQuota / storageUsed diagnostic
    fields (which are kept as raw bytes — formatting is a presentation
    concern, not a wire-format one).

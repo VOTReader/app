@@ -40,7 +40,7 @@ const MANIFEST = {
 let votbak;
 
 const btn = (text) => [...document.querySelectorAll('button')]
-  .find((b) => (b.textContent || '').trim() === text);
+  .find((b) => (b.getAttribute('aria-label') || b.textContent || '').trim() === text);
 const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
 
 /** Every call the freeze touches, in order. */
@@ -81,9 +81,9 @@ async function importBackup(applyResult) {
     applyV3: () => { log.push('apply'); return Promise.resolve(applyResult); },
   });
   renderSettings();
-  await act(async () => { btn('Import').click(); });
+  await act(async () => { btn('Restore from a backup').click(); });
   await settle();
-  const confirm = btn('Import & Overwrite');
+  const confirm = btn('Restore and overwrite');
   expect(confirm, 'the import confirm sheet did not open - this case measured nothing').toBeTruthy();
   await act(async () => { confirm.click(); });
   await settle();
@@ -96,10 +96,10 @@ async function wipeEverything(failing) {
     AudioPlayer: { stop: () => { log.push('stop'); }, getState: () => ({ status: 'playing' }) },
   });
   renderSettings();
-  await act(async () => { btn('Clear All My Data').click(); });
+  await act(async () => { btn('Delete all my data').click(); });
   const input = screen.getByLabelText('Type DELETE to confirm');
   await act(async () => { fireEvent.change(input, { target: { value: 'DELETE' } }); });
-  await act(async () => { btn('Delete Everything').click(); });
+  await act(async () => { btn('Delete everything').click(); });
   await settle();
   await settle();
 }

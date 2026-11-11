@@ -10,6 +10,8 @@
 
 import { inertAttr } from '../../utils/inert-attr.js';
 import { OPEN_EVENT, byDay } from '../../utils/whats-new.js';
+import { EmptyState, ListRow } from './UiParts.jsx';
+import { LinkRow, tourMeta } from './about-parts.jsx';
 
 export function WhatsNewSheet() {
   const [items, setItems] = React.useState(/** @type {{ t: number, text: string }[] | null} */ (null));
@@ -22,6 +24,8 @@ export function WhatsNewSheet() {
     return () => window.removeEventListener(OPEN_EVENT, open);
   }, []);
   const close = () => setItems(null);
+  // WS3 settings (ab-new): Back and Escape close the sheet first, not the screen under it (the modal-registry global).
+  useModalRegistry({ id: 'whats-new-sheet', dismiss: close, active: isOpen });
   if (!isOpen) return null;   // nothing in the page until it is asked for
   const days = byDay(items);
   return ReactDOM.createPortal(
@@ -30,8 +34,19 @@ export function WhatsNewSheet() {
       <div className={`fn-sheet whats-new-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role="dialog"
         aria-modal={!rail && isOpen ? 'true' : undefined} aria-hidden={!isOpen} {...inertAttr(!isOpen)} aria-label="What's new">
         <SheetHandle onClose={close} />
-        <div className="fn-sheet-num">What&rsquo;s new</div>
-        {!days.length && <p className="whats-new-none">Nothing new to tell yet.</p>}
+        <div className="ui-sheet-head ws3-new-head"><h2 className="ui-sheet-title">What&rsquo;s new</h2></div>
+        {/* WS3 settings (ab-new): an empty list still leads somewhere. */}
+        {!days.length && (
+          <div className="ws3-new-empty">
+            <EmptyState icon="spark" title="Nothing new to tell yet." text="When an update changes something you will notice, it is listed here, newest first." />
+            <div className="ui-group is-inset">
+              {typeof TourController !== 'undefined' ? (
+                <ListRow icon="help" title="Show me around" meta={tourMeta()} onClick={() => { close(); TourController.start('settings'); }} />
+              ) : null}
+              <LinkRow href="https://www.thevolumesoftruth.com" icon="out" title="thevolumesoftruth.com" meta="The canonical text, audio, video and PDFs" />
+            </div>
+          </div>
+        )}
         {days.map((d) => (
           <section key={d.day} className="whats-new-day-group">
             <h3 className="whats-new-day">{d.day}</h3>

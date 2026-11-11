@@ -48,30 +48,30 @@ describe('ErrorBoundary — E4 crash-loop guard', () => {
     expect(getByText('all good')).toBeTruthy();
   });
 
-  it('first crash shows Reload App but NOT Reset to Home', () => {
+  it('first crash shows Reload app but NOT Go to the Read tab', () => {
     const { getByText, queryByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
-    expect(getByText('Reload App')).toBeTruthy();
-    expect(queryByText('Reset to Home')).toBeNull();
+    expect(getByText('Reload app')).toBeTruthy();
+    expect(queryByText('Go to the Read tab')).toBeNull();
     expect(sessionStorage.getItem('vot-crash-count')).toBe('1');
   });
 
-  it('a 2nd crash within the window surfaces Reset to Home', () => {
+  it('a 2nd crash within the window surfaces Go to the Read tab', () => {
     // first crash, then unmount to mimic a reload
     render(<ErrorBoundary><Boom /></ErrorBoundary>);
     cleanup();
     // second crash with the counter persisted across the "reload"
     const { getByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
-    expect(getByText('Reset to Home')).toBeTruthy();
+    expect(getByText('Go to the Read tab')).toBeTruthy();
     expect(sessionStorage.getItem('vot-crash-count')).toBe('2');
   });
 
-  it('clicking Reset to Home sets the one-shot recover flag', () => {
+  it('clicking Go to the Read tab sets the one-shot recover flag', () => {
     render(<ErrorBoundary><Boom /></ErrorBoundary>);
     cleanup();
     const { getByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
     // sessionStorage.setItem runs before location.reload() in the handler;
     // with the file-level location stub, the reload itself is observable too.
-    fireEvent.click(getByText('Reset to Home'));
+    fireEvent.click(getByText('Go to the Read tab'));
     expect(sessionStorage.getItem('vot-crash-recover')).toBe('1');
     expect(window.location.reload).toHaveBeenCalledTimes(1);
   });
@@ -92,7 +92,7 @@ describe('ErrorBoundary — ERR3 custom fallback (AppShell chrome boundaries)', 
     sheet.unmount();
     const { getByText, queryByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
     expect(getByText('Something went wrong')).toBeTruthy();
-    expect(queryByText('Reset to Home')).toBeNull();
+    expect(queryByText('Go to the Read tab')).toBeNull();
     expect(queryByText(/keeps failing/)).toBeNull();
     expect(sessionStorage.getItem('vot-crash-count')).toBe('1');
   });
@@ -146,9 +146,9 @@ describe('ErrorBoundary — the crash panel follows the theme', () => {
     const { container } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
     const panel = /** @type {HTMLElement} */ (container.querySelector('.vot-crash-panel'));
     const style = panel.getAttribute('style') || '';
-    expect(style).toMatch(/color:\s*var\(--gold/);
+    expect(style).toMatch(/color:\s*var\(--text-1/);
     expect(style).toMatch(/background:\s*var\(--bg/);
     const btn = /** @type {HTMLElement} */ (panel.querySelector('button'));
-    expect(btn.getAttribute('style') || '').toMatch(/var\(--gold/);
+    expect(btn.className).toContain('ui-btn');  // WS6: the shared button, its colours from the tokens in app.css
   });
 });

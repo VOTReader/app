@@ -171,9 +171,9 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
     expect(banner.textContent).toContain('50.0 MB');
   });
 
-  it('shows "Export data" button', () => {
+  it('shows "Back up" button', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.WARNING, remaining: 30e6 });
-    expect(container.querySelector('.sh-banner-btn').textContent).toBe('Export data');
+    expect(container.querySelector('.sh-banner-btn').textContent).toBe('Back up');
   });
 
   it('is NOT dismissable', () => {
@@ -234,7 +234,7 @@ describe('StorageHealthBanner — scenario 7 (critical)', () => {
     });
     const banner = container.querySelector('.sh-banner');
     expect(banner.className).toContain('sh-banner-danger');
-    expect(banner.textContent).toContain("couldn't be saved");
+    expect(banner.textContent).toContain('could not be saved');
   });
 
   it('is NOT dismissable', () => {
@@ -248,7 +248,7 @@ describe('StorageHealthBanner — scenario 7 (critical)', () => {
       writeFailedThisSession: true,
       remaining: 10e6,
     });
-    expect(container.querySelector('.sh-banner').textContent).toContain("couldn't be saved");
+    expect(container.querySelector('.sh-banner').textContent).toContain('could not be saved');
   });
 });
 
@@ -335,7 +335,7 @@ describe('StorageHealthBanner — priority', () => {
       writeFailedThisSession: true,
       privateModeLikely: true,
     });
-    expect(container.querySelector('.sh-banner').textContent).toContain("couldn't be saved");
+    expect(container.querySelector('.sh-banner').textContent).toContain('could not be saved');
   });
 
   it('WARNING > CAUTION not-persisted', () => {
@@ -382,7 +382,7 @@ describe('StorageHealthBanner — shares the strip with the offline library (B5)
     const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY });
     const strip = container.querySelector('.offline-library-banner');
     expect(strip).not.toBeNull();
-    expect(strip && strip.textContent).toContain('Offline library incomplete.');
+    expect(strip && strip.textContent).toContain('Offline library incomplete');
   });
 
   it('a storage scenario takes the strip even when the offline library is incomplete', async () => {

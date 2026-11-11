@@ -226,14 +226,14 @@ export function EmptyState({ icon = 'info', title, text, action = null }) {
  * a red edge, announced at once), 'warn' (running low: amber edge), 'info' (plain). `inline` puts one action at the right
  * of a one-line notice ("Retry").
  * @param {{ tone?: 'info' | 'warn' | 'danger', icon?: string, title: any, text?: any,
- *   actions?: Array<{ label: string, onClick: () => void, kind?: 'primary' | 'secondary' | 'text' }>,
+ *   actions?: Array<{ label: string, onClick: () => void, kind?: 'primary' | 'secondary' | 'text', className?: string }>,
  *   onDismiss?: () => void, dismissLabel?: string, inline?: boolean, className?: string }} props
  */
 export function Notice({ tone = 'info', icon, title, text, actions = [], onDismiss, dismissLabel = 'Dismiss', inline = false, className = '' }) {
   const glyph = icon || (tone === 'info' ? 'info' : 'data');
   const acts = (actions || []).filter(Boolean);
   const buttons = acts.map((a, i) => (
-    <UiButton key={i} small kind={a.kind || (tone === 'danger' && i === 0 ? 'primary' : 'secondary')} onClick={a.onClick}>{a.label}</UiButton>
+    <UiButton key={i} small kind={a.kind || (tone === 'danger' && i === 0 ? 'primary' : 'secondary')} onClick={a.onClick} className={a.className}>{a.label}</UiButton>
   ));
   return (
     <div className={cx('ui-notice', 'is-' + tone, inline && 'is-inline', className)} role={tone === 'danger' ? 'alert' : 'status'}>

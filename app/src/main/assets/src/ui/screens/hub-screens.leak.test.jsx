@@ -194,7 +194,7 @@ describe('leaks — the Garden', () => {
     const l = new Set();
     put('GardenPosStore', { getState: () => 'loaded', get: () => 0, set: noop, subscribe: (cb) => { l.add(cb); return () => { l.delete(cb); }; } });
     await leakFree('GardenView', () => render(<GardenView page={3} onPageChange={noop} onBack={noop} theme="dark" onThemeChange={noop} tier="std" />),
-      (r) => { fireEvent.click(r.getByRole('button', { name: /jump to a page/ })); });
+      (r) => { fireEvent.click(r.getByRole('button', { name: /go to a page/ })); });
   });
 });
 
@@ -207,6 +207,6 @@ describe('leaks — Settings', () => {
   it('Settings with the Clear All My Data dialog open', async () => {
     setupSettingsGlobals({ ScreenLayout: Layout });
     // Each mount starts from the same stored state (the harness's group-expand clicks are remembered).
-    await leakFree('SettingsScreen + dialog', () => { localStorage.clear(); return renderSettings(); }, (r) => { fireEvent.click(r.getByRole('button', { name: 'Clear All My Data' })); });
+    await leakFree('SettingsScreen + dialog', () => { localStorage.clear(); return renderSettings(); }, (r) => { fireEvent.click(r.getByRole('button', { name: 'Delete all my data' })); });
   });
 });

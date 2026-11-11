@@ -1,7 +1,7 @@
 // @ts-nocheck — tests construct partial payloads for all 14 stores
 /* W2.6 — replaceAll/setAll/set across every importable store.
    ─────────────────────────────────────────────────────────────
-   The Settings → Your Data → Import path is the ONLY backup
+   The Settings → Your data → Import path is the ONLY backup
    restore mechanism in the app (no cloud sync, no Play Store,
    no account-keyed server state). If replaceAll silently drops
    a payload or leaves the store in an unusable state on

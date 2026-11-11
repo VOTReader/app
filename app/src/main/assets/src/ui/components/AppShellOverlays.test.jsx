@@ -108,7 +108,7 @@ describe('Garden tier choice', () => {
     );
     const opts = [...document.querySelectorAll('.garden-tier-option')];
     expect(opts.length).toBeGreaterThan(1);
-    const pressed = opts.map((b) => b.getAttribute('aria-pressed'));
+    const pressed = opts.map((b) => b.getAttribute('aria-checked'));
     expect(pressed.filter((v) => v === 'true').length).toBe(1);
     expect(pressed.every((v) => v === 'true' || v === 'false')).toBe(true);
     expect(opts.every((b) => b.getAttribute('type') === 'button')).toBe(true);
@@ -117,7 +117,7 @@ describe('Garden tier choice', () => {
 
 // U09.6: offline, the gate's Wi-Fi and size talk led on to "Failed to load"; it says it needs a connection instead.
 describe('Garden gate offline', () => {
-  it('says the pictures need a connection and offers only Go Back', () => {
+  it('says the pictures need a connection and offers only Go back', () => {
     const was = Object.getOwnPropertyDescriptor(window.navigator, 'onLine');
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     try {
@@ -138,9 +138,9 @@ describe('Garden gate offline', () => {
           setScreen={noop}
         />,
       );
-      expect(document.getElementById('garden-warning-title').textContent).toBe('No connection');
+      expect(document.querySelector('.garden-gate .ui-sheet-title').textContent).toBe('No connection');
       expect(document.querySelectorAll('.garden-tier-option').length).toBe(0);
-      expect([...document.querySelectorAll('.garden-warning-btn')].map((b) => b.textContent)).toEqual(['Go Back']);
+      expect([...document.querySelectorAll('.garden-gate button.ui-btn')].map((b) => b.textContent)).toEqual(['Go back']);
     } finally {
       if (was) Object.defineProperty(window.navigator, 'onLine', was); else delete /** @type {any} */ (window.navigator).onLine;
     }
