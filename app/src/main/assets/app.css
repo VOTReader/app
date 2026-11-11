@@ -554,6 +554,7 @@
         --fs-16:  1rem;        --fsc-16:  16px;   /* body / reading anchor */
         --fs-18:  1.125rem;    --fsc-18:  18px;
         --fs-20:  1.25rem;     --fsc-20:  20px;
+        --fs-22:  1.375rem;    --fsc-22:  22px;   /* the top bar's title (the UI pass, 2026-11-11) */
         --fs-24:  1.5rem;      --fsc-24:  24px;
         --fs-30:  1.875rem;    --fsc-30:  30px;
         --fs-36:  2.25rem;     --fsc-36:  36px;
@@ -600,6 +601,73 @@
         --settings-warning: #d18f2e;   /* warning amber (Clear Progress) */
         --input-text:       var(--cream);  /* light mode override below */
         --white:            #ffffff;       /* pure white (theme-agnostic) */
+      }
+      /* ══ THE UI PASS TOKENS (W1, 2026-11-11; R/U-ui-general-pass.md §1-2, mock/v2/base.css) ══
+         Everything AROUND the content reads these: surfaces instead of outlines, gold only where you can act or
+         where you are, two faces with jobs (serif names things, the UI face does controls and facts), seven text
+         sizes, one 4 px rhythm, four corner sizes. The older tokens above stay for the code that still reads
+         them; a role that already had a token aliases it (--accent IS --gold) so the two cannot drift.
+         The light twins are in body.light below. Usage, per group: R/build/COMPONENTS.md. */
+      :root {
+        /* surfaces: the page, then one step up each (no borders; rows split by an inset hairline) */
+        --surface-1:   #131312;   /* cards, groups, fields, sheets */
+        --surface-2:   #1f1e1b;   /* icon chips, selected, pressed, a card inside a card */
+        --surface-3:   #2b2925;   /* a chip on surface-2, the selected segment, the grab handle */
+        --hairline:    rgba(255,255,255,0.085);
+        --tabbar-bg:   #0b0b0a;
+        --scrim:       rgba(0,0,0,0.6);
+        --shadow-float: 0 6px 20px rgba(0,0,0,0.5);
+        /* text: names and values (1), facts (2), chevrons and "None yet" (3, never for needed text) */
+        --text-1:      #f2eee6;
+        --text-2:      #aaa59a;
+        --text-3:      #7a766d;
+        /* accent: the gold, its ink on a gold fill, and its soft fill (selected chip, active tab) */
+        --accent:      var(--gold);
+        --accent-ink:  #1a1407;
+        --accent-soft: rgba(214,179,95,0.15);
+        --accent-ring: rgba(214,179,95,0.4);
+        --tone-danger: #e2776b;   /* destroying something, a failed save */
+        --tone-warn:   #d9a03c;   /* running low */
+        /* faces */
+        --font-serif:  var(--font-body);   /* the reader's face: titles, row and tile names, reading */
+        --font-ui:     Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;   /* under 15 px and every control */
+        /* the seven text sizes (rule 4) + the two between them the mocks use. Content sizes are --fs (they grow with
+           Text size); the bars' title is --fsc (chrome does not). */
+        --ts-display:  var(--fs-30);   /* a landing hero, serif 600 */
+        --ts-title:    var(--fsc-22);  /* the top bar's title, serif 700 */
+        --ts-sheet:    var(--fs-20);   /* a sheet's or a continue card's title, serif 700 */
+        --ts-headline: var(--fs-18);   /* row and tile titles, serif 600 */
+        --ts-body:     var(--fs-16);
+        --ts-control:  var(--fs-15);   /* buttons, fields: ui 500 */
+        --ts-value:    var(--fs-14);   /* a row's value, a chip, a segment: ui */
+        --ts-meta:     var(--fs-13);   /* the one meta line: ui 400, --text-2 */
+        --ts-label:    var(--fs-12);   /* the section label: ui 600 caps .09em gold; tab labels 12 ui 500 */
+        --lh-headline: 1.28; --lh-meta: 1.38; --lh-label: 1.34;
+        --track-label: 0.09em;
+        /* sizes */
+        --bar-h:       56px;   /* the top bar's row, under the inset */
+        --tap:         44px;   /* the smallest thing a finger presses */
+        --row-h:       64px;   /* a two-line row */
+        --row-h-1:     54px;   /* a one-line row */
+        --btn-h:       48px;   --btn-h-sm: 38px;
+        --field-h:     48px;
+        --chip-h:      38px;
+        --seg-h:       36px;
+        --icon-chip:   38px;   /* the square behind a row's icon */
+        --icon:        22px;   --icon-sm: 18px;
+        /* space: the 4 px grid */
+        --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-7: 28px; --sp-8: 32px;
+        --gutter:      20px;   /* every non-reader page's side margin */
+        --card-pad:    16px;
+        --grid-gap:    12px;
+        --label-above: 26px;   --label-below: 10px;
+        /* the four corners + the sheet's */
+        --r-card:  14px;   /* cards, tiles, groups, notices */
+        --r-field: 12px;   /* fields, segmented controls */
+        --r-chip:  10px;   /* icon chips, covers */
+        --r-pill:  999px;  /* buttons, chips */
+        --r-sheet: 20px;   /* a sheet's top corners */
+        --press:   120ms;  /* pressed: one surface step lighter for this long */
       }
       /* ── BOTTOM DOCK (cz1, 2026-10-05) ── one stack owns where every floating
          bottom control sits, so none of them can land on another. Rows, bottom up:
@@ -713,6 +781,24 @@
         --danger:      #a02622;   /* a11y-ux-1: :root's #ef9a9a is tuned for the dark theme (9.36:1 on dark --bg3) and had no light override, so every light-theme danger/delete site was falling through to it at 1.61-1.93:1 against light bg/bg2/bg3; this clears WCAG AA 4.5:1 on all three (6.73:1 / 6.09:1 / 5.62:1) */
         --accent-pink: #c2185b;
         --input-text:  #2a2520;   /* near-black with brown tint, softer than #000 */
+        /* The UI pass's light twins (W1): surface-1 one step lighter than the cream page, 2 and 3 darker; today's ink;
+           the tab bar's taupe for facts (5.6:1); a lighter taupe for chevrons (3:1 floor); today's dark gold. */
+        --surface-1:   #fdfaf3;
+        --surface-2:   #ede6d7;
+        --surface-3:   #e0d7c5;
+        --hairline:    rgba(0,0,0,0.08);
+        --tabbar-bg:   #f1ebdf;
+        --scrim:       rgba(36,27,12,0.42);
+        --shadow-float: 0 6px 20px rgba(0,0,0,0.16);
+        --text-1:      var(--cream);
+        --text-2:      #6b6253;
+        --text-3:      #8a8070;
+        --accent:      var(--gold);   /* restated: :root's var(--gold) was resolved there, to the dark gold */
+        --accent-ink:  #ffffff;
+        --accent-soft: rgba(122,92,16,0.12);
+        --accent-ring: rgba(122,92,16,0.45);
+        --tone-danger: #a02622;
+        --tone-warn:   #8a5a00;
       }
       body.light .top-nav { background: rgba(247,242,232,0.95); }
       /* ── Right-cluster alignment ──────────────────────────────────────────
