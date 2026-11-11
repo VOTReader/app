@@ -106,7 +106,7 @@ describe('the Listening Library hub: Downloads (item 8; downloads brief D3, pict
     const onOpenOffline = vi.fn();
     hub(onOpenOffline);
     const row = screen.getByText('Downloads').closest('button');
-    expect(row.textContent).toContain('2 on this phone · 30 MB');
+    expect(row.textContent).toContain('2 recordings · 30 MB');
     fireEvent.click(row);
     expect(onOpenOffline).toHaveBeenCalledTimes(1);
   });

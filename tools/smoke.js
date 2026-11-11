@@ -369,7 +369,7 @@
         } },
       { screen: 'audio-library', label: 'Listen tab',
         open: async function () { await goHome(); return openTab('Listen'); },
-        there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
+        there: function () { return /Recordings and songs you starred/.test(document.body.textContent || ''); } },
       { screen: 'settings', label: 'the gear → Settings',
         open: async function () { await goHome(); return openSettings(); },
         there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
@@ -577,7 +577,7 @@
       openTab('Listen'); await sleep(360);
       const body = document.body.textContent || '';
       // The Listen tab's own furniture: the saved doorway + one doorway per source.
-      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /The Bible/.test(body);
+      return /Recordings and songs you starred/.test(body) && /The Volumes of Truth/.test(body) && /The Bible/.test(body);
     });
     await step('Listening → The Volumes', async function () {
       await goHome();
