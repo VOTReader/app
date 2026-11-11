@@ -16,6 +16,7 @@ import { readingBlocksIn, readingRange } from '../../utils/reading-range.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // A dragged selection stays in the reading column and scrolls it gently at the edges (rs1); the bottom dock's top.
 import { startSelectionDrag, selectionDragging, dockTop } from './selection-drag.js';
+import { hasWordChar, nearestWordRange } from './selection-word.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 import { snapshotGroups, offerUndoRemoved, offerUndoAdded } from '../../utils/annotation-undo.js';
@@ -546,7 +547,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         setVisible(false);
         return;
       }
-      const live = sel.getRangeAt(0);
+      let live = sel.getRangeAt(0);
+      // Half-baked 14: a selection with no letter or digit in it (a comma) grows to the nearest word first, so a
+      // colour tap always marks something.
+      try {
+        const held = sel.toString();
+        if (held.trim() && !hasWordChar(held)) {
+          const grown = nearestWordRange(live);
+          if (grown) { sel.removeAllRanges(); sel.addRange(grown); live = sel.getRangeAt(0); }
+        }
+      } catch (_e) { /* keep the selection as it was */ }
       // rs1: every action reads the reading text the selection covers (utils/reading-range.js). An end on a verse
       // number or in the space between two verses belongs to the verse beside it, and a number alone is its verse,
       // so taking in a number never reshapes the toolbar (it lost Listen from here and Repeat, Corbin 2026-10-22).
