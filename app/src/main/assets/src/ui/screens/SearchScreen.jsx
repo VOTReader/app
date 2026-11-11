@@ -8,6 +8,7 @@ import { pickTopic, topicTexts, withOwnPassage } from '../components/srch-topic.
 import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
 import { UiIcon } from '../components/UiIcon.jsx';
+import { SelectSheet } from '../components/SelectField.jsx';
 import { translationLabel } from '../../data/translations.js';
 import { cardHeads } from '../components/SrchCard.jsx';
 
@@ -489,6 +490,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // changed nothing a reader could see (Corbin 2026-10-14, sr12). Book order now
   // drops Best Matches (relevance's row) and opens every collection in reading order.
   const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
+  const [sortOpen, setSortOpen] = React.useState(false);
   // The order holds while the query is refined (search200 audit 146: each key typed dropped Book order back to
   // Relevance mid-word) and starts over once the box is cleared.
   React.useEffect(() => { if (!(query || '').trim()) setSortMode('relevance'); }, [query]);
@@ -1053,6 +1055,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       <div className="search-screen" ref={screenRef}>
         <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{liveText}</div>
 
+        {/* FA (s-empty, s-ref, s-none, s-slash): the tabs come with results, as the mock draws them; a tab other than All
+            stays so the reader can always get back to All. */}
+        {(qTrim && !qTrim.startsWith('/') && !(engineNav && directEntries.length > 0) && !(isDone && state.results.length === 0))
+          || (settings.searchCorpus || 'all') !== 'all' ? (
         <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
           {[
             { k: 'all', label: 'All' },
@@ -1071,6 +1077,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             );
           })}
         </div>
+        ) : null}
 
         {searchContext && (
           <button
@@ -1266,11 +1273,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               </span>
               {/* [8] the order switch: both orders named, the one in use lit (one sort label, search200 audit 144). */}
               {sortToggleVisible ? (
-                <div className="srch-sort" role="group" aria-label="Order results">
-                  <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
-                    onClick={() => setSortMode('relevance')}>Relevance</button>
-                  <button type="button" className={'srch-sort-btn' + (bookOrder ? ' active' : '')} aria-pressed={bookOrder}
-                    onClick={() => setSortMode('canonical')}>Book order</button>
+                /* FA (s-results): one "Relevance ⌄" control, as the mock; it opens the two orders as a choice */
+                <div className="srch-sort">
+                  <button type="button" className="srch-sort-btn srch-sort-pick" aria-haspopup="dialog" aria-label={'Order: ' + (bookOrder ? 'Book order' : 'Relevance')}
+                    onClick={() => setSortOpen(true)}>{bookOrder ? 'Book order' : 'Relevance'}<UiIcon name="down" size="sm" /></button>
+                  <SelectSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Order results" value={sortMode}
+                    options={[{ id: 'relevance', label: 'Relevance' }, { id: 'canonical', label: 'Book order' }]} onChange={(v) => setSortMode(v)} />
                 </div>
               ) : null}
             </div>

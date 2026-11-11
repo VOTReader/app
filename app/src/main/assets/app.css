@@ -4444,6 +4444,10 @@
     .srch-none-title { margin:0 0 6px; font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; color:var(--text-1); }
     .srch-no-results-tip, .srch-fewer { display:block; margin-top:4px; }
     /* ── end WA3 search ── */
+    /* ── FA search: the order as one "Relevance ⌄" control (mock search.html s-results) ── */
+    .srch-sort-btn.srch-sort-pick { display:inline-flex; align-items:center; gap:4px; color:var(--text-1); font-weight:500; }
+    .srch-sort-pick svg { color:var(--text-2); }
+    /* ── end FA search ── */
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }

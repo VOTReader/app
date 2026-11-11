@@ -132,7 +132,8 @@ describe('F: the topic card a question gets', () => {
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, parsedTerms: ['tithing'], results: tithing(0.95) }));
     await typeAndWait(baseProps(), 'what is tithing');
     expect(document.querySelector('.srch-topic')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Book order' }));
+    fireEvent.click(/** @type {Element} */ (document.querySelector('.srch-sort-pick')));
+    fireEvent.click(screen.getByRole('radio', { name: /Book order/ }));
     expect(document.querySelector('.srch-topic')).toBeNull();
   });
 });

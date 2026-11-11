@@ -30,6 +30,13 @@ const MAP = {
   pastor: ['shepherd', 'pastor'],
 };
 
+/* FA: the order is one "Relevance ⌄" control that opens a choice of the two orders */
+const orderNow = () => { const b = document.querySelector('.srch-sort-pick'); return b ? b.textContent : null; };
+const pickOrder = (/** @type {string} */ name) => {
+  fireEvent.click(/** @type {Element} */ (document.querySelector('.srch-sort-pick')));
+  fireEvent.click(/** @type {Element} */ ([...document.querySelectorAll('.select-sheet-option')].find((b) => b.textContent.startsWith(name))));
+};
+
 describe('relatedWordsFor / relatedWordsFound (search200 audit 145)', () => {
   it("names each typed word's group, typed words out, none for a phrase or with synonyms off", () => {
     expect(relatedWordsFor({ kind: 'text' }, ['shepherd'], MAP, true)).toEqual(['pastor']);
@@ -467,8 +474,11 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(document.querySelector('.srch-filter-row')).toBeNull();
     const row = document.querySelector('.srch-summary-head .srch-sort');
     expect(row, 'the sort row').toBeTruthy();
-    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn active', 'srch-sort-btn']);
-    expect([...row.querySelectorAll('.srch-sort-btn')].map((b) => b.textContent)).toEqual(['Relevance', 'Book order']);
+    // FA: one "Relevance ⌄" control (the mock's), opening the two orders as a choice
+    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn srch-sort-pick']);
+    expect(orderNow()).toBe('Relevance');
+    fireEvent.click(row.querySelector('.srch-sort-pick'));
+    expect([...document.querySelectorAll('.select-sheet-option-label')].map((b) => b.textContent)).toEqual(['Relevance', 'Book order']);
     vi.useRealTimers();
   });
 
@@ -604,12 +614,11 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     expect(document.querySelector('.stub-group').textContent).toBe('55,9,53,37');   // relevance
-    const btn = [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === 'Book order');
-    expect(btn, 'the toggle shows for letters alone').toBeTruthy();
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
-    fireEvent.click(btn);
+    expect(document.querySelector('.srch-sort-pick'), 'the order control shows for letters alone').toBeTruthy();
+    expect(orderNow()).toBe('Relevance');
+    pickOrder('Book order');
     expect(document.querySelector('.stub-group').textContent).toBe('9,37,53,55');
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(orderNow()).toBe('Book order');
     // A lone group keeps its full page (the short first page is for several collections at once).
     expect(document.querySelector('.stub-group').getAttribute('data-open')).toBe('true');
     expect(document.querySelector('.stub-group').getAttribute('data-page')).toBe('undefined');
@@ -643,11 +652,8 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     const groups = () => [...document.querySelectorAll('.stub-group')];
-    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
     // Relevance: Best Matches leads, the 37 results open as a closed contents list.
-    expect([...document.querySelectorAll('.srch-sort-btn')].map((b) => b.textContent), 'both orders are named in the switch').toEqual(['Relevance', 'Book order']);
-    expect(sw('Relevance').getAttribute('aria-pressed')).toBe('true');
-    expect(sw('Book order').getAttribute('aria-pressed')).toBe('false');
+    expect(orderNow()).toBe('Relevance');
     expect(document.querySelector('.srch-top-results'), 'Best Matches').toBeTruthy();
     // One sort label (search200 audit 144): the lit Relevance button says the order; no note or visible heading repeats it.
     // WA3: the old .srch-sort-note is gone; the order's note (Book order only) is text in .srch-syn-line.
@@ -656,10 +662,10 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(document.querySelector('.srch-top-results h2').className, 'the row keeps its heading for a screen reader only').toBe('sr-only');
     expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
     const relevanceShows = document.body.textContent;
-    fireEvent.click(sw('Book order'));
+    pickOrder('Book order');
     // Book order: what the reader sees changes.
     expect(document.body.textContent).not.toBe(relevanceShows);
-    expect(sw('Book order').getAttribute('aria-pressed')).toBe('true');
+    expect(orderNow()).toBe('Book order');
     expect(document.querySelector('.srch-top-results'), 'no relevance row under Book order').toBeNull();
     expect(document.querySelector('.srch-syn-line').textContent).toMatch(/Genesis to Revelation/);
     expect(groups().map((g) => g.getAttribute('data-key')), 'the original before its reprint').toEqual(['bible', 'v1', 'wtlb1']);
@@ -671,7 +677,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(bible[bible.length - 1]).toBe('malachi 3:6');
     expect(groups()[1].textContent.split(',').slice(0, 3)).toEqual(['v1#14', 'v1#19', 'v1#20']);
     // And back: relevance's screen again.
-    fireEvent.click(sw('Relevance'));
+    pickOrder('Relevance');
     expect(document.querySelector('.srch-top-results')).toBeTruthy();
     expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
     expect(document.body.textContent).toBe(relevanceShows);
@@ -705,14 +711,13 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     const groups = () => [...document.querySelectorAll('.stub-group')];
-    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
     const more = () => document.querySelector('.srch-loose-more');
     // Relevance is untouched: Best Matches, every result in its collection, no line.
     expect(document.querySelector('.srch-top-results')).toBeTruthy();
     expect(groups().map((g) => g.textContent.split(',').length)).toEqual([23, 14, 1]);
     expect(more()).toBeNull();
     const relevanceShows = document.body.textContent;
-    fireEvent.click(sw('Book order'));
+    pickOrder('Book order');
     expect(document.querySelector('.srch-top-results')).toBeNull();
     // The close matches only, each collection in reading order, the original before its reprint.
     expect(groups().map((g) => g.getAttribute('data-key'))).toEqual(['bible', 'v1', 'wtlb1']);
@@ -734,7 +739,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(loose[0].getAttribute('data-capped'), 'the capped collection says so on its loose list').toBe('true');
     expect(loose[1].textContent.split(',').slice(0, 2)).toEqual(['v1#18', 'v1#19']);
     // A new search starts with the line again; back to Relevance shows relevance's screen.
-    fireEvent.click(sw('Relevance'));
+    pickOrder('Relevance');
     expect(document.body.textContent).toBe(relevanceShows);
     vi.useRealTimers();
   });
@@ -755,7 +760,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       rerender(<SearchScreen {...props} query={'a passage typed out ' + mark} />);
       act(() => { vi.advanceTimersByTime(200); });
       await act(async () => { await Promise.resolve(); });
-      fireEvent.click([...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === 'Book order'));
+      pickOrder('Book order');
       expect([...document.querySelectorAll('.stub-group')].map((g) => g.textContent), String(mark)).toEqual(['genesis 1,john 3', 'v1#2,v1#9']);
       expect(document.querySelector('.srch-loose-more'), String(mark)).toBeNull();
       expect(document.querySelector('.srch-close-label'), String(mark)).toBeNull();
@@ -782,16 +787,15 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       act(() => { vi.advanceTimersByTime(200); });
       await act(async () => { await Promise.resolve(); });
     };
-    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
     await runQuery('faith');
-    fireEvent.click(sw('Book order'));
-    expect(sw('Book order').getAttribute('aria-pressed')).toBe('true');
+    pickOrder('Book order');
+    expect(orderNow()).toBe('Book order');
     await runQuery('faith w');
     await runQuery('faith works');
-    expect(sw('Book order').getAttribute('aria-pressed'), 'refining keeps the order').toBe('true');
+    expect(orderNow(), 'refining keeps the order').toBe('Book order');
     await runQuery('');
     await runQuery('grace');
-    expect(sw('Relevance').getAttribute('aria-pressed'), 'a cleared box starts over').toBe('true');
+    expect(orderNow(), 'a cleared box starts over').toBe('Relevance');
     vi.useRealTimers();
   });
 
