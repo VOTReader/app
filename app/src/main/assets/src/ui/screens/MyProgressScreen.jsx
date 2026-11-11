@@ -298,9 +298,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     // Lifetime reading time — the ledger's visibility-honest activeMs sum.
     ...(readingStats && readingStats.totalActiveMs > 60000
       ? [{ label: 'Time spent reading', value: _fmtDuration(readingStats.totalActiveMs) }] : []),
-    // Re-reads only appear once one exists — a zero here would just be noise.
+    // "Read more than once" only appears once one exists — a zero here would just be noise.
     ...(readingStats && readingStats.rereads > 0
-      ? [{ label: 'Re-reads', value: readingStats.rereads.toLocaleString('en-US') }] : []),
+      ? [{ label: 'Read more than once', value: readingStats.rereads.toLocaleString('en-US') }] : []),
   ];
   const journalFacts = [
     { label: 'Entries', value: journalCount.toLocaleString('en-US') },

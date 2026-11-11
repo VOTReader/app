@@ -295,9 +295,9 @@ export function MoreMenuBtn() {
             <span className="more-menu-row-label">Theme</span>
             <span className="more-menu-seg">
               <button type="button" role="menuitemradio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'on' : ''}
-                onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); }}>Dark</button>
+                onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); close(true); }}>Dark</button>
               <button type="button" role="menuitemradio" aria-checked={theme === 'light'} className={theme === 'light' ? 'on' : ''}
-                onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); }}>Light</button>
+                onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); close(true); }}>Light</button>
             </span>
           </div>
           <div className="more-menu-row" role="group" aria-label="Text size">

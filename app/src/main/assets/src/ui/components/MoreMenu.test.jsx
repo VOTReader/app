@@ -88,16 +88,21 @@ describe('MoreMenuBtn — the compact bar', () => {
     expect(s.menu()).toBeNull();
   });
 
-  it('the theme switches in place and the menu stays open; the current theme is checked and a no-op', () => {
+  it('choosing a theme switches it and closes the menu; the current theme is checked and a no-op; text size keeps it open', () => {
     const s = setup({ theme: 'dark' });
     s.open();
     expect(s.item('Dark').getAttribute('aria-checked')).toBe('true');
     expect(s.item('Light').getAttribute('aria-checked')).toBe('false');
     act(() => { fireEvent.click(s.item('Dark')); });
     expect(s.value.onThemeChange).not.toHaveBeenCalled();
+    expect(s.menu(), 'a tap on the current theme still closes it').toBeNull();
+    s.open();
     act(() => { fireEvent.click(s.item('Light')); });
     expect(s.value.onThemeChange).toHaveBeenCalledWith('light');
-    expect(s.menu(), 'stays open so the change is seen').not.toBeNull();
+    expect(s.menu(), 'choosing a theme closes the menu').toBeNull();
+    s.open();
+    act(() => { fireEvent.click(s.item('Larger text')); });
+    expect(s.menu(), 'text size keeps it open').not.toBeNull();
   });
 
   it('text size steps by 10 % in place, shows Standard at 100 %, and stops at the slider limits', () => {
