@@ -13,19 +13,11 @@
    screen. Read and Listen start at the first chapter or letter of today not
    read yet; what they open is the caller's (screen-routes).
 
-   Under the plans, one Answers question a day (QuestionRow, mockup
-   docs/mockups/question-of-the-day/a-foot-row.html): a hairline, "Question of
-   the day", "What does The Lord say about the Days of Noah?" and a chevron,
-   one button that opens the topic. The pick is utils/answers-question-day.js,
-   from the title index bundle-d already ships, so drawing it fetches nothing;
-   with no question (no index) the row is simply not there. With no plan and
-   no offer the card holds the question alone.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { volumeSequence } from '../../data/reading-plans.js';
 import { usePlanRuns, runRow } from '../../utils/plan-runs-view.js';
 import { useListenMinutes } from './OfflineAudioControls.jsx';
-import { answersQuestionOfDay, answersQuestionPool, shippedQuestionPool } from '../../utils/answers-question-day.js';
 
 /** The Volumes in site order from the loaded corpus; [] until it is in. */
 function volumesNow() {
@@ -88,38 +80,6 @@ export function useNow() {
 }
 
 /**
- * Today's Answers question, the same all day and turning at local midnight (useNow). `titles` stands in for the
- * shipped title index (tests); null or empty means no question.
- * @param {Record<string, string> | null} [titles]
- * @returns {{ id: string, subject: string, text: string } | null}
- */
-export function useQuestionOfDay(titles) {
-  const now = useNow();
-  const pool = React.useMemo(() => (titles === undefined ? shippedQuestionPool() : answersQuestionPool(titles)), [titles]);
-  const day = now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the local day: a visibility re-read on the same day keeps the object
-  return React.useMemo(() => answersQuestionOfDay(pool, now), [pool, day]);
-}
-
-/**
- * The question row: one button, at least 48 px, named for screen readers as "Question of the day: …".
- * @param {{ question: { id: string, subject: string, text: string }, onOpen: (id: string) => void, alone?: boolean }} props
- */
-function QuestionRow({ question, onOpen, alone = false }) {
-  const lead = question.text.slice(0, question.text.length - question.subject.length - 1);
-  return (
-    <button type="button" className={'today-q' + (alone ? ' today-q-alone' : '')} aria-label={'Question of the day: ' + question.text}
-      onClick={() => onOpen(question.id)}>
-      <span className="today-q-text" aria-hidden="true">
-        {alone ? null : <span className="today-q-eyebrow">Question of the day</span>}
-        <span className="today-q-line">{lead}<em>{question.subject}</em>?</span>
-      </span>
-      <span className="today-q-chev" aria-hidden="true">›</span>
-    </button>
-  );
-}
-
-/**
  * @typedef {{ id: string, name: string, loading: boolean, label: string, done: boolean, day: number,
  *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string,
  *   todayTicked?: number, todayCount?: number, minutes?: number }} TodayRow
@@ -164,23 +124,12 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen }
  * again; two plans list each with its day number; "Mark as read is off" is a button that turns it on.
  * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
  *   onOpenPlans: () => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
- *   offerStart?: boolean, onHideOffer?: () => void, tracksOf?: (refs: any[]) => any[],
- *   question?: { id: string, subject: string, text: string } | null, onOpenQuestion?: (id: string) => void }} props
+ *   offerStart?: boolean, onHideOffer?: () => void, tracksOf?: (refs: any[]) => any[] }} props
  */
-export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead, offerStart, onHideOffer, tracksOf, question, onOpenQuestion }) {
-  const q = question && onOpenQuestion ? <QuestionRow question={question} onOpen={onOpenQuestion} /> : null;
+export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead, offerStart, onHideOffer, tracksOf }) {
   if (!rows || !rows.length) {
     // C8: the way in when no plan runs (r2-home-states "No plan").
-    if (!offerStart) {
-      if (!question || !onOpenQuestion) return null;
-      // No plan and no offer: the card holds the question alone, its label in the head.
-      return (
-        <section className="today-card" aria-label="Question of the day">
-          <div className="today-head"><span className="today-eyebrow">Question of the day</span></div>
-          <QuestionRow question={question} onOpen={onOpenQuestion} alone />
-        </section>
-      );
-    }
+    if (!offerStart) return null;
     return (
       <section className="today-card" aria-label="Reading plans">
         <div className="today-head">
@@ -196,7 +145,6 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
             <button type="button" className="today-btn" onClick={onOpenPlans}>Browse plans</button>
           </div>
         </div>
-        {q}
       </section>
     );
   }
@@ -236,8 +184,7 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
             {r.again ? <button type="button" className="today-link" onClick={() => onRead(r.again, r.id)}>Read again</button> : null}
           </div>
           {foot}
-          {q}
-        </section>
+          </section>
       );
     }
     const ready = !r.loading && !!r.next;
@@ -263,7 +210,6 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
           ) : null}
         </div>
         {foot}
-        {q}
       </section>
     );
   }
@@ -294,7 +240,6 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
         <button type="button" className="today-btn today-btn-wide" onClick={() => onListen(listenOf(first), first.id)}>Listen to today</button>
       ) : null}
       {foot}
-      {q}
     </section>
   );
 }

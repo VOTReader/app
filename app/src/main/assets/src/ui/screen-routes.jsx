@@ -1160,7 +1160,6 @@ export function buildScreenRoutes({
         onEnableMarkAsRead={() => updateSetting('markAsRead', true)}
         onOpenPlans={goReadingPlans}
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
-        onOpenAnswersTopic={(/** @type {string} */ id) => _openAnswersTopic(id, null, 'Home')}
       />
     ),
     'about': () => (

@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
-import { TodayCard, useTodayRows, useQuestionOfDay } from '../components/TodayCard.jsx';
+import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
@@ -82,13 +82,11 @@ function ContinueRow({ entry, onContinue, onStartHere }) {
   );
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead, onOpenAnswersTopic }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
   // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
-  // The Answers question of the day under the plans (TodayCard.jsx): from the title index, nothing fetched.
-  const question = useQuestionOfDay();
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
   // Today offers one; "Not now" hides the offer on this device.
   const [offerHidden, setOfferHidden] = React.useState(() => { try { return localStorage.getItem(PLAN_OFFER_KEY) === '1'; } catch (_e) { return false; } });
@@ -375,8 +373,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}
-          offerStart={offerPlan} onHideOffer={hideOffer}
-          question={question} onOpenQuestion={onOpenAnswersTopic} />
+          offerStart={offerPlan} onHideOffer={hideOffer} />
         <nav className="home-shortcuts" aria-label="Quick access">
           {searchEnabled !== false && <button type="button" className="home-search-action" onClick={onSearch}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
