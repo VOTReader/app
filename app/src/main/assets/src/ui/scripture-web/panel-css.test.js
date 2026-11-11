@@ -173,17 +173,24 @@ describe('the docked panel (spec section 3)', () => {
      phone the panel's own credit is last in its scroll, below the fold, and the key hides, so no
      credit showed with a panel open. The legend keeps its tail there, the credit alone, at the
      canvas area's bottom-right, clear of ? and hide-UI at its bottom-left. */
+  // WA4: the credit is the key's second line (.sw-legend-sub) in the bottom bar, which ends at the
+  // docked panel's edge; with a panel open (phone and PC) the bar's key stays and only its cue line hides
   it('on a phone with the panel open, the legend keeps its CC-BY tail at the canvas area\'s foot', () => {
-    const keep = rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend');
-    expect(keep).toMatch(/display:\s*block/);
-    expect(keep).toMatch(/right:\s*calc\(var\(--sw-panel-w[^)]*\) \+ 16px\)/);
-    expect(rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line > :not(.sw-credit)')).toMatch(/display:\s*none/);
-    // PC pins the panel's own credit at its foot: the key and its tail both hide there
-    expect(rule('.sw-root.sw-panel-open .sw-legend')).toMatch(/display:\s*none/);
+    expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-wbot')).toMatch(/right:\s*calc\(var\(--sw-panel-w, 42%\) \+ 12px\)/);
+    const keep = rule('.sw-root.sw-panel-open .sw-wbot .sw-legend');
+    expect(keep, 'the key, its credit line, stays beside the docked panel').not.toBeNull();
+    expect(keep).toMatch(/display:\s*flex/);
+    // more specific than the old panel-open hide, and after it, so it wins inside the bar
+    expect(BARE.indexOf('.sw-root.sw-panel-open .sw-wbot .sw-legend {')).toBeGreaterThan(BARE.indexOf('.sw-root.sw-panel-open .sw-legend {'));
+    expect(rule('.sw-root.sw-panel-open .sw-wbot .sw-legend-line')).toMatch(/display:\s*none/);
+    expect(rule('.sw-root.sw-panel-open .sw-wbot .sw-legend-sub'), 'the credit line is not hidden').toBeNull();
   });
 
-  it('? and hide-UI move to the canvas area\'s bottom-left', () => {
-    expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-guide-btn')).toMatch(/left:\s*24px/);
+  // WA4: the ? left the screen (the ⋯ menu's How to read this web); the bottom bar stops at the
+  // docked panel's edge and rides above a sheet; Show controls still moves to the bottom-left
+  it('the bottom bar stops at the docked panel\'s edge, rides above a sheet; Show controls moves bottom-left', () => {
+    expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-wbot')).toMatch(/right:\s*calc\(var\(--sw-panel-w, 42%\) \+ 12px\)/);
+    expect(rule('.sw-root.sw-panel-open[data-panel="sheet"] .sw-wbot')).toMatch(/bottom:\s*calc\(var\(--sw-sheet-h, 60%\) \+ 10px\)/);
     expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-hide-all')).toMatch(/left:\s*80px/);
   });
 
@@ -415,10 +422,25 @@ describe('panel density (w4)', () => {
    count sits inline beside the title, right over the chosen verse's gold fan, and with a panel open
    it says nothing about what the reader chose. There it steps aside; the title stays. */
 describe('the web count with a verse open on a phone', () => {
+  // WA4: the count left the title for the key's second line (.sw-legend-sub), at the canvas area's
+  // foot beside the panel, never over the chosen verse's fan; with the credit it stays there, wrapping
+  // rather than clipping
   it('steps aside on compact with the panel open, and only the canon count', () => {
-    const r = rule('.sw-root.sw-compact.sw-panel-open .sw-title-count');
-    expect(r, 'the rule').not.toBeNull();
-    expect(r).toMatch(/visibility:\s*hidden/);
-    expect(BARE, 'never on a desk').not.toMatch(/\.sw-root\.sw-panel-open \.sw-title-count/);
+    expect(BARE).not.toMatch(/\.sw-title-count\b/);
+    const sub = rule('.sw-legend-sub');
+    expect(sub).toMatch(/text-align:\s*center/);
+    expect(sub).not.toMatch(/white-space:\s*nowrap|text-overflow:\s*ellipsis|overflow:\s*hidden/);
+    expect(rule('.sw-root.sw-panel-open .sw-wbot .sw-legend')).toMatch(/display:\s*flex/);
+  });
+});
+
+describe('a zoomed phone gives its deep band the room (WA4)', () => {
+  // WA4: zoomed in on a phone the key drops its cue line, keeping the count and credit line, so the
+  // deep band keeps its "+n" pills and verse numerals (overlay-canvas.test.js r3-03)
+  it('.sw-compact.sw-zoomed hides the key\'s cue line only, never the credit line', () => {
+    expect(rule('.sw-root.sw-compact.sw-zoomed .sw-wbot .sw-legend-line')).toMatch(/display:\s*none/);
+    expect(rule('.sw-root.sw-compact.sw-zoomed .sw-wbot .sw-legend-sub')).toBeNull();
+    expect(rule('.sw-root.sw-compact.sw-zoomed .sw-wbot .sw-legend')).toBeNull();
+    expect(rule('.sw-root.sw-zoomed .sw-wbot .sw-legend-line'), 'a PC keeps both lines').toBeNull();
   });
 });

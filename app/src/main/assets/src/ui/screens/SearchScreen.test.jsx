@@ -307,7 +307,9 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const hero = container.querySelector('.srch-empty-hero');
     expect(hero).not.toBeNull();
     expect(hero.textContent).not.toMatch(/study notes|footnotes/i);
-    expect(hero.textContent).toMatch(/Bible studies/);
+    // WA3: the all-tab line names what is searched in plain words: "The letters, the Bible, studies and Answers."
+    expect(hero.querySelector('p').textContent).toBe('The letters, the Bible, studies and Answers.');
+    expect(hero.querySelector('h2.sr-only').textContent).toBe('Search everything');
   });
 
   /* C2-C [C8]: the app's primary search field named itself only by
@@ -460,8 +462,10 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(document.body.textContent).not.toMatch(/\bWTLB\b/);
     // The corpus row is THE chip row: three pills, once.
     expect([...document.querySelectorAll('.srch-corpus-btn')].map((b) => b.textContent)).toEqual(['All', 'Scriptures', 'Volumes']);
-    // Two verses in a scripture group: the order switch shows, alone in its row, both orders named (sr12).
-    const row = document.querySelector('.srch-filter-row');
+    // Two verses in a scripture group: the order switch shows, alone in its group beside the count, both orders named (sr12).
+    // WA3: the old separate .srch-filter-row is gone; the switch sits in the summary head.
+    expect(document.querySelector('.srch-filter-row')).toBeNull();
+    const row = document.querySelector('.srch-summary-head .srch-sort');
     expect(row, 'the sort row').toBeTruthy();
     expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn active', 'srch-sort-btn']);
     expect([...row.querySelectorAll('.srch-sort-btn')].map((b) => b.textContent)).toEqual(['Relevance', 'Book order']);
@@ -646,7 +650,9 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(sw('Book order').getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('.srch-top-results'), 'Best Matches').toBeTruthy();
     // One sort label (search200 audit 144): the lit Relevance button says the order; no note or visible heading repeats it.
-    expect(document.querySelector('.srch-sort-note').textContent, 'no "Best matches first" note').toBe('');
+    // WA3: the old .srch-sort-note is gone; the order's note (Book order only) is text in .srch-syn-line.
+    expect(document.querySelector('.srch-sort-note')).toBeNull();
+    expect(document.querySelector('.srch-syn-line').textContent, 'no "Best matches first" note').not.toMatch(/best matches|Genesis to Revelation/i);
     expect(document.querySelector('.srch-top-results h2').className, 'the row keeps its heading for a screen reader only').toBe('sr-only');
     expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
     const relevanceShows = document.body.textContent;
@@ -655,7 +661,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(document.body.textContent).not.toBe(relevanceShows);
     expect(sw('Book order').getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelector('.srch-top-results'), 'no relevance row under Book order').toBeNull();
-    expect(document.querySelector('.srch-sort-note').textContent).toMatch(/Genesis to Revelation/);
+    expect(document.querySelector('.srch-syn-line').textContent).toMatch(/Genesis to Revelation/);
     expect(groups().map((g) => g.getAttribute('data-key')), 'the original before its reprint').toEqual(['bible', 'v1', 'wtlb1']);
     expect(groups().map((g) => g.getAttribute('data-open')), 'every collection open').toEqual(['true', 'true', 'true']);
     expect(groups().map((g) => g.getAttribute('data-view'))).toEqual(['book', 'book', 'book']);
@@ -828,14 +834,17 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     await act(async () => { await Promise.resolve(); });
     const summary = document.querySelector('.srch-results-summary');
     // search200 B5: "Found 5+ matches" under the card read as a count of the passage; the five are the closest
-    expect(summary.textContent).toBe('Showing closest matches · Show all');
+    // WA3: the count reads "Closest matches", with no number; "Show all" leads the line under it.
+    expect(summary.querySelector('.srch-count').textContent).toBe('Closest matches');
+    expect(summary.textContent).not.toMatch(/\d/);
+    expect(summary.querySelector('.srch-syn-line').textContent.trim()).toBe('Show all');
     const direct = document.querySelector('.stub-direct');
     expect(direct.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING, 'the card before the summary').toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Show all' }));
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     expect(search.mock.calls[search.mock.calls.length - 1][1].allWords).toBe(true);
-    expect(document.querySelector('.srch-results-summary').textContent).toContain('Found 8 matches');
+    expect(document.querySelector('.srch-results-summary .srch-count').textContent).toBe('8 matches');
     expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
     vi.useRealTimers();
   });
@@ -960,7 +969,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const props = { ...baseProps(), searchScope: { volumeId: 'v7' }, searchContext: { label: 'Volume Seven' }, onToggleScope };
     await typeAndWait(props, 'zzzz');
     const none = document.querySelector('.search-no-results');
-    expect(none.textContent).toContain('No results for \u201czzzz\u201d in Volume Seven.');
+    expect(none.querySelector('h3.srch-none-title').textContent).toBe('Nothing for \u201czzzz\u201d in Volume Seven');
     fireEvent.click(screen.getByRole('button', { name: 'Search everywhere' }));
     expect(onToggleScope).toHaveBeenCalled();
     vi.useRealTimers();
@@ -1497,7 +1506,8 @@ describe('SearchScreen (search200 UX, track B)', () => {
     const groups = [...document.querySelectorAll('.stub-group')].map((g) => [g.getAttribute('data-key'), g.textContent, g.getAttribute('data-more')]);
     expect(groups).toEqual([['v1', 'v1-6,v1-7,v1-8', 'false'], ['v7', 'v7-5', 'true']]);
     // the summary still counts every match, in every section that holds one
-    expect(document.querySelector('.srch-results-summary').textContent).toContain('9 matches across 2 sections');
+    expect(document.querySelector('.srch-results-summary .srch-count').textContent).toBe('9 matches');
+    expect(document.querySelector('.srch-results-summary .srch-syn-line').textContent).toContain('In 2 sections.');
   });
 
   /* search200 UX B10 item 2: "etched My words in stone" gave Volume Three's "Abide in the Doctrine" and the
@@ -1535,13 +1545,15 @@ describe('SearchScreen (search200 UX, track B)', () => {
     /** @type {any} */ (globalThis).SrchGroup = ({ gkey }) => <div className="stub-group" data-key={gkey} />;
     /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
     const headers = () => document.querySelectorAll('.stub-group').length;
-    const claimed = () => { const m = /across (\d+) section/.exec(document.querySelector('.srch-results-summary').textContent); return m ? Number(m[1]) : null; };
+    // WA3: the section count is now "In N sections." on the line under the count
+    const claimed = () => { const m = /^In (\d+) section/.exec(document.querySelector('.srch-results-summary .srch-syn-line').textContent); return m ? Number(m[1]) : null; };
     // Best Matches takes all of v7 and v1; v2 keeps a header
     searchReturns({ results: letters('v7', 4).concat(letters('v1', 1, 4), letters('v2', 3, 5)) });
     const r = await typeIn(baseProps(), 'tittle');
     expect(headers()).toBe(1);
     expect(claimed(), 'no section count over one header for three sections').toBeNull();
-    expect(document.querySelector('.srch-results-summary').textContent).toBe('Found 8 matches');
+    expect(document.querySelector('.srch-results-summary .srch-count').textContent).toBe('8 matches');
+    expect(document.querySelector('.srch-results-summary .srch-syn-line').textContent).toBe('');
     expect(screen.getByRole('status').textContent).toBe('Found 8 matches.');
     r.unmount();
     // every section keeps a header: the count stands, and matches them
@@ -1615,7 +1627,7 @@ describe('SearchScreen (search200 UX, track B)', () => {
     const onSettingsChange = vi.fn();
     searchReturns({ results: [] });
     await typeIn({ ...baseProps(), settings: { searchCorpus: 'scriptures' }, onSettingsChange }, 'qqzzxvb');
-    expect(document.querySelector('.search-no-results').textContent).toContain('No results for \u201cqqzzxvb\u201d in the Scriptures.');
+    expect(document.querySelector('.search-no-results h3.srch-none-title').textContent).toBe('Nothing for \u201cqqzzxvb\u201d in the Scriptures');
     fireEvent.click(screen.getByRole('button', { name: 'Search all' }));
     expect(onSettingsChange).toHaveBeenCalledWith('searchCorpus', 'all');
   });
@@ -1660,7 +1672,7 @@ describe('SearchScreen (search200 UX, track B)', () => {
     await typeIn({ ...baseProps(), settings: { searchCorpus: 'volumes' } }, 'john 3:16');
     expect(direct()).toEqual(['John 3:16']);
     expect(best(), 'the card sits above the tab’s own row').toEqual(['v1-0', 'v1-1', 'v1-2', 'v1-3', 'v1-4']);
-    expect(document.querySelector('.srch-results-summary').textContent, 'the tab searched every match').toMatch(/^Found 40\+ matches/);
+    expect(document.querySelector('.srch-results-summary .srch-count').textContent, 'the tab searched every match').toBe('40+ matches');
   });
 
   /* B2: a book scope with the Volumes tab on said "No results in Luke", and "Search everywhere" kept the
@@ -1757,17 +1769,20 @@ describe('SearchScreen (search200 UX, track B)', () => {
     const r = await typeIn(props, 'faith');
     const line = () => document.querySelector('.srch-syn-line');
     expect(line(), 'the line is there').toBeTruthy();
-    expect(line().textContent, 'a word no result holds is not named').toBe('Also matching: trust, belief, believe · Turn off');
+    // WA3: the line always renders, and reads "In N sections. Also matching a, b and c. Turn off"
+    expect(line().textContent, 'a word no result holds is not named').toBe('In 1 section. Also matching trust, belief and believe. Turn off');
     fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
     expect(changed).toEqual([['searchSynonyms', false]]);
     r.rerender(<SearchScreen {...props} query="faith" settings={{ searchSynonyms: false }} />);
     await commit();
-    expect(line() && line().textContent, 'off, it says so once, with the way back').toBe('Related words are off · Turn on');
+    expect(line() && line().textContent, 'off, it says so once, with the way back').toBe('In 1 section. Related words are off. Turn on');
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }));
     expect(changed[1]).toEqual(['searchSynonyms', true]);
     cleanup();
     await typeIn({ ...props, settings: { searchSynonyms: false } }, 'faith');
-    expect(line(), 'off from Settings: no line at all').toBeNull();
+    // WA3: the line always renders now (it says where); off from Settings it names no related words and offers no switch
+    expect(line().textContent, 'off from Settings: no related-words text at all').toBe('In 1 section. ');
+    expect(line().querySelector('button'), 'off from Settings: no Turn on').toBeNull();
   });
 
   /* search200 audit 143: a search that found nothing (no result, no reference card, no topic) is not kept as a
@@ -1910,10 +1925,10 @@ describe('SearchScreen (search200 UX, track B)', () => {
     r.rerender(<SearchScreen {...props} query="zzyzxqw" />);
     expect(status.textContent, 'not searched yet').not.toContain('zzyzxqw');
     expect(status.textContent).toBe('Searching…');
-    expect(document.querySelector('.search-no-results').textContent, 'the line on screen names what was searched').toContain('No results for “zzyzxq”.');
+    expect(document.querySelector('.search-no-results h3.srch-none-title').textContent, 'the line on screen names what was searched').toBe('Nothing for “zzyzxq”');
     await commit();
     expect(status.textContent).toBe('No results for “zzyzxqw”.');
-    expect(document.querySelector('.search-no-results').textContent).toContain('No results for “zzyzxqw”.');
+    expect(document.querySelector('.search-no-results h3.srch-none-title').textContent).toBe('Nothing for “zzyzxqw”');
     // a count is held the same way
     searchReturns({ results: letters('v7', 2) });
     r.rerender(<SearchScreen {...props} query="mercy" />);
@@ -1973,7 +1988,12 @@ describe('SearchScreen (search200 UX, track B)', () => {
     /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
     searchReturns({ results: letters('v7', 30).concat(letters('v1', 10, 30)) });
     await typeIn(baseProps(), 'headed results');
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Best Matches']);
+    // WA3: more than one group heads the list with "Where it appears", the first child of .srch-groups
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Best Matches', 'Where it appears 2 sections']);
+    const where = document.querySelector('h2.srch-section-label.srch-where');
+    expect(where.parentElement.classList.contains('srch-groups')).toBe(true);
+    expect(where.parentElement.firstElementChild).toBe(where);
+    expect(where.querySelector('span').textContent).toBe('2 sections');
     const groups = screen.getAllByRole('heading', { level: 3 });
     expect(groups).toHaveLength(2);
     for (const h of groups) {
@@ -1981,14 +2001,15 @@ describe('SearchScreen (search200 UX, track B)', () => {
       expect(b, 'the open-close button inside the heading').toBeTruthy();
       expect(b.getAttribute('aria-expanded')).toBe('false');
     }
-    expect(groups[0].textContent).toMatch(/^Volume One · 10 letters/);
-    expect(groups[1].textContent).toMatch(/^Volume Seven · 30 letters/);
+    const head = (/** @type {Element} */ h) => [h.querySelector('.srch-group-name').textContent, h.querySelector('.srch-group-count-inline').textContent];
+    expect(head(groups[0])).toEqual(['Volume One', '10 letters']);
+    expect(head(groups[1])).toEqual(['Volume Seven', '30 letters']);
   });
 
   it('B9: the empty screen is headed too: the hero, Recent and Quick picks', () => {
     /** @type {any} */ (window).getRecentSearches = () => ['mercy'];
     render(<SearchScreen {...baseProps()} settings={{ historyEnabled: true }} />);
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Search everything', 'Recent', 'Quick picks']);
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Search everything', 'Recent', 'Quick picks', 'Go to']);
   });
 
   /* B5 (copy): the placeholder "Search scriptures, volumes, studies…" was cut off on a 360 px phone, and nothing
@@ -2012,7 +2033,8 @@ describe('SearchScreen (search200 UX, track B)', () => {
     const card = { kind: 'named-passage', bookId: 'matthew', bookTitle: 'Matthew', chapter: 28, label: 'Resurrection' };
     searchReturns({ parsed: card, parsedTerms: ['resurrection'], results: letters('v1', 5), truncated: true });
     await typeIn(baseProps(), 'the resurrection');
-    expect(document.querySelector('.srch-results-summary').textContent).toBe('Showing closest matches · Show all');
+    expect(document.querySelector('.srch-results-summary .srch-count').textContent).toBe('Closest matches');
+    expect(document.querySelector('.srch-results-summary .srch-syn-line').textContent.trim()).toBe('Show all');
     // the card's own label first, as the card reads
     expect(screen.getByRole('status').textContent).toBe('Matthew 28. Showing closest matches.');
   });

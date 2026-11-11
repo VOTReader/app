@@ -473,7 +473,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     };
     const lastCamX = () => DRAWN[DRAWN.length - 1].camX;
     const pickNearby = async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      // WA4: Nearby is the bottom bar's List pill now
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       // the first thread row: the list leads with the chapter row since landing 15
       fireEvent.click(document.querySelector('.sw-choice-row:not(.sw-choice-chapter)'));
@@ -507,8 +508,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection sheet opened').toBeTruthy();
       // a line is a fork in the road (2026-11-03): either end is a way on
-      expect(screen.getByRole('button', { name: /^follow to genesis 2:552$/i })).toBeTruthy();
-      const follow = screen.getByRole('button', { name: /^follow to genesis 2:5101$/i });
+      expect(screen.getByRole('button', { name: /^see its threads: genesis 2:552$/i })).toBeTruthy();
+      const follow = screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i });
       /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
          the camera is read once the fly has landed (it once jumped, and one frame was enough). */
       const landsAt = async (x) => {
@@ -546,7 +547,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         }
         expect(lastCamX()).toBeCloseTo(x, 1);
       };
-      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i }));
       await landsAt(20100.5);
       expect(container.querySelectorAll('.sw-trail-stops li'), 'home, then here').toHaveLength(2);
       fireEvent.click(container.querySelector('.sw-trail .sw-trail-btn'));
@@ -578,7 +579,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         const view = await mount({}, threaded);
         for (let i = 0; i < 40; i++) await pressFrame('+');
         await pickNearby();
-        fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i }));
         await landsAt(20100.5);
         return view;
       };
@@ -602,7 +603,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
 
       it('Reset brings the whole web back and keeps the paths: the pill offers the way back', async () => {
         const { container } = await followed();
-        fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+        // WA4: Reset left the menu; "Whole web" (shown while a panel is open) is the same resetView
+        fireEvent.click(screen.getByRole('button', { name: 'Whole web' }));
         await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
         expect(container.querySelector('.sw-panel')).toBeNull();
         expect(screen.getByRole('button', { name: 'Back to your path at Genesis 2:5101' })).toBeTruthy();
@@ -982,14 +984,14 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const { container } = await mount({ settings: seen }, threaded);
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
-      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await settle(20);
       const row = container.querySelector('.sw-list .sw-choice-row');
       expect(row, 'PRECONDITION: My Web lists the reader\'s link').toBeTruthy();
       fireEvent.click(row);
       await settle();
       expect(container.querySelector('.sw-sheet'), 'PRECONDITION: the link\'s sheet opened').toBeTruthy();
-      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
       await settle(60);
       expect(container.querySelector('.sw-sheet')).toBeNull();
       const last = DRAWN[DRAWN.length - 1];
@@ -1012,7 +1014,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const home = CANON / 2;
       const a = DRAWN[DRAWN.length - 1].camX;
       expect(Math.abs(a - home), 'PRECONDITION: off the middle before Reset').toBeGreaterThan(10);
-      fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+      // WA4: Reset left the menu; zoomed in, "Whole web" shows and is the same eased resetView
+      fireEvent.click(screen.getByRole('button', { name: 'Whole web' }));
       // the first frame the fly has moved (polled in short steps, so a loaded machine's slow
       // frames cannot make the window miss it), and it is not home yet
       let b = a;
@@ -1022,7 +1025,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(1200);
       // the canon's camera is the Bible rail's (camRef): back on the canon, it reads where the fly was
-      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
       await settle(40);
       const x = DRAWN[DRAWN.length - 1].camX;
       expect(Math.abs(x - home), 'the fly did not carry on home while My Web was up').toBeGreaterThan(1);
@@ -1047,7 +1050,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       expect(ppv() / fit, 'My Web\'s Bible rail at fit, not the canon\'s zoom').toBeCloseTo(1, 2);
-      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
       await settle(60);
       expect(ppv() / zoomed, 'the canon\'s zoom is back').toBeCloseTo(1, 2);
       expect(DRAWN[DRAWN.length - 1].camX, 'and its place').toBeCloseTo(xz, 1);
@@ -1093,7 +1096,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       // the switch reads "My Web" (the panel stream's one vocabulary for the web's words)
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
-      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await settle(20);
       const rows = [...container.querySelectorAll('.sw-list .sw-choice-row')];
       expect(rows.length, 'every link, not the first 36').toBe(40);
@@ -1159,7 +1162,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(lastDraw().camY, 'nor climb').toBe(before.camY);
       fireEvent.click(screen.getByRole('button', { name: 'Close the filters' }));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await settle(20);
       const row = container.querySelector('.sw-list .sw-choice-row');
       expect(row, 'PRECONDITION: the list has a row').toBeTruthy();
@@ -1223,10 +1226,15 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
 
   /* w4 quality hunt: Hide controls came before ? in the DOM, though ? is drawn left of it (or
      above it), so Tab crossed the pair right to left */
+  // WA4 (w-menu): the ? and the round hide left the corner for the ⋯ menu's rows; the rows stand in
+  // the DOM in the order drawn top to bottom, so Tab crosses them as they read
   it('the ? comes before Hide controls in the DOM, as it is drawn', async () => {
     const { container } = await mountGuide();
-    const pair = Array.from(container.querySelectorAll('.sw-guide-btn, .sw-hide-all'));
-    expect(pair.map((b) => (b.classList.contains('sw-guide-btn') ? '?' : 'hide'))).toEqual(['?', 'hide']);
+    expect(container.querySelector('.sw-guide-btn'), 'no round ? any more').toBeNull();
+    const rows = Array.from(container.querySelectorAll('.sw-menu#sw-menu > .sw-mrow'));
+    expect(rows.map((b) => b.textContent)).toEqual([
+      'How to read this web', 'Hide the controlsA Show controls button stays', 'About the dataOpenBible.info, CC-BY',
+    ]);
   });
 
   it('stays closed for a reader who has seen it; the ? button brings it back and Escape closes it without leaving', async () => {
@@ -1310,31 +1318,34 @@ describe('the Nearby list reads the lens (landing 15)', () => {
 
   // Sweep mw12: My Web's list is the reader's links (every one, nearest the middle first since w3
   // item 29); its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
+  // WA6 (w-list): titled "Links", the reader's own under "Yours · N" (Timothy's notes their own tab)
   it('on My Web the list says what it is: your links, with no "nearby" and no "at this location"', async () => {
     const { container } = await mountList();
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
-    fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     const list = container.querySelector('.sw-list');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toBe('Your links');
+    expect(list.querySelector('.sw-panel-title').textContent).toBe('Links');
+    expect(list.querySelector('.sw-list-tabs .sw-seg-btn.is-on').textContent).toBe('Yours · 0');
     expect(list.textContent).not.toMatch(/nearby links|at this location/i);
     expect(list.querySelector('.sw-list-empty').textContent).toBe('You have no links on the web yet.');
   });
 
   it('leads with the chapter row (where its threads go), then the threads strongest first; at the overview the header says Nearby', async () => {
     const { container } = await mountList();
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list, 'the list opened').toBeTruthy();
     expect(list.getAttribute('data-lens-on')).toBe('0');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
+    // WA5 (w-near): List is "In view": the chapter at the centre as a card, then its strongest threads
+    expect(list.querySelector('.sw-panel-title').textContent).toBe('In view');
+    expect(list.querySelector('.sw-panel-meta').textContent).toMatch(/^Centre of the screen: Genesis 1$/);
+    expect(list.querySelector('.sw-inview-chapter').getAttribute('aria-label')).toBe('Genesis 1, where its threads go');
     const rows = [...list.querySelectorAll('.sw-choice-row')];
-    expect(rows.length).toBe(3);
-    expect(rows[0].className).toMatch(/sw-choice-chapter/);
-    expect(rows[0].textContent).toMatch(/Genesis 1 — where its threads go/);
-    expect(rows[1].textContent).toMatch(/30 votes/);
-    expect(rows[2].textContent).toMatch(/7 votes/);
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toMatch(/30 votes/);
+    expect(rows[1].textContent).toMatch(/7 votes/);
   });
 
   // "Under the lens" retired (digest item 22: "Nearby" means one thing); the header still names the
@@ -1346,12 +1357,12 @@ describe('the Nearby list reads the lens (landing 15)', () => {
       fireEvent.keyDown(root, { key: '+' });
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     }
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list.getAttribute('data-lens-on')).toBe('1');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
-    fireEvent.click(list.querySelector('.sw-choice-chapter'));
+    expect(list.querySelector('.sw-panel-meta').textContent).toMatch(/^Centre of the screen: Genesis 1$/); // WA5 (w-near)
+    fireEvent.click(list.querySelector('.sw-inview-chapter'));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(container.querySelector('.sw-list')).toBeNull();
     const sheet = container.querySelector('.sw-sheet');
@@ -1368,7 +1379,7 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     document.addEventListener('keydown', appEscape);
     try {
       const { container } = await mountList();
-      fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(container.querySelector('.sw-list')).toBeTruthy();
       expect(modalRegistry.isAnyOpen(), 'an open panel is in the registry').toBe(true);
@@ -1380,7 +1391,7 @@ describe('the Nearby list reads the lens (landing 15)', () => {
       expect(modalRegistry.isAnyOpen()).toBe(false);
 
       // Android Back: handleAndroidBack dismisses the registry's top entry
-      fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(container.querySelector('.sw-list')).toBeTruthy();
       act(() => { modalRegistry.peek().dismiss(); });
@@ -1420,7 +1431,7 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     const { container } = await mountList();
     const root = container.querySelector('.sw-root');
     root.focus();
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list.getAttribute('role')).toBe('dialog');
@@ -1694,10 +1705,13 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(keys).toEqual(['Timothy’s notes', 'your links']);
     // w4 (r2-05; the hub: the CC-BY credit stays on screen, a licence obligation): the credit
     // is My Web's legend tail too, read, never a line of its own. Through w3 My Web had none.
-    const credit = legend.querySelector('.sw-credit');
+    // WA4: the credit is the key's second line (.sw-legend-sub), My Web's with no count before it
+    const credit = legend.querySelector('.sw-legend-sub');
     expect(credit, 'the credit, in the legend').toBeTruthy();
-    expect(credit.textContent).toBe('Cross-reference data © OpenBible.info (CC-BY)');
-    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    // WA6 (w-mine0): with no links of the reader's yet the line says so before the credit
+    expect(credit.textContent).toBe('No links of yours yet · Cross-reference data © OpenBible.info (CC-BY)');
+    expect(legend.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    expect(legend.querySelector('.sw-legend-line .sw-credit'), 'said once').toBeNull();
     expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
     expect(legend.querySelectorAll('.sw-key-line').length).toBe(2);
     expect(legend.querySelector('.sw-key-pin')).toBeNull();
@@ -1708,7 +1722,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
 
   it('offers a Dismiss control on the notice', async () => {
     await openMyWeb();
-    expect(screen.getByText('Your web is still being woven.')).toBeTruthy();
+    expect(screen.getByText('Your web is still being woven')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy();
   });
 
@@ -1716,20 +1730,20 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const updateSetting = vi.fn();
     await openMyWeb({ updateSetting });
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
   });
 
   it('does not pitch the notice again once the dismissal is stored', async () => {
     await openMyWeb({ settings: { swEmptyDismissed: true } });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
   });
 
   it('closes on Escape while focus is inside the notice', async () => {
     const updateSetting = vi.fn();
     await openMyWeb({ updateSetting });
     fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
   });
 
@@ -1742,7 +1756,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const onBack = vi.fn();
     await openMyWeb({ onBack });
     fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
   });
 
@@ -1765,7 +1779,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const onBack = vi.fn();
     await openMyWeb({ onBack });
     fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
   });
 
@@ -1819,9 +1833,11 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
 
   it('PC 1600x900: the panel docks right at 640 px, and its 960 px canvas area collapses the controls', async () => {
     const { root } = await mountAt(1600, 900);
-    expect(root.classList.contains('sw-collapse'), 'closed: the whole 1600 px is canvas').toBe(false);
-    expect(screen.queryByRole('button', { name: 'More controls' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    // WA4 (w-menu): the ⋯ is always the menu (the rare things), so the root is always collapsed,
+    // panel or none; the strip's old controls live in the title and the bottom bar
+    expect(root.classList.contains('sw-collapse'), 'closed: the ⋯ menu all the same').toBe(true);
+    expect(screen.getByRole('button', { name: 'More controls' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await wait(30);
     expect(root.getAttribute('data-panel')).toBe('dock');
     expect(root.classList.contains('sw-panel-open')).toBe(true);
@@ -1831,7 +1847,7 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     fireEvent.keyDown(root, { key: 'Escape' });
     await wait(30);
     expect(root.getAttribute('data-panel')).toBeNull();
-    expect(root.classList.contains('sw-collapse')).toBe(false);
+    expect(root.classList.contains('sw-collapse')).toBe(true);
   });
 
   /* w4 (interaction hunt): at 768x1024 the collapsed strip sat over the title ("Web" under the
@@ -1840,7 +1856,7 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     const { root } = await mountAt(768, 1024);
     expect(root.classList.contains('sw-stack'), 'closed').toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await wait(30);
     expect(root.getAttribute('data-panel')).toBe('dock');
     expect(root.classList.contains('sw-stack'), '768 - 420 = 348 px of canvas').toBe(true);
@@ -1856,25 +1872,35 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     const more = screen.getByRole('button', { name: 'More controls' });
     expect(more.getAttribute('aria-expanded')).toBe('false');
     expect(more.getAttribute('aria-controls')).toBe('sw-menu');
-    // the menu holds every control (hidden by CSS until it opens)
+    // WA4 (w-menu): the menu holds the rare things (hidden by CSS until it opens); the switch is the
+    // title's and List the bottom bar's, on screen without the menu
     const menu = container.querySelector('#sw-menu');
-    expect(menu.textContent).toMatch(/Scripture/);
-    expect(menu.textContent).toMatch(/Nearby/);
-    expect(menu.textContent).toMatch(/Reset/);
+    expect(menu.textContent).toMatch(/How to read this web/);
+    expect(menu.textContent).toMatch(/Hide the controls/);
+    expect(menu.textContent).toMatch(/About the data/);
+    expect(menu.textContent).not.toMatch(/Scripture|Nearby|Reset|List/);
+    expect(container.querySelector('.sw-title .sw-wname').textContent).toMatch(/Scripture Web/);
+    const list = screen.getByRole('button', { name: 'List' });
+    expect(list.closest('.sw-wbot .sw-wpills')).toBeTruthy();
     fireEvent.click(more);
     expect(root.classList.contains('sw-menu-open')).toBe(true);
     expect(more.getAttribute('aria-expanded')).toBe('true');
     // Escape in the menu closes the menu only, and focus goes back to the more button
-    const nearby = screen.getByRole('button', { name: /^nearby$/i });
-    nearby.focus();
-    fireEvent.keyDown(nearby, { key: 'Escape' });
+    const row = screen.getByRole('button', { name: /^About the data/ });
+    row.focus();
+    fireEvent.keyDown(row, { key: 'Escape' });
     expect(root.classList.contains('sw-menu-open')).toBe(false);
     expect(document.activeElement).toBe(more);
-    // a control in the menu acts and closes it
+    // a control in the menu acts and closes it: About the data opens the card in its about variant
     fireEvent.click(more);
-    fireEvent.click(nearby);
+    fireEvent.click(row);
     await wait(30);
     expect(root.classList.contains('sw-menu-open')).toBe(false);
+    expect(container.querySelector('.sw-guide .sw-guide-title').textContent).toBe('About the data');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await wait(10);
+    fireEvent.click(list);
+    await wait(30);
     expect(root.getAttribute('data-panel')).toBe('dock');
     expect(root.style.getPropertyValue('--sw-panel-w')).toBe('374px');
     expect(container.querySelector('.sw-list')).toBeTruthy();
@@ -1892,20 +1918,22 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
   it('below 560 px the panel is a bottom sheet of the measured height', async () => {
     const { root } = await mountAt(500, 800);
     expect(root.classList.contains('sw-narrow')).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
     await wait(30);
     expect(root.getAttribute('data-panel')).toBe('sheet');
     expect(root.style.getPropertyValue('--sw-sheet-h')).toBe('480px');
   });
 
+  // WA4 (w-main): the go-to slot moved to the bottom bar, first of its pills (Go to, Filters, List);
+  // the top-right controls are the menu and the ⋯ that opens it
   it('the go-to slot stays first in the controls (CONTRACTS.md section 9), the menu after it', async () => {
     const { container } = await mountAt(891, 411);
+    const pills = container.querySelector('.sw-wbot .sw-wpills');
+    expect(pills.firstElementChild.classList.contains('sw-goto-btn'), 'the go-to button leads').toBe(true);
+    expect([...pills.children].map((b) => b.textContent)).toEqual(['Go to', 'Filters', 'List']);
     const controls = container.querySelector('.sw-controls');
-    // the go-to's search button fills the slot (goto.jsx, the navigation stream), the menu follows
-    // it, the more button ends the row (this test once pinned the empty slot: the menu leading)
-    const [first, second] = controls.children;
-    expect(first.classList.contains('sw-goto-btn'), 'the go-to button leads').toBe(true);
-    expect(second.id).toBe('sw-menu');
+    expect(controls.querySelector('.sw-goto-btn')).toBeNull();
+    expect(controls.firstElementChild.id).toBe('sw-menu');
     expect(controls.lastElementChild.getAttribute('aria-label')).toBe('More controls');
   });
 });

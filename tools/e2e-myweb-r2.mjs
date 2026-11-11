@@ -178,6 +178,14 @@ const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new
  *  "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px, so every
  *  phone frame), through that menu; the walk's own labels are unchanged. need: wait for it
  *  (or the menu) and throw when neither carries it, as clickLabel did. */
+/** WA5: the v2 chrome's way back to fit in My Web: each zoomed rail's own reset pill (there is no global
+ * "Reset the view" any more); a rail at fit shows none, and there is nothing to reset. */
+async function resetBoth(page) {
+  let any = false;
+  for (const l of ['Reset the Volumes rail', 'Reset the Bible rail']) { if (await clickIfPresent(page, l)) { any = true; await sleep(150); } }
+  return any;
+}
+
 async function control(page, label, need) {
   if (need) {
     await page.waitForFunction((l, s) => { const f = new Function('return ' + s)(); return !!f(l) || !!f('More controls'); },
@@ -216,7 +224,7 @@ async function toMyWeb(page) {
   await control(page, 'My Web', true); await sleep(800);
   await clickIfPresent(page, 'Got it'); await sleep(300);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
-  await control(page, 'Reset the view'); await sleep(700);
+  await resetBoth(page); await sleep(700);
   return true;
 }
 const attr = (page, k) => page.evaluate((k) => (document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute(k), k);
@@ -322,7 +330,7 @@ async function armS(page, tag, fname, c, r0) {
   const gate = STREAK_HORIZ[fname];
   note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px), ribbon ${s.ribbon}`);
   if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
-  await control(page, 'Reset the view'); await sleep(600);
+  await resetBoth(page); await sleep(600);
   return s;
 }
 
@@ -375,7 +383,7 @@ async function armC(page, tag, fname, c, r0, f) {
   if (!found) { fails.push(`${tag} C: no corpus thread within 14 px of the bottom rail near the centre of Isaiah`); return; }
   const book = found.ref.replace(/\s+\d+:\d+.*$/, '');
   note(`${tag} C: following "${found.ref}" ↕ "${found.alt}" (${found.meta}); verse ${found.verse}, vot ${found.vot}`);
-  await control(page, 'Reset the view', true); await sleep(600);
+  await resetBoth(page); await sleep(600);
   const W = c.w * f.dpr;
   const read = async () => {
     const r = await rails(page);
@@ -422,7 +430,7 @@ async function armC(page, tag, fname, c, r0, f) {
   };
   await strip('top', volumeOf(found.meta));
   await strip('bottom', book);
-  await control(page, 'Reset the view'); await sleep(400);
+  await resetBoth(page); await sleep(400);
 }
 
 /** Arm R: the release fade, measured in the Matthew corridor. */
@@ -431,7 +439,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
   // bottom rail (the Study Bible notes), the densest ink on the overview
   const band = r0.bottom.find((b) => b.label === 'Matthew');
   if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
-  await control(page, 'Reset the view'); await sleep(500);
+  await resetBoth(page); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   // THE INSTRUMENT is data-cap-fraction read every animation frame: the
   // fraction the screen drew that frame (0 live, 1 full, between = fading).
@@ -504,7 +512,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
     : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
   else if (!(fadeSpan >= 100)) fails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
   if (falls) fails.push(`${tag} R: the cap fraction fell ${falls} times during the release: not monotone`);
-  await control(page, 'Reset the view'); await sleep(300);
+  await resetBoth(page); await sleep(300);
   return 'ok';
 }
 
@@ -533,13 +541,13 @@ async function walk(page, url, fname, attempt) {
     note(`${tag} T1 pill "Reset the Volumes rail": Volumes ${(q.v / p1.before.v).toFixed(2)}x of fit, Bible ${(q.b / p1.before.b).toFixed(1)}x held`);
     if (!topBack) fails.push(`${tag} T1: the Volumes pill did not return the top camera to fit`);
     if (!bibleHeld) fails.push(`${tag} T1: the Volumes pill moved the Bible camera`);
-    await control(page, 'Reset the view', true); await sleep(500);
+    await resetBoth(page); await sleep(500);
     const z = await ppv(page);
     if (!(Math.abs(z.b - p1.before.b) <= p1.before.b * 0.01 && Math.abs(z.v - p1.before.v) <= p1.before.v * 0.01)) fails.push(`${tag} T1: "Reset the view" did not return both cameras to fit (${JSON.stringify(z)} vs ${JSON.stringify(p1.before)})`);
   }
-  await control(page, 'Reset the view'); await sleep(500);
+  await resetBoth(page); await sleep(500);
   await pairing(page, tag, fname, c, r0, 'Vol I', 'Revelation', /^Vol I$/, /^Revelation\b/, '2');
-  await control(page, 'Reset the view'); await sleep(300);
+  await resetBoth(page); await sleep(300);
 }
 
 let browser, own;

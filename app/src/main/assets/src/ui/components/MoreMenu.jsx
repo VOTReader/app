@@ -253,7 +253,7 @@ export function MoreMenuBtn() {
           <div className="rd-menu-group" role="group" aria-label="This page">
             {pageItems ? pageItems.map((it) => (
               <button key={it.key} type="button" role="menuitem" className={'more-menu-item more-menu-page-item' + (it.danger ? ' danger' : '')} onClick={go(it.onSelect)}>
-                {it.icon === 'find' ? <UiIcon name="search" /> : null}
+                {it.icon === 'find' ? <UiIcon name="search" /> : it.icon === 'share' ? <UiIcon name="share" /> : null}
                 <span>{it.label}</span>
               </button>
             )) : null}

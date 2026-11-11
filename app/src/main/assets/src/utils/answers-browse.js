@@ -171,7 +171,7 @@ export function answersPlaceOf(entries, id) {
   const s = answersSiteShelfOf(entries, id);
   if (!s) return ANSWERS_OTHER_LABEL;
   if (s.kind === 'commandment') return `The ${ANSWERS_COMMANDMENTS[/** @type {number} */ (s.num) - 1].ordinal} Commandment`;
-  if (s.kind === 'tstl') return s.num + SEP + s.short;
+  if (s.kind === 'tstl') return s.short; // WA1 (a-az): group numbers dropped
   return shelfLabel(s);
 }
 

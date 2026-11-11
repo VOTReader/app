@@ -222,7 +222,7 @@ const BACK_BY_SCREEN = {
   'search': 'searchOrigin',
   'scripture-genre': 'scriptures',
   'bible-study-index': 'studies',
-  'answers-group': 'answers', 'answers-media': 'answers', 'answers-saved': 'answers', 'answers-subject': 'answers', 'answers-az': 'answers',
+  'answers-group': 'answers', 'answers-media': 'answers', 'answers-saved': 'answers',
 };
 
 export function useAndroidBack({

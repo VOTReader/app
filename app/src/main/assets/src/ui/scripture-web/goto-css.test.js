@@ -24,11 +24,15 @@ function declsFor(sel) {
   return out.join(';');
 }
 
-describe("the go-to's rows keep their spaces", () => {
-  it('the sub and the text parts, which open with " · " and " — ", keep the space they open with', () => {
-    for (const sel of ['.sw-goto-sub', '.sw-goto-text']) {
-      expect(declsFor(sel), sel).toMatch(/white-space:\s*pre\b/);
-    }
+// WA5 (w-goto, v2 pictures): a row is two lines now, the reference over "Whole chapter" or the
+// verse's words, so no part opens with a space to lose; the words are one italic line that ends in "…"
+describe("the go-to's rows are two lines", () => {
+  it('the reference and its second line stack, and the verse words are one italic line with an ellipsis', () => {
+    expect(declsFor('.sw-goto-lines')).toMatch(/flex-direction:\s*column/);
+    const t = declsFor('.sw-goto-text');
+    expect(t).toMatch(/font-style:\s*italic/);
+    expect(t).toMatch(/white-space:\s*nowrap/);
+    expect(t).toMatch(/text-overflow:\s*ellipsis/);
   });
 });
 

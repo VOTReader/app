@@ -548,6 +548,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
         onBack: ansBack ? ansBack.onBack : navBack ? navBack.onBack : onHome,
         backLabel: ansBack ? ansBack.label : navBack ? navBack.label : (partLabel || 'Index'),
+        // WA2 (mock v2 a-end): an Answers topic's bar has no Home; the tab bar and Back go there
+        showHome: !isAns,
         arrows: {
           onPrev: goPrev, onNext: goNext,
           prevDisabled: !prevEntry && !prevBoundary,

@@ -7,6 +7,31 @@ import { cardPassage } from '../components/SrchCard.jsx';
 import { pickTopic, topicTexts, withOwnPassage } from '../components/srch-topic.js';
 import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { translationLabel } from '../../data/translations.js';
+import { cardHeads } from '../components/SrchCard.jsx';
+
+/* WA3 (v2 search.html s-slash): the "/" shortcuts by their plain names, each with its icon. Keyed by the engine's own
+   label (search-data.js COMMANDS), which stays as it is; a command not named here keeps that label. */
+const SRCH_CMD_UI = /** @type {Record<string, [string, string]>} */ ({
+  'Random verse or letter': ['shuffle', 'Surprise me'],
+  'Go home': ['home', 'Go to Read'],
+  'Open settings': ['gear', 'Settings'],
+  'Go to scriptures': ['book', 'The Scriptures of Truth'],
+  'Go to volumes': ['note', 'The Volumes of Truth'],
+  'Clear search history': ['trash', 'Clear recent searches'],
+  'Clear current search': ['x', 'Clear current search'],
+  'Show search help': ['help', 'Search help'],
+  'Rebuild search index': ['reset', 'Rebuild search index'],
+});
+const SRCH_SUG_ICON = /** @type {Record<string, string>} */ ({ book: 'book', passage: 'book', verse: 'book', chapter: 'book', letter: 'note', topic: 'quote', song: 'music' });
+/** @param {any} s */
+function sugLook(s) {
+  if (s.kind === 'command') return SRCH_CMD_UI[s.label] || ['search', s.label];
+  return [SRCH_SUG_ICON[s.kind] || 'search', s.label];
+}
+/** "belief, trust and grace" @param {string[]} w */
+function andList(w) { return w.length < 2 ? w.join('') : w.slice(0, -1).join(', ') + ' and ' + w[w.length - 1]; }
 import {
   refQuote, expandSnippetTerms, isStopTerm, typedStopWords, markStopWords, scopeConflict, letterRefCards,
   searchMemo, matchCountLabel, groupInSiteOrder, correctedQuery, isPlansQuery,
@@ -132,7 +157,7 @@ export function useImeHideBlur(inputRef) {
   }, []);
 }
 
-export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null, onOpenPlans = null }) {
+export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null, onOpenPlans = null, onOpenAnswers = null, listenRef = null }) {
   // Songs of the Letters (L8): ONE shortcut row at the top when the LOADED song catalog matches the query — a
   // pure in-memory filter (findSongFamilies, bundle-d). Songs never join the MiniSearch index, so a daily catalog
   // change never forces the index rebuild; a catalog not yet loaded shows nothing and is not fetched from here.
@@ -446,6 +471,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // Handle command-kind parsed results
   React.useEffect(() => {
     if (state.parsed && state.parsed.kind === 'command') {
+      // "/help" (Search help, s-slash): the empty screen is the help, its line on what to type and its shortcuts.
+      if (state.parsed.action === 'help') { onQueryChange(''); return; }
       if (onCommand) onCommand(state.parsed.action);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
@@ -520,6 +547,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
   const renderGroups = (/** @type {Array<{key: string, items: any[], more?: boolean}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
     <div className="srch-groups">
+      {/* WA3 (s-sections): the collections under one label, each a row that opens in place. */}
+      {view === 'relevance' && groups.length > 1 ? (
+        <h2 className="srch-section-label srch-where">Where it appears <span>{groups.length} sections</span></h2>
+      ) : null}
       {groups.map((g) => (
         <SrchGroup
           /* Keyed by the search the list came from (state.memo, search200 B2):
@@ -589,7 +620,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
         : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
       const quote = refQuote(p, settings.translation || 'nkjv');
-      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: quote || (p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter'), ref: p });
+      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: quote || (p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter'), __trans: quote ? translationLabel(settings.translation || 'nkjv') : '', ref: p });
     } else if (p.kind === 'ref-letter') {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
       for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
@@ -758,7 +789,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             <h2 className="srch-section-label">Recent</h2>
             {confirmRecent == null && !confirmClearAll ? (
               <button type="button" className="srch-clear-all" aria-label="Clear all recent searches"
-                onClick={() => setConfirmClearAll(true)}>Clear all</button>
+                onClick={() => setConfirmClearAll(true)}>Clear</button>
             ) : null}
           </div>
           {confirmClearAll ? (
@@ -789,16 +820,20 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               }}
             />
           ) : (
-            <div className="srch-quick-row">
+            /* WA3 (s-empty): the recent searches as rows of one card, a clock before each, the remove at the right. */
+            <div className="ui-group srch-recent">
               {recents.slice(0, 12).map((r) => (
-                <span key={r} className="srch-quick-chip-wrap">
-                  <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
+                <div key={r} className="srch-recent-row">
+                  <button type="button" className="srch-recent-go" onClick={() => onQueryChange(r)}>
+                    <UiIcon name="clock" size="sm" /><span className="srch-recent-q">{r}</span>
+                  </button>
                   <button
+                    type="button"
                     className="srch-chip-remove"
                     aria-label={'Remove recent search ' + r}
                     onClick={() => setConfirmRecent(r)}
-                  >{"✕"}</button>
-                </span>
+                  ><UiIcon name="x" size="sm" /></button>
+                </div>
               ))}
             </div>
           )}
@@ -812,6 +847,52 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       </div>
     </>
   );
+
+  /* WA3 (s-empty "Go to"): the doors Search holds besides its words. Surprise me is the "/random" shortcut, named. */
+  const goRows = (
+    <>
+      <h2 className="srch-section-label">Go to</h2>
+      <div className="ui-group srch-goto">
+        <button type="button" className="srch-row" onClick={() => { if (onCommand) onCommand('random'); }}>
+          <span className="srch-row-ic" aria-hidden="true"><UiIcon name="shuffle" /></span>
+          <span className="srch-row-t">Surprise me</span><kbd className="srch-kbd">/random</kbd>
+        </button>
+        {typeof onOpenPlans === 'function' ? (
+          <button type="button" className="srch-row" onClick={() => onOpenPlans()}>
+            <span className="srch-row-ic" aria-hidden="true"><UiIcon name="cal" /></span>
+            <span className="srch-row-t">Reading plans</span><UiIcon name="chev" size="sm" />
+          </button>
+        ) : null}
+        {typeof onOpenSongs === 'function' ? (
+          <button type="button" className="srch-row" onClick={() => onOpenSongs('')}>
+            <span className="srch-row-ic" aria-hidden="true"><UiIcon name="music" /></span>
+            <span className="srch-row-t">Songs of the Letters</span><UiIcon name="chev" size="sm" />
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
+
+  /* WA3 (s-inpage, X-hidden row 67): opened from a letter or a chapter, the first row finds the words in it. The row
+     is the search's own result for that text (FindInUnit marks every place on landing), so it shows only when the
+     text holds them. `searchContext.at` is where the reader was (use-search.js). */
+  const at = searchContext && searchContext.at;
+  const findHere = React.useMemo(() => {
+    if (!at || !state.results.length) return null;
+    const hit = state.results.find((/** @type {any} */ e) => {
+      const d = e.doc || {};
+      if (at.letterId) return d.letterId === at.letterId && (!searchContext.volumeId || d.volumeId === searchContext.volumeId) && d.kind !== 'study-note';
+      return at.bookId && at.chapterNum && d.kind === 'verse' && d.bookId === at.bookId && Number(d.chapterNum) === Number(at.chapterNum);
+    });
+    if (!hit) return null;
+    const d = hit.doc;
+    const noun = d.kind === 'verse' ? 'chapter' : /letter/.test(d.kind) ? 'letter' : 'entry';
+    const h = cardHeads(d);
+    const where = d.kind === 'verse' ? (d.bookTitle || (searchContext && searchContext.label) || '') + ' ' + d.chapterNum
+      : [h.headline, h.locLine || (searchContext && searchContext.label)].filter(Boolean).join(' · ');
+    return { entry: hit, noun, where };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `at` is part of searchContext.
+  }, [searchContext, state.results]);
 
   const handleKey = (e) => {
     // A keyboard still composing a word (an IME) owns its keys, Enter among them.
@@ -927,8 +1008,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
        exempts this screen from the right-cluster anchor via :not(:has(~ .srch-input-row)). */
     <ScreenLayout hideTabsBtn={true} navChildren={
       <>
-        <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">{"‹"}</button>
+        <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back"><UiIcon name="back" /></button>
         <div className="srch-input-row">
+          <span className="srch-field-ic" aria-hidden="true"><UiIcon name="search" size="sm" /></span>
           {/* C2-C [C8]: the app's PRIMARY search field named itself only by
               placeholder — which a screen reader stops announcing the moment
               a character is typed, and which nothing announces on a field
@@ -964,7 +1046,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             spellCheck={false}
           />
           {/* …and its clear button announced as the bare glyph "✕". */}
-          {query ? <button className="srch-clear-btn" onClick={clearQuery} title="Clear search" aria-label="Clear search">{"✕"}</button> : null}
+          {query ? <button className="srch-clear-btn" onClick={clearQuery} title="Clear search" aria-label="Clear search"><UiIcon name="x" size="sm" /></button> : null}
         </div>
       </>
     }>
@@ -997,13 +1079,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           >
             {searchScope ? (
               <>
-                <span className="srch-scope-chip-icon">{"✓"}</span>
+                <span className="srch-scope-chip-icon" aria-hidden="true"><UiIcon name="check" size="sm" /></span>
                 <span>Scoped to {searchContext.label}</span>
-                <span className="srch-scope-chip-x">{"✕"}</span>
+                <span className="srch-scope-chip-x" aria-hidden="true"><UiIcon name="x" size="sm" /></span>
               </>
             ) : (
               <>
-                <span className="srch-scope-chip-icon">{"⌕"}</span>
+                <span className="srch-scope-chip-icon" aria-hidden="true"><UiIcon name="search" size="sm" /></span>
                 <span>Search in {searchContext.label}</span>
               </>
             )}
@@ -1028,7 +1110,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         )}
 
         {suggestOpen && (
-          <div className="srch-suggest-anchor"><div className="srch-suggest" id="srch-suggest-list" role="listbox" aria-label="Suggestions" ref={suggestRef}>
+          <div className="srch-suggest-anchor">
+            {suggestions.every((s) => s.kind === 'command') ? (
+              <div className="srch-suggest-head" aria-hidden="true"><span>Shortcuts</span><span>Type the word or tap</span></div>
+            ) : null}
+            <div className="srch-suggest" id="srch-suggest-list" role="listbox" aria-label="Suggestions" ref={suggestRef}>
             {suggestions.map((s, i) => (
               /* A click picks (search200 B3): a screen reader's activation and a keyboard's
                  send no mousedown. The mousedown only keeps the focus in the box. */
@@ -1043,9 +1129,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => fireSuggestion(s)}
               >
-                <span className="srch-suggest-kind">{s.kind}</span>
-                <span className="srch-suggest-label">{s.label}</span>
-                {s.hint && <span className="srch-suggest-hint">{s.hint}</span>}
+                <span className="srch-row-ic" aria-hidden="true"><UiIcon name={sugLook(s)[0]} /></span>
+                <span className="srch-suggest-kind sr-only">{s.kind}</span>
+                <span className="srch-suggest-label">{sugLook(s)[1]}</span>
+                {s.kind === 'command' ? <kbd className="srch-kbd">{s.query}</kbd>
+                  : s.hint ? <span className="srch-suggest-hint">{s.hint}</span> : null}
               </button>
             ))}
           </div></div>
@@ -1057,26 +1145,29 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <>
             {/* The hero names the tab in use (search200 B2): a saved Scriptures tab sat lit
                 under "Search everything". */}
+            {/* WA3 (s-empty): one note line under the box, which already says "Search everything"; the heading stays
+                for moving by headings. */}
             <div className="srch-empty-hero">
               {corpus === 'scriptures' ? (
                 <>
-                  <h2>Search the Scriptures</h2>
+                  <h2 className="sr-only">Search the Scriptures</h2>
                   <p>Verses across all 66 books.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
                 </>
               ) : corpus === 'volumes' ? (
                 <>
-                  <h2>Search the Volumes</h2>
+                  <h2 className="sr-only">Search the Volumes</h2>
                   <p>Letters, Words To Live By, Answers and Bible studies.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
                 </>
               ) : (
                 <>
-                  <h2>Search everything</h2>
-                  <p>Verses, letters, Words To Live By, Answers and Bible studies — across all 66 books and every Volume.</p>
+                  <h2 className="sr-only">Search everything</h2>
+                  <p>The letters, the Bible, studies and Answers.</p>
                 </>
               )}
               <p className="srch-hint">Try a reference (John 3:16), a phrase, or “exact words” in quotes.</p>
             </div>
             {pickRows}
+            {goRows}
           </>
         )}
 
@@ -1102,19 +1193,17 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             query that is only that; a longer phrase ("the plan of salvation") gets none. */}
         {typeof onOpenPlans === 'function' && isPlansQuery(query) ? (
           <button type="button" className="srch-songs-row" onClick={() => onOpenPlans()}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-              <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
-            </svg>
+            <span className="srch-row-ic" aria-hidden="true"><UiIcon name="cal" /></span>
             <span className="srch-songs-row-text">Reading plans</span>
-            <span aria-hidden="true">›</span>
+            <UiIcon name="chev" size="sm" />
           </button>
         ) : null}
 
         {songsFound > 0 && typeof onOpenSongs === 'function' ? (
           <button type="button" className="srch-songs-row" onClick={() => onOpenSongs(songQuery)}>
-            <span aria-hidden="true">♪</span>
+            <span className="srch-row-ic" aria-hidden="true"><UiIcon name="music" /></span>
             <span className="srch-songs-row-text">{songsFound.toLocaleString('en-US')} {songsFound === 1 ? 'song matches' : 'songs match'} “{songQuery}”</span>
-            <span aria-hidden="true">›</span>
+            <UiIcon name="chev" size="sm" />
           </button>
         ) : null}
 
@@ -1135,12 +1224,28 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         {/* The card answers the query; the summary below counts the words' matches,
             so it follows the card rather than seem to count it. */}
         {directEntries.length > 0 && (
-          <div className="srch-groups">
+          <div className="srch-direct">
             {directEntries.map((d, i) => (
-              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
+              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} listenRef={listenRef} />
             ))}
           </div>
         )}
+
+        {findHere && !engineNav ? (
+          <>
+            <h2 className="srch-section-label">In the {findHere.noun} you were reading</h2>
+            <div className="ui-group srch-find-here">
+              <button type="button" className="srch-row is-two" onClick={() => handleSelect(findHere.entry)}>
+                <span className="srch-row-ic" aria-hidden="true"><UiIcon name="search" /></span>
+                <span className="srch-row-tx">
+                  <span className="srch-row-t">Find “{qTrim}” in this {findHere.noun}</span>
+                  <span className="srch-row-m">{findHere.where}</span>
+                </span>
+                <UiIcon name="chev" size="sm" />
+              </button>
+            </div>
+          </>
+        ) : null}
 
         {/* A quote nothing holds word for word was searched as its words: said, not done silently. */}
         {query && state.phase === 'done' && state.results.length > 0 && state.unquoted && (
@@ -1148,45 +1253,43 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
+          /* WA3 (s-results): the count is the section label ("312 matches"), the order switch at its right; one meta
+             line under it says where (sections, or the edition on the Scriptures tab) and what else matched. */
           <div className="srch-results-summary">
-            {closestOnly ? (
-              <>
-                Showing closest matches{' · '}
-                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(qTrim)}>Show all</button>
-              </>
-            ) : (
-              <>
-                {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
-                Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
-                {sectionsListed ? <>{" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong></> : null}
-              </>
-            )}
-            {settings.searchSynonyms !== false && relatedShown.length > 0 ? (
-              <div className="srch-syn-line">
-                {'Also matching: ' + (relatedShown.length > 5 ? relatedShown.slice(0, 5).join(', ') + ' and ' + (relatedShown.length - 5) + ' more' : relatedShown.join(', '))}
-                {' · '}
-                <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(qTrim); onSettingsChange('searchSynonyms', false); }}>Turn off</button>
-              </div>
-            ) : settings.searchSynonyms === false && synOffFor !== '' && synOffFor === qTrim ? (
-              <div className="srch-syn-line">
-                {'Related words are off · '}
-                <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(''); onSettingsChange('searchSynonyms', true); }}>Turn on</button>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* [8] the order switch: both orders named, the one in use lit, and a line saying what it does
-            (the old single button showed the OTHER order's name, which read as the current one). */}
-        {sortToggleVisible && (
-          <div className="srch-filter-row">
-            {/* One sort label (search200 audit 144): under Relevance the lit button says the order alone. */}
-            <span className="srch-sort-note">{bookOrder ? 'Genesis to Revelation, then Volume One onward' : ''}</span>
-            <div className="srch-sort" role="group" aria-label="Order results">
-              <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
-                onClick={() => setSortMode('relevance')}>Relevance</button>
-              <button type="button" className={'srch-sort-btn' + (bookOrder ? ' active' : '')} aria-pressed={bookOrder}
-                onClick={() => setSortMode('canonical')}>Book order</button>
+            <div className="srch-summary-head">
+              <span className="srch-count">
+                {closestOnly ? 'Closest matches' : <>
+                  {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
+                  {matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)}{' '}
+                  {corpus === 'scriptures' && grouped.length === 1 ? (state.results.length === 1 ? 'verse' : 'verses') : (state.results.length === 1 ? 'match' : 'matches')}
+                </>}
+              </span>
+              {/* [8] the order switch: both orders named, the one in use lit (one sort label, search200 audit 144). */}
+              {sortToggleVisible ? (
+                <div className="srch-sort" role="group" aria-label="Order results">
+                  <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
+                    onClick={() => setSortMode('relevance')}>Relevance</button>
+                  <button type="button" className={'srch-sort-btn' + (bookOrder ? ' active' : '')} aria-pressed={bookOrder}
+                    onClick={() => setSortMode('canonical')}>Book order</button>
+                </div>
+              ) : null}
+            </div>
+            <div className="srch-syn-line">
+              {closestOnly ? <><button type="button" className="srch-more-link" onClick={() => setAllWordsFor(qTrim)}>Show all</button>{' '}</> : null}
+              {bookOrder ? 'Genesis to Revelation, then Volume One onward. ' : null}
+              {!closestOnly && corpus === 'scriptures' && grouped.length === 1 ? translationLabel(translation) + '. '
+                : !closestOnly && sectionsListed ? 'In ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections') + '. ' : null}
+              {settings.searchSynonyms !== false && relatedShown.length > 0 ? (
+                <>
+                  {'Also matching ' + (relatedShown.length > 5 ? relatedShown.slice(0, 5).join(', ') + ' and ' + (relatedShown.length - 5) + ' more' : andList(relatedShown)) + '. '}
+                  <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(qTrim); onSettingsChange('searchSynonyms', false); }}>Turn off</button>
+                </>
+              ) : settings.searchSynonyms === false && synOffFor !== '' && synOffFor === qTrim ? (
+                <>
+                  {'Related words are off. '}
+                  <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(''); onSettingsChange('searchSynonyms', true); }}>Turn on</button>
+                </>
+              ) : null}
             </div>
           </div>
         )}
@@ -1243,7 +1346,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 </>
               ) : help && help.fewer ? (
                 <>
-                  No results for “{answered}”{scopeIn}.
+                  <span className="srch-none-icon" aria-hidden="true"><UiIcon name="search" /></span>
+                  <h3 className="srch-none-title">Nothing for “{answered}”{scopeIn}</h3>
                   {/* The fewer words and the way out of the tab or scope, as one line of links (G's pick). */}
                   <span className="srch-fewer">
                     Try fewer words:{' '}
@@ -1254,7 +1358,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 </>
               ) : (
                 <>
-                  No results for “{answered}”{scopeIn}.
+                  <span className="srch-none-icon" aria-hidden="true"><UiIcon name="search" /></span>
+                  <h3 className="srch-none-title">Nothing for “{answered}”{scopeIn}</h3>
                   {searchScope ? <>{' '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
                     tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
                 </>
@@ -1272,13 +1377,29 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               </div>
             ) : null}
             {state.stopWordsOnly ? null : pickRows}
+            {/* WA3 (s-none, X-hidden 96): nothing found offers Answers as well as the picks. */}
+            {state.stopWordsOnly || typeof onOpenAnswers !== 'function' ? null : (
+              <>
+                <h2 className="srch-section-label">Or ask</h2>
+                <div className="ui-group srch-ask">
+                  <button type="button" className="srch-row is-two" onClick={() => onOpenAnswers()}>
+                    <span className="srch-row-ic" aria-hidden="true"><UiIcon name="quote" /></span>
+                    <span className="srch-row-tx">
+                      <span className="srch-row-t">Answers Only God Can Give</span>
+                      <span className="srch-row-m">What does The Lord say about…</span>
+                    </span>
+                    <UiIcon name="chev" size="sm" />
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
 
         {noteItems.length > 0 && state.results.length === 0 ? renderNotes() : null}
 
         {/* Nothing to search for: an emoji or punctuation alone left a blank screen. */}
-        {query && query.trim() && !/[\p{L}\p{N}]/u.test(query) && (
+        {query && query.trim() && !/[\p{L}\p{N}]/u.test(query) && !suggestOpen && (
           <div className="search-no-results">Type a word, a title or a reference to search.</div>
         )}
 

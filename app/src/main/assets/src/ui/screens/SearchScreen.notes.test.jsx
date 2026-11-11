@@ -80,7 +80,7 @@ describe('SearchScreen — study notes, chapter summaries and headings', () => {
 
   it('index.html names the group, listed after every collection', () => {
     const meta = realGroupMeta();
-    expect(meta.notes.label).toBe('Study notes & headings');
+    expect(meta.notes.label).toBe('Study notes and headings');
     for (const k of Object.keys(meta)) if (k !== 'notes' && k !== 'other') expect(meta.notes.order).toBeGreaterThan(meta[k].order);
   });
 
@@ -97,8 +97,10 @@ describe('SearchScreen — study notes, chapter summaries and headings', () => {
     /** @type {any} */ (globalThis).SrchGroup = RealSrchGroup;
     const onSelect = vi.fn();
     await typeIn({ ...baseProps(), onSelect }, 'creation');
-    const header = [...document.querySelectorAll('.srch-group-header')].map((h) => h.textContent);
-    expect(header[header.length - 1]).toMatch(/^Study notes & headings · 2 matches/);
+    const headers = [...document.querySelectorAll('.srch-group-header')];
+    const last = headers[headers.length - 1];
+    expect(last.querySelector('.srch-group-name').textContent).toBe('Study notes and headings');
+    expect(last.querySelector('.srch-group-count-inline').textContent).toBe('2 matches');
     const note = [...document.querySelectorAll('.stub-card')].find((c) => c.textContent === 'N1');
     fireEvent.click(/** @type {Element} */ (note));
     expect(onSelect).toHaveBeenCalledWith(NOTES[1], expect.anything(), 'creation', expect.anything());

@@ -48,8 +48,7 @@ export const SECTIONS = Object.freeze({
   'scriptures-home': on('read'), 'scripture-genre': on('read'), 'bible-idx': on('read'), 'matthew-idx': on('read'),
   'studies-home': on('read'), 'bible-study-index': on('read'),
   'answers-home': on('read'), 'answers-group': on('read'), 'answers-media': on('read'), 'answers-saved': on('read'),
-  // Retired Answers shelves (no button reaches them; a saved place is rewritten on the way): Answers' own place.
-  'answers-subject': on('read'), 'answers-az': on('read'),
+
   // ── LISTEN ──
   'audio-library': on('listen'),
   'audio-library-volumes': on('listen'), 'audio-library-offline': on('listen'), 'audio-library-studies': on('listen'), 'audio-library-bible': on('listen'),

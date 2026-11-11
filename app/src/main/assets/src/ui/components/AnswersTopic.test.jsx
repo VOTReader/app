@@ -198,21 +198,21 @@ describe('AnswersTopic — hero words (f07)', () => {
   it('reads the meta line in words; a page of links says "See: N links", never "0 passages"', () => {
     const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
     expect(NB(answersHeroMeta(byId.get('regarding-the-holy-days-of-god'), M['regarding-the-holy-days-of-god'])))
-      .toBe('26 passages · ~31 min · 15 sections · 2 playlists · 1 video · audio · PDF · 2 charts');
+      .toBe('26 passages · ~31 min · 2 playlists · 1 video · audio · PDF · 2 charts');
     expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('See: 6 links');
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
-      .toBe('12 passages · ~12 min · 6 sections · 2 videos · downloads · YouTube channel');
+      .toBe('12 passages · ~12 min · 2 videos · downloads · YouTube channel');
   });
 });
 
-describe('AnswersTopic — "All topics in this group" counts what its shelf shows', () => {
+describe('AnswersTopic — "All answers" (its group) counts what its shelf shows', () => {
   it('an Other Topics member says 16 topics, the shelf\'s own count (the page outside the site\'s menu included)', () => {
     const other = answersShelfByKey(A, 'other');
     const member = other.topics.find((e) => answersSiteShelfOf(A, e.id) && answersSiteShelfOf(A, e.id).kind === 'other');
     render(<AnswersTopic entry={member} entries={A} meta={M[member.id]} metaAll={M} site={null} ready={true} ts2={false} landedPara={-1}
       mainRef={{ current: null }} isRead={() => false} pathOn={false} findOn={false} act={{ cite() {}, jump() {}, source() {}, letter() {} }} nav={{}} />);
-    const row = [...document.querySelectorAll('.ans-foot .ans-row')].find((r) => r.textContent.includes('All topics in this group'));
+    const row = [...document.querySelectorAll('.ans-foot .ans-end-step button')].find((r) => r.textContent === 'All answers');
     expect(other.topics.length).toBe(16);
-    expect(row.textContent.split(String.fromCharCode(160)).join(' ')).toContain('16 topics');
+    expect(row.getAttribute('aria-label')).toContain('16 topics');
   });
 });

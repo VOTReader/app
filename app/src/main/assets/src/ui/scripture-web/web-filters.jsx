@@ -127,13 +127,6 @@ export function legendChips({ web }) {
       [<i className="sw-key-tick" aria-hidden="true" key="i" />, 'cited in the Volumes'], 'Show only verses cited in the Volumes'),
     chip('prophecy', f.prophecy, () => web.toggle('prophecy'),
       [<i className="sw-key-arc" aria-hidden="true" key="i" />, 'prophecy fulfilled'], 'Show only prophecy fulfilled'),
-    <button type="button" key="filters" className={'sw-key sw-chip sw-chip-more' + (web.sheetOpen ? ' is-on' : '')}
-      aria-expanded={web.sheetOpen} aria-haspopup="dialog" onClick={() => web.setSheetOpen(!web.sheetOpen)}>
-      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-        <path d="M4 6h16M7 12h10M10 18h4" />
-      </svg>
-      Filters
-    </button>,
   ];
 }
 
@@ -163,16 +156,17 @@ export function FilterPill({ web }) {
 
 /**
  * One row of the sheet: a name and a segmented choice.
- * @param {{ name: string, value: string, options: Array<[string, string]>, onChange: (v: string) => void }} p
+ * @param {{ name: string, value: string, options: Array<[string, string]>, onChange: (v: string) => void,
+ *   dots?: Record<string, string> }} p  dots: a coloured dot's class before an option's name (Distance's bands)
  */
-function SegRow({ name, value, options, onChange }) {
+function SegRow({ name, value, options, onChange, dots }) {
   return (
     <div className="sw-filter-row">
       <span className="sw-filter-name" id={'sw-filter-' + name}>{name}</span>
       <div className="sw-seg sw-filter-seg" role="group" aria-labelledby={'sw-filter-' + name}>
         {options.map(([v, label]) => (
           <button type="button" key={v} className={'sw-seg-btn' + (value === v ? ' is-on' : '')} aria-pressed={value === v}
-            onClick={() => onChange(v)}>{label}</button>
+            onClick={() => onChange(v)}>{dots && dots[v] ? <i className={'sw-filter-dot ' + dots[v]} aria-hidden="true" /> : null}{label}</button>
         ))}
       </div>
     </div>
@@ -214,9 +208,9 @@ export function FilterSheet({ web, graph, density, chooseDensity, total }) {
       </select>
     </label>
   );
-  const toggle = (label, value, key) => (
+  const toggle = (label, value, key, mark) => (
     <button type="button" className={'sw-btn sw-toggle' + (value ? ' is-on' : '')} aria-pressed={value}
-      onClick={() => web.change({ [key]: !value })}>{label}</button>
+      onClick={() => web.change({ [key]: !value })}><i className={mark} aria-hidden="true" />{label}</button>
   );
   const count = web.on ? web.shown : total;
   const strength = strengthOf(f, density);
@@ -230,8 +224,9 @@ export function FilterSheet({ web, graph, density, chooseDensity, total }) {
     <div className="sw-filter-sheet" ref={ref} role="dialog" aria-modal="false" aria-label="Filters" data-wheel-through="1">
       <div className="sw-filter-head">
         <h2>Filters</h2>
+        {/* WA6 (w-filters): how many are on ("1 on"), as the bar's badge counts them; with none on, what the web shows */}
         <span className="sw-filter-count">
-          {count >= 0 ? count.toLocaleString() + ' shown' : ''}
+          {web.on ? web.labels.length + ' on' : count >= 0 ? count.toLocaleString() + ' shown' : ''}
         </span>
         <button type="button" className="sw-filter-clear" disabled={!web.on && density === 'famous'} onClick={clearAll}>Clear all</button>
         <button type="button" className="sw-btn sw-btn-icon sw-filter-close" aria-label="Close the filters"
@@ -241,22 +236,24 @@ export function FilterSheet({ web, graph, density, chooseDensity, total }) {
           </svg>
         </button>
       </div>
+      {/* WA6 (w-filters): one row per choice, Distance first with each band's colour, Show only and the books last */}
       <div className="sw-filter-body">
-        <div className="sw-filter-row">
-          <span className="sw-filter-name">Show only</span>
-          <div className="sw-filter-toggles">
-            {toggle('Prophecy fulfilled', f.prophecy, 'prophecy')}
-            {toggle('Cited in the Volumes', f.cited, 'cited')}
-          </div>
-        </div>
         <SegRow name="Distance" value={f.distance} onChange={(v) => web.change({ distance: /** @type {any} */ (v) })}
+          dots={{ near: 'is-near', middle: 'is-middle', far: 'is-far' }}
           options={['all', 'near', 'middle', 'far'].map((k) => [k, k === 'middle' ? 'Middle' : DISTANCE_LABEL[k]])} />
         <SegRow name="Testament" value={f.testament} onChange={(v) => web.change({ testament: /** @type {any} */ (v) })}
           options={['all', 'oo', 'on', 'nn'].map((k) => [k, TESTAMENT_LABEL[k]])} />
         <SegRow name="Strength" value={strength} onChange={setStrength}
           options={[['all', 'All'], ['essential', 'Essential'], ['strong', '50+ votes'], ['strongest', '100+ votes']]} />
         <div className="sw-filter-row">
-          <span className="sw-filter-name">Books</span>
+          <span className="sw-filter-name">Show only</span>
+          <div className="sw-filter-toggles">
+            {toggle('Prophecy fulfilled', f.prophecy, 'prophecy', 'sw-key-arc')}
+            {toggle('Cited in the Volumes', f.cited, 'cited', 'sw-key-tick')}
+          </div>
+        </div>
+        <div className="sw-filter-row">
+          <span className="sw-filter-name">Between books</span>
           <div className="sw-filter-books">
             {bookSelect('From book', f.fromBook, 'fromBook')}
             <span className="sw-filter-and" aria-hidden="true">and</span>

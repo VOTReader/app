@@ -16,6 +16,11 @@
 import { answersSavedSum, answersParaSource } from '../../utils/answers-extras.js';
 import { answersHitSource } from '../../utils/answers-browse.js';
 import { answersIndexOf, answersPlainText } from '../../utils/answers-search.js';
+import { EmptyState } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { copyText } from '../../utils/copy-share.js';
+import { ANSWERS_MAIN_PAGE_ID } from '../../utils/answers-shelves.js';
 import { LeadTitle, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 
 /**
@@ -28,38 +33,54 @@ export function AnswersSaved({ entries, fontScale, onBack, onSearch, onHistory, 
   const sum = answersSavedSum(saved);
   const index = React.useMemo(() => (sum ? answersIndexOf(entries) : []), [entries, sum]);
   const itemOf = React.useMemo(() => new Map(index.map((t) => [t.entry.id, t])), [index]);
+  const [menu, setMenu] = React.useState(/** @type {any} */ (null));
+  const closeMenu = React.useCallback(() => setMenu(null), []);
+  const open = (id, it) => {
+    const t = entries.find((e) => e.id === id);
+    const p = t && t.paragraphs[it.index];
+    onOpenTopic(id, p ? p.text : null, 'Saved answers', null, null, it.index);
+  };
   return (
     <ScreenLayout className={answersLayoutClass(fontScale, false)}
-      navChildren={LibraryNav({ onBack, backLabel: 'Answers', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange })}>
-      <div className="ans-page">
-        <header className="ans-hero">
-          <p className="ans-label">Answers Only God Can Give</p>
-          <h1 className="ans-display">Saved answers</h1>
-          {sum ? <p className="ans-lede">{sum + ', in the site’s order.'}</p> : null}
-        </header>
-        {sum ? null : <p className="ans-empty">No saved answers yet. Hold your finger on any line to highlight it.</p>}
+      navChildren={LibraryNav({ onBack, backLabel: 'Answers', showHome: false, onSettings, onHistory, onSearch, theme, onThemeChange,
+        leftExtras: <h1 className="ans-bar-title is-on">Saved answers</h1> })}>
+      <div className="ans-page ans-saved-page">
+        {/* WA2 (a-saved, a-saved0): one quiet line, then a card per topic; nothing saved: how, and a door */}
+        {sum ? <p className="ans-saved-note">{sum + ', in the site’s order. They also sit with your other highlights in the Library.'}</p> : (
+          <EmptyState icon="star" title="No saved answers yet" text="Hold a line in any answer and pick a colour. It is kept here and with your highlights."
+            action={{ label: 'Open the Main Page', onClick: () => onOpenTopic(ANSWERS_MAIN_PAGE_ID, null, 'Saved answers') }} />
+        )}
         {saved.topics.map((t) => {
           const id = t.entry.id;
           const sections = (meta && meta[id] && meta[id].sections) || null;
           return (
             <section key={id} aria-labelledby={'ans-saved-' + id}>
-              <div className="ans-sechead"><h2 className="ans-h2" id={'ans-saved-' + id}><LeadTitle title={t.entry.title} /></h2></div>
-              {t.items.map((it) => {
-                const p = t.entry.paragraphs[it.index];
-                const src = answersHitSource(t.entry, answersParaSource(itemOf.get(id), it.index, sections), answersPlainText);
-                return (
-                  <button key={it.gid} type="button" className="ans-hit"
-                    onClick={() => onOpenTopic(id, p ? p.text : null, 'Saved answers', null, null, it.index)}>
-                    <span className="ans-hit-snip">{it.text}</span>
-                    {it.note ? <span className="ans-hit-src ans-hit-note">{it.note}</span> : null}
-                    {src ? <span className="ans-hit-src">{src}</span> : null}
-                  </button>
-                );
-              })}
+              <div className="ans-sechead"><h2 className="ans-h2" id={'ans-saved-' + id}><LeadTitle title={t.entry.title} /></h2><span className="ans-count">{t.items.length}</span></div>
+              <div className="ans-box">
+                {t.items.map((it) => {
+                  const src = answersHitSource(t.entry, answersParaSource(itemOf.get(id), it.index, sections), answersPlainText);
+                  return (
+                    <div key={it.gid} className="ans-saved-row">
+                      <button type="button" className="ans-hit" onClick={() => open(id, it)}>
+                        <span className="ans-hit-snip">{it.text}</span>
+                        {it.note ? <span className="ans-hit-src ans-hit-note">{it.note}</span> : null}
+                        {src ? <span className="ans-hit-src">{src}</span> : null}
+                      </button>
+                      <button type="button" className="ans-saved-menu" aria-haspopup="dialog" aria-label="Saved line options"
+                        onClick={() => setMenu({ id, it, title: t.entry.title })}><UiIcon name="more" /></button>
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           );
         })}
       </div>
+      <ActionSheet open={!!menu} onClose={closeMenu} title={menu ? menu.it.text : ''} sub={menu ? menu.title : ''}
+        actions={menu ? [
+          { id: 'open', icon: 'book', label: 'Open in the answer', onSelect: () => { const m = menu; setMenu(null); open(m.id, m.it); } },
+          { id: 'copy', icon: 'copy', label: 'Copy the words', onSelect: () => { const m = menu; setMenu(null); copyText('“' + m.it.text + '”'); } },
+        ] : []} />
     </ScreenLayout>
   );
 }

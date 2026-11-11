@@ -137,7 +137,7 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
     const rails = JSON.parse(root.getAttribute('data-rails') || 'null');
     expect(rails, 'the frame drew the rails').toBeTruthy();
     expect(rails.bottom.map((b) => b.label)).toEqual(['Numbers', 'John', 'Romans']);
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Scripture' })); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' })); });
     for (let i = 0; i < 30 && !container.querySelector('.sw-fallback-list'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     }

@@ -27,7 +27,7 @@ import { h, Fragment } from '../jsx-h.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from './AnswersParts.jsx';
 import { FoldRow, TocRows, AnswersContentsSheet } from './AnswersContents.jsx';
 import { AnsSheet, ChartViewer, CommandmentSheet } from '../sheets/AnswersSheets.jsx';
-import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
+import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, answersBrowseShelves, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
@@ -39,6 +39,10 @@ import {
 import { answersFragmentStart } from '../../utils/answers-links.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { endsOnClosing } from '../../utils/closing-breaks.js';
+import { usePageMenu } from '../../utils/page-menu.js';
+import { answersIndexOf } from '../../utils/answers-search.js';
+import { answersCardFor, answersShownText, answersCardWords, ANSWERS_CARD_MAX_WORDS } from '../../utils/answers-extras.js';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
 const IMG_WH = { 'answers-chart-chronology.jpg': [2000, 1545], 'answers-holidays-vs-holy-days.jpg': [1472, 960], 'answers-banner.jpg': [1200, 304] };
@@ -56,7 +60,8 @@ export function answersHlDomChanged() {
 /** How much of the page's top the running head covers (0 on desktop, where it is hidden). */
 export function answersHeadCover() {
   const rh = typeof document !== 'undefined' ? /** @type {HTMLElement | null} */ (document.querySelector('.ans-runhead')) : null;
-  return rh && getComputedStyle(rh).display !== 'none' ? rh.offsetHeight : 0;
+  // WA1: it sits in the top bar now, over no page text
+  return rh && getComputedStyle(rh).display !== 'none' && rh.getBoundingClientRect().top > 8 ? rh.offsetHeight : 0;
 }
 
 /* ── A paragraph's decorated runs, as elements ─────────────────────── */
@@ -286,11 +291,12 @@ function closesPassage(entry, meta, i) {
 
 /**
  * @param {{ entry: any, entries: any[] | null, meta: any, pending: boolean, heroRef: any, onEyebrow: (shelf: any) => void,
- *   onContents: () => void, h1: any }} props
+ *   onContents: () => void, h1: any, rows?: any[], onSection?: (k: number) => void }} props
  */
-function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1 }) {
+function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1, rows, onSection }) {
   const eb = entries ? answersEyebrow(entries, entry) : null;
   const cl = meta ? answersContentsLine(entry, meta) : null;
+  const n = meta ? answersTopSections(meta).length : 0;
   return (
     <>
       {entry.id === ANSWERS_MAIN_PAGE_ID ? <img className="ans-banner" src="answers-banner.jpg" alt="Answers Only God Can Give" width="1200" height="304" /> : null}
@@ -301,10 +307,12 @@ function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h
         {h1 || <h1 className={'ans-display' + (answersLongTitle(entry) ? ' is-long' : '')}>{entry.title}</h1>}
         {/* no line once the sidecars are in without this topic's row, or could not load */}
         {meta ? <p className="ans-meta">{answersHeroMeta(entry, meta)}</p> : pending ? <p className="ans-meta"><em>Loading contents…</em></p> : null}
+        {/* WA1 (a-topic): the sections as a strip under the title; the first chip opens "On this page" */}
         {cl ? (
-          <button type="button" className="ans-contents-line" aria-haspopup="dialog" onClick={onContents}>
-            <span className="ans-names">{cl.names}</span><span className="ans-more">{cl.more}<Chev /></span>
-          </button>
+          <nav className="ans-az-strip ans-jump-strip ans-sec-strip" aria-label="Sections">
+            <button type="button" className="ans-az-key ans-contents-line" aria-haspopup="dialog" aria-current="true" onClick={onContents}><AnsIcon name="list" />{pl(n, 'section')}</button>
+            {(rows || []).map((r, k) => <button key={k} type="button" className="ans-az-key" onClick={() => onSection(k)}>{r.title}</button>)}
+          </nav>
         ) : null}
       </header>
     </>
@@ -373,6 +381,31 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   const tcRow = rows.find((r) => r.trumpet);
   const tcAt = tcRow ? tcRow.at : entry.paragraphs.length;
 
+  // X-hidden 69 (WA6): "Share as a card" in the topic's ⋯ menu, beside "Find in this topic" when that is there.
+  // The card holds the passage the reader is in: from the section on view on, the first passage whose words fit a card
+  // whole, else its first paragraph that does (a card holds 80 words), else that passage as it is (the sheet then
+  // asks for a shorter one); its words as the page shows them, its source and date its own (answersCardFor).
+  // Other words go through the selection's card door.
+  const cardRef = React.useRef(() => {});
+  cardRef.current = () => {
+    const item = answersIndexOf(entries || [entry]).find((t) => t.entry === entry);
+    const all = item ? item.passages.filter((x) => x.paras.length) : [];
+    const from = rows[cur] ? rows[cur].at : 0;
+    const at = all.findIndex((x) => x.paras[x.paras.length - 1].index >= from);
+    const ps = at > 0 ? all.slice(at).concat(all.slice(0, at)) : all;
+    if (!ps.length) return;
+    const text = (/** @type {any[]} */ qs) => qs.map((q) => answersShownText(entry.paragraphs[q.index].text)).join('\n');
+    const fits = (/** @type {string} */ w) => { const n = answersCardWords(w); return n > 0 && n <= ANSWERS_CARD_MAX_WORDS; };
+    let pick = null;
+    for (const p of ps) { if (fits(text(p.paras))) { pick = p.paras; break; } }
+    if (!pick) for (const p of ps) { const q = p.paras.find((x) => fits(text([x]))); if (q) { pick = [q]; break; } }
+    if (!pick) pick = ps[0].paras;
+    setSheet({ kind: 'card', card: answersCardFor(entry, item, pick[0].index, text(pick), meta && meta.sections) });
+  };
+  const cardMenu = React.useMemo(() => (inert || !ready ? null
+    : [{ key: 'answers-card', label: 'Share as a card', icon: /** @type {'share'} */ ('share'), onSelect: () => cardRef.current() }]), [inert, ready]);
+  usePageMenu(cardMenu);
+
   // Fold on or off moves every paragraph into or out of its section's div.ans-fold, so React mounts
   // them anew and the marks painted inside them go with the old ones: say so, and the pass re-paints.
   const foldedRef = React.useRef(folded);
@@ -389,11 +422,11 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     const sc = root && root.closest('.screen-scroll');
     if (!sc) return undefined;
     setLayoutEl(sc.closest('.screen-layout'));
-    let heroVis = true, last = sc.scrollTop, up = 0, raf = 0;
+    let heroVis = true, raf = 0;
     const IO = typeof IntersectionObserver !== 'undefined' ? IntersectionObserver : null;
     const io1 = IO && heroRef.current ? new IO((es) => {
       for (const e of es) heroVis = e.isIntersecting;
-      if (heroVis && !sheetRef.current) setShown(false);
+      if (!sheetRef.current && pinRef.current <= Date.now()) setShown(!heroVis);
     }) : null;
     if (io1 && heroRef.current) io1.observe(heroRef.current);
     // The current section: the last heading whose top has reached the head's lower edge (48 under the
@@ -420,16 +453,14 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       raf = requestAnimationFrame(() => {
         raf = 0;
         const st = sc.scrollTop;
-        const d = st - last;
-        last = st;
         const max = sc.scrollHeight - sc.clientHeight;
         const pct = (max > 0 ? Math.min(100, Math.max(0, (st / max) * 100)) : 0).toFixed(1) + '%';
         if (barRef.current) barRef.current.style.width = pct;
         if (railBarRef.current) railBarRef.current.style.width = pct;
         section(st);
         if (sheetRef.current || pinRef.current > Date.now()) return;
-        if (heroVis) { up = 0; setShown(false); return; }
-        if (d < 0) { up -= d; if (up >= 8) setShown(true); } else if (d > 0) { up = 0; setShown(false); }
+        // WA1 (a-topic2): the running head sits in the bar and names the section whenever the hero is out of view
+        setShown(!heroVis);
       });
     };
     sc.addEventListener('scroll', onScroll, { passive: true });
@@ -620,7 +651,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     {btn ? <span className="ans-runhead-s"><span className="ans-runhead-num">{curRow.num}</span> <span className="ans-runhead-sec">{curRow.title}</span></span> : null}
     <span className="ans-runhead-t">{btn ? short + NBSP + '·' + NBSP : short}</span>
   </span>,
-  btn ? <AnsIcon name="list" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
+  btn ? <AnsIcon name="down" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
 
   const top = meta ? answersTopSections(meta).length : 0;
   const passages = answersPassageCount(entry);
@@ -639,7 +670,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
         ) : null}
         <div className="ans-topic-main" ref={mainRef} data-copy-key={'wtlb:' + entry.id} data-mark-entry={'wtlb:' + entry.id + ':'}
           data-mark-blocks={entry.paragraphs.length} onClick={(e) => onTap(e, null)} onKeyDown={(e) => onTap(e, null)}>
-          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} />
+          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} rows={rows} onSection={jumpRow} />
           <div className="ans-reading">{body}</div>
           {/* Reading-end sentinel: end of body text, before the foot. */}
           <div className="reading-end" />
@@ -662,8 +693,10 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       ) : null}
       {sheet && sheet.kind === 'cmd' && entries ? (
         <CommandmentSheet shelf={sheet.shelf} meta={metaAll} isRead={(id) => !!pathOn && isRead(id)} tall={ts2} onClose={() => setSheet(null)}
+          onStep={(n) => { const c = answersBrowseShelves(entries).commandments.find((x) => x.num === n); if (c) setSheet({ kind: 'cmd', shelf: c }); }}
           onOpenTopic={(id) => { setSheet(null); nav.openTopic(id, null); }} onGoToRef={nav.goToRef ? (ref) => { setSheet(null); nav.goToRef(ref); } : undefined} />
       ) : null}
+      {sheet && sheet.kind === 'card' ? <AnswersCardSheet card={sheet.card} onClose={() => setSheet(null)} /> : null}
       {sheet && sheet.kind === 'chart' ? (
         <ChartViewer chart={sheet.chart} onClose={() => { const f = sheet.from; setSheet(null); if (f && f.focus) f.focus({ preventScroll: true }); }} />
       ) : null}
@@ -771,7 +804,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
             {groups.map((g, gi) => (
               <React.Fragment key={'g' + gi}>
                 {g.label ? <h3 className="ans-foot-h3">{g.label}</h3> : null}
-                {g.items.map((it, j) => (it.anchor ? moreRow(it, gi + ':' + j) : topicRow(it.id, gi + ':' + j)))}
+                <div className="ans-box">{g.items.map((it, j) => (it.anchor ? moreRow(it, gi + ':' + j) : topicRow(it.id, gi + ':' + j)))}</div>
               </React.Fragment>
             ))}
           </React.Fragment>,
@@ -784,7 +817,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       parts.push(
         <React.Fragment key="r">
           <div className="ans-sechead"><h2 className="ans-h2">Related Topics</h2></div>
-          {vis.map((r, k) => (r.more ? moreRow(r, 'm' + k) : topicRow(r.id, 't' + k)))}
+          <div className="ans-box">{vis.map((r, k) => (r.more ? moreRow(r, 'm' + k) : topicRow(r.id, 't' + k)))}</div>
           {R.length > RELATED_SHOWN ? (
             <button type="button" className="ans-textbtn" aria-expanded={all} onClick={() => setAll(!all)}>
               {all ? 'Show fewer' : 'Show all ' + R.length}<Chev dir={all ? 'up' : 'down'} />
@@ -797,13 +830,15 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       const fd = entry.id === ANSWERS_FD_INDEX_ID;
       const main = entry.id === ANSWERS_MAIN_PAGE_ID;
       const rows = [];
+      // WA2 (a-end): "Keep reading", the next topic as a card, then worded Previous topic | All answers
+      const step = [];
       if (sn && sn.next && byId.has(sn.next)) {
         const nx = byId.get(sn.next);
         rows.push(<KRow key="n" kicker={'Next in ' + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next)} onClick={() => nav.go(sn.next)} />);
       }
       if (sn && sn.prev && byId.has(sn.prev)) {
         const pv = byId.get(sn.prev);
-        rows.push(<KRow key="p" prev title={<LeadTitle title={pv.title} />} sub={topicSub(sn.prev)} onClick={() => nav.go(sn.prev)} />);
+        step.push(<button key="p" type="button" className="ans-tile-btn" aria-label={'Previous topic: ' + pv.title} onClick={() => nav.go(sn.prev)}><AnsIcon name="left" />Previous topic</button>);
       }
       if (sn && sn.end && sn.proceed) {
         const pr = sn.proceed;
@@ -822,12 +857,13 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
         // the count the shelf it opens shows (Other Topics lists the page outside the site's menu too)
         const browse = shelf.kind === 'commandment' ? null : answersShelfByKey(entries, shelf.kind === 'other' ? 'other' : String(shelf.num));
         const n = (browse ? browse.topics : shelf.topics).length;
-        rows.push(<AnsRow key="g" title="All topics in this group" sub={answersPlaceOf(entries, entry.id) + SEP + pl(n, 'topic')} onClick={() => onShelf(shelf)} />);
+        step.push(<button key="g" type="button" className="ans-tile-btn" aria-label={'All answers: ' + answersPlaceOf(entries, entry.id) + ', ' + pl(n, 'topic').replace(NBSP, ' ')} onClick={() => onShelf(shelf)}><AnsIcon name="list" />All answers</button>);
       }
-      if (!main && !fd) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
+      if (step.length) rows.push(<div key="st" className="ans-two ans-end-step">{step}</div>);
+      if (!main && !fd && !step.length) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
       parts.push(
         <nav key="nav" className="ans-foot-nav" aria-labelledby={'ans-nav-' + entry.id}>
-          <h2 className="sr-only" id={'ans-nav-' + entry.id}>Navigation</h2>
+          <h2 className="ans-foot-k" id={'ans-nav-' + entry.id}>Keep reading</h2>
           {rows}
         </nav>,
       );

@@ -26,8 +26,9 @@ const SCREEN = fs.readFileSync(path.join(HERE, 'panels.jsx'), 'utf8');
 
 /** The guide as the reader reads it: its list items, tags stripped. */
 function guideItems() {
-  const guide = SCREEN.slice(SCREEN.indexOf('How to read this web</div>'), SCREEN.indexOf('Got it</button>'));
-  const items = guide.match(/<li>[\s\S]*?<\/li>/g) || [];
+  // WA4: the title and the close button read their words from `about`; the points are li.sw-guide-pt
+  const guide = SCREEN.slice(SCREEN.indexOf("'How to read this web'}</div>"), SCREEN.indexOf("'Got it'}</button>"));
+  const items = guide.match(/<li[\s>][\s\S]*?<\/li>/g) || [];
   return items.map((s) => s.replace(/<[^>]+>/g, ''));
 }
 
@@ -81,7 +82,9 @@ describe('the guide names the drag that reaches the sky (ux1)', () => {
   it('the sky line names a direction for the finger', () => {
     // and why to look there: it said "where the long threads cross" until the w3 review asked the
     // guide to say what an arch's height means (C22); the taller arches it names are the long threads
-    expect(skyLine()).toMatch(/\btaller\b[^.]*\barch\b[^.]*\blook higher\b/i);
+    // WA4: the four-point card says the taller arch in its first point and the drag in the zoom point
+    expect(skyLine()).toMatch(/\bdrag down to look higher\b/i);
+    expect(guideItems().join(' ')).toMatch(/\bfarther apart\b[^.]*\btaller\b[^.]*\barch\b/i);
     expect(guideItems().join(' ')).not.toMatch(/\bsky\b/i);
     expect(['up', 'down']).toContain(directionWord(skyLine()));
   });

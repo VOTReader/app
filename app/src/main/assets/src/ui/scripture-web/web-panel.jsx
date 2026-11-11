@@ -40,7 +40,7 @@
 
 import { ConnectionRow } from './connection-row.jsx';
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, openInReaderLabel,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, openInReaderLabel,
   verseTextFor, WHOLE_WEB, exitsWords, endsOf,
   goOnTitle, goOnRowLabel, allByBookLabel, cameFromLabel, backToLabel, forwardToLabel, pathsLabel, pathsMeta, forkLabel,
 } from '../../utils/scripture-web/describe.js';
@@ -159,10 +159,10 @@ function Chevron({ open }) {
 /** A section with a tracked-caps head; `collapsible` makes the head a disclosure button. The head
  * is named in the title's own case (w4 screen-reader hunt): the CSS capitals went into the
  * accessible name, and some readers spell an all-caps word letter by letter. */
-function Section({ title, collapsible = false, startOpen = true, children, className = '' }) {
+function Section({ title, collapsible = false, startOpen = true, children, className = '', label = '' }) {
   const [open, setOpen] = React.useState(startOpen);
   const shown = !collapsible || open;
-  const name = typeof title === 'string' ? title : undefined;
+  const name = label || (typeof title === 'string' ? title : undefined);
   // A section opened at the panel's foot shows its rows (Corbin, 2026-10-22: "More from Nehemiah
   // 1:5 · 8 connections" opened with its rows under the edge, so the toggle seemed to do nothing).
   // `nearest` leaves a section already in view alone, shows a short one whole and brings a tall
@@ -204,13 +204,51 @@ function titleEnds(title) {
 }
 
 /** The panel's head: overline, title, meta (spec 4.6 items 1-3). */
-function PanelHead({ over, title, meta }) {
-  return (
-    <div className="sw-panel-head">
-      <div className="sw-sheet-eyebrow sw-panel-over">{over}</div>
+function PanelHead({ over, title, meta, action = null }) {
+  // WA5 (w-focus): a chapter's one gold button sits beside its head; (w-conn) a connection has no overline
+  const words = (
+    <React.Fragment>
+      {over ? <div className="sw-sheet-eyebrow sw-panel-over">{over}</div> : null}
       {title ? <h2 className="sw-panel-title">{titleEnds(title)}</h2> : null}
       {meta ? <div className="sw-sheet-meta sw-panel-meta">{metaItems(meta)}</div> : null}
+    </React.Fragment>
+  );
+  if (!action) return <div className="sw-panel-head">{words}</div>;
+  return (
+    <div className="sw-panel-head has-action">
+      <div className="sw-panel-head-words">{words}</div>
+      {action}
     </div>
+  );
+}
+
+/** An open book, the mark of every "open it in the reader" button (WA5). */
+const BOOK_PATH = (
+  <React.Fragment>
+    <path d="M12 6.5C10.3 5.2 7.9 4.8 4 5v13c3.9-.2 6.3.2 8 1.5 1.7-1.3 4.1-1.7 8-1.5V5c-3.9-.2-6.3.2-8 1.5z" /><path d="M12 6.5v13" />
+  </React.Fragment>
+);
+function BookIcon() {
+  return <svg className="sw-act-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{BOOK_PATH}</svg>;
+}
+/** A section head with a quiet note at its right (WA5: "Strongest first", "7 places"). */
+function SplitTitle({ words, note }) {
+  return <span className="sw-sec-split"><span>{words}</span><span className="sw-sec-note">{note}</span></span>;
+}
+/** Three lines, the mark of "Verses it cites" and of the list (WA5). */
+function ListIcon() {
+  return <svg className="sw-act-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" /></svg>;
+}
+/** A mortarboard, the mark of "Open study" (WA5, w-cited). */
+function StudyIcon() {
+  return <svg className="sw-act-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 9L12 4.5 21.5 9 12 13.5z" /><path d="M6.5 11v5c3 2.2 8 2.2 11 0v-5" /></svg>;
+}
+/** A fork, the mark of "See its threads" (WA5, w-conn). */
+function ForkIcon() {
+  return (
+    <svg className="sw-act-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20v-7M12 13L6 5M12 13l6-8M4 5h4M16 5h4" />
+    </svg>
   );
 }
 
@@ -259,14 +297,20 @@ export function crumbText(g, c) {
 }
 
 /** One verse in full, with "Open in reader ›" (and, for the far end of a connection, its Follow). */
-function VerseBlock({ block, heading = true, onOpen, extra = null }) {
+function VerseBlock({ block, heading = true, onOpen, extra = null, card = false }) {
+  // WA5 (w-conn): a connection's end is a card, its two actions worded buttons with their marks
   return (
-    <div className="sw-verse">
+    <div className={'sw-verse' + (card ? ' is-card' : '')}>
       {heading ? <h3 className="sw-verse-ref">{block.ref.label}</h3> : null}
       <p className={'sw-verse-text' + (block.text ? '' : ' is-pending')}>{block.text || 'The verse is still loading.'}</p>
-      <div className="sw-links">
-        <button type="button" className="sw-link" onClick={() => onOpen(block.endpoint)}
-          aria-label={openInReaderLabel(block.ref.label)}>Open in reader <span aria-hidden="true">›</span></button>
+      <div className={card ? 'sw-acts' : 'sw-links'}>
+        {card ? (
+          <button type="button" className="sw-act" onClick={() => onOpen(block.endpoint)}
+            aria-label={openInReaderLabel(block.ref.label)}><BookIcon />Open in reader</button>
+        ) : (
+          <button type="button" className="sw-link" onClick={() => onOpen(block.endpoint)}
+            aria-label={openInReaderLabel(block.ref.label)}>Open in reader <span aria-hidden="true">›</span></button>
+        )}
         {extra}
       </div>
     </div>
@@ -327,9 +371,9 @@ const ICON = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke
  * shows something else than the stop the reader is at (a line tapped on the way), Back is the way
  * back to that stop, and its crumb a button.
  * @param {{ g: any, journey: any, atHere: boolean, branches: number, pathsOpen: boolean,
- *   onPaths: () => void, onMove: () => void }} p
+ *   onPaths: () => void, onMove: () => void, aside?: string }} p
  */
-function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove }) {
+function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove, aside = '' }) {
   const { path, here, trail } = journey;
   const stopsRef = React.useRef(/** @type {HTMLOListElement | null} */ (null));
   // the crumb where the reader is stays in view as the trail grows: the row scrolls sideways to
@@ -380,6 +424,8 @@ function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove }) 
             </li>
           );
         })}
+        {/* WA5 (w-conn): a card open off the trail (a connection) names itself after the stop it opened from */}
+        {aside && !atHere ? <li className="is-aside"><span className="sw-trail-aside">{aside}</span></li> : null}
       </ol>
       {branches > 1 ? (
         <button type="button" className={'sw-trail-paths' + (pathsOpen ? ' is-on' : '')} onClick={onPaths}
@@ -493,7 +539,7 @@ function Quote({ text, title, children }) {
     <React.Fragment>
       <p ref={ref} className={'sw-cite-quote' + (open ? '' : ' is-clamped')}>{text}</p>
       {/* "more" ends the passage's own row of links (w4: on a row of its own it cost a line a quote) */}
-      <div className="sw-links">
+      <div className="sw-acts">
         {children}
         {/* each passage's own "more", so a list of them is not "more, more, more" (ideas audit s27.1) */}
         {long ? (
@@ -516,29 +562,31 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel, onRet
   const keys = letterKeys(g);
   const shown = all ? cited : cited.slice(0, CITED_SHOWN);
   return (
-    <Section title={'Cited in the Volumes · ' + cited.length} collapsible startOpen={startOpen} className="sw-sec-cited">
+    // WA5 (w-cited): CITED IN THE VOLUMES, "n places" at its right; each passage a card with worded buttons
+    <Section title={<SplitTitle words="Cited in the Volumes" note={plural(cited.length, 'place', 'places')} />}
+      label={'Cited in the Volumes · ' + cited.length} collapsible startOpen={startOpen} className="sw-sec-cited sw-sec-books">
       <ul className="sw-cites">
         {shown.map((c) => {
           const links = (
             <React.Fragment>
               {c.endpoint ? (
-                <button type="button" className="sw-link" onClick={() => onOpen(c.endpoint)}
+                <button type="button" className="sw-act" onClick={() => onOpen(c.endpoint)}
                   aria-label={'Open ' + c.title + ' where it cites ' + c.cites}>
-                  {c.collection === 'studies' ? 'Open study' : 'Open letter'} <span aria-hidden="true">›</span>
+                  {c.collection === 'studies' ? <StudyIcon /> : <BookIcon />}{c.collection === 'studies' ? 'Open study' : 'Open letter'}
                 </button>
               ) : null}
               {keys.has(c.letterKey) ? (
-                <button type="button" className="sw-link sw-link-quiet"
+                <button type="button" className="sw-act"
                   onClick={() => openPanel({ mode: 'letter', letterKey: c.letterKey }, { back: true })}
-                  aria-label={'The verses ' + c.title + ' cites'}>Verses it cites <span aria-hidden="true">›</span></button>
+                  aria-label={'The verses ' + c.title + ' cites'}><ListIcon />Verses it cites</button>
               ) : null}
             </React.Fragment>
           );
           return (
             <li className="sw-cite" key={c.key}>
               <div className="sw-cite-title">{c.title}</div>
-              <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · ' + c.cites : ''))}</div>
-              {c.excerpt ? <Quote text={c.excerpt} title={c.title}>{links}</Quote> : <div className="sw-links">{links}</div>}
+              <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · cites ' + c.cites : ''))}</div>
+              {c.excerpt ? <Quote text={c.excerpt} title={c.title}>{links}</Quote> : <div className="sw-acts">{links}</div>}
             </li>
           );
         })}
@@ -604,8 +652,11 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
             ref={(el) => { if (el) items.current.set(grp.book, el); else items.current.delete(grp.book); }}>
             <button type="button" className="sw-group-head" aria-expanded={isOpen} onClick={() => toggle(grp.book)}
               onMouseEnter={() => light(ids)} onMouseLeave={() => light(null)}
-              onFocus={() => light(ids)} onBlur={() => light(null)}>
-              <span className="sw-group-title">{grp.title} · {grp.rows.length.toLocaleString()}</span>
+              onFocus={() => light(ids)} onBlur={() => light(null)}
+              aria-label={grp.title + ' · ' + grp.rows.length.toLocaleString()}>
+              {/* WA5 (w-focus): the book, its count at the right, the chevron after it */}
+              <span className="sw-group-title">{grp.title}</span>
+              <span className="sw-group-count" aria-hidden="true">{grp.rows.length.toLocaleString()}</span>
               <Chevron open={isOpen} />
             </button>
             {isOpen ? (
@@ -763,12 +814,15 @@ export function WebPanel(props) {
     lightThreads(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- baseKey is base's content: the trigger
   }, [mode, baseKey, webMode, lightThreads]);
+  // WA6 (w-list): My Web's list keeps the reader's links and Timothy's notes apart; it opens on Yours when there
+  // are any (null: not chosen yet)
+  const [mineSide, setMineSide] = React.useState(/** @type {string | null} */ (null));
 
   if (!g || !mode) return null;
   const containerClass = 'sw-panel ' + (mode === 'list' ? 'sw-list' : mode === 'chooser' ? 'sw-choice' : 'sw-sheet');
-  const label = mode === 'list' ? 'Nearby connections' : mode === 'chooser' ? 'Connections here'
+  const label = mode === 'list' ? (webMode === 'personal' ? 'My Web list' : 'In view') : mode === 'chooser' ? 'Connections here'
     : sheetEyebrow(detail) + ' details';
-  const closeLabel = mode === 'list' ? 'Close nearby connections' : mode === 'chooser' ? 'Close connection choices' : 'Close';
+  const closeLabel = mode === 'list' ? 'Close the list' : mode === 'chooser' ? 'Close connection choices' : 'Close';
 
   /** A thread row (2026-11-03): a way on. The whole row follows the thread to the verse it names
    * (followRow: that verse becomes a stop of the trail, its panel opens there), and says whether
@@ -785,13 +839,81 @@ export function WebPanel(props) {
   };
   const votesTag = (/** @type {any} */ r) => plural(r.votes, 'vote', 'votes');
   const fromTag = (/** @type {any} */ r) => 'from ' + shortRef(g, r.hereVerse);
+  const fromVotesTag = (/** @type {any} */ r) => fromTag(r) + ' · ' + votesTag(r);
   const sortNote = <p className="sw-sort-note">Strongest first in each book.</p>;
 
   let body = null;
   if (mode === 'list') {
     // the canon list leads with the chapter it reads (landing 15); My Web lists the reader's links
     const chapter = webMode !== 'personal' && listItems[0] && listItems[0].kind === 'chapter' ? listItems[0] : null;
-    body = (
+    if (chapter) {
+      // WA5 (w-near): List (was Nearby) is what is in view: the chapter at the centre of the screen as a
+      // card with its book mark, then its strongest threads, "36 of 266" at the head's right
+      const rest = listItems.slice(1);
+      const n = chapter.connections;
+      const name = chapter.book.title + ' ' + chapter.chapter;
+      body = (
+        <React.Fragment>
+          <div className="sw-panel-head sw-inview-head">
+            <h2 className="sw-panel-title">In view</h2>
+            <div className="sw-sheet-meta sw-panel-meta">Centre of the screen: {name}</div>
+          </div>
+          <button type="button" className="sw-inview-chapter" onClick={() => onChoose(chapter)}
+            aria-label={name + ', where its threads go'}>
+            <span className="sw-inview-mark"><BookIcon /></span>
+            <span className="sw-inview-words">
+              <span className="sw-row-ref">{name}</span>
+              <span className="sw-row-text">{connectionMeta(chapter)}</span>
+            </span>
+            <Chevron open={false} />
+          </button>
+          <Section title={<SplitTitle words="Strongest here"
+            note={n > 0 && rest.length < n ? rest.length.toLocaleString() + ' of ' + n.toLocaleString() : plural(n || 0, 'connection', 'connections')} />}
+            label="Strongest here" className="sw-sec-books">
+            {rest.length ? (
+              <ul className="sw-rows sw-choice-list">
+                {rest.map((item, i) => (
+                  <ConnectionRow key={i} title={connectionTitle(item)} text={connectionMeta(item)} mainClass="sw-choice-row"
+                    onMain={() => onChoose(item)}
+                    onLight={item.kind === 'arc' ? (on) => light(on ? [item.index] : null) : undefined} />
+                ))}
+              </ul>
+            ) : <div className="sw-list-empty">{listMeta(chapter, listItems.length)}</div>}
+          </Section>
+        </React.Fragment>
+      );
+    } else if (webMode === 'personal') {
+      // WA6 (w-list): "Links", then Yours · N | Timothy's notes, then one card of rows; a note's row says its Volume
+      const yours = listItems.filter((it) => it.kind !== 'underlay');
+      const notes = listItems.filter((it) => it.kind === 'underlay');
+      const side = mineSide || (yours.length || !notes.length ? 'yours' : 'notes');
+      const rows = side === 'notes' ? notes : yours;
+      const tab = (/** @type {string} */ k, /** @type {string} */ words) => (
+        <button type="button" className={'sw-seg-btn' + (side === k ? ' is-on' : '')} aria-pressed={side === k}
+          onClick={() => setMineSide(k)}>{words}</button>
+      );
+      body = (
+        <React.Fragment>
+          <div className="sw-panel-head sw-inview-head">
+            <h2 className="sw-panel-title">Links</h2>
+            <div className="sw-sheet-meta sw-panel-meta">Tap one to see it and open both ends</div>
+          </div>
+          <div className="sw-seg sw-list-tabs" role="group" aria-label="Whose links">
+            {tab('yours', 'Yours · ' + yours.length)}
+            {notes.length ? tab('notes', 'Timothy’s notes') : null}
+          </div>
+          {rows.length ? (
+            <ul className="sw-rows sw-choice-list">
+              {rows.map((item, i) => (
+                <ConnectionRow key={i} title={connectionTitle(item)}
+                  text={item.kind === 'underlay' ? item.volume || connectionMeta(item) : connectionMeta(item)}
+                  mainClass="sw-choice-row" onMain={() => onChoose(item)} />
+              ))}
+            </ul>
+          ) : <div className="sw-list-empty">You have no links on the web yet.</div>}
+        </React.Fragment>
+      );
+    } else body = (
       <React.Fragment>
         <PanelHead over={listEyebrow(webMode, chapter, lensOn)} title={null} meta={listMeta(chapter, listItems.length)} />
         {listItems.length ? (
@@ -803,7 +925,7 @@ export function WebPanel(props) {
                 onLight={item.kind === 'arc' ? (on) => light(on ? [item.index] : null) : undefined} />
             ))}
           </ul>
-        ) : <div className="sw-list-empty">{webMode === 'personal' ? 'You have no links on the web yet.' : 'No nearby connections at this location.'}</div>}
+        ) : <div className="sw-list-empty">No nearby connections at this location.</div>}
       </React.Fragment>
     );
   } else if (mode === 'chooser') {
@@ -814,15 +936,15 @@ export function WebPanel(props) {
       if (c.kind !== 'arc') return '';
       const near = (/** @type {number} */ v) => choiceChapter >= 0 && g.chapterOfVerse[v] === choiceChapter;
       const end = near(c.from) && !near(c.to) ? c.b : near(c.to) && !near(c.from) ? c.a : endsOf(c)[1];
-      const text = verseText(end, translation);
-      return text ? end.label + ' ' + text : '';
+      // WA5 (w-pick): the words alone, in italics; the row's title already names both ends
+      return verseText(end, translation) || '';
     };
     const arcs = rows.filter((r) => r.kind === 'arc').map((r) => r.index);
     body = (
       <React.Fragment>
-        <PanelHead over="Connections here"
-          title={choiceCut ? 'The ' + rows.length + ' nearest threads' : plural(rows.length, 'thread', 'threads') + ' close together'}
-          meta="Choose the one you meant. Strongest first, by readers’ votes." />
+        <PanelHead over="Threads here"
+          title={rows.length === 1 ? '1 thread meets here' : rows.length + ' threads meet here'}
+          meta={(choiceCut ? 'The nearest ' + rows.length + '. ' : '') + 'Pick the one you meant. Strongest first, by readers’ votes.'} />
         <ul className="sw-rows sw-choice-list">
           {rows.map((c) => (
             <ConnectionRow key={c.kind + c.index} title={connectionTitle(c)} text={connectionMeta(c)} quote={quoteOf(c)} mainClass="sw-choice-row"
@@ -839,22 +961,22 @@ export function WebPanel(props) {
     // stands has none: they are there
     const followTo = (/** @type {any} */ e) => {
       if (here && atHereVerse(here, e.verse)) return null;
-      const words = followLabel(e.ref.label);
       const far = e.verse === detail.to ? 'to' : 'from';
+      // WA5 (w-conn): worded "See its threads" (the follow, as before), named with its verse
       return (
-        <button type="button" className="sw-link sw-follow" onClick={() => followThread(Object.assign({}, detail, { far }))}
-          aria-label={words}><span className="sw-follow-label">{metaItems(words)}</span> <span aria-hidden="true">›</span></button>
+        <button type="button" className="sw-act sw-follow" onClick={() => followThread(Object.assign({}, detail, { far }))}
+          aria-label={'See its threads: ' + e.ref.label}><ForkIcon /><span className="sw-follow-label">See its threads</span></button>
       );
     };
     body = (
       <React.Fragment>
-        <PanelHead over="Connection" title={connectionTitle(detail)} meta={arcLine(detail)} />
+        <PanelHead over={null} title={connectionTitle(detail)} meta={arcLine(detail)} />
         <div className="sw-sec sw-verses">
           {model.ends.map((e) => (
-            <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={followTo(e)} />
+            <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={followTo(e)} card />
           ))}
         </div>
-        <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel}
+        <CitedSection g={g} cited={cited} showCites={() => true} startOpen onOpen={onOpen} openPanel={openPanel}
           onRetry={retryStudies} />
         {model.more.map((m, i) => (
           <Section key={m.verse} collapsible startOpen={i === 0} className="sw-sec-more"
@@ -923,20 +1045,17 @@ export function WebPanel(props) {
       : (detail.cards && detail.cards[0] && detail.cards[0].endpoint) || null;
     body = (
       <React.Fragment>
+        {/* WA5 (w-focus): one gold button beside the head opens the chapter; the rows carry their votes */}
         <PanelHead over={chapter ? 'Chapter' : 'Bundle'} title={title}
-          meta={(chapter ? plural(detail.verses, 'verse', 'verses') + ' · ' : '') + plural(n, 'connection', 'connections')} />
-        {endpoint ? (
-          <div className="sw-links sw-sec">
-            <button type="button" className="sw-link" onClick={() => onOpen(endpoint)}
-              aria-label={openInReaderLabel(endpoint.label || title)}>Open in reader <span aria-hidden="true">›</span></button>
-          </div>
-        ) : null}
-        <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
+          meta={(chapter ? plural(detail.verses, 'verse', 'verses') + ' · ' : '') + plural(n, 'connection', 'connections')}
+          action={endpoint ? (
+            <button type="button" className="sw-open-gold" onClick={() => onOpen(endpoint)}
+              aria-label={openInReaderLabel(endpoint.label || title)}><BookIcon />{chapter ? 'Open ' + title : 'Open in reader'}</button>
+          ) : null} />
+        <Section title={n ? <SplitTitle words="Connections by book" note="Strongest first" /> : 'Connections by book'}
+          label="Connections by book" className="sw-sec-more sw-sec-books">
           {n ? (
-            <React.Fragment>
-              {sortNote}
-              <ThreadGroups groups={model.threads.groups} tagOf={fromTag} translation={translation} rowProps={rowProps} light={light} />
-            </React.Fragment>
+            <ThreadGroups groups={model.threads.groups} tagOf={fromVotesTag} translation={translation} rowProps={rowProps} light={light} />
           ) : <p className="sw-panel-empty">No threads at this density.</p>}
         </Section>
         {webMode !== 'personal' ? <ZoomRow g={g} chapterIndex={model.zoom} zoomTo={zoomTo} /> : null}
@@ -1029,6 +1148,7 @@ export function WebPanel(props) {
       </button>
       {trailShown ? (
         <TrailBar g={g} journey={journey} atHere={atHere && !showPaths} branches={branches} pathsOpen={showPaths}
+          aside={mode === 'connection' && !showPaths ? 'Connection' : ''}
           onPaths={() => setPathsOpen(!showPaths)} onMove={() => setPathsOpen(false)} />
       ) : null}
       {/* a document inside the dialog (w4 quality hunt): the screen's root is role="application"

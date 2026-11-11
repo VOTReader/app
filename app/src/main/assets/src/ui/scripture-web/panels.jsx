@@ -16,6 +16,7 @@
 import { connectionTitle, arcLine, endpointLabel, plural, WEB_CREDIT, loadErrorWords, myWebLegendWords } from '../../utils/scripture-web/describe.js';
 import { LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import { ink } from '../../utils/scripture-web/sw-ink.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 
 /** The hover chip. `inset` is what the docked panel covers (CONTRACTS.md section 5): the chip
  * stays in the canvas area beside it, never under it. */
@@ -96,7 +97,7 @@ export function TipChip({ info, viewport, inset }) {
  * `mode` 'personal' (w4): My Web's own four lines, its two rails, the reader's links and
  * Timothy's notes as the legend names them, a tap, and the rails' Reset buttons; the canon's
  * card told of votes and gold ticks My Web does not draw. */
-export function HowToReadGuide({ onClose, canSearch, mode, home }) {
+export function HowToReadGuide({ onClose, mode, home, about = false }) {
   // where focus was as it opened: on a first visit it opens itself with focus nowhere (<body>), and
   // closing it handed the keyboard back there, where the web's keys do not reach (w4 focus hunt);
   // then home (the web's root) takes it
@@ -113,29 +114,34 @@ export function HowToReadGuide({ onClose, canSearch, mode, home }) {
       {/* the words in a document (w4): the root's role="application" stops a screen reader's
           virtual cursor, a document turns it back on; Got it stays a control after it */}
       <div role="document">
-        <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
-        {/* the lines sit between the title and Got it (guide-sky-direction.test.js reads them there) */}
-        {mode === 'personal' ? (
-          <ul className="sw-guide-body">
-            <li><strong>The Volumes</strong> run along the top, the Bible along the bottom. Drag or pinch either one.</li>
-            <li>The lines are {words.yours} and {words.timothy}; the key tells them apart.</li>
-            <li>Tap a line to read both ends.</li>
-            <li><strong>Reset Volumes</strong> and <strong>Reset Bible</strong> bring a rail back; Reset brings both.</li>
+        <div className="sw-guide-title" id="sw-guide-title">{about ? 'About the data' : 'How to read this web'}</div>
+        {/* WA4 (w-guide): four plain points, each with its icon; the lines sit between the title and Got it
+            (guide-sky-direction.test.js reads them there). `about` (the ⋯ menu's About the data): whose data it is. */}
+        {about ? (
+          <ul className="sw-guide-list">
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="info" /></span>
+              <span>The threads are the cross-references of <b>OpenBible.info</b>, shared under Creative Commons Attribution (CC-BY). The gold ticks and the Volumes&rsquo; citations come from the letters themselves.</span></li>
+          </ul>
+        ) : mode === 'personal' ? (
+          <ul className="sw-guide-list">
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="book" /></span><span><b>The Volumes</b> run along the top, the Bible along the bottom. Drag or pinch either one.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="link" /></span><span>The lines are {words.yours} and {words.timothy}; the key tells them apart.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="web" /></span><span><b>Tap a line</b> to read both ends.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="reset" /></span><span><b>Reset Volumes</b> and <b>Reset Bible</b> bring a rail back.</span></li>
           </ul>
         ) : (
-          <ul className="sw-guide-body">
-            <li><strong>Pinch</strong> or scroll to zoom, all the way down to each verse&rsquo;s words.</li>
-            <li>The farther apart two verses, the taller their arch: drag down to look higher.</li>
-            <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
-            <li>A number where threads meet counts them; tap it to fan them out.</li>
-            <li>Bold names are the major books; a gold tick under the baseline marks a verse the Volumes cite.</li>
-            <li><strong>Filters</strong> narrows the web; hold a book&rsquo;s name to keep only its threads.</li>
-            {canSearch ? <li><strong>Go to</strong> (the magnifier at the top, or /) jumps to a book, chapter or verse.</li> : null}
-            <li><strong>Reset</strong> brings the whole web back; <strong>My Web</strong>, in More, draws your own links.</li>
+          <ul className="sw-guide-list">
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="web" /></span><span><b>Each thread joins two verses.</b> The farther apart they sit in the Bible, the taller the arch.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="link" /></span><span><b>Tap a thread</b> to read both ends. A number marks threads that meet: tap it to fan them out.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="plus" /></span><span><b>Zoom with + and &minus;</b>, or pinch, down to each verse&rsquo;s words. Drag to move, drag down to look higher.</span></li>
+            <li className="sw-guide-pt"><span className="sw-guide-ic"><UiIcon name="book" /></span><span><b>Bold names</b> are the major books. A gold tick marks a verse the Volumes cite.</span></li>
           </ul>
         )}
       </div>
-      <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>
+      <div className="sw-guide-foot">
+        {about ? <span /> : <span className="sw-guide-again">Find this again under &#x22EF;</span>}
+        <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>{about ? 'Done' : 'Got it'}</button>
+      </div>
     </div>
   );
 }
@@ -190,21 +196,32 @@ export function legendFor(mode, credit, chips) {
   ];
 }
 
-/** The empty-web notice on a My Web with no links yet: what to do, in one
- * sentence, and a close the screen's dismissEmpty remembers. */
-export function EmptyWebNotice({ onDismiss }) {
+/** The empty-web notice on a My Web with no links yet: what to do, a close the screen's dismissEmpty
+ * remembers, and (WA6, w-mine0) Start reading, which leaves the web for the reading it came from. */
+export function EmptyWebNotice({ onDismiss, onStart }) {
   return (
     <div className="sw-empty">
-      <div className="sw-empty-title">Your web is still being woven.</div>
-      {/* Two short sentences, so the panel covers under half the band on the
-          800x360 frame (the walk's R3); the faint threads behind it are
-          Timothy's notes, and the panel must not hide them. */}
-      <div className="sw-empty-body">
-        Select text anywhere in the app, tap <strong>Link</strong>, and pick
-        where it goes. The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
+      <div className="sw-empty-in">
+        <span className="sw-empty-mark" aria-hidden="true"><UiIcon name="link" /></span>
+        <div>
+          <div className="sw-empty-title">Your web is still being woven</div>
+          {/* the faint threads behind the card are Timothy's notes: it stays small and inert but for its buttons */}
+          <div className="sw-empty-body">
+            Select text anywhere in the app, tap Link, and pick where it goes. It shows here as a gold thread.
+            The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
+          </div>
+        </div>
       </div>
-      <button type="button" className="sw-empty-close" aria-label="Dismiss"
-        onClick={onDismiss}>×</button>
+      {onStart ? (
+        <div className="sw-empty-foot">
+          <button type="button" className="sw-empty-go" onClick={onStart}>Start reading</button>
+        </div>
+      ) : null}
+      <button type="button" className="sw-empty-close" aria-label="Dismiss" onClick={onDismiss}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }

@@ -57,7 +57,8 @@ import { placeOfRef } from '../../utils/scripture-web/ref-parse.js';
 import { parseReference } from '../../search/ref-parser.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection, showsStop } from '../scripture-web/use-web-selection.js';
-import { usePanelLayout, usePanelInset, collapsedFor, stackedFor } from '../scripture-web/use-panel-layout.js';
+import { usePanelLayout, usePanelInset, stackedFor } from '../scripture-web/use-panel-layout.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 import { WebPanel } from '../scripture-web/web-panel.jsx';
 import { useWebKeys, WEB_KEYS_HELP, MY_WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
 import { useJourney, pathArcsOf } from '../scripture-web/use-journey.js';
@@ -69,7 +70,7 @@ import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
 import { useWebFilters, legendChips, FilterPill, FilterSheet } from '../scripture-web/web-filters.jsx';
 import { startChapter, webChapter } from '../../utils/scripture-web/chapter-connections.js';
-import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
+import { graphStats, densityLine, myWebHeadline, myWebSkippedLine, WEB_CREDIT } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 import { useNoAudioHere } from '../components/AudioPlayerBar.jsx';
@@ -183,10 +184,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   /* The one-screen "how to read this web" card (landing 13). Open on the
      first visit to the canon web until the reader closes it; the ? button
      brings it back. The seen flag rides `settings` like swEmptyDismissed. */
-  const [guideOpen, setGuideOpen] = React.useState(() => !(settings && settings.swGuideSeen));
+  // WA4: 'about' opens the same card on the ⋯ menu's About the data
+  const [guideOpen, setGuideOpen] = React.useState(/** @type {() => boolean | string} */ (() => !(settings && settings.swGuideSeen)));
   // The card waits for the web (w4): on a first visit it opened over the loader and hid
   // "Weaving the web…" behind a card about a web that was not there yet.
-  const guideShown = guideOpen && !!graph;
+  const guideShown = !!guideOpen && !!graph;
   const closeGuide = React.useCallback(() => {
     setGuideOpen(false);
     if (typeof updateSetting === 'function') updateSetting('swGuideSeen', true);
@@ -393,7 +395,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (panelOpen && !panelWas.current && guideOpen) closeGuide();
     panelWas.current = panelOpen;
   }, [panelOpen, guideOpen, closeGuide]);
-  const collapse = collapsedFor(layout, panelOpen);
+  // WA4 (w-menu): the ⋯ is always the menu, holding only the rare things; the strip's controls
+  // moved to the title (the switch) and the bottom bar (Go to, Filters, List, the zoom)
+  const collapse = true;
   // too narrow beside a docked panel for the header and the strip side by side: the strip drops (w4)
   const stack = stackedFor(layout, panelOpen);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -574,13 +578,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // no-WebGL face.)
 
   const stats = graph ? graphStats(graph, density) : null;
+  /** WA4: + and − press the web's own zoom keys on its root. @param {string} key */
+  const zoomKey = (key) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    onKeyDown(/** @type {any} */ ({ key, target: el, currentTarget: el, ctrlKey: false, metaKey: false, altKey: false,
+      shiftKey: false, preventDefault() {}, stopPropagation() {} }));
+  };
 
   return (
     <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')
       // the layout classes from the root's own box (use-panel-layout.js); sw-narrow agrees with the
       // renderer's classList toggle, so a re-render cannot drop it
       + (layout && layout.narrow ? ' sw-narrow' : '') + (layout && layout.compact ? ' sw-compact' : '')
-      + (panelOpen ? ' sw-panel-open' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '') + (stack ? ' sw-stack' : '')}
+      + (panelOpen ? ' sw-panel-open' : '') + (mode !== 'personal' && railZoom.whole ? ' sw-zoomed' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '') + (stack ? ' sw-stack' : '')}
       ref={wrapRef} data-panel={panelOpen ? (layout && layout.sheet ? 'sheet' : 'dock') : undefined} data-density={density}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
@@ -598,7 +609,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="sw-title">
-          <h1>{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
+          <h1 className="sw-sr-only">{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
+          <div className="sw-seg sw-wname" role="group" aria-label="Which web">
+            <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
+              aria-pressed={mode === 'canonical'} onClick={() => switchMode('canonical')}>Scripture Web</button>
+            <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
+              aria-pressed={mode === 'personal'} onClick={() => switchMode('personal')}>My Web</button>
+          </div>
           {mode === 'personal'
             /* "N links · M from Timothy's notes" (r2-05), the invitation with no
                links (R3), and the links not on the web said, never dropped (item
@@ -611,7 +628,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                something the reader had not asked about (Corbin, 2026-09-11:
                "just keep x connections"); the density hint that flashes on a
                switch is where the two densities are explained. */
-            : (stats && <p className="sw-title-count">{web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections'}</p>)}
+            : null /* WA4: the count is the key's second line, with the credit */}
           {/* the density's line after a switch: seen here, said by .sw-live (one live region) */}
           {hint ? <div className="sw-hint" aria-hidden="true">{hint}</div> : null}
         </div>
@@ -625,32 +642,30 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           setMenuOpen(false);
           if (moreBtnRef.current) moreBtnRef.current.focus();
         }}>
-        {/* THE HEADER SLOT: the go-to's search button, first in the row (spec
-            section 4.1). goto.jsx owns it (null in My Web, where nothing renders) */}
-        {goTo.button}
-        {/* THE MENU: the controls in the row or, collapsed (spec section 3), the drop-down the
-            more button opens; the same buttons either way */}
-        <div className="sw-menu" id="sw-menu">
-        <div className="sw-seg" role="group" aria-label="Which web">
-          <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
-            aria-pressed={mode === 'canonical'} onClick={fromMenu(() => switchMode('canonical'))}>Scripture</button>
-          <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={fromMenu(() => switchMode('personal'))}>My Web</button>
-        </div>
-        <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
-          onClick={fromMenu(() => { setListOpen(!listOpen); setChoices(null); })}
-          aria-expanded={listOpen} aria-haspopup="dialog">Nearby</button>
-        {/* the canon's density is the Filters sheet's Strength row (Corbin, 2026-10-23: the Famous /
-            Essential menu folds into it); My Web keeps its notes toggle here */}
-        {mode === 'canonical' ? null : (
-          <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
-            onClick={fromMenu(() => { setShowUnderlay(!showUnderlay); schedule(); })}
-            aria-label={'Timothy’s notes · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' citations'}>
-            Timothy&rsquo;s notes · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
+        {/* THE MENU (WA4, w-menu): the drop-down the ⋯ opens, the rare things only: the guide, hiding
+            the controls, My Web's notes toggle, and where the data comes from */}
+        <div className="sw-menu sw-wmenu" id="sw-menu">
+          {graph ? (
+            <button type="button" className="sw-mrow" onClick={fromMenu(() => setGuideOpen(true))} aria-haspopup="dialog">
+              <UiIcon name="help" />How to read this web
+            </button>
+          ) : null}
+          <button type="button" className="sw-mrow" onClick={fromMenu(toggleChrome)}>
+            <UiIcon name="full" /><span>Hide the controls<small>A Show controls button stays</small></span>
           </button>
-        )}
-        {/* Reset brings the whole web back: the view, and the filters with it */}
-        <button type="button" className="sw-btn" onClick={fromMenu(() => { resetView(); web.clear(); if (density !== 'famous') chooseDensity('famous'); })} aria-label="Reset the view">Reset</button>
+          {/* My Web keeps its notes toggle (the canon's density is the Filters sheet's Strength row) */}
+          {mode === 'canonical' ? null : (
+            <button type="button" className={'sw-mrow sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
+              onClick={fromMenu(() => { setShowUnderlay(!showUnderlay); schedule(); })}
+              aria-label={'Timothy’s notes · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' citations'}>
+              <UiIcon name="note" /><span>Timothy&rsquo;s notes<small>{showUnderlay ? 'Shown' : 'Hidden'} · {contextCount > 0 ? contextCount.toLocaleString() : '…'}</small></span>
+            </button>
+          )}
+          {graph ? (
+            <button type="button" className="sw-mrow" onClick={fromMenu(() => setGuideOpen('about'))} aria-haspopup="dialog">
+              <UiIcon name="info" /><span>About the data<small>OpenBible.info, CC-BY</small></span>
+            </button>
+          ) : null}
         </div>
         {collapse ? (
           <button type="button" ref={moreBtnRef} className={'sw-btn sw-btn-icon sw-more-btn' + (menuOpen ? ' is-on' : '')}
@@ -667,11 +682,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           as the card does (w4 review: pressed during the load it showed nothing, then opened the
           card late and unasked when the web arrived). Before the hide-all button in the DOM, as it
           is drawn left of it (or above it), so Tab crosses the pair left to right (w4 review) */}
-      {graph && (
-        <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
-          onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
-          aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
-      )}
 
       {/* HIDE THE CONTROLS — outside everything it hides, because it is the way
           back; bottom-right, the one free corner on the smallest frame (app.css
@@ -682,7 +692,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           interactable UI"). Its label flips with its name (the a11y pass, w3): "Hide
           controls" (a round icon, the words for a screen reader and a tooltip) and, hidden,
           "Show controls" in words, because then it is the only way back. */}
-      <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
+      {chromeHidden ? <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
         aria-label={chromeHidden ? 'Show controls' : 'Hide controls'}
         title={chromeHidden ? undefined : 'Hide controls'} onClick={toggleChrome}>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -693,8 +703,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           {chromeHidden ? null : <path d="M4 4l16 16" />}
         </svg>
         <span className="sw-hide-label">{chromeHidden ? 'Show controls' : 'Hide controls'}</span>
-      </button>
-      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} mode={mode}
+      </button> : null}
+      {guideShown && <HowToReadGuide onClose={closeGuide} mode={mode} about={guideOpen === 'about'}
         home={() => wrapRef.current} />}
       {goTo.box}
       {/* the way back to the verse a choice zoomed out of (use-web-selection.js returnTo) */}
@@ -721,7 +731,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {web.canon && graph && web.sheetOpen ? (
         <FilterSheet web={web} graph={graph} density={density} chooseDensity={chooseDensity} total={stats ? stats.shown : 0} />
       ) : null}
-      {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
+      {emptyShown && !listOpen && <EmptyWebNotice onDismiss={dismissEmpty} onStart={onBack} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
           over the chooser over the open card, the precedence the state has */}
@@ -735,8 +745,44 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} />
       ) : null}
 
-      {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}
-      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution, web.canon && graph ? legendChips({ web }) : null)}</div></div>
+      {/* THE BOTTOM BAR (WA4, w-main): Go to, Filters (a count when any is on), List (was Nearby); the key
+          with the count and the OpenBible.info credit (Q5) on its second line; Whole web while zoomed in or
+          a card is open; the zoom pair. The go-to's button is goto.jsx's (null in My Web). */}
+      <div className="sw-wbot">
+        <div className="sw-wpills">
+          {goTo.button}
+          {web.canon && graph ? (
+            <button type="button" className={'sw-btn sw-wfilters' + (web.on || web.sheetOpen ? ' is-on' : '')}
+              aria-expanded={web.sheetOpen} aria-haspopup="dialog" onClick={() => web.setSheetOpen(!web.sheetOpen)}
+              aria-label={web.on ? 'Filters, ' + web.labels.length + ' on' : undefined}>
+              <UiIcon name="filter" />Filters{web.on ? <span className="sw-wpill-count" aria-hidden="true">{web.labels.length}</span> : null}
+            </button>
+          ) : null}
+          <button type="button" className={'sw-btn sw-wlist' + (listOpen ? ' is-on' : '')}
+            onClick={() => { setListOpen(!listOpen); setChoices(null); }}
+            aria-expanded={listOpen} aria-haspopup="dialog"><UiIcon name="list" />List</button>
+        </div>
+        {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden */}
+        <div className="sw-legend">
+          <div className="sw-legend-line">{legendFor(mode, graph && graph.attribution, web.canon && graph ? legendChips({ web }) : null)
+            .filter((/** @type {any} */ el) => !(el && el.key === 'credit'))}</div>
+          {/* WA5: the count its own span, so a card open can let it go and keep the credit (app.css WA5 web) */}
+          <div className="sw-legend-sub">{mode !== 'personal' && stats ? (
+            <span className="sw-legend-count">{(web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections') + ' · '}</span>
+          ) : null}{mode === 'personal' && graph && personalCount === 0 ? (
+            <span className="sw-legend-count">No links of yours yet · </span>
+          ) : null}<span className="sw-credit">{(graph && graph.attribution) || WEB_CREDIT}</span></div>
+        </div>
+        <div className="sw-wbot-end">
+          {mode !== 'personal' && graph && (railZoom.whole || panelOpen) ? (
+            <button type="button" className="sw-btn sw-whole" onClick={() => { resetView(); }}>Whole web</button>
+          ) : null}
+          <div className="sw-wzoom" role="group" aria-label="Zoom">
+            <button type="button" className="sw-btn" aria-label="Zoom out" onClick={() => zoomKey('-')}><UiIcon name="minus" /></button>
+            <button type="button" className="sw-btn" aria-label="Zoom in" onClick={() => zoomKey('+')}><UiIcon name="plus" /></button>
+          </div>
+        </div>
+      </div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
           data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>

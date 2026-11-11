@@ -229,7 +229,8 @@ async function zoom3(page, tag) {
   if (!(p0 > 0)) { fails.push(`${tag} the screen publishes no data-ppv-css, so no zoom can be asserted`); return 0; }
   const hasBtn = await page.evaluate(() => !!document.querySelector('button[aria-label="Zoom in"]'));
   let ratio = 1;
-  if (hasBtn) { for (let i = 0; i < 3; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } ratio = (await readPpv(page)) / p0; }
+  // WA5: the v2 bar's + is the keyboard's step (x1.6); four presses reach the old button's three (x1.8 each)
+  if (hasBtn) { for (let i = 0; i < 4; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } ratio = (await readPpv(page)) / p0; }
   else {
     // the Bible rail's half of the band: camFor splits the two cameras at the drawn rails' midline (fix-review #7),
     // which sits 15 CSS px BELOW the canvas's centre at 1920x1080 (rails at 150 and 961), so a wheel at the centre

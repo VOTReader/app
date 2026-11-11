@@ -97,7 +97,7 @@ describe('on the real corpus', () => {
     expect(answersPlaceOf(A, 'answers-main-page')).toBe('Main Page');
     expect(answersPlaceOf(A, 'false-doctrines-within-the-churches-of-men-regarding')).toBe('False Doctrines index');
     expect(answersPlaceOf(A, 'god-speaks-about-the-sabbath')).toBe('The Fourth Commandment');
-    expect(show(answersPlaceOf(A, answersShelfByKey(A, '5').topics[0].id))).toBe('5~· Scripture & doctrine');
+    expect(show(answersPlaceOf(A, answersShelfByKey(A, '5').topics[0].id))).toBe('Scripture & doctrine');
     expect(answersPlaceOf(A, 'come-out-and-fight-against-me')).toBe('Other Topics');
   });
   it('every question opens a topic that exists; six are chips', () => {
@@ -218,12 +218,12 @@ describe('search words (f06)', () => {
   it('only the False Doctrines index counts categories; other pages of prose count sections', () => {
     // Regarding the Trinity and the Mormons page have no source lines either: they are not indexes.
     expect(show(answersSearchSub(A, { entry: E('regarding-the-church-of-jesus-christ-of-latter-day-saints-mormons'), n: 1, total: 2, prose: true })))
-      .toBe('1~of 2~sections~· 4~· The churches');
+      .toBe('1~of 2~sections~· The churches');
     // One section (or one passage) to the page: "1 of 1" says nothing, so it is a match.
     expect(show(answersSearchSub(A, { entry: E('regarding-the-trinity'), n: 1, total: 1, prose: true })))
-      .toBe('1~match~· 5~· Scripture & doctrine');
+      .toBe('1~match~· Scripture & doctrine');
     expect(show(answersSearchSub(A, { entry: E('regarding-the-united-church-of-god'), n: 1, total: 1, prose: false })))
-      .toBe('1~match~· 4~· The churches');
+      .toBe('1~match~· The churches');
   });
   it('a title-only result is not "0 matches"', () => {
     expect(show(answersSearchSum({ matches: 0, groups: new Array(1) }))).toBe('In Answers~· 1~topic by its title');

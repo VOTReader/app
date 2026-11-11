@@ -223,6 +223,8 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
       // letter was one unit and this was the letter's index)
       verse: underlay.versePos[found.index], vot: railUnit(p.votRail, underlay.votPos[found.index] + 0.5),
       joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
+      // the Volume's whole name, for My Web's list (WA6, w-list: "Volume One")
+      volume: (seg && seg.label) || '',
       // the family in words (design-myweb-colour.md, 5): the source the thread's
       // colour encodes, then the Volume
       sourceName: MY_WEB_SOURCES[underlay.source ? underlay.source[found.index] : MY_WEB_SOURCES.length - 1].name,

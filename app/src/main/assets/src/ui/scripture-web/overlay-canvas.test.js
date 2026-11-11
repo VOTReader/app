@@ -245,11 +245,12 @@ describe('the overview ruler (r2-01a)', () => {
     const v = FRAMES.phone, s = v.DPR;
     const root = { className: 'sw-root', offsetParent: null };
     const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
-    const els = { '.sw-hide-all': el(891 - 14 - 44, 411 - 8 - 44, 44, 44), '.sw-guide-btn': el(891 - 76 - 44, 411 - 8 - 44, 44, 44) };
+    // WA4: the right corner holds the bottom bar's zoom pair (at fit, no "Whole web")
+    const els = { '.sw-wbot-end': el(891 - 12 - ZOOM_W, 411 - 7 - 40, ZOOM_W, 40) };
     root.querySelector = (sel) => els[sel] || null;
     const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
     const { rec, fs } = paint('phone', 1, g.total / 2, { canvas });
-    const zone = { x0: (891 - 76 - 44 - 8) * s, x1: v.W, y0: (411 - 8 - 44 - 8) * s, y1: v.H };
+    const zone = { x0: (891 - 12 - ZOOM_W - 8) * s, x1: v.W, y0: (411 - 7 - 40 - 8) * s, y1: v.H };
     const names = new Set(g.books.flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
     const drawn = rec.texts().filter((c) => names.has(c.t));
     expect(drawn.length, 'one row of names on the phone (w4)').toBeGreaterThan(12);
@@ -268,7 +269,12 @@ describe('the overview ruler (r2-01a)', () => {
     for (const zoom of [1, 40]) {
       const root = { className: 'sw-root', offsetParent: null };
       const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
-      const at = (dx) => ({ '.sw-hide-all': el(891 - dx - 14 - 44, 411 - 8 - 44, 44, 44), '.sw-guide-btn': el(891 - dx - 76 - 44, 411 - 8 - 44, 44, 44) });
+      // WA4: the corner buttons are the bottom bar's end (Whole web while zoomed in or docked, the zoom
+      // pair), which ends at the docked panel's edge; the pills hold the bar's left end
+      const at = (dx) => {
+        const w = (zoom > 1 || dx ? WHOLE_W + 8 : 0) + ZOOM_W;
+        return { '.sw-wbot-end': el(891 - dx - 12 - w, 411 - 7 - 40, w, 40), '.sw-wpills': el(12, 411 - 7 - 40, PILLS_W, 40) };
+      };
       let els = at(0);
       root.querySelector = (sel) => els[sel] || null;
       const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
@@ -276,7 +282,8 @@ describe('the overview ruler (r2-01a)', () => {
       // the panel docks on the right and the buttons move left with it; the frame right after
       els = at(panel);
       const { rec } = paint('phone', zoom, ISA53_6, { canvas, panelInset: { right: panel, bottom: 0 } });
-      const zone = { x0: (891 - panel - 76 - 44 - 8) * s, x1: (891 - panel - 14 + 8) * s, y0: (411 - 8 - 44 - 8) * s, y1: v.H };
+      const endW = WHOLE_W + 8 + ZOOM_W;
+      const zone = { x0: (891 - panel - 12 - endW - 8) * s, x1: (891 - panel - 12 + 8) * s, y0: (411 - 7 - 40 - 8) * s, y1: v.H };
       const drawn = rec.texts().filter((c) => /^[0-9A-Z]+$/.test(c.t));
       expect(drawn.length, zoom + 'x').toBeGreaterThan(5);
       for (const c of drawn) {
@@ -301,26 +308,34 @@ describe('the overview ruler (r2-01a)', () => {
 /* w4, the band stream: the band under the baseline read as r2-01a, r2-06 and r3-03 read. A
    screen root laid out as app.css lays it out (the round buttons at their corner, or at the canvas
    area's bottom-left while the panel is docked; the hidden pill; the legend's one line), CSS px. */
-function chromeRoot(name, { panel = 0, hidden = false } = {}) {
+/* WA4: the v2 chrome (app.css "WA4 web"): one bottom bar, 40 px tall, 12 px in and 7 px up, ending at
+   the docked panel's edge: the pills (Go to, Filters, List) at its left, the key between, and at its
+   right the zoom pair, with "Whole web" before it while zoomed in or a panel is open. The hide-all
+   button renders only while the chrome is hidden ("Show controls", bottom-right; bottom-left beside a
+   docked panel); the bar's buttons are then visibility:hidden, which keeps their layout boxes. */
+const PILLS_W = 88 + 8 + 96 + 8 + 76;   // Go to, Filters, List at 14 px, 8 px apart
+const ZOOM_W = 84, WHOLE_W = 94;
+/* `whole`: the canon zoomed past fit (use-web-renderer.js railZoom.whole), so "Whole web" shows and the
+   root is .sw-zoomed; a zoomed phone (.sw-compact.sw-zoomed) drops the key's cue line (WA4). */
+function chromeRoot(name, { panel = 0, hidden = false, whole = false } = {}) {
   const pc = name === 'pc';
   const W = Math.round(FRAMES[name].W / FRAMES[name].DPR), H = Math.round(FRAMES[name].H / FRAMES[name].DPR);
-  const btn = pc ? 44 : 40, bottom = pc ? 16 : 8, side = pc ? 24 : 16, pill = pc ? 160 : 148;
-  const root = { className: 'sw-root' + (pc ? '' : ' sw-compact') + (panel ? ' sw-panel-open' : '') + (hidden ? ' sw-chrome-hidden' : ''), offsetParent: null };
+  const bar = 40, bottom = 7, side = 12, btn = pc ? 44 : 40, pill = pc ? 160 : 148;
+  const root = { className: 'sw-root sw-collapse' + (pc ? '' : ' sw-compact') + (panel ? ' sw-panel-open' : '') + (whole ? ' sw-zoomed' : '') + (hidden ? ' sw-chrome-hidden' : ''), offsetParent: null };
   const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
-  const top = H - bottom - btn;
+  const top = H - bottom - bar;
+  const endW = (whole || panel ? WHOLE_W + 8 : 0) + ZOOM_W;
+  const barRight = W - (panel ? panel + 12 : 12);
   const els = {};
-  if (panel) {
-    els['.sw-guide-btn'] = el(side, top, btn, btn);
-    els['.sw-hide-all'] = el(pc ? 80 : 68, top, btn, btn);
-  } else if (hidden) {
-    els['.sw-hide-all'] = el(W - side - pill, top, pill, btn);
-  } else {
-    els['.sw-hide-all'] = el(W - side - btn, top, btn, btn);
-    els['.sw-guide-btn'] = el(W - (pc ? 80 : 68) - btn, top, btn, btn);
-  }
-  // the legend's lines: one, or two where it wraps (on the 667 phone, e2e-sw-legend)
-  const lh = (pc ? 14 * 1.35 : 12 * 1.25) * (W < 800 ? 2 : 1);
-  if (!panel) els['.sw-legend'] = el(side, H - bottom - lh, 600, lh);
+  els['.sw-wpills'] = el(side, top, PILLS_W, bar);
+  els['.sw-wbot-end'] = el(barRight - endW, top, endW, bar);
+  if (hidden) els['.sw-hide-all'] = panel ? el(pc ? 80 : 68, H - bottom - btn, pill, btn) : el(W - 12 - pill, H - bottom - btn, pill, btn);
+  // the key's two lines, no padding in the bar, its foot at the bar's foot: the 12 px chips with their
+  // 1 px edges, a 3 px gap, the 11 px count and credit at line-height 1.2; with a panel open, or on a
+  // zoomed phone, the cue line hides and the count-and-credit line stays
+  const lh = panel || (whole && !pc) ? 11 * 1.2 : 14 + 3 + 11 * 1.2;
+  const legendLeft = side + PILLS_W + 8;
+  els['.sw-legend'] = el(legendLeft, H - bottom - lh, barRight - endW - 8 - legendLeft, lh);
   root.querySelector = (sel) => els[sel] || null;
   const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
   const s = FRAMES[name].DPR;
@@ -495,7 +510,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
 
   it('a thin rule stands between each two neighbouring names, and only there (r2-01a\'s cells)', () => {
     for (const [name, zoom, verse] of [['pc', 1, g.total / 2], ['phone', 1, g.total / 2], ['pc', 3.5, verseOf('ezekiel', 1, 1)]]) {
-      const { canvas } = chromeRoot(name);
+      const { canvas } = chromeRoot(name, { whole: zoom > 1.02 }); // WA4: zoomed, the root is .sw-zoomed
       const { rec, fs } = paint(name, zoom, verse, { canvas });
       const s = fs.v.DPR, what = name + ' ' + zoom + 'x';
       const drawn = bookTexts(rec).map((c) => Object.assign(textRect(c), { t: c.t })).sort((a, b) => a.x0 - b.x0);
@@ -666,7 +681,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
       const W = FRAMES[name].W;
       const fit = geo.fitPPV({ total: g.total }, W);
       const zoom = (0.7 * W) / ((S04.b - S04.a) * fit);
-      const { canvas } = chromeRoot(name);
+      const { canvas } = chromeRoot(name, { whole: zoom > 1.02 }); // WA4: zoomed, the root is .sw-zoomed
       const { rec, fs } = paint(name, zoom, (S04.a + S04.b) / 2, { canvas, focus: { arc: S04.i } });
       const s = fs.v.DPR;
       const gold = rec.texts().filter((c) => c.fill === css('chosenLabel'));
@@ -687,7 +702,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
   }
 
   it('phone at the deep span, the legend on its one line: the "+n" pills stay, clear of the chapter numerals (the stack closed its gaps under the legend and the pills went)', () => {
-    const { canvas } = chromeRoot('phone');
+    const { canvas } = chromeRoot('phone', { whole: true }); // WA4: a zoomed phone keeps only the credit line
     for (const zoom of [85, 196, 211]) {
       const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
       const s = fs.v.DPR;
@@ -705,7 +720,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
   });
 
   it('phone 200x: the ruler runs to the right end, its numerals clear above the corner buttons, and nothing is drawn under them', () => {
-    const { canvas, zones } = chromeRoot('phone');
+    const { canvas, zones } = chromeRoot('phone', { whole: true }); // WA4: zoomed in, "Whole web" shows
     const { rec, fs } = paint('phone', 207, ISA53_6, { canvas });
     const s = fs.v.DPR;
     const marks = inked(rec, (f) => [css('verseTick'), css('chapterTick'), css('citedDot')].includes(f) || /^rgba\(196,164,105,/.test(String(f)));
@@ -719,7 +734,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
 
   it('phone, panel open: the corner buttons at the bottom-left cover neither "JOHN" and its numeral 1 at the book start nor "‹ JOHN" stuck at the edge; the ticks run clear of them', () => {
     const panel = 374;
-    const { canvas, zones } = chromeRoot('phone', { panel });
+    const { canvas, zones } = chromeRoot('phone', { panel, whole: true });
     const v = FRAMES.phone, s = v.DPR;
     const zoom = 85, ppv = geo.fitPPV({ total: g.total }, v.W) * zoom;
     const john1 = verseOf('john', 1, 1);
@@ -736,7 +751,9 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
       if (!sticky) expect(one, what + 'the numeral 1').toBeTruthy();
       for (const c of texts) for (const z of zones) expect(meet(textRect(c), z), what + '"' + c.t + '" under a corner button').toBe(false);
       const marks = inked(rec, (f) => [css('verseTick'), css('chapterTick'), css('citedDot')].includes(f));
-      expect(marks.length).toBeGreaterThan(20);
+      // WA4: beside a docked panel the bottom bar's pills and end span nearly the canvas area's whole
+      // foot, so the ticks in that row give way to them (the assertion below); the band is still drawn
+      expect(marks.length).toBeGreaterThan(10);
       for (const m of marks) for (const z of zones.slice(0, 2)) expect(meet(m, z), what + 'a tick under a corner button').toBe(false);
     }
   });
@@ -746,7 +763,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
      gave way to them: the far-left book went unnamed. It stands just right of them, over its own book. */
   it('phone, panel open: a book that starts under the corner buttons is named just right of them, over its own book', () => {
     const panel = 374;
-    const { canvas, zones } = chromeRoot('phone', { panel });
+    const { canvas, zones } = chromeRoot('phone', { panel, whole: true });
     const v = FRAMES.phone, s = v.DPR;
     for (const [book, zoom] of [['genesis', 200], ['genesis', 85], ['john', 200]]) {
       const ppv = geo.fitPPV({ total: g.total }, v.W) * zoom;   // device px a verse
@@ -808,7 +825,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
      begun, and at 196x not drawn at all. They fade in from 4.5 px a verse, full by 6. */
   it('phone at r3-03\'s span (211x on Isaiah 53) has its every-5th verse numerals in full ink, and at 196x already drawn', () => {
     for (const [zoom, least] of [[196, 0.5], [211, 0.95]]) {
-      const { canvas } = chromeRoot('phone');
+      const { canvas } = chromeRoot('phone', { whole: true }); // WA4: a zoomed phone keeps only the credit line
       const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
       const s = fs.v.DPR, what = 'phone ' + zoom + 'x (' + (fs.cam.ppv / s).toFixed(2) + ' px a verse)';
       const vnums = rec.texts().filter((c) => c.align === 'center' && isNum(c) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);

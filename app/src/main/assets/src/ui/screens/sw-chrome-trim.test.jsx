@@ -114,7 +114,13 @@ async function mount(props = {}) {
   return view;
 }
 
-const HIDE_ALL = /hide.*(controls|chrome|ui)/i;
+const _HIDE_ALL = /hide.*(controls|chrome|ui)/i;
+// WA4 (w-menu): hiding is the ⋯ menu's "Hide the controls" row; the way back is the one "Show controls"
+const hideRow = () => screen.getByRole('button', { name: /^Hide the controls/ });
+const hideChrome = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+  fireEvent.click(hideRow());
+};
 
 describe('the Scripture Web chrome, trimmed', () => {
   beforeEach(() => {
@@ -149,10 +155,28 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(screen.queryByText('The whole canon')).toBeNull();
   });
 
-  it('renders NO zoom − / + buttons — pinch, wheel and the +/- keys remain', async () => {
-    await mount();
-    expect(screen.queryByLabelText('Zoom out')).toBeNull();
-    expect(screen.queryByLabelText('Zoom in')).toBeNull();
+  // WA4: the v2 pictures (w-main) bring the zoom pair back, in the bottom bar's end; each press is the
+  // web's own + / − key, so the pair zooms exactly as the keys, the pinch and the wheel do
+  it('renders the zoom − / + pair at the bottom bar\'s end, and each one zooms the web', async () => {
+    const { container } = await mount();
+    const root = container.querySelector('.sw-root');
+    const zin = screen.getByRole('button', { name: 'Zoom in' });
+    const zout = screen.getByRole('button', { name: 'Zoom out' });
+    expect(zin.closest('.sw-wbot-end .sw-wzoom')).toBeTruthy();
+    expect(zout.closest('.sw-wbot-end .sw-wzoom')).toBeTruthy();
+    const ppv = () => Number(root.getAttribute('data-ppv-css'));
+    const settleTo = async (ok) => {
+      for (let i = 0; i < 60 && !ok(); i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    };
+    const fit = ppv();
+    expect(fit, 'PRECONDITION: the root reports its zoom').toBeGreaterThan(0);
+    fireEvent.click(zin);
+    await settleTo(() => ppv() > fit * 1.05);
+    const zoomed = ppv();
+    expect(zoomed, 'Zoom in zooms in').toBeGreaterThan(fit * 1.05);
+    fireEvent.click(zout);
+    await settleTo(() => ppv() < zoomed * 0.95);
+    expect(ppv(), 'Zoom out zooms out').toBeLessThan(zoomed * 0.95);
   });
 
   /* Was 'renders NO "Go to" — deletion is the fix for a control that did not function'.
@@ -168,7 +192,9 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(screen.queryByRole('button', { name: /^go to$/i })).toBeNull();
     expect(container.querySelector('.sw-goto'), 'no box until asked').toBeNull();
     const btn = screen.getByRole('button', { name: /go to a book, chapter or verse/i });
-    expect(btn.closest('.sw-controls').firstElementChild, 'first in the control row (spec 4.1)').toBe(btn);
+    // WA4: the go-to is the bottom bar's first pill now (w-main), not the top control row's first
+    expect(btn.closest('.sw-wpills').firstElementChild, 'first in the bottom bar\'s pills').toBe(btn);
+    expect(btn.textContent, 'it names itself').toBe('Go to');
     fireEvent.click(btn);
     const box = container.querySelector('.sw-goto');
     expect(box).toBeTruthy();
@@ -220,35 +246,37 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(DRAWN.map((d) => d.hasColorMode)).toEqual(DRAWN.map(() => false));
   });
 
+  /* WA4 (w-menu): hiding moved into the ⋯ menu ("Hide the controls", its note "A Show controls button
+     stays"), and the round hide-all renders only while hidden, as the way back. The law is the same:
+     ONE way back, outside what it hides, saying which way it goes, and it shows the chrome again. */
   it('has ONE hide-all control, and it hides the chrome and shows it again', async () => {
     const { container } = await mount();
-    const btn = screen.getByLabelText(HIDE_ALL);
-    /* w3 panel step 2 (the a11y pass): the toggle carries a visible label that flips with its
-       name, "Hide controls" / "Show controls", in place of a constant name plus aria-pressed
-       (both at once would read "Show controls, pressed"). The law is the same: ONE control, the
-       same element both ways, outside what it hides, saying which way it goes. */
-    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
-    expect(btn.textContent).toBe('Hide controls');
-    expect(btn.hasAttribute('aria-pressed')).toBe(false);
+    const row = hideRow();
+    expect(row.closest('.sw-menu#sw-menu'), 'hiding is a row of the ⋯ menu').toBeTruthy();
+    expect(row.classList.contains('sw-mrow')).toBe(true);
+    expect(row.hasAttribute('aria-pressed')).toBe(false);
+    expect(container.querySelector('.sw-hide-all'), 'no hide-all while the chrome shows').toBeNull();
 
-    fireEvent.click(btn);
+    hideChrome();
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeTruthy();
+    expect(container.querySelector('.sw-root.sw-menu-open'), 'the row closes the menu').toBeNull();
     expect(container.querySelectorAll('.sw-hide-all')).toHaveLength(1);
-    expect(container.querySelector('.sw-hide-all')).toBe(btn);
+    const btn = container.querySelector('.sw-hide-all');
+    expect(screen.getByLabelText('Show controls')).toBe(btn);
     expect(btn.getAttribute('aria-label')).toBe('Show controls');
     expect(btn.textContent).toBe('Show controls');
     /* The button is the way back, so it must not be inside what it hides. */
-    expect(btn.closest('.sw-topbar, .sw-controls, .sw-legend, .sw-credit')).toBeNull();
+    expect(btn.closest('.sw-topbar, .sw-controls, .sw-legend, .sw-credit, .sw-wbot')).toBeNull();
 
     fireEvent.click(btn);
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeNull();
-    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
+    expect(container.querySelector('.sw-hide-all'), 'shown again, the way back goes').toBeNull();
   });
 
   it('remembers hidden for the SESSION, not the profile', async () => {
     const updateSetting = vi.fn();
     let r = await mount({ updateSetting });
-    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    hideChrome();
     expect(r.container.querySelector('.sw-root.sw-chrome-hidden')).toBeTruthy();
     cleanup();
     r = await mount({ updateSetting });
@@ -268,10 +296,12 @@ describe('the Scripture Web chrome, trimmed', () => {
     await tick();
     expect(seg.getAttribute('aria-pressed')).toBe('true');
     expect(container.querySelector('.sw-context')).toBeNull();
-    expect(screen.queryByLabelText('Zoom out')).toBeNull();
+    // WA4: the zoom pair is the bottom bar's in both webs (w-main); My Web has no go-to at all
+    expect(screen.getByRole('button', { name: 'Zoom out' }).closest('.sw-wbot-end')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^go to$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /go to a book, chapter or verse/i })).toBeNull();
     expect(screen.queryByLabelText('Colour mode')).toBeNull();
-    expect(screen.getByLabelText(HIDE_ALL)).toBeTruthy();
+    expect(hideRow().closest('.sw-menu')).toBeTruthy();
   });
 });
 
@@ -349,10 +379,13 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     const labels = await waitForLabel();
     expect(labels.some((s) => /^gen/i.test(s)), 'PRECONDITION: the rail painted').toBe(true);
     const legend = container.querySelector('.sw-legend');
-    const credit = legend && legend.querySelector('.sw-credit');
+    // WA4: the credit is the tail of the key's second line, .sw-legend-sub ("N connections \u00b7 credit"),
+    // the legend's last child; the key's first line no longer carries it
+    const credit = legend && legend.querySelector('.sw-legend-sub');
     expect(credit, 'the credit, in the legend').toBeTruthy();
-    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
-    expect(credit.textContent).toBe('Cross-reference data \u00a9 OpenBible.info (CC-BY)');
+    expect(legend.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    expect(credit.textContent.split(' \u00b7 ').pop()).toBe('Cross-reference data \u00a9 OpenBible.info (CC-BY)');
+    expect(legend.querySelector('.sw-legend-line .sw-credit'), 'once, not on the key\'s line too').toBeNull();
     expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
 
     const here = dirname(fileURLToPath(import.meta.url));
@@ -364,18 +397,18 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
       return m[1];
     };
     const H = SIZES.find((s) => s[0] === 'clientHeight')[1];
-    // a root 500 px tall or less is .sw-compact (use-panel-layout.js); jsdom gives the root no box,
-    // so the canvas's height stands in for it
-    const compact = H <= 500;
-    const own = ruleOf(compact ? '.sw-root.sw-compact .sw-legend' : '.sw-legend');
-    const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(own)[1]);
+    /* WA4: the legend sits at the foot of the bottom bar (.sw-wbot, its bottom offset), two lines one
+       above the other at line-height 1 (the key's line, the gap, the count-and-credit sub line), on a
+       phone and a PC alike; the key's chips carry a 1 px edge above and below */
+    const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(ruleOf('.sw-wbot'))[1]);
+    const own = ruleOf('.sw-root .sw-wbot .sw-legend');
     const size = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(own)[1]);
-    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(/line-height/.test(own) ? own : ruleOf('.sw-legend'))[1]);
-    // a phone's legend is one line where it fits since w4 (12 px, "far": about 670 px against the
-    // 751 beside ? and hide-UI on the 891 px phone) and wraps to two where it does not, as on this
-    // 800 px frame (660 beside them; tools/e2e-sw-legend.mjs measures it): the labels clear two
-    const lines = compact ? 2 : 1;
-    const legendTop = H - bottom - lines * size * lineHeight;
+    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(own)[1]);
+    const gap = Number(/gap:\s*(\d+)px/.exec(own)[1]);
+    const subRule = ruleOf('.sw-legend-sub');
+    const subSize = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(subRule)[1]);
+    const subLine = Number((/line-height:\s*([\d.]+)/.exec(subRule) || [0, lineHeight])[1]);
+    const legendTop = H - bottom - (size * lineHeight + 2 + gap + subSize * subLine);
     // a book label is the fixture book's name or abbreviation as the rail prints it (upper case),
     // in the web's one face: Cinzel is retired from the canvas (sw-ink.js FONT), so the font no
     // longer tells a book label from the other canvas text
@@ -395,7 +428,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
   it('hidden keeps the book rail: the redraw after the hide (a rotation) still paints the book labels', async () => {
     await mount();
     await waitForLabel();
-    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    hideChrome();
     CALLS.length = 0;
     await rotate();
     const labels = await waitForLabel();
@@ -407,7 +440,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));
     await tick();
     await waitForLabel();
-    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    hideChrome();
     CALLS.length = 0;
     await rotate();
     const labels = await waitForLabel();
@@ -416,7 +449,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
 
   it('hidden keeps the colour key in the DOM and hides the strip and the topbar', async () => {
     const { container } = await mount();
-    fireEvent.click(screen.getByLabelText(HIDE_ALL));
+    hideChrome();
     const root = container.querySelector('.sw-root.sw-chrome-hidden');
     expect(root).toBeTruthy();
     /* The elements stay mounted either way (the hiding is CSS); the CSS gate lives in
@@ -425,12 +458,15 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(root.querySelector('.sw-controls')).toBeTruthy();
   });
 
+  // WA4: the count left the header for the key's second line, before the credit
   it('the header count reads "N connections", not "N of M connections"', async () => {
     const { container } = await mount();
-    const sub = container.querySelector('.sw-title p');
+    expect(container.querySelector('.sw-title p, .sw-title-count'), 'no count in the header').toBeNull();
+    const sub = container.querySelector('.sw-legend .sw-legend-sub');
     expect(sub).toBeTruthy();
-    expect(sub.textContent).toMatch(/^\d[\d,]* connections$/);
-    expect(sub.textContent).not.toMatch(/ of /);
+    const count = sub.textContent.split(' · ')[0];
+    expect(count).toMatch(/^\d[\d,]* connections$/);
+    expect(count).not.toMatch(/ of /);
   });
 
   /* Item 5's bottom half, rewritten to the w4 band (r2-01a): the canon's names

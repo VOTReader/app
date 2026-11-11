@@ -103,10 +103,18 @@ describe('the header and the controls (spec 4.1)', () => {
     delete window.SCRIPTURE_WEB_DATA;
   });
 
+  // WA4: the h1 still names the web (for a screen reader); what is seen is the switch, "Scripture Web"
+  // pressed beside "My Web", and the count is the key's second line, before the credit
   it('the title names the web in sentence case and the count reads "N connections"', async () => {
     const { container } = await mount();
-    expect(container.querySelector('.sw-title h1').textContent).toBe('The Scripture Web');
-    expect(container.querySelector('.sw-title p').textContent).toMatch(/^\d[\d,]* connections$/);
+    const h1 = container.querySelector('.sw-title h1');
+    expect(h1.textContent).toBe('The Scripture Web');
+    expect(h1.classList.contains('sw-sr-only')).toBe(true);
+    const names = [...container.querySelectorAll('.sw-title .sw-seg.sw-wname .sw-seg-btn')];
+    expect(names.map((b) => b.textContent)).toEqual(['Scripture Web', 'My Web']);
+    expect(names.map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    expect(container.querySelector('.sw-title p'), 'no count in the header').toBeNull();
+    expect(container.querySelector('.sw-legend .sw-legend-sub').textContent.split(' · ')[0]).toMatch(/^\d[\d,]* connections$/);
   });
 
   // Corbin, 2026-10-23: the Famous / Essential menu folds into the Filters sheet's Strength row
@@ -208,7 +216,7 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
      selector list also names the error page's compact Back, so it is found by its first selector,
      whatever follows it in the list.) */
   it('hidden, the hide-UI pill is as wide as its words on a phone too', () => {
-    const roundSel = '.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)';
+    const roundSel = '.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all)'; // WA4: the ? is gone
     const pill = '.sw-root.sw-compact.sw-chrome-hidden .sw-hide-all {';
     const round = [' {', ', '].map((end) => BARE.indexOf(roundSel + end)).filter((i) => i > -1).sort((a, b) => a - b)[0] ?? -1;
     expect(round, 'the phone\'s round rule').toBeGreaterThan(-1);
@@ -243,15 +251,18 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
      narrower phone; the line keeps its wrap and only its items keep their words together. That
      it is one line on the 891 px phone and never clips the credit is the walk's to see
      (tools/e2e-sw-legend.mjs: jsdom lays nothing out). The credit stays the tail. */
+  /* WA4: the v2 key (w-main) is two centred lines in the bottom bar, phone and PC alike: the key's
+     line at 12 px, kept on one line between the pills and the zoom, and under it the count and the
+     credit at 11 px. The law that outlives the old wrap is the licence's: the credit is never cut. */
   it('a phone\'s legend: 12 px, the ramp ending "far", the credit last, and a line that wraps rather than clip the credit', async () => {
-    expect(rule('.sw-root.sw-compact .sw-legend')).toMatch(/font-size:\s*var\(--fsc-12\)/);
+    expect(rule('.sw-root .sw-wbot .sw-legend')).toMatch(/font-size:\s*var\(--fsc-12\)/);
+    expect(rule('.sw-legend-sub')).toMatch(/font-size:\s*var\(--fsc-11\)/);
     expect(rule('.sw-legend')).toMatch(/overflow:\s*hidden/);
     expect(rule('.sw-legend-line')).toMatch(/flex-wrap:\s*wrap/);
-    for (const m of BARE.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-      const sel = m[1].trim();
-      if (!/\.sw-legend-line\s*$/.test(sel) && !/\.sw-legend\s*$/.test(sel)) continue;
-      expect(m[2], sel + ': the legend line may not be kept from wrapping').not.toMatch(/flex-wrap:\s*nowrap|white-space:\s*nowrap/);
-    }
+    // the credit's own line may be neither cut with an ellipsis nor clipped unwrapped
+    const sub = rule('.sw-legend-sub');
+    expect(sub, '.sw-legend-sub: the credit may not be cut').not.toMatch(/text-overflow:\s*ellipsis/);
+    expect(/overflow:\s*hidden/.test(sub) && /white-space:\s*nowrap/.test(sub), '.sw-legend-sub: the credit may not be clipped on one line').toBe(false);
     expect(rule('.sw-root.sw-compact .sw-legend-line > *')).toMatch(/white-space:\s*nowrap/);
     expect(rule('.sw-key-short')).toMatch(/display:\s*none/);
     expect(rule('.sw-root.sw-compact .sw-key-long')).toMatch(/display:\s*none/);
@@ -270,6 +281,12 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
     for (const m of BARE.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       const sel = m[1].trim();
       if (!/\.swf?-/.test(sel)) continue;
+      // WA4: the one exception is the key's second line, the count and the credit, at 11 px as the
+      // v2 picture (w-main) draws it; nothing else
+      if (sel === '.sw-legend-sub') {
+        expect(m[2]).toMatch(/font-size:\s*var\(--fsc-11\)/);
+        continue;
+      }
       for (const f of m[2].matchAll(/font-size:\s*var\(--fsc?-(\d+)\)/g)) if (Number(f[1]) < 12) small.push(sel + ' -> ' + f[0]);
     }
     expect(small).toEqual([]);

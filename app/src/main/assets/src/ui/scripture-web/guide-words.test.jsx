@@ -33,46 +33,45 @@ const lines = (card) => [...card.querySelectorAll('li')].map((li) => li.textCont
 
 afterEach(cleanup);
 
-describe('How to read this web: seven or eight short lines about controls that exist', () => {
-  /* w4 quality hunt: the line called the control "Search", which everywhere else is Go to (its
-     aria-label, its tooltip "Go to ( / )", the dialog, the key help). This test pinned the word
-     "search"; its intent, the go-to's line comes only with the go-to, now pins the control's name. */
-  it('seven lines without the go-to, eight with it; the Go to line comes only with the go-to, by its own name', () => {
-    const without = lines(guide());
-    expect(without).toHaveLength(7);
-    expect(without.join(' ')).not.toMatch(/go to|search/i);
-    cleanup();
-    const withSearch = lines(guide({ canSearch: true }));
-    expect(withSearch).toHaveLength(8);
-    expect(withSearch.filter((s) => /\bGo to\b/.test(s) && /book, chapter or verse/.test(s))).toHaveLength(1);
-    expect(withSearch.join(' ')).not.toMatch(/search/i);
+describe('How to read this web: four short points about controls that exist', () => {
+  /* w4 quality hunt: the line called the control "Search", which everywhere else is Go to. WA4: the
+     v2 guide (w-guide) is four points, each an icon and its words; the Go to, Filters and List pills
+     name themselves in the bottom bar, so no line explains them and no line calls one "search". */
+  it('four points, each an icon and its words; no line for the go-to, and never "search"', () => {
+    const card = guide();
+    const pts = [...card.querySelectorAll('ul.sw-guide-list > li.sw-guide-pt')];
+    expect(pts).toHaveLength(4);
+    for (const li of pts) expect(li.querySelector('.sw-guide-ic'), li.textContent).not.toBeNull();
+    expect(lines(card)).toHaveLength(4);
+    expect(lines(card).join(' ')).not.toMatch(/go to|search/i);
   });
 
   it('each line is short (one or two sentences, under 110 characters)', () => {
-    for (const s of lines(guide({ canSearch: true }))) {
+    for (const s of lines(guide())) {
       expect(s.length, s).toBeLessThan(110);
       expect((s.match(/[.!?](\s|$)/g) || []).length, s).toBeLessThanOrEqual(2);
     }
   });
 
-  it('names what the screen has: pinch or scroll to zoom, tap a thread, the gold ticks, Reset', () => {
+  // WA4: the zoom is the bottom bar's + and − (and pinch); Reset left the screen (Whole web is its own pill)
+  it('names what the screen has: + and − or pinch to zoom, tap a thread, the gold ticks; no Reset', () => {
     const text = lines(guide()).join(' ');
-    expect(text).toMatch(/pinch or scroll to zoom/i);
+    expect(text).toMatch(/zoom with \+ and −, or pinch/i);
     expect(text).toMatch(/tap a thread/i);
     expect(text).toMatch(/gold ticks?\b[^.]*\bVolumes\b/i);
-    expect(text).toMatch(/\bReset\b/);
+    expect(text).not.toMatch(/\bReset\b/);
   });
 
-  // ideas audit A10.1 (2026-10-23): the card left out what the numbers count, the bold names, the
-  // zoom down to the words, Filters, the held name and where My Web is
-  it('says what a count number is, what bold names mark, that zoom reaches the words, Filters, a held name, My Web in More', () => {
+  // ideas audit A10.1 (2026-10-23): the card left out what the numbers count, the bold names and the
+  // zoom down to the words. WA4: Filters and My Web are pills and the title's switch now, named on
+  // screen, so the card no longer points at them (and never at a "More" that holds them)
+  it('says what a count number is, what bold names mark, that zoom reaches the words; never "in More"', () => {
     const text = lines(guide()).join(' ');
-    expect(text).toMatch(/number where threads meet counts them/);
+    expect(text).toMatch(/A number marks threads that meet: tap it to fan them out/);
     expect(text).toMatch(/Bold names are the major books/);
-    expect(text).toMatch(/zoom, all the way down to each verse’s words/);
-    expect(text).toMatch(/Filters narrows the web/);
-    expect(text).toMatch(/hold a book’s name to keep only its threads/);
-    expect(text).toMatch(/My Web, in More, draws your own links/);
+    expect(text).toMatch(/down to each verse’s words/);
+    expect(text).toMatch(/drag down to look higher/i);
+    expect(text).not.toMatch(/\bin More\b/);
   });
 
   it("says what an arch's height means, once: the farther apart its verses, the taller (C22, w3 review)", () => {
@@ -81,15 +80,18 @@ describe('How to read this web: seven or eight short lines about controls that e
     expect(text.match(/\btaller\b/gi)).toHaveLength(1);
   });
 
-  it('says what votes are, once, in plain words', () => {
+  // WA4: the four-point card drops the votes line; it must not name votes without saying what they are
+  it('names no votes it does not explain', () => {
     const text = lines(guide()).join(' ');
-    expect(text).toMatch(/readers’ votes for how strong the link is/);
-    expect(text.match(/\bvotes\b/g)).toHaveLength(2);
+    expect(text).not.toMatch(/\bvotes?\b/i);
   });
 
-  it('claims no control the screen lacks: no "+" to zoom, no ruler on the left, no bar to jump (item 23)', () => {
-    const text = lines(guide({ canSearch: true })).join(' ');
-    expect(text).not.toMatch(/\+/);
+  // WA4: the bottom bar has its zoom pair again, so "+ and −" is a control the screen has (the
+  // retired ruler and jump bar still are not)
+  it('claims no control the screen lacks: + only with its − pair, no ruler on the left, no bar to jump (item 23)', () => {
+    const text = lines(guide()).join(' ');
+    expect(text.match(/\+/g)).toHaveLength(1);
+    expect(text).toMatch(/\+ and −/);
     expect(text).not.toMatch(/\bruler\b/i);
     expect(text).not.toMatch(/\bbar\b/i);
   });
@@ -105,10 +107,24 @@ describe('How to read this web: seven or eight short lines about controls that e
 
   // Corbin, 2026-10-29: "We don't need huge credit lines about OpenBible really anywhere except for
   // a small spot in sweb": the credit is the legend's tail alone, not the card's footer
+  // WA4: the card has a foot again, but it holds the way back to it and Got it, never a credit
   it('carries no credit line of its own: the legend\'s small one is the web\'s', () => {
     const card = guide();
-    expect(card.querySelector('.sw-guide-foot')).toBeNull();
+    const foot = card.querySelector('.sw-guide-foot');
+    expect(foot).not.toBeNull();
+    expect(foot.textContent).toBe('Find this again under ⋯Got it');
     expect(card.textContent).not.toContain(WEB_CREDIT);
+    expect(card.textContent).not.toMatch(/OpenBible|CC-BY/);
+  });
+
+  // WA4 (w-menu): the ⋯ menu's About the data opens the same card in its `about` variant
+  it('about: titled "About the data", names OpenBible.info and CC-BY, closes with Done', () => {
+    const card = guide({ about: true });
+    expect(card.querySelector('[role="document"] .sw-guide-title').textContent).toBe('About the data');
+    expect(card.textContent).toMatch(/OpenBible\.info/);
+    expect(card.textContent).toMatch(/CC-BY/);
+    expect(card.querySelector('.sw-guide-close').textContent).toBe('Done');
+    expect(card.querySelector('.sw-guide-again')).toBeNull();
   });
 });
 
@@ -147,11 +163,11 @@ describe('the guide reads in browse mode (w4 quality hunt)', () => {
   // the screen's root is role="application": the card's words sit in a document inside the
   // dialog, so NVDA and JAWS read them with the virtual cursor
   it('its title and lines sit in a role="document" region; Got it stays outside it', () => {
-    const card = guide({ canSearch: true });
+    const card = guide();
     const doc = card.querySelector('[role="document"]');
     expect(doc).not.toBeNull();
     expect(doc.querySelector('.sw-guide-title')).not.toBeNull();
-    expect(doc.querySelectorAll('li').length).toBe(8);
+    expect(doc.querySelectorAll('li').length).toBe(4); // WA4: four points
     expect(doc.contains(card.querySelector('.sw-guide-close'))).toBe(false);
   });
 });
@@ -165,11 +181,15 @@ describe('the guide card is the web\'s dark panel in both themes (Q4)', () => {
     expect(card).toMatch(/color:\s*var\(--sw-text-body\)/);
     expect(card).not.toMatch(/var\(--(bg\d?|cream|gold)[-)]/);
     expect(rule('.sw-guide-title')).toMatch(/color:\s*var\(--sw-title\)/);
-    expect(rule('.sw-guide-body strong')).toMatch(/color:\s*var\(--sw-gold\)/);
+    // WA4: the points' bold leads are the panel's title ink, their icons the web's gold
+    expect(rule('.sw-guide-pt b')).toMatch(/color:\s*var\(--sw-title\)/);
+    expect(rule('.sw-guide-ic')).toMatch(/color:\s*var\(--sw-gold\)/);
+    expect(rule('.sw-guide-pt')).toMatch(/color:\s*var\(--sw-text-body\)/);
   });
 
   it('reads at 13 px or more', () => {
-    for (const sel of ['.sw-guide-title', '.sw-guide-body']) {
+    // WA4: the points are .sw-guide-pt; the foot's "Find this again under ⋯" too
+    for (const sel of ['.sw-guide-title', '.sw-guide-pt', '.sw-guide-again']) {
       const m = /font-size:\s*var\(--fsc?-(\d+)\)/.exec(rule(sel));
       expect(m, sel).toBeTruthy();
       expect(Number(m[1]), sel).toBeGreaterThanOrEqual(13);

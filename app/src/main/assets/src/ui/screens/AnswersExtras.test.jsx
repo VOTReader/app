@@ -35,7 +35,7 @@ beforeEach(() => {
   resetAnswersLanding();
   try { localStorage.clear(); } catch (_e) { /* */ }
   window.ScreenLayout = ({ navChildren, children }) => <div>{navChildren}{children}</div>;
-  window.LibraryNav = (p) => <button type="button" data-testid="nav-back" onClick={p.onBack}>{p.backLabel}</button>;
+  window.LibraryNav = (p) => <span><button type="button" data-testid="nav-back" onClick={p.onBack}>{p.backLabel}</button>{p.leftExtras || null}</span>;
   window.SheetHandle = ({ onClose, glyph }) => <button type="button" onClick={onClose} aria-label="Close">{glyph || '‹'}</button>;
   window.useFocusTrap = () => ({ current: null });
   window.ReactDOM = ReactDOM;
@@ -56,9 +56,8 @@ describe('Saved answers (O5)', () => {
     stores(MARKS, { n1: 'Read this again on the Sabbath.' });
     const onOpenTopic = vi.fn();
     render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={onOpenTopic} />);
-    expect(document.querySelector('.ans-label').textContent).toBe('Answers Only God Can Give');
     expect(document.querySelector('h1').textContent).toBe('Saved answers');
-    expect(NB(document.querySelector('.ans-lede').textContent)).toBe('3 highlights and notes in 2 topics, in the site’s order.');
+    expect(NB(document.querySelector('.ans-saved-note').textContent)).toBe('3 highlights and notes in 2 topics, in the site’s order. They also sit with your other highlights in the Library.');
     expect([...document.querySelectorAll('.ans-sechead .ans-h2')].map((n) => n.textContent)).toEqual(['THERE IS NO OTHER', 'God Speaks About The Sabbath']);
     const hits = [...document.querySelectorAll('.ans-hit')];
     expect(hits.map((h) => h.querySelector('.ans-hit-snip').textContent)).toEqual(['there is no other', '“Thus says The Lord', 'My Sabbaths']);
@@ -68,27 +67,34 @@ describe('Saved answers (O5)', () => {
     fireEvent.click(hits[1]);
     const sabbath = ANSWERS.find((e) => e.id === 'god-speaks-about-the-sabbath');
     expect(onOpenTopic).toHaveBeenCalledWith('god-speaks-about-the-sabbath', sabbath.paragraphs[2].text, 'Saved answers', null, null, 2);
+    // WA2 (a-saved): each row has a menu that opens the same place
+    fireEvent.click(screen.getAllByRole('button', { name: 'Saved line options' })[2]);
+    fireEvent.click(screen.getByText('Open in the answer'));
+    expect(onOpenTopic).toHaveBeenLastCalledWith('god-speaks-about-the-sabbath', expect.anything(), 'Saved answers', null, null, expect.any(Number));
   });
 
   it('empty: says how to save one; a mark made elsewhere appears at once', () => {
     const s = stores({});
     render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={noop} />);
-    expect(screen.getByText('No saved answers yet. Hold your finger on any line to highlight it.')).toBeTruthy();
-    expect(document.querySelector('.ans-lede')).toBeNull();
+    expect(screen.getByText('No saved answers yet')).toBeTruthy();
+    expect(screen.getByText('Hold a line in any answer and pick a colour. It is kept here and with your highlights.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open the Main Page' })).toBeTruthy();
+    expect(document.querySelector('.ans-saved-note')).toBeNull();
     act(() => s.set({ 'wtlb:there-is-no-other:5': [mark('g2', 0, 'there is no other')] }));
-    expect(NB(document.querySelector('.ans-lede').textContent)).toBe('1 highlight in 1 topic, in the site’s order.');
-    expect(document.querySelector('.ans-empty')).toBeNull();
+    expect(NB(document.querySelector('.ans-saved-note').textContent)).toMatch(/^1 highlight in 1 topic, in the site’s order/);
+    expect(screen.queryByText('No saved answers yet')).toBeNull();
   });
 
   it('the landing\'s Tools row shows the live counts only when there are any, and opens the screen', () => {
     const s = stores({});
     const onOpenSaved = vi.fn();
     render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} onOpenMedia={noop} onOpenSaved={onOpenSaved} />);
-    const row = () => [...document.querySelectorAll('.ans-tools .ans-row')].find((r) => r.querySelector('.ans-row-title').textContent === 'Saved answers');
-    expect(row()).toBeUndefined();
+    // WA1 (a-saved): the door is always offered, beside Charts and videos; its label carries the live count
+    const row = () => screen.getByRole('button', { name: /^Saved answers/ });
+    expect(row().getAttribute('aria-label')).toBe('Saved answers');
     act(() => s.set(MARKS));
-    expect(NB(row().querySelector('.ans-row-sub').textContent)).toBe('3 highlights and notes in 2 topics');
-    expect(row().previousElementSibling.querySelector('.ans-row-title').textContent).toBe('Charts & videos');
+    expect(NB(row().getAttribute('aria-label'))).toBe('Saved answers, 3 highlights and notes in 2 topics');
+    expect(row().previousElementSibling.textContent).toBe('Charts and videos');
     fireEvent.click(row());
     expect(onOpenSaved).toHaveBeenCalledTimes(1);
   });
@@ -99,7 +105,7 @@ describe('Share as a card (O6)', () => {
     stores({});
     render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} now={new Date(2026, 4, 17, 12)} />);
     const daily = document.querySelector('.ans-daily');
-    fireEvent.click(within(daily.querySelector('.ans-daily-head')).getByLabelText('Share as a card'));
+    fireEvent.click(within(daily).getByLabelText('Share as a card'));
     const sheet = screen.getByRole('dialog', { name: 'Share as a card' });
     // One choice of three that repaints the card: a radio group (a tablist would want panels to show).
     const group = within(sheet).getByRole('radiogroup', { name: 'Card theme' });

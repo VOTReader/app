@@ -62,7 +62,7 @@ import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
 import { AnswersSaved } from './screens/AnswersSaved.jsx';
 import { readAnswersPath, writeAnswersPath } from './components/AnswersParts.jsx';
-import { ANSWERS_SUBJECT_GROUP, isAnswersGroupKey } from '../utils/answers-retired.js';
+import { isAnswersGroupKey } from '../utils/answers-retired.js';
 import { answersSectionAnchor } from '../utils/answers-sections.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
@@ -1212,6 +1212,16 @@ export function buildScreenRoutes({
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
         onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
         onOpenPlans={goReadingPlans}
+        onOpenAnswers={() => { resetAnswersLanding(); setScreen('answers-home'); }}
+        listenRef={{
+          // WA4 (s-ref): a passage card's Listen plays its chapter in the reader's audio edition, the way a
+          // plan's Listen does (planPortion); a chapter with no recording gets no button.
+          can: (/** @type {any} */ r) => planPortion([r]).length > 0,
+          play: (/** @type {any} */ r, /** @type {string} */ label) => {
+            const items = planPortion([r]);
+            if (items.length) AudioPlayer.playPortion({ items, label });
+          },
+        }}
       />
     ),
     'home': () => (
@@ -1956,8 +1966,6 @@ export function buildScreenRoutes({
     )),
     // Retired by the AOGCG redesign (answers-retired.js): a place saved on the nine subjects or the
     // old A–Z screen opens where its topics live now (use-saved-state rewrites the record itself).
-    'answers-subject': () => _wrapAnswers((entries) => _answersShelf(entries, /** @type {Record<string, string>} */ (ANSWERS_SUBJECT_GROUP)[String(letterId || '')])),
-    'answers-az': () => _wrapAnswers((entries) => _answersLanding(entries)),
     'answers-entry': () => (_kickVot(null), _wrapAnswers(() => {
       // A topic also waits for the letters: its attributions open them (the
       // registry that resolves a tap knows only letters that have landed), and

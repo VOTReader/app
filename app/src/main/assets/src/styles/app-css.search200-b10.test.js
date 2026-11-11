@@ -111,58 +111,88 @@ describe('B10 item 1 — the mini title band', () => {
   });
 });
 
-/* "44px" or larger from a min-height declaration */
-const atLeast44 = (v) => /^\d+px$/.test(v || '') && parseInt(v, 10) >= 44;
+/* "44px" or larger from a min-height declaration; WA3: the --tap token (44px) and the one-line row
+   token --row-h-1 (54px) count too, and their values are pinned below. */
+const TOKEN_PX = { 'var(--tap)': 44, 'var(--row-h-1)': 54 };
+const atLeast44 = (v) => (v in TOKEN_PX ? TOKEN_PX[v] >= 44 : /^\d+px$/.test(v || '') && parseInt(v, 10) >= 44);
 
 describe('B10 item 3 — real 44px search tap targets, paid for by trimmed padding', () => {
-  it('the corpus pills are 44px, fully rounded, Cinzel --fs-10 at 0.15em, outlined in --gold-border', () => {
+  it('the tokens the targets name hold their sizes: --tap 44px, --row-h-1 54px', () => {
+    expect(CSS).toMatch(/--tap:\s*44px;/);
+    expect(CSS).toMatch(/--row-h-1:\s*54px;/);
+  });
+
+  /* WA3: the corpus tabs are a segmented control: each half draws its lit segment inside a transparent
+     border (background-clip:padding-box), so the 44px target is bigger than the segment it shows. */
+  it('the corpus pills are 44px, rounded, sized by a --ts token, the lit segment inside a transparent border', () => {
     const b = decls('.srch-corpus-btn');
     expect(atLeast44(b['min-height'])).toBe(true);
-    expect(parseInt(b['border-radius'], 10)).toBeGreaterThanOrEqual(22);
-    expect(b['font-size']).toBe('var(--fs-10)');
-    expect(b['letter-spacing']).toBe('0.15em');
-    expect(b.border).toBe('1px solid var(--gold-border)');
+    expect(b['border-radius']).toBe('var(--r-field)');
+    expect(b['font-size']).toBe('var(--ts-control)');
+    expect(b.border).toMatch(/^\d+px solid transparent$/);
+    expect(b['background-clip']).toBe('padding-box');
   });
 
-  it('the corpus row pads 8px above and below, so the band is about 60px', () => {
-    expect(decls('.srch-corpus-row').padding).toMatch(/^8px /);
+  it('the corpus row is the segmented control\'s track, rounded to match', () => {
+    const row = decls('.srch-corpus-row');
+    expect(row.display).toBe('flex');
+    expect(row.background).toBe('var(--surface-1)');
+    expect(row['border-radius']).toBe('var(--r-field)');
   });
 
-  it('both halves of the order switch are 44px, its outline rounded 22px, its row padding trimmed', () => {
-    expect(atLeast44(decls('.srch-sort-btn')['min-height'])).toBe(true);
-    expect(decls('.srch-sort')['border-radius']).toBe('22px');
-    expect(decls('.srch-filter-row').padding).toBe('4px min(1.2rem, 20px) 0');
+  it('both halves of the order switch are 44px, fully rounded, the lit half inside a transparent border', () => {
+    const s = decls('.srch-sort-btn');
+    expect(atLeast44(s['min-height'])).toBe(true);
+    expect(s['border-radius']).toBe('var(--r-pill)');
+    expect(s.border).toMatch(/^\d+px solid transparent$/);
+    expect(s['background-clip']).toBe('padding-box');
+    expect(decls('.srch-sort').display).toBe('inline-flex');
+    // the old separate order row is gone: the switch sits in the count's head
+    expect(decls('.srch-filter-row')).toEqual({});
+    expect(atLeast44(decls('.srch-summary-head')['min-height'])).toBe(true);
   });
 
-  it('group headers are 44px, the label still --fs-12', () => {
+  it('group headers are one-line rows (54px), the label sized by a --ts token', () => {
     const h = decls('.srch-group-header');
     expect(atLeast44(h['min-height'])).toBe(true);
-    expect(h['font-size']).toBe('var(--fs-12)');
-    expect(h.padding).toBe('0 1rem');
+    expect(h['min-height']).toBe('var(--row-h-1)');
+    expect(h['font-size']).toBe('var(--ts-body)');
+    expect(h.padding).toBe('0 var(--card-pad)');
   });
 
-  it('the scope chip and the quick and recent chips are 44px, their outer padding trimmed', () => {
+  it('the scope chip, the quick chips and Clear are 44px; the recent rows are 54px, their remove button 44x44', () => {
     const scope = decls('.srch-scope-chip');
     expect(atLeast44(scope['min-height'])).toBe(true);
-    expect(scope.padding).toBe('0 0.9rem');
+    expect(scope.padding).toBe('0 14px');
     const chip = decls('.srch-quick-chip');
     expect(atLeast44(chip['min-height'])).toBe(true);
     expect(chip['align-items']).toBe('center');
-    expect(parseInt(chip['border-radius'], 10)).toBeGreaterThanOrEqual(22);
-    expect(decls('.srch-quick-row').padding).toBe('0.4rem 1rem 0.8rem');
+    expect(chip['background-clip']).toBe('padding-box');
+    const clear = decls('.srch-clear-all');
+    expect(atLeast44(clear['min-height'])).toBe(true);
+    expect(atLeast44(clear['min-width'])).toBe(true);
+    expect(decls('.srch-recent-go')['min-height']).toBe('var(--row-h-1)');
+    const rm = decls('.srch-chip-remove');
+    expect([rm.width, rm.height]).toEqual(['var(--tap)', 'var(--tap)']);
+    const x = decls('.srch-clear-btn');
+    // 48 x 48 (L3, 2026-10-05; e2e:phone T1), overhanging the 44px pill by 2px top and bottom.
+    expect([x.width, x.height]).toEqual(['48px', '48px']);
+    for (const sel of ['.srch-row', '.srch-suggest-item', '.srch-songs-row']) expect(decls(sel)['min-height'], sel).toBe('var(--row-h-1)');
   });
 });
 
 describe('B10 item 2 — a reprint folds under its original as "Also in N places"', () => {
-  it('the row is styled exactly as the more-places row: Cinzel --fs-10 at 0.12em, --gold, 44px, a --gold-border hairline above, the triangle at the right', () => {
+  /* WA3: both rows read in the UI face at the meta size, sentence case, the accent colour, a hairline above. */
+  it('the row is styled exactly as the more-places row: --ts-meta, sentence case, the accent, 44px, a hairline above, the triangle at the right', () => {
     for (const sel of ['.srch-also-toggle', '.srch-places-toggle']) {
       const d = decls(sel);
       expect(atLeast44(d['min-height']), sel).toBe(true);
-      expect(d['font-size'], sel).toBe('var(--fs-10)');
-      expect(d['letter-spacing'], sel).toBe('0.12em');
-      expect(d['text-transform'], sel).toBe('uppercase');
-      expect(d.color, sel).toBe('var(--gold)');
+      expect(d['font-size'], sel).toBe('var(--ts-meta)');
+      expect(d['letter-spacing'], sel).toBe('0');
+      expect(d['text-transform'], sel).toBe('none');
+      expect(d.color, sel).toBe('var(--accent)');
       expect(d['border-top'], sel).toBe('1px solid var(--gold-border)');
+      expect(d['border-top-color'], sel).toBe('var(--hairline)');
       expect(d['justify-content'], sel).toBe('space-between');
     }
   });
@@ -178,74 +208,58 @@ describe('B10 item 2 — a reprint folds under its original as "Also in N places
     expect(item['border-left']).toBe('2px solid var(--gold)');
     // the card's 1.1rem gutter, then 16px in
     expect(item['margin-left']).toBe('calc(1.1rem + 16px)');
+    // WA3: the title reads at the value size in the first text colour, the collection under it recedes to meta / --text-2
     const title = decls('.srch-also-title');
-    expect(title['font-size']).toBe('var(--fs-10)');
-    expect(title.color).toBe('var(--gold)');
+    expect(title['font-size']).toBe('var(--ts-value)');
+    expect(title.color).toBe('var(--text-1)');
     const where = decls('.srch-also-where');
-    // the ladder's floor is --fs-10, so the collection recedes by colour and tracking, not size
-    expect(where['font-size']).toBe('var(--fs-10)');
-    expect(where.color).toBe('var(--gold-dim)');
+    expect(where['font-size']).toBe('var(--ts-meta)');
+    expect(where.color).toBe('var(--text-2)');
   });
 });
 
-describe('B10 item 4 — the order switch stacks at a large Text Size, nothing clipped, no sideways scroll', () => {
-  const AT = '@container srch-filter';
-  it('the order row is a size container and no longer scrolls sideways (BOOK ORDER hid off its edge at 300%)', () => {
-    const row = decls('.srch-filter-row');
-    expect(row.container).toBe('srch-filter / inline-size');
-    expect(row['overflow-x']).toBeUndefined();
+/* WA3: the order switch lives in the count's head now; the srch-filter size container and its stacking
+   @container rule are gone, and so is the srch-corpus container. What still guards "no sideways scroll,
+   nothing scrolled off" is asserted here. */
+describe('B10 item 4 — the order switch and the corpus pills at a large Text Size, no sideways scroll', () => {
+  it('the switch sits in the count\'s head, a flex row with a gap, the count and the switch at either end; no row scrolls sideways', () => {
+    const head = decls('.srch-summary-head');
+    expect(head.display).toBe('flex');
+    expect(head.gap).toBe('8px');
+    expect(head['justify-content']).toBe('space-between');
+    expect(head['overflow-x']).toBeUndefined();
+    expect(decls('.srch-sort').flex).toBe('none');
   });
 
-  it('stacks only when the row cannot hold the switch (about 1.7x on 412px), so 100% is unchanged', () => {
-    const q = RULES.find((r) => r.at.startsWith(AT));
-    expect(q).toBeTruthy();
-    const rem = Number((/max-width:\s*([\d.]+)rem/.exec(q.at) || [])[1]);
-    // the switch is 12.3rem wide at any size (195px at 16px); the 412px row holds 21.9rem at 100%, 18.8 on 360px
-    expect(rem).toBeGreaterThanOrEqual(12.5);
-    expect(rem).toBeLessThanOrEqual(14);
+  it('no label inside the switch breaks mid-word: each half keeps its words on one line', () => {
+    expect(decls('.srch-sort-btn')['white-space']).toBe('nowrap');
   });
 
-  it('stacked: the note on its own line, the switch a full-width column, RELEVANCE over BOOK ORDER split by a hairline', () => {
-    expect(decls('.srch-sort-note', AT)['flex-basis']).toBe('100%');
-    const sort = decls('.srch-sort', AT);
-    expect(sort['flex-direction']).toBe('column');
-    expect(sort.flex).toBe('1 1 100%');
-    expect(sort['border-radius']).toBe('20px');
-    const btn = decls('.srch-sort-btn', AT);
-    expect(btn['white-space']).toBe('normal');
-    expect(btn['text-align']).toBe('center');
-    const second = decls('.srch-sort-btn + .srch-sort-btn', AT);
-    expect(second['border-left']).toBe('none');
-    expect(second['border-top']).toBe('1px solid var(--gold-border)');
+  it('the old stacking container rules are gone, not left to fight the new head', () => {
+    expect(RULES.some((r) => r.at.startsWith('@container srch-filter')), '@container srch-filter').toBe(false);
+    expect(RULES.some((r) => r.at.startsWith('@container srch-corpus')), '@container srch-corpus').toBe(false);
+    expect(decls('.srch-sort-note')).toEqual({});
   });
 
-  it('the row keeps the sides it had at 100% but caps them at 20px, so a stacked label has the width', () => {
-    expect(decls('.srch-filter-row').padding).toBe('4px min(1.2rem, 20px) 0');
-  });
-
-  it('the corpus pills still pair ALL with SCRIPTURES at 300%: px sides and gaps, tracking closed only past 2.6x', () => {
-    const row = decls('.srch-corpus-row');
-    expect(row.container).toBe('srch-corpus / inline-size');
-    expect(row.gap).toBe('6px');
-    expect(decls('.srch-corpus-btn').padding).toBe('0 8px');
-    expect(decls('.srch-corpus-btn', '@container srch-corpus (max-width: 9rem)')['letter-spacing']).toBe('0.06em');
+  it('the corpus pills share the row evenly (flex:1), so ALL, SCRIPTURES and VOLUMES stay on one track', () => {
+    expect(decls('.srch-corpus-row').display).toBe('flex');
+    expect(decls('.srch-corpus-btn').flex).toBe('1');
+    expect(decls('.srch-corpus-row')['overflow-x']).toBeUndefined();
   });
 });
 
-describe('B10 item 5 — the chosen pill is solid antique gold in the light theme', () => {
-  it('a lit corpus pill and a lit order half fill with --gold, their label parchment --bg, their edge --gold', () => {
-    for (const sel of ['body.light .srch-corpus-btn.active', 'body.light .srch-sort-btn.active']) {
-      const d = decls(sel);
-      expect(d.background, sel).toBe('var(--gold)');
-      expect(d.color, sel).toBe('var(--bg)');
-      expect(d['border-color'], sel).toBe('var(--gold)');
-    }
+/* WA3: the lit tab and the lit order half are a raised segment on the track, coloured by tokens that carry the
+   light theme themselves, so the body.light special rule is gone. */
+describe('B10 item 5 — the chosen pill is a raised segment in either theme', () => {
+  it('no body.light rule for a lit corpus pill or a lit order half: the tokens carry the light theme', () => {
+    for (const sel of ['body.light .srch-corpus-btn.active', 'body.light .srch-sort-btn.active']) expect(decls(sel), sel).toEqual({});
   });
 
-  it('the dark theme and the unlit pills are as they were', () => {
-    expect(decls('.srch-corpus-btn.active')).toMatchObject({ background: 'var(--gold-faint)', color: 'var(--gold-bright)', 'border-color': 'var(--gold-dim)' });
-    expect(decls('.srch-sort-btn.active')).toMatchObject({ background: 'var(--gold-faint)', color: 'var(--gold-bright)' });
-    expect(decls('.srch-corpus-btn')).toMatchObject({ background: 'transparent', color: 'var(--cream-muted)' });
+  it('lit: the corpus pill on --surface-3, the order half on --surface-1, both in --text-1; unlit, no fill and --text-2', () => {
+    expect(decls('.srch-corpus-btn.active')).toMatchObject({ 'background-color': 'var(--surface-3)', color: 'var(--text-1)' });
+    expect(decls('.srch-sort-btn.active')).toMatchObject({ 'background-color': 'var(--surface-1)', color: 'var(--text-1)' });
+    expect(decls('.srch-corpus-btn')).toMatchObject({ background: 'none', color: 'var(--text-2)' });
+    expect(decls('.srch-sort-btn')).toMatchObject({ background: 'none', color: 'var(--text-2)' });
   });
 
   it('the scope chip, a full-width band and not a pill, keeps its own lit state', () => {
@@ -259,23 +273,25 @@ describe('B10 item 6 — group headers pin under the search bar while their own 
     expect(h.position).toBe('sticky');
     expect(h.top).toBe('0');
     expect(Number(h['z-index'])).toBeGreaterThanOrEqual(2);
-    // under the suggestions, which drop over the results
-    expect(Number(h['z-index'])).toBeLessThan(Number(decls('.srch-suggest-anchor')['z-index']));
+    // WA3: the suggestions no longer drop over the results (they sit in the flow above them), so no header
+    // can paint over them: neither the anchor nor the list is positioned out of the flow.
+    expect(decls('.srch-suggest-anchor').position).toBeUndefined();
+    expect(decls('.srch-suggest').position).toBeUndefined();
   });
 
-  it('its band is solid --bg2, closed by a --gold-border hairline while the group is open', () => {
-    expect(decls('.srch-group-header').background).toBe('var(--bg2)');
-    expect(decls('.srch-group:not(.collapsed) > .srch-group-h')['border-bottom']).toBe('1px solid var(--gold-border)');
+  it('its band is solid (--surface-1, --surface-2 while open among others), each card under it parted by a hairline', () => {
+    expect(decls('.srch-group-header').background).toBe('var(--surface-1)');
+    expect(decls('.srch-group:not(:only-of-type):not(.collapsed) > .srch-group-h > .srch-group-header').background).toBe('var(--surface-2)');
+    expect(decls('.srch-group-items > *')['border-top']).toBe('1px solid var(--hairline)');
   });
 
-  it('the "show more" row stays a centred 44px Cinzel --fs-10 gold row with a hairline below', () => {
+  it('the "show more" row is a one-line 54px row in the accent, a hairline above it', () => {
     const m = decls('.srch-group-more');
-    expect(m['min-height']).toBe('44px');
-    expect(m['text-align']).toBe('center');
-    expect(m['font-size']).toBe('var(--fs-10)');
-    expect(m['letter-spacing']).toBe('0.12em');
-    expect(m.color).toBe('var(--gold)');
-    expect(m['border-bottom']).toBe('1px solid var(--gold-border)');
+    expect(m['min-height']).toBe('var(--row-h-1)');
+    expect(m['text-align']).toBe('left');
+    expect(m['font-size']).toBe('var(--ts-value)');
+    expect(m.color).toBe('var(--accent)');
+    expect(m['border-top']).toBe('1px solid var(--hairline)');
   });
 
   it('the results end clear of the system nav bar, so the last group\'s "show more" row takes a tap', () => {
