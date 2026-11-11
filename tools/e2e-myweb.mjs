@@ -438,7 +438,10 @@ async function makeLink(page, route, verseIdx, ref) {
   await input.click({ clickCount: 3 });
   await input.type(ref, { delay: 20 });
   await sleep(700);
-  await page.keyboard.press('Enter');
+  // MERGE3: the picker lists its matches and a person taps one (Enter on the field picks nothing); the first
+  // row under "Titles and places" is the reference typed.
+  const row = await page.waitForSelector('.navpick-sheet .navpick-row', { visible: true, timeout: 8000 });
+  await row.click();
   await sleep(900);
   await clickIfPresent(page, 'Done'); await clickIfPresent(page, 'Close');
   await sleep(300);

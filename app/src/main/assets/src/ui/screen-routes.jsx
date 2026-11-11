@@ -1031,7 +1031,9 @@ export function buildScreenRoutes({
       onOpenGroup={_openAnswersGroup}
       onOpenMedia={() => setScreen('answers-media')}
       onOpenSaved={() => setScreen('answers-saved')}
-      onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+      /* Search switched off hides every door into Search (Settings: "Off hides the search button everywhere"),
+         the find boxes' "Search the whole library" rows too; Answers' own topic finder stays. */
+      onSearchLibrary={settings.searchEnabled !== false ? (q) => { setSearchQuery(q); goSearch(); } : undefined}
       onOpenLetter={(target) => openInAppLetter(target, { sourceLetterTitle: 'Answers', sourceVolumeLabel: null })}
       onGoToRef={(ref) => {
         const m = /^Exodus 20:(\d+)$/.exec(ref);
@@ -1192,7 +1194,7 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
         onAbout={goAbout}
-        onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+        onSearchLibrary={settings.searchEnabled !== false ? (q) => { setSearchQuery(q); goSearch(); } : null}
         onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
         onOpenGarden={() => handleVolumeSelect('garden')}
         onOpenProgress={() => { setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('my-progress'); }}

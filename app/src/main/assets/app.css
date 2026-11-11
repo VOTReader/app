@@ -3041,6 +3041,10 @@
     .hero .hero-play-pill.letter-sung-pill { background: var(--surface-1); color: var(--text-1); }
     .hero .hero-play-pill.letter-sung-pill svg { color: var(--accent); }
     @media (hover: hover) { .hero .hero-play-pill:hover { transform: none; filter: brightness(1.06); } }
+    /* MERGE3: at large text on a narrow phone "Listen · 1 min" ran past both screen edges (nowrap, 334 px in a
+       275 px row at text 3, 320 px): the pills keep inside their row and wrap their words there. */
+    .hero .letter-listen-row .hero-play-pill { max-width: 100%; }
+    .vot-large-text .hero .letter-listen-row .hero-play-pill { white-space: normal; text-align: center; line-height: 1.2; padding-block: 6px; }
     .hero + .page-wrapper:has(> .letter-meta:first-child) { padding-top: 0; }
     .hero + .page-wrapper > .letter-meta:first-child { border-top: 1px solid var(--hairline); padding-top: 14px; }
     .meta-date { font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; color: var(--text-2); margin-bottom: 0.15rem; }
