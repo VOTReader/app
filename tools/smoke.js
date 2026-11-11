@@ -615,6 +615,8 @@
       if (help && !document.querySelector('[data-settings-group="help"].open')) { help.click(); await sleep(200); }
       if (!clickByText(/About VOTReader/)) return false;
       await sleep(400);
+      // WS3 settings (ab-credits): About from Settings keeps the credits on their own page, one row down.
+      if (clickByText(/^Credits and privacy\s*$/)) await sleep(400);
       const credit = document.querySelector('.about-credit');
       const text = (credit && credit.textContent) || '';
       return /OpenBible\.info/.test(text) && /CC-BY/.test(text);

@@ -105,7 +105,7 @@ function AboutHome({ onBack, onYourData }) {
             </div>
             {/* CC-BY obligation for the Scripture Web's cross-reference dataset (AboutScreen.test.jsx pins the first-run copy). */}
             <SectionLabel>Scripture cross-references</SectionLabel>
-            <div className="ui-card ws3-credit">
+            <div className="ui-card ws3-credit about-credit">
               <p className="ws3-credit-title"><a className="ws3-credit-link" href="https://www.openbible.info/labs/cross-references/" target="_blank" rel="noopener noreferrer">OpenBible.info</a></p>
               <p className="ws3-credit-text">Cross-reference data, used under CC-BY.</p>
             </div>
