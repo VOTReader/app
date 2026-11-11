@@ -7541,24 +7541,6 @@
     .sw-goto.is-compact .sw-goto-list {
       flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 4px;
     }
-    .sw-goto-row {
-      display: flex; align-items: baseline; height: 48px; padding: 0 14px; border-radius: 8px;
-      white-space: nowrap; overflow: hidden; cursor: pointer; font-size: var(--fsc-18); line-height: 48px; color: var(--sw-text);
-    }
-    .sw-goto.is-compact .sw-goto-row { height: 44px; line-height: 44px; font-size: var(--fsc-16); }
-    .sw-goto-row.is-sel { background: var(--sw-hairline); }
-    .sw-goto-ref, .sw-goto-sub { flex: none; }
-    /* each part is a flex item, whose leading space would collapse ("John 3· whole chapter") */
-    .sw-goto-sub, .sw-goto-text { white-space: pre; }
-    .sw-goto-text {
-      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-      font-size: var(--fsc-16); color: var(--sw-text-meta);
-    }
-    .sw-goto.is-compact .sw-goto-text { font-size: var(--fsc-14); }
-    .sw-goto-hint {
-      margin: 6px 24px 0; padding: 12px 0 14px; border-top: 1px solid var(--sw-control-border);
-      font-size: var(--fsc-16); color: var(--sw-text-muted);
-    }
     .sw-goto.is-compact .sw-goto-hint { margin: 4px 18px 0; padding: 8px 0 10px; font-size: var(--fsc-14); }
     .sw-goto-list + .sw-goto-hint { margin-top: 6px; }
     .sw-goto-chip, .sw-goto-edge {
@@ -7807,8 +7789,6 @@
     .sw-link-quiet { color: var(--sw-text-meta); }
     /* CITED IN THE VOLUMES: a 2 px gold rule, 14 px in */
     .sw-cites { list-style: none; margin: 0; padding: 0; }
-    .sw-cite { margin-top: 8px; padding-left: 14px; border-left: 2px solid var(--sw-cite-rule); }
-    .sw-cite:first-child { margin-top: 0; }
     .sw-cite-title { font-size: calc(var(--fsc-18) * var(--sw-ts)); font-style: italic; line-height: 1.25; color: var(--sw-title); }
     .sw-cite-source { margin-top: 1px; font-size: calc(var(--fsc-14) * var(--sw-ts)); line-height: 1.3; color: var(--sw-text-muted); }
     .sw-cite-quote { margin: 2px 0 0; font-size: calc(var(--fsc-16) * var(--sw-ts)); line-height: 1.4; color: var(--sw-text-body); }
@@ -7828,17 +7808,9 @@
     .sw-panel-empty, .sw-list-empty { margin: 8px 0; font-size: calc(var(--fsc-15) * var(--sw-ts)); color: var(--sw-text-muted); }
     /* MORE FROM: one 44 px header per book with a chevron, its rows under a gold rule */
     .sw-groups { list-style: none; margin: 0; padding: 0; }
-    .sw-group-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      width: 100%; min-height: 44px; padding: 0; background: none; border: 0; text-align: left;
-      font-family: var(--sw-font); font-size: calc(var(--fsc-20) * var(--sw-ts)); color: var(--sw-text); cursor: pointer;
-    }
-    .sw-group .sw-rows { padding-left: 14px; border-left: 2px solid var(--sw-cite-rule); }
-    .sw-group > .sw-more { margin-left: 16px; }
     /* THE ROW (connection-row.jsx), every list's: the reference, its tag, a one-line preview, and
        [Open] [Follow] on the right; hover or focus lights its thread on the web */
     .sw-rows { list-style: none; margin: 0; padding: 0; }
-    .sw-choice-list { display: grid; gap: 2px; margin-top: 12px; }
     .sw-row { display: flex; align-items: center; gap: 12px; min-height: 56px; border-radius: 6px; }
     .sw-row:hover, .sw-row:focus-within, .sw-row.is-on { background: var(--sw-active-fill); }
     .sw-row-main {
@@ -8548,6 +8520,114 @@
     .sw-guide-again { font-family: var(--font-ui); font-size: var(--fsc-13); color: var(--sw-text-muted); }
     .sw-root .sw-guide .sw-guide-close { margin: 0; min-height: 40px; padding: 0 22px; border: 0; border-radius: 20px; background: var(--sw-gold); color: #1a1608; font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 600; }
     /* ── end WA4 web ── */
+    /* ── WA5 web: the Scripture Web's sheets to the v2 pictures (mock web.html w-goto, w-focus, w-pick, w-conn).
+       The chrome only, dark in both themes as the web's always is; the drawing is untouched. ── */
+    /* Go to: a gold-ringed field with its clear; the chapter row first with its book mark, verses with their
+       words in italics under them, a chevron on each */
+    .sw-root .sw-goto { background: var(--sw-glass); border-color: rgba(255, 255, 255, 0.08); border-radius: 18px; }
+    .sw-root .sw-goto-field { height: 48px; margin: 10px 10px 4px; padding: 0 0 0 16px; border: 1.5px solid var(--sw-gold); border-radius: 24px; }
+    .sw-root .sw-goto.is-compact .sw-goto-field { height: 48px; margin: 6px 6px 2px; padding: 0 0 0 14px; }
+    .sw-root .sw-goto-icon { color: var(--sw-title); }
+    .sw-goto-clear { flex: none; width: 48px; height: 48px; display: grid; place-items: center; margin: -1.5px -1.5px -1.5px 0; padding: 0; border: 0; border-radius: 24px; background: none; color: var(--sw-text-meta); cursor: pointer; }
+    .sw-goto-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -4px; }
+    .sw-goto-row {
+      display: flex; align-items: center; gap: 12px; min-height: 56px; box-sizing: border-box; padding: 6px 8px 6px 10px;
+      border-radius: 10px; cursor: pointer; color: var(--sw-text);
+    }
+    .sw-goto-row + .sw-goto-row { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+    .sw-goto-row.is-sel { background: var(--sw-active-fill); border-top-color: transparent; }
+    .sw-goto-row.is-sel + .sw-goto-row { border-top-color: transparent; }
+    .sw-goto.is-compact .sw-goto-row { min-height: 50px; padding: 4px 6px 4px 8px; }
+    .sw-goto-mark { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--sw-gold); }
+    .sw-goto-row.is-whole .sw-goto-mark { background: rgba(255, 255, 255, 0.07); }
+    .sw-goto-lines { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .sw-goto-ref { font-size: var(--fsc-18); line-height: 1.25; color: var(--sw-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sw-goto-sub { font-family: var(--font-ui); font-size: var(--fsc-13); line-height: 1.3; color: var(--sw-text-meta); }
+    .sw-goto-text { font-size: var(--fsc-15); line-height: 1.35; font-style: italic; color: var(--sw-text-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sw-goto.is-compact .sw-goto-ref { font-size: var(--fsc-16); }
+    .sw-goto.is-compact .sw-goto-text { font-size: var(--fsc-14); }
+    .sw-goto-chev { flex: none; color: var(--sw-text-muted); }
+    .sw-goto-row.is-sel .sw-goto-chev { color: var(--sw-gold); }
+    .sw-goto-hint { margin: 6px 24px 0; padding: 12px 0 14px; font-family: var(--font-ui); font-size: var(--fsc-13); color: var(--sw-text-muted); }
+    /* every card's overline: the 12 px gold section label */
+    .sw-panel .sw-panel-over { font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0.12em; color: var(--sw-gold); }
+    /* a chapter in focus: its one gold button beside the head */
+    .sw-panel-head.has-action { display: flex; align-items: flex-start; gap: 12px; }
+    .sw-panel-head-words { flex: 1 1 auto; min-width: 0; }
+    .sw-open-gold {
+      flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 4px; padding: 0 18px;
+      border: 0; border-radius: 22px; background: var(--sw-gold); color: #1a1608; cursor: pointer;
+      font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 600; white-space: nowrap;
+    }
+    .sw-open-gold:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 3px; }
+    .sw-act-icon { flex: none; }
+    /* CONNECTIONS BY BOOK, "Strongest first" at its right; each book a card of rows */
+    .sw-sec.sw-sec-books { border-top: 0; }
+    .sw-sec-books .sw-sec-title { flex: 1 1 auto; font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0.12em; color: var(--sw-gold); }
+    .sw-sec-split { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .sw-sec-note { font-size: var(--fsc-13); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--sw-text-meta); }
+    .sw-groups { display: grid; gap: 8px; }
+    .sw-group { border-radius: 12px; background: rgba(255, 255, 255, 0.045); overflow: hidden; }
+    .sw-group-head {
+      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px 0 14px; background: none; border: 0;
+      text-align: left; font-family: var(--sw-font); font-size: calc(var(--fsc-18) * var(--sw-ts)); color: var(--sw-title); cursor: pointer;
+    }
+    .sw-group .sw-group-head:focus-visible { outline-offset: -2px; border-radius: 12px; }
+    .sw-group-title { flex: 1 1 auto; min-width: 0; }
+    .sw-group-count { flex: none; font-family: var(--font-ui); font-size: var(--fsc-14); color: var(--sw-text-meta); }
+    .sw-group .sw-chev { transform: rotate(90deg); }
+    .sw-group .sw-chev.is-open { transform: rotate(-90deg); }
+    .sw-group .sw-row, .sw-choice .sw-choice-list .sw-row { border-radius: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+    .sw-group .sw-row-main { padding: 7px 8px 7px 14px; }
+    .sw-group > .sw-more { margin: 2px 14px 8px; }
+    .sw-panel .sw-row-tag { font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-panel :is(.sw-row-text-go, .sw-row-quote) { font-style: italic; }
+    /* threads where the reader tapped: one card of rows */
+    .sw-choice-list { display: grid; margin-top: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.045); overflow: hidden; }
+    .sw-choice .sw-choice-list .sw-row:first-child { box-shadow: none; }
+    /* one connection: each end a card with its two worded buttons; the trail names the card */
+    .sw-verse.is-card { padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.045); }
+    .sw-verse.is-card .sw-verse-ref { font-size: calc(var(--fsc-18) * var(--sw-ts)); color: var(--sw-title); }
+    .sw-verse.is-card .sw-verse-text { font-size: calc(var(--fsc-16) * var(--sw-ts)); }
+    .sw-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .sw-act {
+      position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 14px 0 12px;
+      border: 0; border-radius: 19px; background: rgba(255, 255, 255, 0.07); color: var(--sw-title); cursor: pointer;
+      font-family: var(--font-ui); font-size: var(--fsc-14); font-weight: 500;
+    }
+    .sw-act::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+    .sw-act .sw-act-icon { color: var(--sw-gold); }
+    .sw-act:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-trail-aside { color: var(--sw-title); white-space: nowrap; }
+    /* a card docked open on the phone: the bar's pills keep their marks and names but not their words, and the
+       key keeps only the CC-BY credit (the licence's), so the credit reads in at most two lines and the key
+       stays about 30 px tall (the canvas keeps its text above it) */
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-wpills .sw-btn { width: 40px; padding: 0; gap: 0; justify-content: center; font-size: 0; }
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-wpills .sw-wpill-count { position: absolute; top: -4px; right: -4px; }
+    .sw-root.sw-panel-open .sw-wbot .sw-legend-count { display: none; }
+    /* where the Volumes cite it: each passage a card with worded buttons */
+    .sw-cites { display: grid; gap: 8px; }
+    .sw-cite { padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.045); }
+    .sw-panel .sw-cite-source { font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-cite .sw-acts { align-items: center; }
+    /* List (was Nearby): In view, the chapter at the centre as a card, its strongest threads as one card of rows */
+    .sw-inview-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; }
+    .sw-inview-head .sw-panel-title { margin: 0; font-size: calc(var(--fsc-20) * var(--sw-ts)); }
+    .sw-inview-head .sw-panel-meta { margin: 0; font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-inview-chapter {
+      display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; margin-top: 12px; padding: 8px 12px;
+      box-sizing: border-box; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.045); color: inherit;
+      text-align: left; font-family: var(--sw-font); cursor: pointer;
+    }
+    .sw-inview-chapter:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-inview-mark { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, 0.07); color: var(--sw-gold); }
+    .sw-inview-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .sw-inview-chapter .sw-row-ref { color: var(--sw-title); }
+    .sw-inview-chapter .sw-row-text { font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-list .sw-sec .sw-choice-list { margin-top: 0; }
+    .sw-list .sw-choice-list .sw-row { border-radius: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+    .sw-list .sw-choice-list .sw-row:first-child { box-shadow: none; }
+    /* ── end WA5 web ── */
 
       /* ══════════════════════════════════════════════════════════════════
          "Show me around" — the tour (review-tutorial, 2026-09-04)

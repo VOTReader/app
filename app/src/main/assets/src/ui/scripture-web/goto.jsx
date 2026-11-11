@@ -57,7 +57,15 @@ import { WHOLE_WEB } from '../../utils/scripture-web/describe.js';
  */
 
 /** The hint under the rows (spec 4.5). */
-export const GOTO_HINT = 'Try “Isaiah 53”, “Romans”, “Gen 1:1”';
+export const GOTO_HINT = 'Type a book, a chapter or a verse';
+
+/** The go-to's mark on a whole chapter or book row (WA5, w-goto): an open book. */
+const BOOK_ICON = (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6"
+    strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 6.5C10.3 5.2 7.9 4.8 4 5v13c3.9-.2 6.3.2 8 1.5 1.7-1.3 4.1-1.7 8-1.5V5c-3.9-.2-6.3.2-8 1.5z" /><path d="M12 6.5v13" />
+  </svg>
+);
 /** At most this many rows: PC, and the phone (its keyboard takes the rest). */
 export const GOTO_ROWS = 5;
 export const GOTO_ROWS_COMPACT = 3;
@@ -660,16 +668,31 @@ export function useGoTo(web) {
           aria-activedescendant={selAt >= 0 ? optId(selAt) : undefined}
           autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go"
           onChange={(e) => { setQuery(e.target.value); setSel(0); }} onKeyDown={onInputKey} />
+        {/* WA5 (w-goto): the field's clear, as the app's other search fields have */}
+        {query ? (
+          <button type="button" className="sw-goto-clear" aria-label="Clear" onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setQuery(''); setSel(0); if (inputRef.current) inputRef.current.focus(); }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M17 7L7 17M7 7l10 10" /></svg>
+          </button>
+        ) : null}
       </div>
       {rows.length ? (
         <ul id="sw-goto-list" className="sw-goto-list" role="listbox" aria-label="Places">
           {rows.map((row, k) => (
+            // WA5 (w-goto): two lines, a book mark on a whole chapter or book, the verse's words in
+            // italics under its reference, a chevron; the option's name keeps the words apart
             <li key={row.key} id={optId(k)} role="option" aria-selected={k === selAt}
-              className={'sw-goto-row' + (k === selAt ? ' is-sel' : '')}
+              aria-label={row.label + (row.sub ? ', ' + row.sub : '') + (row.text ? ', ' + row.text : '')}
+              className={'sw-goto-row' + (k === selAt ? ' is-sel' : '') + (row.sub ? ' is-whole' : '')}
               onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setSel(k)} onClick={() => choose(row)}>
-              <span className="sw-goto-ref">{row.label}</span>
-              {row.sub ? <span className="sw-goto-sub">{' · ' + row.sub}</span> : null}
-              {row.text ? <span className="sw-goto-text">{' — ' + row.text}</span> : null}
+              <span className="sw-goto-mark" aria-hidden="true">{row.sub ? BOOK_ICON : null}</span>
+              <span className="sw-goto-lines">
+                <span className="sw-goto-ref">{row.label}</span>
+                {row.sub ? <span className="sw-goto-sub">{row.sub.charAt(0).toUpperCase() + row.sub.slice(1)}</span> : null}
+                {row.text ? <span className="sw-goto-text">{row.text}</span> : null}
+              </span>
+              <svg className="sw-goto-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </li>
           ))}
         </ul>

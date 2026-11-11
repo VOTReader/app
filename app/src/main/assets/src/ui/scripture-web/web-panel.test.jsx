@@ -136,7 +136,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(panel.getAttribute('role')).toBe('dialog');
     expect(panel.getAttribute('aria-modal')).toBe('false');
     expect(panel.getAttribute('data-mode')).toBe('connection');
-    expect(panel.querySelector('.sw-panel-over').textContent).toBe('Connection');
+    expect(panel.querySelector('.sw-panel-over'), 'WA5 (w-conn): no overline; the trail names the card').toBeNull();
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('Isaiah 7:14 ↔ Matthew 1:23');
     expect(panel.querySelector('.sw-panel-meta').textContent).toMatch(/^183 votes · [\d,]+ verses apart$/);
   });
@@ -172,9 +172,9 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     fireEvent.click(open[0]);
     expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ type: 'bible', bookId: 'isaiah', chapter: 7, verse: 14 }));
     // the far end named, its name the words it shows (w3 review), one wording on PC and phone (w4)
-    const follow = byLabel(/^Follow to Matthew 1:23$/);
+    const follow = byLabel(/^See its threads: Matthew 1:23$/);
     expect(follow).toHaveLength(1);
-    expect(follow[0].textContent).toBe('Follow to Matthew 1:23 ›');
+    expect(follow[0].textContent).toBe('See its threads') // WA5 (w-conn): worded, named with its verse;
     expect(panel.textContent).not.toContain('Follow to the other end');
     fireEvent.click(follow[0]);
     expect(props.followThread).toHaveBeenCalledWith(expect.objectContaining({ index: ARC, far: 'to' }));
@@ -182,10 +182,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
 
   it('compact, Follow is the same words, its name the words it shows, on the row with "Open in reader" (w4)', () => {
     const { panel, byLabel, props } = mount({ detail: detail(), compact: true });
-    const follow = byLabel(/^Follow to Matthew 1:23$/);
+    const follow = byLabel(/^See its threads: Matthew 1:23$/);
     expect(follow).toHaveLength(1);
-    expect(follow[0].textContent).toBe('Follow to Matthew 1:23 ›');
-    expect(follow[0].parentElement.querySelector('.sw-link').textContent).toMatch(/^Open in reader/);
+    expect(follow[0].textContent).toBe('See its threads') // WA5 (w-conn): worded, named with its verse;
+    expect(follow[0].parentElement.querySelector('.sw-act').textContent).toMatch(/^Open in reader/);
     fireEvent.click(follow[0]);
     expect(props.followThread).toHaveBeenCalledWith(expect.objectContaining({ index: ARC, far: 'to' }));
     expect(panel.textContent).not.toContain('Follow to the other end');
@@ -194,7 +194,8 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
   it('two citations show before "Show n more", as r2-02 shows them, so More from begins on the first screen (w4)', () => {
     expect(CITED_SHOWN).toBe(2);
     const { panel } = mount({ detail: detail() });
-    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-cited .sw-sec-title').textContent)[1]);
+    // WA5 (w-cited): the head reads "Cited in the Volumes" and "n places"; its name keeps "· n"
+    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-cited .sw-sec-toggle').getAttribute('aria-label'))[1]);
     expect(n).toBeGreaterThan(2);
     expect(panel.querySelector('.sw-sec-cited .sw-more').textContent).toBe('Show ' + (n - 2) + ' more');
   });
@@ -235,14 +236,15 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
 
   it('CITED IN THE VOLUMES: each entry with its letter, collection and "Open letter" at the citing place', () => {
     const { panel, byLabel, props } = mount({ detail: detail() });
-    const head = panel.querySelector('.sw-sec-cited .sw-sec-title').textContent;
+    const head = panel.querySelector('.sw-sec-cited .sw-sec-toggle').getAttribute('aria-label');
     const n = Number(/· (\d+)$/.exec(head)[1]);
+    expect(panel.querySelector('.sw-sec-cited .sw-sec-title').textContent).toBe('Cited in the Volumes' + n + (n === 1 ? ' place' : ' places'));
     expect(n).toBeGreaterThan(0);
     const cites = panel.querySelectorAll('.sw-cite');
     expect(cites.length).toBe(Math.min(n, CITED_SHOWN));
     for (const c of cites) {
       expect(c.querySelector('.sw-cite-title').textContent.length).toBeGreaterThan(0);
-      expect(c.querySelector('.sw-cite-source').textContent).toMatch(/ · (Isaiah 7:14|Matthew 1:23)/);
+      expect(c.querySelector('.sw-cite-source').textContent).toMatch(/ · cites (Isaiah 7:14|Matthew 1:23)/);
     }
     const letters = byLabel(/ where it cites /);
     expect(letters.length).toBe(cites.length);
@@ -481,7 +483,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     const d = detail();
     const { panel, props } = mount({ detail: d });
     const follows = [...panel.querySelectorAll('.sw-verses .sw-follow')];
-    expect(follows.map((f) => f.getAttribute('aria-label'))).toEqual(['Follow to Isaiah 7:14', 'Follow to Matthew 1:23']);
+    expect(follows.map((f) => f.getAttribute('aria-label'))).toEqual(['See its threads: Isaiah 7:14', 'See its threads: Matthew 1:23']);
     fireEvent.click(follows[0]);
     const asked = props.followThread.mock.calls[0][0];
     expect(asked.far === 'to' ? asked.to : asked.from, 'the end the button names').toBe(ISA_7_14);
@@ -489,7 +491,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     const atIsaiah = journeyOf(walked([g.to[ARC], 'Matthew 1:23'], [ISA_7_14, 'Isaiah 7:14', ARC]));
     const two = mount({ detail: d, journey: atIsaiah });
     expect([...two.panel.querySelectorAll('.sw-verses .sw-follow')].map((f) => f.getAttribute('aria-label')))
-      .toEqual(['Follow to Matthew 1:23']);
+      .toEqual(['See its threads: Matthew 1:23']);
   });
 
   it('a card opened from another card shows its Back link', () => {
@@ -687,8 +689,10 @@ describe('group mode: a chapter', () => {
     expect(panel.getAttribute('data-mode')).toBe('group');
     expect(panel.querySelector('.sw-panel-over').textContent).toBe('Chapter');
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('Isaiah 7');
-    expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · 65');
-    expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^from Isa 7:\d+$/);
+    // WA5 (w-focus): "Connections by book" with "Strongest first" at its right; each row its votes too
+    expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections by bookStrongest first');
+    expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^from Isa 7:\d+ · \d+ votes?$/);
+    expect(panel.querySelector('.sw-open-gold').textContent).toBe('Open Isaiah 7');
     const zoom = byText(/^Zoom to Isaiah 7$/);
     expect(zoom).toHaveLength(1);
     fireEvent.click(zoom[0]);
@@ -702,7 +706,7 @@ describe('the chooser at overview', () => {
     const choices = ids.map(arcOf).reverse();
     const { panel, byText, props } = mount({ choices });
     expect(panel.classList.contains('sw-choice')).toBe(true);
-    expect(panel.querySelector('.sw-panel-title').textContent).toBe('5 threads close together');
+    expect(panel.querySelector('.sw-panel-title').textContent).toBe('5 threads meet here') // WA5 (w-pick);
     expect(panel.querySelector('.sw-panel-meta').textContent).toMatch(/Strongest first/);
     const rows = [...panel.querySelectorAll('.sw-choice-row')];
     expect(rows).toHaveLength(5);
@@ -724,12 +728,13 @@ describe('the chooser at overview', () => {
     const isaiah7 = g.chapterOfVerse[ISA_7_14];
     const tapped = mount({ choices, choiceChapter: isaiah7 });
     expect(quotes(tapped.panel)).toHaveLength(5);
-    for (const q of quotes(tapped.panel)) expect(q, 'the end away from Isaiah 7').not.toMatch(/^Isaiah 7:/);
-    for (const q of quotes(tapped.panel)) expect(q).toMatch(/^\S.* TEXT \S+ \d+:\d+$/);
+    // WA5 (w-pick): the words alone (the row's title names both ends)
+    for (const q of quotes(tapped.panel)) expect(q, 'the end away from Isaiah 7').not.toMatch(/^TEXT isaiah 7:/);
+    for (const q of quotes(tapped.panel)) expect(q).toMatch(/^TEXT \S+ \d+:\d+$/);
     cleanup();
     const untapped = mount({ choices });
     const later = strongestFirst(choices).map((c) => (c.from <= c.to ? c.b : c.a).label);
-    expect(quotes(untapped.panel).map((q) => q.split(' TEXT ')[0])).toEqual(later);
+    expect(quotes(untapped.panel).map((q) => q.replace(/^TEXT \S+ /, ''))).toEqual(later.map((l) => l.replace(/^.* /, '')));
   });
 
   it('"Zoom to" names the chapter the reader tapped when the tap is known (w3 review)', () => {
@@ -747,8 +752,9 @@ describe('the chooser at overview', () => {
     const ids = [ARC, ...pm.threadsFrom(g, ISA_7_14, ISA_7_14, 'famous').ids.slice(0, 7)];
     const { panel } = mount({ choices: ids.map(arcOf), choiceCut: true });
     expect(panel.querySelectorAll('.sw-choice-row')).toHaveLength(8);
-    expect(panel.querySelector('.sw-panel-title').textContent).toBe('The 8 nearest threads');
-    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('Choose the one you meant. Strongest first, by readers’ votes.');
+    // WA5 (w-pick): the picture's head; the meta still says these are the nearest
+    expect(panel.querySelector('.sw-panel-title').textContent).toBe('8 threads meet here');
+    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('The nearest 8. Pick the one you meant. Strongest first, by readers’ votes.');
   });
 
   it('lights nothing on My Web (the reader\'s own links have no lit set)', () => {

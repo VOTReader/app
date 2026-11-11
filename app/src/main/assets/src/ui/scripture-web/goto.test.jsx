@@ -123,7 +123,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
 
 const box = (c) => c.querySelector('.sw-goto');
 const input = (c) => /** @type {HTMLInputElement} */ (c.querySelector('.sw-goto-input'));
-const rowTexts = (c) => Array.from(c.querySelectorAll('.sw-goto-row')).map((r) => r.textContent);
+const rowTexts = (c) => Array.from(c.querySelectorAll('.sw-goto-row')).map((r) => r.getAttribute('aria-label')); // WA5: the rows are two lines; their names keep the words apart
 
 describe('the go-to box (spec 4.5)', () => {
   it('the search button opens it, with the keyboard in it and the hint under it; nothing typed, no rows', () => {
@@ -142,7 +142,7 @@ describe('the go-to box (spec 4.5)', () => {
     fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
     const rows = rowTexts(container);
     expect(rows[0]).toBe('Genesis 1:1');
-    expect(rows[rows.length - 1]).toBe('Genesis 1 · whole chapter');
+    expect(rows[rows.length - 1]).toBe('Genesis 1, whole chapter');
     expect(rows.length).toBeLessThanOrEqual(5);
     const sel = () => Array.from(container.querySelectorAll('.sw-goto-row')).findIndex((r) => r.classList.contains('is-sel'));
     expect(sel()).toBe(0);
@@ -211,7 +211,7 @@ describe('the go-to box (spec 4.5)', () => {
     fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
     expect(rowTexts(container)[0], 'no corpus yet: the reference alone').toBe('Genesis 1:1');
     act(() => { loaded = true; version = 1; for (const cb of subs) cb(); });
-    expect(rowTexts(container)[0]).toBe('Genesis 1:1 — In the beginning');
+    expect(rowTexts(container)[0]).toBe('Genesis 1:1, In the beginning');
   });
 
   it('Enter on a verse: the box closes, the camera frames it, its threads light, verse mode opens, the chip names it', async () => {
@@ -408,7 +408,7 @@ describe('the go-to box (spec 4.5)', () => {
   it('Enter on a chapter frames it at about 70 % with its group open; on a book, the book fills the frame', async () => {
     const { container, get } = mountWeb();
     act(() => { get().goTo.open('Genesis 1'); });
-    expect(rowTexts(container)[0]).toBe('Genesis 1 · whole chapter');
+    expect(rowTexts(container)[0]).toBe('Genesis 1, whole chapter');
     fireEvent.keyDown(input(container), { key: 'Enter' });
     expect(get().sel.detail).toMatchObject({ kind: 'chapter', chapterIndex: 0 });
     settle(); await flush();
@@ -426,7 +426,7 @@ describe('the go-to box (spec 4.5)', () => {
     g.chapterOfVerse = new Uint16Array(TOTAL).map((_, v) => (v < 15550 ? 0 : v < 15552 ? 1 : 2));
     const { container, get } = mountWeb({ web: g, cam: { x: 3000, ppv: 1 } });
     act(() => { get().goTo.open('Genesis 2'); });
-    expect(rowTexts(container)[0]).toBe('Genesis 2 · whole chapter');
+    expect(rowTexts(container)[0]).toBe('Genesis 2, whole chapter');
     fireEvent.keyDown(input(container), { key: 'Enter' });
     settle(); await flush();
     const cam = get().cam.camRef.current;
@@ -610,7 +610,7 @@ describe('Back puts the panel back as it was', () => {
     fireEvent.keyDown(input(container), { key: 'Enter' });
     settle(); await flush();
     act(() => { get().goTo.open('Genesis'); });
-    expect(rowTexts(container)[0]).toBe('Genesis · whole book');
+    expect(rowTexts(container)[0]).toBe('Genesis, whole book');
     fireEvent.keyDown(input(container), { key: 'Enter' });
     settle(); await flush();
     expect(get().sel.panel, 'a book opens no panel').toBeNull();

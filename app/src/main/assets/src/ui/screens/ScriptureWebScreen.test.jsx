@@ -508,8 +508,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection sheet opened').toBeTruthy();
       // a line is a fork in the road (2026-11-03): either end is a way on
-      expect(screen.getByRole('button', { name: /^follow to genesis 2:552$/i })).toBeTruthy();
-      const follow = screen.getByRole('button', { name: /^follow to genesis 2:5101$/i });
+      expect(screen.getByRole('button', { name: /^see its threads: genesis 2:552$/i })).toBeTruthy();
+      const follow = screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i });
       /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
          the camera is read once the fly has landed (it once jumped, and one frame was enough). */
       const landsAt = async (x) => {
@@ -547,7 +547,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         }
         expect(lastCamX()).toBeCloseTo(x, 1);
       };
-      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i }));
       await landsAt(20100.5);
       expect(container.querySelectorAll('.sw-trail-stops li'), 'home, then here').toHaveLength(2);
       fireEvent.click(container.querySelector('.sw-trail .sw-trail-btn'));
@@ -579,7 +579,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         const view = await mount({}, threaded);
         for (let i = 0; i < 40; i++) await pressFrame('+');
         await pickNearby();
-        fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^see its threads: genesis 2:5101$/i }));
         await landsAt(20100.5);
         return view;
       };
@@ -1336,13 +1336,14 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     const list = container.querySelector('.sw-list');
     expect(list, 'the list opened').toBeTruthy();
     expect(list.getAttribute('data-lens-on')).toBe('0');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
+    // WA5 (w-near): List is "In view": the chapter at the centre as a card, then its strongest threads
+    expect(list.querySelector('.sw-panel-title').textContent).toBe('In view');
+    expect(list.querySelector('.sw-panel-meta').textContent).toMatch(/^Centre of the screen: Genesis 1$/);
+    expect(list.querySelector('.sw-inview-chapter').getAttribute('aria-label')).toBe('Genesis 1, where its threads go');
     const rows = [...list.querySelectorAll('.sw-choice-row')];
-    expect(rows.length).toBe(3);
-    expect(rows[0].className).toMatch(/sw-choice-chapter/);
-    expect(rows[0].textContent).toMatch(/Genesis 1 — where its threads go/);
-    expect(rows[1].textContent).toMatch(/30 votes/);
-    expect(rows[2].textContent).toMatch(/7 votes/);
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toMatch(/30 votes/);
+    expect(rows[1].textContent).toMatch(/7 votes/);
   });
 
   // "Under the lens" retired (digest item 22: "Nearby" means one thing); the header still names the
@@ -1358,8 +1359,8 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list.getAttribute('data-lens-on')).toBe('1');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
-    fireEvent.click(list.querySelector('.sw-choice-chapter'));
+    expect(list.querySelector('.sw-panel-meta').textContent).toMatch(/^Centre of the screen: Genesis 1$/); // WA5 (w-near)
+    fireEvent.click(list.querySelector('.sw-inview-chapter'));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(container.querySelector('.sw-list')).toBeNull();
     const sheet = container.querySelector('.sw-sheet');

@@ -766,8 +766,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-legend">
           <div className="sw-legend-line">{legendFor(mode, graph && graph.attribution, web.canon && graph ? legendChips({ web }) : null)
             .filter((/** @type {any} */ el) => !(el && el.key === 'credit'))}</div>
-          <div className="sw-legend-sub">{[mode !== 'personal' && stats ? (web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections') : '',
-            (graph && graph.attribution) || WEB_CREDIT].filter(Boolean).join(' · ')}</div>
+          {/* WA5: the count its own span, so a card open can let it go and keep the credit (app.css WA5 web) */}
+          <div className="sw-legend-sub">{mode !== 'personal' && stats ? (
+            <span className="sw-legend-count">{(web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections') + ' · '}</span>
+          ) : null}<span className="sw-credit">{(graph && graph.attribution) || WEB_CREDIT}</span></div>
         </div>
         <div className="sw-wbot-end">
           {mode !== 'personal' && graph && (railZoom.whole || panelOpen) ? (
