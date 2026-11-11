@@ -380,7 +380,10 @@ export function AudioPlayerBar() {
   // what it will play, and line 2 says how many it skips.
   const onPhone = !online && !restoring && !single && !songIdOfKey(track.key) ? queuePlaceOnPhone(queue, st.qi, unitOnPhone) : null;
   const counted = onPhone && onPhone.skipped && onPhone.at ? onPhone : queuePlace(queue, st.qi);
-  const place = single || restoring || counted.of < 2 ? null : counted.at + ' of ' + counted.of;
+  // A Bible chapter's bar says the chapter (its title) and the time left; "1 of 19" counted the rest of the book's
+  // queue, which stays in Up next (half-baked 13).
+  const bibleChapter = /^Chapter \d+$/.test(String(track.partLabel || '').trim());
+  const place = single || restoring || bibleChapter || counted.of < 2 ? null : counted.at + ' of ' + counted.of;
   const skippedLine = onPhone && onPhone.skipped && onPhone.at ? 'Skipped ' + onPhone.skipped + ' not on this phone' : null;
   // Why the last start failed (brief 3g), while the bar sits paused on it. Offline (player brief 3g): nothing ahead of
   // it is on the phone either, or it was the last one.
@@ -428,7 +431,7 @@ export function AudioPlayerBar() {
     // With a sleep or speed chip beside it, line 2 keeps the source and its place and gives up the time left
     // (picture 02, "Sleep and speed set"): the full player has the clock.
     // A07.12: the place first, the source last, so a short line loses the edition ("KJV · BRM"), not "1 of 19".
-    line2 = place
+    line2 = place || bibleChapter
       ? [place, skippedLine || (sleepChip || speedChip ? null : left), track.sub].filter(Boolean).join(' · ')
       : [track.sub, skippedLine || (sleepChip || speedChip ? null : left)].filter(Boolean).join(' · ');
   }

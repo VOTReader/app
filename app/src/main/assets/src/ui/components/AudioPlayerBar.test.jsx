@@ -305,6 +305,19 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
     expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].partLabel).toBe('Chapter 2');
   });
 
+  it('half-baked 13: a Bible chapter shows its time left, never "1 of N" (the queue count stays in Up next)', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
+    globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
+    render(<AudioPlayerBar />);
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV · BRM', chapterNum: 1 }));
+    emit('playing');
+    clockAt(5, 245);
+    expect(AudioPlayer.getState().queue.length).toBeGreaterThan(1);
+    expect(title()).toBe('Jonah 1');
+    expect(line2()).toBe('4 min left · KJV · BRM');
+    expect(line2()).not.toMatch(/ of /);
+  });
+
   it('keeps a part label the title does not already spell out', () => {
     globalThis.BIBLE_AUDIO_MANIFEST = BIBLE_MANIFEST;
     globalThis.BIBLE_AUDIO_BOOKS = BIBLE_BOOKS;
