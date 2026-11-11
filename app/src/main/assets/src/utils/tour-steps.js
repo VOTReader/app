@@ -196,7 +196,7 @@ const STOPS = [
      goes there with one navigation. Rings the first plan in Find a plan (always listed; one tap starts it). */
   {
     id: 'plans', screen: 'reading-plans', enter: 'goReadingPlans',
-    target: { selector: '.plans-group .plans-row' }, act: null,
+    target: { selector: '.plan-find-row' }, act: null,
     label: 'Reading plans',
     title: 'Read a little each day',
     text: 'Reading plans are in the Library. Pick one, or build your own from any books and letters. Each day\'s reading then waits for you on Home.',
