@@ -18,6 +18,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { JournalViewerScreen } from './JournalViewerScreen.jsx';
 import { JournalHubScreen, JournalCardMenu } from './JournalHubScreen.jsx';
+import * as ReactDOM from 'react-dom';
+/** @type {any} */ (globalThis).ReactDOM = ReactDOM;   // the sheets portal
 
 /** @type {any} */ (globalThis).JournalCardMenu = JournalCardMenu;
 
@@ -84,11 +86,11 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     // No floating pen — the edit affordance moved INTO the ⋯ menu.
     expect(container.querySelector('.jrn-fab-action.is-edit')).toBeNull();
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    expect(screen.queryByText('Open Entry')).toBeNull();       // already inside the entry
-    expect(screen.getByText('Edit Entry')).toBeTruthy();
-    expect(screen.getByText('Unpin Entry')).toBeTruthy();      // ENTRY.pinned = true
-    expect(screen.getByText('Delete Entry')).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'Entry options' })).toBeTruthy();
+    expect(screen.queryByText('Open')).toBeNull();       // already inside the entry
+    expect(screen.getByText('Edit')).toBeTruthy();
+    expect(screen.getByText('Unpin')).toBeTruthy();      // ENTRY.pinned = true
+    expect(screen.getByText('Delete entry')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Morning Reflection' })).toBeTruthy();   // mock v2 l-jmenu: the sheet is titled by the entry
     expect(modalRegistry.peek().id).toBe('journal-card-menu');
   });
 
@@ -97,7 +99,7 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     setupGlobals();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Edit Entry'));
+    fireEvent.click(screen.getByText('Edit'));
     expect(onEdit).toHaveBeenCalled();
   });
 
@@ -105,7 +107,7 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     setupGlobals();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Unpin Entry'));
+    fireEvent.click(screen.getByText('Unpin'));
     expect(window.JournalStore.togglePin).toHaveBeenCalledWith('e1');
   });
 
@@ -114,7 +116,7 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     const onBack = vi.fn();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={onBack} onEdit={() => {}} />);
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Delete Entry'));
+    fireEvent.click(screen.getByText('Delete entry'));
     expect(screen.getByText('Delete this entry?')).toBeTruthy();
     fireEvent.click(screen.getByText('Continue'));
     fireEvent.click(screen.getByText('I am sure'));

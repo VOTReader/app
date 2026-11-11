@@ -16,7 +16,6 @@ const read = (...p) => readFileSync(resolve(here, ...p), 'utf8');
 // LibraryScreen left the family on 2026-11-10: it is the Library tab's root, named in the root top bar (RootNav.jsx).
 // ReadingPlansScreen left it on 2026-11-11 (plans2): Reading plans is named in its top bar (PlansHub.jsx, U rules 10-11).
 const TITLES = {
-  JournalHubScreen: 'Journal',
 };
 // The UI pass (U rule 10, W2 2026-11-11): a utility screen's title is the bar's, with no second title in the page.
 const BAR_TITLED = {
@@ -25,6 +24,7 @@ const BAR_TITLED = {
   BookmarksScreen: 'Bookmarks',
   LinksScreen: 'Links',
   MyProgressScreen: 'Progress',
+  JournalHubScreen: 'Journal',
 };
 const RETIRED = [
   'library-eyebrow', 'library-title', 'library-sub', 'jrn-hub-header', 'jrn-hub-title', 'jrn-hub-count',

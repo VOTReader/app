@@ -186,10 +186,10 @@ const STOPS = [
   },
   {
     id: 'journal', screen: 'journal-home', enter: 'goJournalHub',
-    target: { selector: '.jrn-fab-newentry' }, act: null,
+    target: { selector: '.jrn-fab-newentry, .jrn-hub .ui-empty .ui-btn' }, act: null,
     label: 'Journal',
     title: 'Keep your own notes in the Journal',
-    text: 'Your Journal is in the Library. Tap New Entry to write one. It saves by itself as you write.',
+    text: 'Your Journal is in the Library. Tap New entry to write one. It saves by itself as you write.',
     primary: 'Next',
   },
   /* READING PLANS GET A STOP (mw18 C8, the hub 2026-10-23): after the Journal, the other Library stop, so the tour

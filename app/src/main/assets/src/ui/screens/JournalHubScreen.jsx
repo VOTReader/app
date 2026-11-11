@@ -2,98 +2,58 @@
    JournalHubScreen — Cluster B (esbuild bundle-b.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { Segmented, EmptyState } from '../components/UiParts.jsx';
+import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+
+/* The entry menu (mock v2 l-jmenu) and the three-step delete kept as one sheet with a step bar (l-jdel). Owner call
+   2026-07-28: the triple confirm alone gates an entry delete; the type-DELETE ritual is reserved for the Settings
+   erase-all wipe. `startStep` 1 opens straight on Delete's first step (the viewer's Delete). */
+const DELETE_STEPS = [
+  null,
+  { ask: 'Delete this entry?', go: 'Continue' },
+  { ask: 'Are you sure? This cannot be undone.', go: 'I am sure' },
+  { ask: 'Last step: permanently remove this entry?', go: 'Delete forever' },
+];
+
 export function JournalCardMenu(props) {
-  var useState = React.useState;
   var entry = props.entry;
-  var _step = useState(props.startStep || 0);   // 1: open on Delete's first confirm (the viewer's ⋯ Delete)
+  var _step = React.useState(props.startStep || 0);
   var step = _step[0]; var setStep = _step[1];
-  useModalRegistry({ id: 'journal-card-menu', dismiss: close, active: !!entry });
-  var trapRef = useFocusTrap(!!entry);
   if (!entry) return null;
-
-  function close() { props.onClose && props.onClose(); }
-
-  return (
-    <div className="link-action-overlay" onClick={close}>
-      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Entry options" onClick={function(e) { e.stopPropagation(); }}>
-        <SheetHandle onClose={close} />
-        {step === 0 && (
-          <>
-            {/* "Open Entry" is meaningless when the menu is launched from
-                INSIDE the entry (JournalViewerScreen sets hideOpen). */}
-            {!props.hideOpen && (
-            <button className="link-action-btn" onClick={function() { close(); props.onOpen(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              <span>Open Entry</span>
-            </button>
-            )}
-            <button className="link-action-btn" onClick={function() { close(); props.onEdit(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9" />
-                <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
-              </svg>
-              <span>Edit Entry</span>
-            </button>
-            <button className="link-action-btn" onClick={function() { props.onTogglePin(); close(); }}>
-              <svg viewBox="0 0 24 24" fill={entry.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
-                <path d="M8 12 L3 19" />
-              </svg>
-              <span>{entry.pinned ? 'Unpin Entry' : 'Pin Entry'}</span>
-            </button>
-            <button className="link-action-btn link-action-btn-danger" onClick={function() { setStep(1); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
-              <span>Delete Entry</span>
-            </button>
-          </>
-        )}
-        {step > 0 && (
-          <div className="jrn-tripledel" style={{ margin: '6px 4px 4px' }}>
-            <div className="jrn-tripledel-step-label">{'Step ' + step + ' of 3'}</div>
-            <div className="jrn-tripledel-question">
-              {step === 1 ? 'Delete this entry?'
-                : step === 2 ? 'Are you sure? This cannot be undone.'
-                : 'Last step: permanently remove this entry?'}
-            </div>
-            {(function () {
-              var summary = (typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary)
-                ? JournalStore.associatedDataSummary(entry.id) : null;
-              return summary && (
-                <div className="jrn-tripledel-cascade">
-                  {'This will also permanently delete ' + summary + ' you placed inside this entry.'}
-                </div>
-              );
-            })()}
-            {/* Owner call 2026-07-28: the triple confirm alone gates an entry
-                delete — the type-DELETE ritual is RESERVED for the Settings
-                erase-all-app-data wipe, so its weight stays meaningful. */}
-            <div className="jrn-tripledel-actions">
-              <button className="jrn-tripledel-cancel" onClick={function() { setStep(0); }}>Cancel</button>
-              {step < 3 && (
-                <button className="jrn-tripledel-next" onClick={function() { setStep(step + 1); }}>
-                  {step === 1 ? 'Continue' : 'I am sure'}
-                </button>
-              )}
-              {step === 3 && (
-                <button
-                  className="jrn-tripledel-final"
-                  onClick={function() { props.onDelete(); close(); }}
-                >
-                  Delete forever
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+  function close() { setStep(0); props.onClose && props.onClose(); }
+  var title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle(entry)) || 'Untitled';
+  var when = typeof JournalHelpers !== 'undefined'
+    ? JournalHelpers.shortDate(entry.updated || entry.created) + ' \xB7 ' + JournalHelpers.shortTime(entry.updated || entry.created) : '';
+  var actions = [
+    !props.hideOpen ? { id: 'open', icon: 'book', label: 'Open', onSelect: function() { props.onOpen(); } } : null,
+    { id: 'edit', icon: 'pen', label: 'Edit', onSelect: function() { props.onEdit(); } },
+    { id: 'pin', icon: 'pin', label: entry.pinned ? 'Unpin' : 'Pin to the top', onSelect: function() { props.onTogglePin(); } },
+    { id: 'del', icon: 'trash', label: 'Delete entry', danger: true, keepOpen: true, onSelect: function() { setStep(1); } },
+  ].filter(Boolean);
+  var summary = step > 0 && typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary
+    ? JournalStore.associatedDataSummary(entry.id) : null;
+  var st = DELETE_STEPS[step];
+  return step === 0 ? (
+    <ActionSheet id="journal-card-menu" open onClose={close} title={title} sub={when} actions={actions} portal className="jrn-entry-sheet" />
+  ) : (
+    <ActionSheet id="journal-card-menu" open onClose={close} title="Delete this entry?" portal className="jrn-del-sheet"
+      confirm={{ label: st.go, danger: true, onConfirm: function() {
+        if (step < 3) { setStep(step + 1); return false; }
+        props.onDelete();
+        return true;
+      } }}>
+      <div className="jrn-del-steps" role="progressbar" aria-label="Delete steps" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step}>
+        <i className="is-on" /><i className={step >= 2 ? 'is-on' : ''} /><i className={step >= 3 ? 'is-on' : ''} />
       </div>
-    </div>
+      <div className="ui-group is-inset jrn-del-entry">
+        <div className="ui-row no-lead"><span className="ui-row-text"><span className="ui-row-title">{title}</span><span className="ui-row-meta">{when}</span></span></div>
+      </div>
+      <p className="jrn-tripledel-question">
+        {'Step ' + step + ' of 3. ' + st.ask + (summary ? ' ' + summary.charAt(0).toUpperCase() + summary.slice(1) + ' inside the entry are deleted with it.' : '')}
+      </p>
+    </ActionSheet>
   );
 }
 
@@ -254,21 +214,7 @@ export function JournalHubScreen(props) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEntry && onOpenEntry(entry.id); }
           }}
         >
-          <span className={'jrn-card-mood ' + moodClass} />
-          <div className="jrn-card-row">
-            <h3 className={'jrn-card-title' + (title ? '' : ' untitled')}>{title || 'Untitled'}</h3>
-            <span className="jrn-card-date">
-              {entry.pinned && (
-                <svg className="jrn-card-pin-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-label="Pinned" role="img">
-                  <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
-                  <path d="M8 12 L3 19" />
-                </svg>
-              )}
-              {/* A05.3: a time from an edit says so (more than a minute after it was written). */}
-              {(entry.updated && entry.created && entry.updated - entry.created > 60000 ? 'Edited ' : '') + JournalHelpers.shortDate(entry.updated || entry.created)}
-              <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
-            </span>
-          </div>
+          <h3 className={'jrn-card-title' + (title ? '' : ' untitled')}>{title || 'Untitled'}</h3>
           {snip ? (
             <p className="jrn-card-preview jrn-card-snippet">
               {snip.where && <span className="jrn-card-hit-where">{snip.where === 'excerpt' ? 'In an excerpt: ' : snip.where === 'caption' ? 'In a caption: ' : 'In a tag: '}</span>}
@@ -283,14 +229,24 @@ export function JournalHubScreen(props) {
             </div>
           )}
           {entry.tags && entry.tags.length > 0 && (
-            <div className="jrn-card-meta">
-              <div className="jrn-tags">
-                {entry.tags.slice(0, 4).map(function(t, i) {
-                  return <span key={i} className="jrn-tag">{'#' + t}</span>;
-                })}
-              </div>
+            <div className="jrn-tags">
+              {entry.tags.slice(0, 4).map(function(t, i) {
+                return <span key={i} className="jrn-tag">{'#' + t}</span>;
+              })}
             </div>
           )}
+          {/* Mock v2 l-jrn: the time under the words. A05.3: a time from an edit says so. */}
+          <span className="jrn-card-date">
+            {moodClass && moodClass !== 'none' ? <span className={'jrn-card-mood ' + moodClass} aria-hidden="true" /> : null}
+            {entry.pinned && (
+              <svg className="jrn-card-pin-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-label="Pinned" role="img">
+                <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
+                <path d="M8 12 L3 19" />
+              </svg>
+            )}
+            {(entry.updated && entry.created && entry.updated - entry.created > 60000 ? 'Edited ' : '') + JournalHelpers.shortDate(entry.updated || entry.created)}
+            <span className="jrn-card-time">{' \xB7 ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
+          </span>
         </div>
         <button
           className="jrn-card-menu-btn"
@@ -300,11 +256,7 @@ export function JournalHubScreen(props) {
           aria-expanded={!!(menuEntry && menuEntry.id === entry.id)}
           title="Options"
         >
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="12" cy="19" r="1.6" />
-          </svg>
+          <UiIcon name="more" />
         </button>
       </div>
     );
@@ -340,42 +292,25 @@ export function JournalHubScreen(props) {
 
     return (
       <>
-        {/* One empty-state pattern (n118): an empty tab shows its how-to, no search or sort;
-            the New Entry button below is its one primary action. */}
+        {/* One empty-state pattern (n118, rule 15): an empty tab shows its how-to and one button, no search or sort. */}
         {list.length > 0 && (
-          <div className="jrn-controls">
-            <input
-              className="jrn-search"
-              type="text"
-              placeholder="Search entries…"
-              aria-label={isPinnedTab ? 'Search pinned entries' : 'Search journal entries'}
-              value={query}
-              onChange={function(e) { setQuery(e.target.value); }}
-            />
-            <button
-              className="notes-index-sort-btn"
-              onClick={function() { setSortNewest(function(v) { return !v; }); }}
-              title="Toggle sort order"
-            >
-              {sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑'}
-            </button>
-          </div>
+          <>
+            <ListSearch className="jrn-search" placeholder="Search entries"
+              label={isPinnedTab ? 'Search pinned entries' : 'Search journal entries'} value={query} onChange={setQuery} />
+            <ListLine count={filtered.length} of={list.length} noun="entry" sort={sortNewest ? 'newest' : 'oldest'}
+              onSort={function(id) { setSortNewest(id !== 'oldest'); }} />
+          </>
         )}
         {filtered.length === 0 ? (
-          <div className="jrn-empty">
-            <div className="jrn-empty-title">
-              {isPinnedTab
-                ? (list.length === 0 ? 'No Pinned Entries' : 'No Matches')
-                : (list.length === 0 ? 'No Entries Yet' : 'No Matches')}
-            </div>
-            <div className="jrn-empty-hint">
-              {isPinnedTab && list.length === 0
-                ? 'Pin your favorite or most-used journal entries here to access them easily.'
-                : list.length === 0
-                  ? 'Tap "New Entry" below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.'
-                  : 'Try a different search term.'}
-            </div>
-          </div>
+          list.length > 0 ? (
+            <EmptyState icon="search" title="No matches" text="Try a different search term." />
+          ) : isPinnedTab ? (
+            <EmptyState icon="pin" title="No pinned entries" text="Pin your favorite or most-used journal entries here to find them easily." />
+          ) : (
+            <EmptyState icon="journal" title="No entries yet"
+              text="Write what you are learning. An entry can hold letters, bookmarks, photos and voice recordings."
+              action={onCreateEntry ? { label: 'Write your first entry', icon: 'pen', onClick: function() { onCreateEntry(); } } : null} />
+          )
         ) : (
           <div className="jrn-list">{filtered.map(renderCard)}</div>
         )}
@@ -383,45 +318,23 @@ export function JournalHubScreen(props) {
     );
   }
 
-  var navChildren = LibraryNav({
-    onBack: onBack, onSearch: props.onSearch, onHistory: props.onHistory,
-    onSettings: props.onSettings,
-    theme: props.theme, onThemeChange: props.onThemeChange
-  });
-
   var pinnedEntries = allEntries.filter(function(e) { return e.pinned; });
-  // id-datasafe 124: in a search the count follows it ("3 of 12 entries"), on the tab shown.
-  var tabEntries = tab === 'pinned' ? pinnedEntries : allEntries;
-  var countText = searchQ
-    ? matching(tabEntries).length + ' of ' + tabEntries.length + (tabEntries.length === 1 ? ' entry' : ' entries')
-    : allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries');
+  // The pill shows wherever the empty state's own button does not (mock v2 l-jrn0: the button is in the middle).
+  var showPill = !!onCreateEntry && (tab === 'pinned' || allEntries.length > 0);
 
   return (
-    <ScreenLayout navChildren={navChildren}>
-      <div className="jrn-hub">
-        <header className="study-head inset">
-          <h1 className="study-head-title">Journal</h1>
-          <span className="study-head-count" aria-live="polite">{countText}</span>
-        </header>
-        <div className="jrn-tabs">
-          <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} aria-pressed={tab === 'all'} onClick={function() { setTab('all'); }}>All Entries</button>
-          <button className={'jrn-tab' + (tab === 'pinned' ? ' active' : '')} aria-pressed={tab === 'pinned'} onClick={function() { setTab('pinned'); }}>Pinned</button>
-        </div>
+    <ScreenLayout utility={{ title: 'Journal', onBack: onBack, backLabel: 'Back to Library' }}>
+      <div className="jrn-hub lib-screen">
+        <Segmented label="Show" options={[{ id: 'all', label: 'All entries' }, { id: 'pinned', label: 'Pinned' }]} value={tab} onChange={setTab} />
         {renderUnclaimed()}
         {tab === 'all' && renderEntries(allEntries, false)}
         {tab === 'pinned' && renderEntries(pinnedEntries, true)}
-        <button
-          className="jrn-fab jrn-fab-newentry"
-          onClick={function() { onCreateEntry && onCreateEntry(); }}
-          title="New Entry"
-          aria-label="New Entry"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
-          </svg>
-          <span className="jrn-fab-newentry-label">New Entry</span>
-        </button>
+        {showPill ? (
+          <button className="jrn-fab jrn-fab-newentry" onClick={function() { onCreateEntry(); }} aria-label="New entry">
+            <UiIcon name="pen" />
+            <span className="jrn-fab-newentry-label">New entry</span>
+          </button>
+        ) : null}
         {menuEntry && (
           <JournalCardMenu
             entry={menuEntry}

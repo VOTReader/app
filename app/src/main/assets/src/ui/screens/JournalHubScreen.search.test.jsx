@@ -12,6 +12,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { JournalHubScreen, JournalCardMenu } from './JournalHubScreen.jsx';
 import { JournalHelpers } from '../../data/journal-helpers.js';
+import * as ReactDOM from 'react-dom';
+/** @type {any} */ (globalThis).ReactDOM = ReactDOM;   // the sheets portal
 
 /** @type {any} */ (globalThis).JournalCardMenu = JournalCardMenu;
 
@@ -56,7 +58,7 @@ function setupGlobals() {
 }
 
 function type(container, q) {
-  fireEvent.change(container.querySelector('.jrn-search'), { target: { value: q } });
+  fireEvent.change(container.querySelector('.jrn-search input'), { target: { value: q } });
 }
 function titles(container) {
   return Array.from(container.querySelectorAll('.jrn-card-title')).map(n => n.textContent);
@@ -101,7 +103,7 @@ describe('JournalHubScreen search reads the whole entry (W36)', () => {
     expect(titles(container)).toEqual(['Evening']);
     type(container, 'zzzz');
     expect(titles(container)).toEqual([]);
-    expect(screen.getByText('No Matches')).toBeTruthy();
+    expect(screen.getByText('No matches')).toBeTruthy();
   });
 });
 
@@ -115,7 +117,7 @@ describe('JournalHubScreen card keyboard (W36)', () => {
     expect(onOpenEntry).not.toHaveBeenCalled();
     fireEvent.click(btn);
     expect(onOpenEntry).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Entry options' })).toBeTruthy();
+    expect(screen.getByRole('dialog')).toBeTruthy();   // titled by the entry (mock v2 l-jmenu)
   });
 
   it('the options button is not nested inside the role=button open control', () => {
@@ -144,14 +146,14 @@ describe('JournalHubScreen empty state and search name', () => {
   it('no entries: no search box or sort, the how-to stays', () => {
     window.JournalStore.all = () => [];
     const { container } = render(<JournalHubScreen onBack={() => {}} onCreateEntry={() => {}} />);
-    expect(container.querySelector('.jrn-search')).toBeNull();
+    expect(container.querySelector('.jrn-search input')).toBeNull();
     expect(container.querySelector('.notes-index-sort-btn')).toBeNull();
-    expect(container.querySelector('.jrn-empty-title').textContent).toBe('No Entries Yet');
+    expect(container.querySelector('.ui-empty-title').textContent).toBe('No entries yet');
   });
 
   it('a full list names its search box', () => {
     render(<JournalHubScreen onBack={() => {}} onCreateEntry={() => {}} />);
-    expect(screen.getByRole('textbox', { name: 'Search journal entries' })).toBeTruthy();
+    expect(screen.getByRole('searchbox', { name: 'Search journal entries' })).toBeTruthy();
   });
 });
 
@@ -180,7 +182,7 @@ describe('JournalHubScreen search shows what matched (id-datasafe 121, 124)', ()
 
   it('the header count follows the search', () => {
     const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
-    const count = () => container.querySelector('.study-head-count').textContent;
+    const count = () => container.querySelector('.lib-qline-count').textContent;
     expect(count()).toBe('2 entries');
     type(container, 'mustard');
     expect(count()).toBe('1 of 2 entries');

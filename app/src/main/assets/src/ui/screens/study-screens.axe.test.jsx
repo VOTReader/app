@@ -478,7 +478,7 @@ describe('axe — Journal hub', () => {
     expect(await seriousViolations(container)).toEqual([]);
     fireEvent.click(screen.getAllByRole('button', { name: 'Entry options' })[0]);
     expect(await seriousViolations(document.body)).toEqual([]);
-    fireEvent.click(screen.getByText('Delete Entry'));
+    fireEvent.click(screen.getByText('Delete entry'));
     expect(await seriousViolations(document.body)).toEqual([]);
   });
 
@@ -486,13 +486,13 @@ describe('axe — Journal hub', () => {
     journalGlobals([]);
     const { container } = render(<JournalHubScreen {...navProps} onOpenEntry={noop} onCreateEntry={noop} />);
     expect(await seriousViolations(container)).toEqual([]);
-    const all = screen.getByRole('button', { name: 'All Entries' });
-    const pinned = screen.getByRole('button', { name: 'Pinned' });
-    expect(all.getAttribute('aria-pressed')).toBe('true');
-    expect(pinned.getAttribute('aria-pressed')).toBe('false');
+    const all = screen.getByRole('radio', { name: 'All entries' });
+    const pinned = screen.getByRole('radio', { name: 'Pinned' });
+    expect(all.getAttribute('aria-checked')).toBe('true');
+    expect(pinned.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(pinned);
-    expect(all.getAttribute('aria-pressed')).toBe('false');
-    expect(pinned.getAttribute('aria-pressed')).toBe('true');
+    expect(all.getAttribute('aria-checked')).toBe('false');
+    expect(pinned.getAttribute('aria-checked')).toBe('true');
     expect(await seriousViolations(container)).toEqual([]);
   });
 });

@@ -427,7 +427,8 @@ export function chapterRuns(chapters) {
 
 /** "1 recording", "1,189 chapters" @param {number} n @param {string} noun @returns {string} */
 export function countOf(n, noun) {
-  return n.toLocaleString('en-US') + ' ' + noun + (n === 1 ? '' : 's');
+  if (n === 1) return '1 ' + noun;
+  return n.toLocaleString('en-US') + ' ' + (/[^aeiou]y$/.test(noun) ? noun.slice(0, -1) + 'ies' : noun + 's');
 }
 
 /** "6 h 10 min", "55 min", "under a minute"; '' for unknown. @param {number | null | undefined} sec @returns {string} */
