@@ -6897,6 +6897,10 @@
     .rd-book-num::before { content: ''; position: absolute; inset: -4px; }
     .rd-book-num.is-current { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
     .rd-book .chapter-cards { display: block; overflow: hidden; padding: 0; background: var(--surface-1); border-radius: var(--r-card); }
+    /* POL1: prophecy Expand / Collapse all, in the page above the first group (was the .mode-toggle-wrap FAB) */
+    .prophecy-expand-row { display: flex; justify-content: flex-end; margin: var(--sp-2) 0 var(--sp-1); }
+    .prophecy-expand-btn { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); padding: 0 var(--sp-1); border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--fsc-14); font-weight: 500; cursor: pointer; }
+    .prophecy-expand-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
     .rd-book .chapter-cards:not(.two-col) .chapter-card-btn { display: flex; align-items: center; gap: 14px; width: 100%; min-height: var(--row-h); margin: 0; padding: 10px 12px 10px 14px; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; background: none; box-shadow: none; text-align: left; }
     .rd-book .chapter-card-btn:last-child { border-bottom: 0; }
     .rd-book .chapter-card-btn.is-current { background: var(--accent-soft); }
