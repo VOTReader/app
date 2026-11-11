@@ -215,8 +215,8 @@ describe('mostAnnotatedSources', () => {
     };
     const out = mostAnnotatedSources(ann);
     expect(out).toEqual([
-      { key: 'bible:psalms', label: 'Psalms', collection: 'Scripture', count: 2, words: 0, per1k: 0 },
-      { key: 'letter:grafted-in', label: 'Grafted In', collection: 'Volume Three', count: 1, words: 0, per1k: 0 },
+      { key: 'bible:psalms', label: 'Psalms', collection: 'Scripture', hlKey: 'bible:psalms:23:1', count: 2, words: 0, per1k: 0 },
+      { key: 'letter:grafted-in', label: 'Grafted In', collection: 'Volume Three', hlKey: 'letter:grafted-in:0', count: 1, words: 0, per1k: 0 },
     ]);
   });
 

@@ -420,7 +420,7 @@ describe('axe — History', () => {
     const year = container.querySelector('.history-year-header');
     if (year) fireEvent.click(year);
     expect(await seriousViolations(container)).toEqual([]);
-    fireEvent.change(container.querySelector('input.notes-index-search'), { target: { value: 'psalm' } });
+    fireEvent.change(container.querySelector('.history-screen .lib-search input'), { target: { value: 'psalm' } });
     expect(await seriousViolations(container)).toEqual([]);
   });
 

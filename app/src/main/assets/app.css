@@ -3576,7 +3576,6 @@
       to   { opacity: 0.65; transform: translateY(0); }
     }
     /* homeHeroIn — removed (unused) */
-    .prg-start { margin:0.25rem 0 1rem; }
     /* Home's up-next card (TodayCard.jsx; the layout pass 2026-11-10, mock read.png; tokens W1): one row per running
        plan, then Continue, in one surface card. The pills are the small secondary and primary buttons; they draw 38 px
        and take a 44 px press through ::after. */
@@ -5014,40 +5013,8 @@
        only opacity breathes (compositor-only). The global reduced-motion block still stills it. */
     .reading-dot-nav .rdg-glyph { display:block; width:16px; height:16px; color:var(--gold); filter:drop-shadow(0 0 5px var(--gold-glow)); animation: ribbon-pulse 2.8s ease-in-out infinite; will-change:opacity; }
     @keyframes ribbon-pulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
-    .history-empty {
-      text-align:center; color:var(--cream-dim);
-      font-family:var(--font-body); padding:3.5rem 1.5rem 4rem;
-      max-width:28.75rem; margin:0 auto;
-    }
-    .history-empty-sigil {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-36);
-      color:var(--gold-dim); opacity:0.5; margin-bottom:1rem;
-    }
-    .history-empty-title {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-24);
-      color:var(--gold-bright); margin-bottom:0.9rem;
-    }
-    .history-empty-body {
-      font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
-    }
-    /* n130: a history row is label, full-width title (wraps at word boundaries, never clamped
-       to a stub), then one meta line: progress · time · visits. */
-    .history-entry-eyebrow { display:flex; align-items:baseline; min-width:0; margin-bottom:0.18rem; }
-    .history-entry-eyebrow .chapter-card-label { margin-bottom:0; flex:0 1 auto; min-width:0; }
-    .history-entry-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-dim); white-space:nowrap; flex-shrink:0; }
-    .history-entry-eyebrow .chapter-card-label + .history-entry-num::before { content:'·'; margin:0 0.45rem; }
-    .history-entry-card .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; word-break:normal; overflow-wrap:break-word; }
-    .history-entry-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:0.1rem 0.5rem; margin-top:0.3rem; }
-    .history-entry-meta > * + *::before { content:'·'; margin-right:0.5rem; color:var(--gold-dim); }
-    .history-entry-meta .idx-min-chip { margin-left:0; align-self:baseline; }
-    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); white-space:nowrap; }
-    /* Result tally under the search box — states the count in words so the
-       filtered emptiness below it is never mistaken for a broken screen. */
-    .history-search-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
-      text-transform:uppercase; color:var(--gold-dim);
-      margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
-    }
+    /* W2b (mock v2 l-hist): a history row is a ListRow; its reading chip reads as plain meta text. */
+    .history-entry-card .idx-min-chip { margin:0; padding:0; border:0; background:none; font:inherit; color:inherit; letter-spacing:0; }
     /* A broad search draws the newest 100 matches; this draws the rest (sweep W69). The tally's
        voice (Cinzel caps, dim gold) on a full-width hairline button, 44 px tall for a thumb. */
     .history-show-all {
@@ -5107,21 +5074,8 @@
     }
     .history-current-section { margin-top:0.6rem; }
     .history-day-section { margin-top:0.3rem; }
-    .history-day-header {
-      width:100%; display:flex; align-items:center; gap:0.55rem;
-      background:transparent; border:none; padding:0.85rem 1.2rem 0.6rem 1.8rem;
-      cursor:pointer; -webkit-tap-highlight-color:transparent; color:inherit;
-      min-height:46px;
-    }
-    .history-day-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-15); letter-spacing:0.2em;
-      color:var(--gold); text-transform:uppercase; white-space:nowrap;
-    }
-    .history-day-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-14); letter-spacing:0.08em;
-      color:var(--gold-dim);
-    }
-    .history-day-spacer { flex:1; min-width:1.5rem; }
+    .history-day-header { width:100%; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); margin-top:var(--sp-2); padding:0; background:none; border:0; color:inherit; cursor:pointer; text-align:left; -webkit-tap-highlight-color:transparent; }
+    .history-day-header .ui-label { margin:0; }
     .history-chevron {
       font-size:var(--fs-24); color:var(--gold-dim); line-height:1;
       transition:transform 0.2s; flex-shrink:0;
@@ -5129,10 +5083,6 @@
       padding:0 0.2rem;
     }
     .history-chevron.is-open { transform:rotate(90deg); color:var(--gold); }
-    .history-day-section .chapter-cards { padding-left:0.9rem; }
-    /* "3 visits" beside the newest visit's time on the meta line: a day's repeats of one reading
-       are one row (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
-    .history-entry-visits { font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted); white-space:nowrap; }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
@@ -6921,118 +6871,29 @@
     }
     /* (The old Library list, .library-grid / .library-tile*, was removed with the UI pass (W1): LibraryScreen draws .root-*.) */
 
-    /* ══════════════════════════════════════════════════════════════
-       PROGRESS SCREEN — read-only dashboard unifying mark-as-read
-       progress, streaks, journaling, listening, library counts and the
-       most-annotated sources. The redesign (2026-09-25, Codex mockup r5
-       take 1): one summary sentence, the 14-day chart, then plain
-       sections of label / value rows on hairlines, the Settings and
-       Library rows' language. The grid of gold-outlined stat boxes and
-       the boxed cards went, and nothing here is under 12 px.
-       ════════════════════════════════════════════════════════════ */
-    .prg-screen {
-      max-width: 40rem; margin: 0 auto;
-      padding: 1.25rem 1.2rem 4rem;
-      width: 100%;
-    }
-    .prg-summary {
-      margin: 0 0 1.5rem;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1.45;
-      color: var(--cream);
-    }
-    .prg-section { margin: 0 0 1.9rem; }
-    /* Wraps at a large Text Size: the figure drops to its own line at the right
-       ("12 of 89 reached" ran 66 px past a 360 px screen at 180 %, the 09-25 walk). */
-    .prg-section-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 1rem; row-gap: 0.15rem;
-      padding-bottom: 0.45rem; border-bottom: 1px solid var(--border);
-    }
-    .prg-section-head h2 {
-      margin: 0;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 400;
-      letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-dim);
-    }
-    .prg-section-meta {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-    }
-    .prg-facts { margin: 0; }
-    /* A row wraps rather than squeezes: at a large Text Size the value drops to
-       its own line at the right, whole ("3h 24m", never "3h / 24m"), and the
-       label keeps the width (measured at 180 % on 360 px). */
-    .prg-fact {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 1rem; row-gap: 0.15rem;
-      min-height: 2.75rem; box-sizing: border-box; padding: 0.6rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .prg-fact dt { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-fact dd {
-      margin: 0 0 0 auto; text-align: right; white-space: nowrap;
-      font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums;
-    }
-    /* A shelf: name and tally, a thin bar under them. */
-    .prg-row, .prg-note, .prg-history-row, .prg-src-row { border-bottom: 1px solid var(--border); }
-    .prg-row { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem 0 0.8rem; }
-    .prg-row-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 0.75rem; row-gap: 0.15rem;
-    }
-    .prg-row-label { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-row-tally {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; text-align: right;
-    }
-    .prg-words-note { white-space: nowrap; }
-    .prg-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
-    .prg-bar-fill { height: 100%; border-radius: 2px; background: var(--gold-dim); }
-    .prg-history-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.7rem 0; }
-    .prg-history-label { font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-note {
-      padding: 0.8rem 0;
-      font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted); line-height: 1.5;
-    }
-    .prg-retry {
-      margin-left: 0.25rem; min-height: 44px; padding: 0 1.2rem; border-radius: 999px;
-      border: 1px solid var(--gold-border); background: transparent; color: var(--cream); font: inherit; cursor: pointer;
-    }
-    .prg-src-row { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.7rem 0; }
-    .prg-src-main { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-    .prg-src-title {
-      font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .prg-src-col { font-family: var(--font-body); font-size: var(--fs-13); color: var(--cream-muted); }
-    /* 14-day words-read mini bars, on the page rather than in a box. Bars are
-       purely decorative (aria-hidden); the accessible summary is the sr-only
-       sentence beside them. */
-    .prg-days-wrap { margin: 0 0 1.9rem; }
-    .prg-days-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 0.75rem; row-gap: 0.15rem;
-      margin-bottom: 0.55rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--gold-dim);
-    }
-    .prg-days-head > :last-child {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); letter-spacing: 0;
-      text-transform: none; color: var(--cream-muted); white-space: nowrap;
-    }
-    .prg-days-bars {
-      display: flex; align-items: flex-end; gap: 0.25rem;
-      height: 2.75rem; border-bottom: 1px solid var(--border);
-    }
-    .prg-days-bar {
-      flex: 1; min-width: 0;
-      height: 2px; /* zero-word baseline; read days get an inline % height */
-      border-radius: 2px 2px 0 0;
-      background: var(--gold-dim);
-    }
+    /* ── W2b PROGRESS (mock v2 l-prog, l-prog2): three tiles, the 14-day chart card, then cards of rows. ── */
+    .prg-section { margin: 0; }
+    .prg-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); margin-top: var(--sp-2); }
+    .prg-tile { min-width: 0; background: var(--surface-1); border-radius: var(--r-card); padding: 13px 12px 12px; }
+    .prg-tile b { display: block; font: 600 var(--ts-display)/1 var(--font-serif); color: var(--text-1); overflow-wrap: anywhere; }
+    .prg-tile span { display: block; margin-top: var(--sp-1); font-family: var(--font-ui); font-size: var(--ts-label); line-height: var(--lh-label); color: var(--text-2); }
+    .prg-days-wrap { margin-top: var(--sp-2); }
+    .prg-days-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 var(--sp-3); font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); }
+    .prg-days-head > :first-child { font-size: var(--ts-control); color: var(--text-1); }
+    .prg-days-bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; margin-top: 14px; }
+    .prg-days-bar { flex: 1; min-width: 0; height: 4px; border-radius: 3px; background: var(--surface-3); }
+    .prg-days-bar.is-on { background: var(--accent); }
+    .prg-days-axis { display: flex; justify-content: space-between; margin-top: var(--sp-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-3); }
+    .prg-row { position: relative; display: flex; flex-direction: column; padding: 12px var(--card-pad) 13px; }
+    .prg-row + .prg-row::before, .prg-row + .ui-row::before { content: ""; position: absolute; top: 0; left: var(--card-pad); right: 0; height: 1px; background: var(--hairline); }
+    .prg-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+    .prg-row-label { min-width: 0; font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); }
+    .prg-row .ui-progress { margin-top: var(--sp-2); }
+    .prg-fact .ui-row-title, .prg-history-row.is-one .ui-row-title { font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; }
+    .prg-src-row .ui-row-title { white-space: normal; }
+    .prg-row .ui-row-meta { margin-top: 6px; }
+    .prg-note { padding: 14px var(--card-pad); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }
+    .prg-retry { min-height: var(--tap); padding: 0 var(--sp-2); border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 
     /* Settings → Your Data → Growth. Same div-bar idiom as the reading-day
        strip above (no SVG, no dependency, theme-aware through --gold-dim),

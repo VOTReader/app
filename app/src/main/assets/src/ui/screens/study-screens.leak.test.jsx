@@ -214,7 +214,7 @@ describe('leaks — Progress and History', () => {
       { type: 'chapter', key: 'ch:john:3', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: now - 400 * 86400000 },
     ];
     await leakFree('HistoryScreen', () => render(<HistoryScreen history={H} {...navProps} onSelect={noop} onPruneDay={noop} onHome={noop} />),
-      (r) => { fireEvent.change(r.container.querySelector('input.notes-index-search'), { target: { value: 'psalm' } }); });
+      (r) => { fireEvent.change(r.container.querySelector('.history-screen .lib-search input'), { target: { value: 'psalm' } }); });
   });
 });
 

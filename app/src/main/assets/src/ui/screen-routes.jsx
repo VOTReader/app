@@ -1258,10 +1258,7 @@ export function buildScreenRoutes({
         onHome={goHome}
         onSelect={_openHistoryEntry}
         onStartReading={() => _openFirstLetter('History')}
-        onSearch={goSearch}
-        onSettings={goSettings}
-        onHistory={goHistory}
-        theme={theme} onThemeChange={setTheme}
+        onClearHistory={clearHistory}
       />
     ),
     'library': () => _kickVot(
@@ -1311,7 +1308,11 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         historyEnabled={settings.historyEnabled !== false}
         onStartReading={() => _openFirstLetter('Progress')}
-        theme={theme} onThemeChange={setTheme}
+        onOpenNotes={goNotesIndex}
+        onOpenHighlights={goHighlightsIndex}
+        onOpenBookmarks={goBookmarksIndex}
+        onOpenLinks={goLinksIndex}
+        onOpenSource={(endpoint) => _listOpen(endpoint, { sourceLetterTitle: 'Progress' })}
       />
     ),
     // Link-outs from the index / viewer / web screens do NOT write navOrigin.

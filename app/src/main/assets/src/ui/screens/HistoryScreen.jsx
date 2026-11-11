@@ -6,6 +6,12 @@
    reading path — so this screen reads its two helpers from the window slots,
    the cross-bundle contract every lazy bundle keeps. */
 
+import { BarMenu } from '../components/RootNav.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { EmptyState } from '../components/UiParts.jsx';
+import { ListSearch } from '../components/LibraryList.jsx';
+import { countOf } from '../../utils/download-tree.js';
+
 /**
  * Everything about one entry a reader might type to find it again, lowercased
  * into one haystack — the same substring contract Notes / Bookmarks / Links
@@ -36,7 +42,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onSearch, onSettings, theme, onThemeChange, onStartReading }) {
+export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onStartReading, onClearHistory }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -234,24 +240,21 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
   };
 
   // Render one day-section. Used both for current-month days (top of screen)
-  // and for tree-leaf days (inside Year > Month > Week).
+  // and for tree-leaf days (inside Year > Month > Week). Mock v2 l-hist: the day is a section label with
+  // "1 place · 2 visits" at its right, the rows one card under it.
   const renderDaySection = (year, month, dg, isCurrent) => {
     const dId = isCurrent ? `cd:${year}-${month}-${dg.day}` : `ymd:${year}-${month}-${dg.day}`;
     const dOpen = isOpen(dId);
+    const visits = dg.entries.reduce((n, e) => n + (e.visits || 1), 0);
     return (
       <div key={dId} className="history-day-section">
-        {/* C2-C [C8]: all four accordion levels announce their state. The
-            chevron rotates for a sighted reader; without aria-expanded a
-            screen reader heard "Today · 4, button" whether the day was open
-            or shut, and the whole screen is four nested accordions. */}
+        {/* C2-C [C8]: every accordion level announces its state. */}
         <button className="history-day-header" aria-expanded={dOpen} onClick={() => toggle(dId)}>
-          <span className="history-day-label">{dayLabel(year, month, dg.day)}</span>
-          {dg.entries.length > 1 && <span className="history-day-count">{"\xB7 "}{dg.entries.length}</span>}
-          <span className="history-day-spacer" />
-          <span className={`history-chevron${dOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
+          <span className="ui-label history-day-label">{dayLabel(year, month, dg.day)}</span>
+          <span className="ui-label-aside history-day-count">{countOf(dg.entries.length, 'place') + ' \xB7 ' + countOf(visits, 'visit')}</span>
         </button>
         {dOpen && (
-          <div className="chapter-cards">
+          <div className="ui-group">
             {dg.entries.map((entry, i) => (
               <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)} />
             ))}
@@ -261,51 +264,32 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
     );
   };
 
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [clearing, setClearing] = React.useState(false);
+  const menuActions = onClearHistory ? [{ id: 'clear', icon: 'trash', label: 'Clear history', danger: true,
+    onSelect: () => { setMenuOpen(false); setClearing(true); } }] : [];
+
   return (
-    <ScreenLayout navChildren={LibraryNav({
-      // hide:['history'] — you are already on History.
-      onBack, backTitle: 'Back', backLabel, hide: ['history'],
-      onSettings, onSearch, theme, onThemeChange,
-    })}>
-      <div className="vol-index history-screen">
-        <div className="vol-index-header">
-          <div className="vol-index-eyebrow">Reading Activity</div>
-          <h1 className="vol-index-title">History</h1>
-          <div className="vol-index-ornament">
-            <div className="vol-index-ornament-line" />
-            <div className="vol-index-ornament-diamond" />
-            <div className="vol-index-ornament-line r" />
-          </div>
-        </div>
-        {/* Same search box, same class, same placeholder grammar as Notes /
-            Bookmarks / Links. Absent while there is nothing to search. */}
+    <ScreenLayout utility={{ title: 'History', onBack, backLabel,
+      menu: history.length > 0 && menuActions.length ? <BarMenu label="History options" onClick={() => setMenuOpen(true)} /> : null }}>
+      <div className="history-screen lib-screen">
+        {/* The same search pill as Notes / Bookmarks / Links. Absent while there is nothing to search. */}
         {history.length > 0 && (
-          <input
-            className="notes-index-search"
-            type="search"
-            placeholder="Search history…"
-            aria-label="Search history"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <ListSearch placeholder="Search history" value={query} onChange={setQuery} />
         )}
         {history.length > 0 && q && (
-          <div className="history-search-count" aria-live="polite">
+          <div className="lib-qline history-search-count" aria-live="polite">
             {matches.length === 0
               ? 'No visits match'
-              : `${matches.length} ${matches.length === 1 ? 'visit' : 'visits'} match` + (capped ? ` · newest ${SEARCH_DRAW_CAP} shown` : '')}
+              : `${matches.length} ${matches.length === 1 ? 'visit' : 'visits'} match` + (capped ? ` \xB7 newest ${SEARCH_DRAW_CAP} shown` : '')}
           </div>
         )}
         {history.length === 0 ? (
-          <div className="history-empty">
-            <div className="history-empty-sigil" aria-hidden="true">✦</div>
-            <div className="history-empty-title">The scroll is blank.</div>
-            <div className="history-empty-body">Every chapter, letter, and study you visit will land here — a trail of what the Spirit has led you through. Begin reading and this will populate.</div>
-            {/* n118: one primary button, the same one every empty list screen carries; n131 (L1.1): it opens the
-                first letter when the route offers that, else goes Home. */}
-            {onStartReading ? <button type="button" className="empty-cta" onClick={onStartReading}>Start with Volume One, Letter 1</button>
-              : onHome && <button type="button" className="empty-cta" onClick={() => onHome()}>Start reading</button>}
-          </div>
+          /* n118 / rule 15: one sentence, one button; it opens the first letter when the route offers that. */
+          <EmptyState icon="clock" title="The scroll is blank."
+            text="Every chapter, letter and study you visit lands here. Begin reading and this fills."
+            action={onStartReading ? { label: 'Start with Volume One, Letter 1', onClick: onStartReading }
+              : onHome ? { label: 'Start reading', onClick: () => onHome() } : undefined} />
         ) : (
           <>
             {currentDays.length > 0 && (
@@ -362,9 +346,15 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
                 {`Show all ${matches.length} matches`}
               </button>
             )}
+            <p className="lib-foot">Every letter, chapter and study you open is kept here, on this phone only. Clear it from the menu at the top.</p>
           </>
         )}
       </div>
+      <ActionSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="History" actions={menuActions} portal />
+      <ActionSheet open={clearing} onClose={() => setClearing(false)} title="Clear history?" portal
+        confirm={{ label: 'Clear history', danger: true, onConfirm: () => { setClearing(false); onClearHistory(); } }}>
+        Every visit is removed from this phone. Your notes, highlights and read marks stay.
+      </ActionSheet>
     </ScreenLayout>
   );
 }

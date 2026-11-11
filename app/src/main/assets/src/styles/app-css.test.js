@@ -213,7 +213,7 @@ describe('app.css — the personal-study header starts at one height', () => {
     return m ? m[1] : '';
   };
   // Notes, Bookmarks and Links left for the UI pass's .lib-screen (W2): their title is the bar's, with no page header.
-  it.each(['.library-screen', '.prg-screen', '.plans-screen'])(
+  it.each(['.library-screen', '.plans-screen'])(
     '%s pads its top 1.25rem', (sel) => {
       expect(block(sel)).toMatch(/padding:\s*1\.25rem\s/);
     });
@@ -254,8 +254,6 @@ describe('app.css — the redesign walk\'s large-type fixes hold', () => {
     return m ? m[1] : '';
   };
   it('Progress headings wrap, their figures to the right', () => {
-    expect(block('.prg-section-head')).toMatch(/flex-wrap:\s*wrap/);
-    expect(block('.prg-section-meta')).toMatch(/margin-left:\s*auto/);
     expect(block('.prg-days-head')).toMatch(/flex-wrap:\s*wrap/);
   });
   it('a wrapped header count stays at the right', () => {
@@ -331,8 +329,8 @@ describe('app.css — Progress is sections of rows, not boxes', () => {
   it('has no stat-box rules left', () => {
     expect(CSS).not.toMatch(/\.prg-hero|\.prg-stat|\.prg-listen-hero/);
   });
-  it('sets its rows on hairlines', () => {
-    expect(ruleBlock(CSS, '.prg-fact {')).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+  it('sets its rows in cards, split by hairlines (mock v2 l-prog)', () => {
+    expect(ruleBlock(CSS, '.prg-row + .prg-row::before, .prg-row + .ui-row::before {')).toMatch(/background:\s*var\(--hairline\)/);
   });
   it('keeps every Progress type size at 12 px or more', () => {
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -750,13 +748,12 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
     '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
     '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
-    '.prg-section-head h2', '.prg-days-head', '.footnote-list-header', '.related-card-title', '.settings-section-label',
+    '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
     '.section-heading', '.compact-list-header',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
-    '.history-entry-time', '.history-search-count',
     '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
     '.part-group-num', '.idx-note-chip',
   ];

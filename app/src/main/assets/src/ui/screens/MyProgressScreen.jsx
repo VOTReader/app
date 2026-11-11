@@ -25,6 +25,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { countMarks } from '../../utils/mark-kinds.js';
+import { BarAction } from '../components/RootNav.jsx';
+import { SectionLabel, ListRow, EmptyState } from '../components/UiParts.jsx';
+import { countOf } from '../../utils/download-tree.js';
 import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
@@ -70,7 +73,8 @@ function _fmtDuration(ms) {
   return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
 }
 
-export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled, onStartReading }) {
+export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, settings, readItems, historyCount, historyEnabled, onStartReading,
+  onOpenNotes, onOpenHighlights, onOpenBookmarks, onOpenLinks, onOpenSource }) {
   // The reading table + most-annotated titles read the lazy corpora
   // (BOOKS for NT/OT totals, VOT for volume totals + letter titles,
   // MATTHEW + BIBLE_STUDIES for the Studies group). Pre-fire every
@@ -290,9 +294,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     return s.charAt(0).toUpperCase() + s.slice(1) + '.';
   })();
 
+  /* Mock v2 l-prog: the streak and the read count are tiles now, so the Reading card holds the bars and the facts
+     the tiles do not carry. */
   const readingFacts = [
-    { label: 'Chapters & letters read', value: totalRead.toLocaleString('en-US') },
-    { label: 'Reading streak', value: plural(readStreak, 'day', 'days') },
     ...(readingStats ? [{ label: 'Words read', value: _fmtWords(readingStats.totalWordsRead || 0) }] : []),
     ...(measuredWpm ? [{ label: 'Reading pace', value: measuredWpm + ' words a minute' }] : []),
     // Lifetime reading time — the ledger's visibility-honest activeMs sum.
@@ -304,7 +308,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   ];
   const journalFacts = [
     { label: 'Entries', value: journalCount.toLocaleString('en-US') },
-    { label: 'Journal streak', value: plural(streak, 'day', 'days') },
+    { label: 'Days in a row', value: streak.toLocaleString('en-US') },
     ...(journalWords !== null ? [{ label: 'Words written', value: _fmtWords(journalWords) }] : []),
     ...(voiceMins > 0 ? [{ label: 'Voice memos', value: voiceMins + ' min' }] : []),
   ];
@@ -329,24 +333,18 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     ];
   })();
 
+  // Mock v2 l-prog2: each count opens its list; Highlights has one name (X-hidden-decisions section 1).
   const libraryFacts = [
-    { label: 'Notes', value: noteCount.toLocaleString('en-US') },
-    { label: 'Highlights & Underlines', value: markCount.toLocaleString('en-US') },
-    { label: 'Bookmarks', value: bookmarkCount.toLocaleString('en-US') },
-    { label: 'Links', value: linkCount.toLocaleString('en-US') },
+    { label: 'Notes', value: noteCount.toLocaleString('en-US'), open: onOpenNotes },
+    { label: 'Highlights', value: markCount.toLocaleString('en-US'), open: onOpenHighlights },
+    { label: 'Bookmarks', value: bookmarkCount.toLocaleString('en-US'), open: onOpenBookmarks },
+    { label: 'Links', value: linkCount.toLocaleString('en-US'), open: onOpenLinks },
   ];
 
-  /** Label / value rows on hairlines. @param {Array<{ label: string, value: string }>} rows */
-  const facts = (rows) => (
-    <dl className="prg-facts">
-      {rows.map((r) => (
-        <div key={r.label} className="prg-fact">
-          <dt>{r.label}</dt>
-          <dd>{r.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
+  /** One-line label / value rows in a card. @param {Array<{ label: string, value: string, open?: () => void }>} rows */
+  const facts = (rows) => rows.map((r) => (
+    <ListRow key={r.label} className="prg-fact" noLead one title={r.label} value={r.value} onClick={r.open || undefined} />
+  ));
   // mw18 S7: each running plan's line, the plans finished, and what all plans cover with an item in two plans
   // counted once ("1,230 chapters and letters across your plans").
   const planRuns = usePlanRuns();
@@ -377,66 +375,81 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     && linkCount === 0 && bookmarkCount === 0 && markCount === 0 && !(historyCount > 0) && voiceMins === 0
     && listenFacts.length === 0 && planRows.length === 0 && finishedPlans.length === 0
     && !(journalWords > 0) && !(readingStats && readingStats.totalWordsRead > 0);
-  /** A section's small-capitals name, with an optional figure at the right. */
-  const head = (id, name, meta) => (
-    <div className="prg-section-head">
-      <h2 id={id}>{name}</h2>
-      {meta ? <span className="prg-section-meta">{meta}</span> : null}
+  /** A section: its gold label (with an optional figure at the right), then one card of rows. */
+  const section = (id, name, body, aside, cls = '') => (
+    <section className={'prg-section' + (cls ? ' ' + cls : '')} aria-labelledby={id}>
+      <SectionLabel id={id} aside={aside || undefined}>{name}</SectionLabel>
+      <div className="ui-group">{body}</div>
+    </section>
+  );
+  /** A progress row: the name and "1 of 727", the bar, then the words line. */
+  const barRow = (key, name, value, pct, sub) => (
+    <div key={key} className="prg-row">
+      <div className="prg-row-head">
+        <span className="prg-row-label">{name}</span>
+        <span className="ui-row-value prg-row-tally">{value}</span>
+      </div>
+      <div className="ui-progress prg-bar" aria-hidden="true"><span className="prg-bar-fill" style={{ width: pct + '%' }} /></div>
+      {sub ? <span className="ui-row-meta prg-words-note">{sub}</span> : null}
     </div>
   );
+  const offNote = <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>;
+  const weekWords = wordDays ? wordDays.slice(-7).reduce((n, d) => n + d.words, 0) : 0;
+  const firstDay = (() => {
+    const m = wordDays && wordDays.length ? /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(wordDays[0].date) : null;
+    return m && typeof MONTH_ABBR !== 'undefined' ? MONTH_ABBR[Number(m[2]) - 1] + ' ' + Number(m[3]) : '';
+  })();
+  const weekLine = _fmtWords(weekWords) + ' ' + (weekWords === 1 ? 'word' : 'words') + ' this week';
 
   return (
-    <ScreenLayout
-      navChildren={LibraryNav({ onBack: onBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}
-    >
-      <div className="prg-screen">
-        <header className="study-head">
-          <h1 className="study-head-title">Progress</h1>
-          <p className="study-head-sub">Your reading, journaling and study at a glance.</p>
-        </header>
-
-        <p className="prg-summary">{summary}</p>
-
+    <ScreenLayout utility={{ title: 'Progress', onBack, backLabel: 'Back to Library',
+      actions: [
+        onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null,
+        onSettings ? <BarAction key="g" icon="gear" label="Settings" onClick={onSettings} /> : null,
+      ].filter(Boolean) }}>
+      <div className="prg-screen lib-screen">
         {isEmpty ? (
           <>
-            {onStartReading ? (
-              <button type="button" className="today-btn prg-start" onClick={onStartReading}>Start with Volume One, Letter 1</button>
-            ) : null}
-            {!markAsReadOn ? <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div> : null}
+            <EmptyState icon="chart" title="Nothing read yet" text="The chapters and letters you read are counted here."
+              action={onStartReading ? { label: 'Start with Volume One, Letter 1', onClick: onStartReading } : undefined} />
+            {!markAsReadOn ? offNote : null}
           </>
         ) : <>
+        <p className="sr-only prg-summary">{summary}</p>
+        <div className="prg-tiles">
+          <div className="prg-tile"><b>{readStreak.toLocaleString('en-US')}</b><span>{readStreak === 1 ? 'day in a row' : 'days in a row'}</span></div>
+          <div className="prg-tile"><b>{totalRead.toLocaleString('en-US')}</b><span>{totalRead === 1 ? 'chapter or letter read' : 'chapters and letters read'}</span></div>
+          {wordDays ? <div className="prg-tile"><b>{_fmtWords(weekWords)}</b><span>{weekWords === 1 ? 'word this week' : 'words this week'}</span></div>
+            : <div className="prg-tile"><b>{journalCount.toLocaleString('en-US')}</b><span>{journalCount === 1 ? 'journal entry' : 'journal entries'}</span></div>}
+        </div>
         {wordDays ? (() => {
           const max = Math.max(0, ...wordDays.map((d) => d.words));
-          const weekWords = wordDays.slice(-7).reduce((n, d) => n + d.words, 0);
           return (
-            <div className="prg-days-wrap" role="group" aria-label="Words read, last 14 days">
-              <span className="sr-only">{_fmtWords(weekWords)} words this week</span>
+            <div className="ui-card prg-days-wrap" role="group" aria-label="Words read, last 14 days">
+              <span className="sr-only">{weekLine}</span>
               <span className="sr-only">
                 {wordDays.map((d) => `${d.date}: ${_fmtWords(d.words)} words`).join('; ')}
               </span>
               <div className="prg-days-head" aria-hidden="true">
                 <span>Last 14 days</span>
-                <span>{_fmtWords(weekWords)} {weekWords === 1 ? 'word' : 'words'} this week</span>
+                <span>{weekLine}</span>
               </div>
               <div className="prg-days-bars" aria-hidden="true">
                 {wordDays.map((d) => (
                   <div
                     key={d.date}
-                    className="prg-days-bar"
+                    className={'prg-days-bar' + (d.words > 0 ? ' is-on' : '')}
                     style={d.words > 0 ? { height: Math.max(8, Math.round((d.words / max) * 100)) + '%' } : null}
                   />
                 ))}
               </div>
+              <div className="prg-days-axis" aria-hidden="true"><span>{firstDay}</span><span>Today</span></div>
             </div>
           );
         })() : null}
 
-        <section className="prg-section" aria-labelledby="prg-h-reading">
-          {head('prg-h-reading', 'Reading')}
-          {facts(readingFacts)}
-          {!markAsReadOn ? (
-            <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>
-          ) : groups.length === 0 ? (
+        {section('prg-h-reading', 'Reading', <>
+          {!markAsReadOn ? offNote : groups.length === 0 ? (
             corpusFailed ? (
               <div className="prg-note" role="alert">
                 Couldn’t load your library.{' '}
@@ -453,88 +466,42 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
               // Bar fill weighs WORDS once computed; item fraction until then.
               const frac = (w && w.wordsTotal > 0) ? w.wordsRead / w.wordsTotal : t.read / t.total;
               const pct = Math.min(100, Math.round(frac * 100));
-              return (
-                <div key={grp.id} className="prg-row">
-                  <div className="prg-row-head">
-                    <span className="prg-row-label">{grp.label}</span>
-                    <span className="prg-row-tally">
-                      {t.read.toLocaleString('en-US')} of {t.total.toLocaleString('en-US')}
-                      {w && w.wordsTotal > 0 && (
-                        <>{' · '}<span className="prg-words-note">{_fmtWords(w.wordsRead)} of {_fmtWords(w.wordsTotal)} words</span></>
-                      )}
-                    </span>
-                  </div>
-                  <div className="prg-bar" aria-hidden="true">
-                    <div className="prg-bar-fill" style={{ width: pct + '%' }} />
-                  </div>
-                </div>
-              );
+              return barRow(grp.id, grp.label, t.read.toLocaleString('en-US') + ' of ' + t.total.toLocaleString('en-US'), pct,
+                w && w.wordsTotal > 0 ? _fmtWords(w.wordsRead) + ' of ' + _fmtWords(w.wordsTotal) + ' words' : '');
             })
           )}
+          {facts(readingFacts)}
           {historyEnabled && (
-            <div className="prg-history-row">
-              <span className="prg-history-label">Reading history</span>
-              <span className="prg-row-tally">{plural(historyCount, 'entry', 'entries')}</span>
-            </div>
+            <ListRow className="prg-history-row" noLead one title="History" value={countOf(historyCount, 'visit')}
+              onClick={onHistory || undefined} />
           )}
-        </section>
+        </>)}
 
-        {planRows.length || finishedPlans.length ? (
-          <section className="prg-section" aria-labelledby="prg-h-plans">
-            {head('prg-h-plans', 'Reading plans', planCoverage)}
-            {planRows.map((r) => (
-              <div key={r.id} className="prg-row">
-                <div className="prg-row-head">
-                  <span className="prg-row-label">{r.name}</span>
-                  <span className="prg-row-tally">{(r.finished ? 'Complete' : 'Day ' + (r.day + 1) + ' of ' + r.totalDays) + ' · ' + r.counts}</span>
-                </div>
-                <div className="prg-bar" aria-hidden="true">
-                  <div className="prg-bar-fill" style={{ width: (r.itemsTotal ? Math.round(r.itemsDone * 100 / r.itemsTotal) : 0) + '%' }} />
-                </div>
-              </div>
-            ))}
-            {finishedPlans.map((r) => (
-              <div key={r.id} className="prg-history-row">
-                <span className="prg-history-label">{runName(r, null)}</span>
-                <span className="prg-row-tally">{finishedLine(r)}</span>
-              </div>
-            ))}
-          </section>
-        ) : null}
+        {planRows.length || finishedPlans.length ? section('prg-h-plans', 'Reading plans', <>
+          {planRows.map((r) => barRow(r.id, r.name, (r.finished ? 'Complete' : 'Day ' + (r.day + 1) + ' of ' + r.totalDays),
+            r.itemsTotal ? Math.round(r.itemsDone * 100 / r.itemsTotal) : 0, r.counts))}
+          {finishedPlans.map((r) => (
+            <ListRow key={r.id} className="prg-history-row" noLead title={runName(r, null)} meta={finishedLine(r)} />
+          ))}
+        </>, planCoverage) : null}
 
-        <section className="prg-section" aria-labelledby="prg-h-journal">
-          {head('prg-h-journal', 'Journal')}
-          {facts(journalFacts)}
-        </section>
+        {section('prg-h-journal', 'Journal', facts(journalFacts))}
 
-        {listenFacts.length > 0 && (
-          <section className="prg-section prg-listening" aria-labelledby="prg-h-listening">
-            {head('prg-h-listening', 'Listening')}
-            {facts(listenFacts)}
-          </section>
-        )}
+        {listenFacts.length > 0 && section('prg-h-listening', 'Listening', facts(listenFacts), null, 'prg-listening')}
 
-        <section className="prg-section" aria-labelledby="prg-h-library">
-          {head('prg-h-library', 'Your library')}
-          {facts(libraryFacts)}
-        </section>
+        {section('prg-h-library', 'Notes and marks', facts(libraryFacts))}
 
-        <section className="prg-section" aria-labelledby="prg-h-annotated">
-          {head('prg-h-annotated', 'Most annotated')}
-          {topSources.length === 0 ? (
-            <div className="prg-note">Nothing marked yet — press and hold any text while reading to highlight it.</div>
-          ) : (
-            topSources.map((s) => (
-              <div key={s.key} className="prg-src-row">
-                <div className="prg-src-main">
-                  <span className="prg-src-title">{s.label}</span>
-                  <span className="prg-src-col">{s.collection}</span>
-                </div>
-                <span className="prg-row-tally">{plural(s.count, 'mark', 'marks')}{s.per1k > 0 ? ' · ' + s.per1k + '/1k words' : ''}</span>
-              </div>
-            ))
-          )}
-        </section>
+        {section('prg-h-annotated', 'Most marked', topSources.length === 0 ? (
+          <div className="prg-note">Nothing marked yet — press and hold any text while reading to highlight it.</div>
+        ) : (
+          topSources.map((s) => {
+            const ep = onOpenSource && typeof _bookmarkSourceEndpoint === 'function' ? _bookmarkSourceEndpoint(s.hlKey) : null;
+            return (
+              <ListRow key={s.key} className="prg-src-row" noLead title={s.label} meta={s.collection}
+                value={plural(s.count, 'mark', 'marks')} onClick={ep ? () => onOpenSource(ep) : undefined} />
+            );
+          })
+        ))}
         </>}
       </div>
     </ScreenLayout>

@@ -123,8 +123,8 @@ const renderScreen = (history, props = {}) => render(
   />,
 );
 
-const searchBox = () => document.querySelector('input.notes-index-search');
-const cardTitles = () => [...document.querySelectorAll('.chapter-card-title')].map((t) => t.textContent);
+const searchBox = () => document.querySelector('.lib-search input');
+const cardTitles = () => [...document.querySelectorAll('.ui-row-title')].map((t) => t.textContent);
 const type = (value) => fireEvent.change(searchBox(), { target: { value } });
 
 describe('HistoryScreen — search', () => {
@@ -140,7 +140,7 @@ describe('HistoryScreen — search', () => {
     const box = searchBox();
     expect(box).toBeTruthy();
     expect(box.getAttribute('type')).toBe('search');
-    expect(box.getAttribute('placeholder')).toBe('Search history…');
+    expect(box.getAttribute('placeholder')).toBe('Search history');
   });
 
   it('has no search box at all while the scroll is blank', () => {
@@ -232,7 +232,7 @@ describe('HistoryScreen — search reaches inside collapsed groups', () => {
     expect(cardTitles()).toEqual(['The Lord Is My Shepherd']);
     // Every ancestor group is open, not merely mounted.
     for (const head of document.querySelectorAll('.history-year-header, .history-month-header, .history-week-header, .history-day-header')) {
-      expect(head.querySelector('.history-chevron.is-open')).toBeTruthy();
+      expect(head.getAttribute('aria-expanded')).toBe('true');
     }
   });
 
@@ -292,7 +292,7 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
       progress: { [`${READ_VERSION_ID}:psalms:2`]: { b: 10, c: [1, 2, 3, 4, 5], tw: 500, w: 250 } },
     });
     renderScreen([chapter('psalms', 'Psalms', 1, today(5)), chapter('psalms', 'Psalms', 2, today(9))]);
-    const cards = [...document.querySelectorAll('.chapter-card-btn')];
+    const cards = [...document.querySelectorAll('.ui-row')];
     expect(within(cards[0]).queryByText(/min left/)).toBeNull();
     expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
   });
@@ -345,7 +345,7 @@ describe('HistoryScreen — resume chips on letter rows', () => {
       letter('the-wide-path', 'The Wide Path', 1, today(5)),
       letter('the-seventh-day', 'The Seventh Day', 2, today(9)),
     ]);
-    const cards = [...document.querySelectorAll('.chapter-card-btn')];
+    const cards = [...document.querySelectorAll('.ui-row')];
     expect(within(cards[0]).queryByText(/min left/)).toBeNull();
     expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
   });
@@ -453,8 +453,8 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     chapter('psalms', 'Psalms', 1, now - 4000),
     chapter('genesis', 'Genesis', 1, now - 5000),
   ];
-  const cardLabels = () => [...document.querySelectorAll('.chapter-card-label')].map((t) => t.textContent);
-  const rowVisits = () => [...document.querySelectorAll('.chapter-card-btn')]
+  const cardLabels = () => [...document.querySelectorAll('.history-entry-label')].map((t) => t.textContent);
+  const rowVisits = () => [...document.querySelectorAll('.ui-row')]
     .map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');
 
   it('one row per reading per day, counting its visits, at the newest visit; a single visit says nothing; another book at the same number is its own row', () => {
@@ -463,8 +463,8 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1', 'Chapter 1']);
     expect(cardLabels()).toEqual(['Psalms', 'Psalms', 'Genesis']);
     expect(rowVisits()).toEqual(['', '3 visits', '']);
-    // The day header counts ROWS, not visits — "Today · 3", never "· 5".
-    expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 3');
+    // The day header counts places, then visits (mock v2 l-hist: "1 place · 2 visits").
+    expect(document.querySelector('.history-day-count').textContent).toBe('3 places \xB7 5 visits');
     expect(document.querySelector('.history-dedupe-btn'), 'the chore button is gone').toBeNull();
   });
 
@@ -472,7 +472,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     setupGlobals();
     const onSelect = vi.fn();
     renderScreen(REPEATS, { onSelect });
-    const rows = [...document.querySelectorAll('.chapter-card-btn')];
+    const rows = [...document.querySelectorAll('.ui-row')];
     expect(rows, 'three rows: the three Psalms 1 visits are one, Genesis 1 is not one of them').toHaveLength(3);
     fireEvent.click(rows[1]);
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -494,7 +494,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     fireEvent.click(document.querySelector('.history-day-header'));
     expect(cardTitles()).toEqual(['Chapter 1']);
     expect(rowVisits()).toEqual(['2 visits']);
-    expect(document.querySelector('.history-day-count'), 'one row, so the day header shows no count').toBeNull();
+    expect(document.querySelector('.history-day-count').textContent).toBe('1 place \xB7 2 visits');
   });
 
   it('CONTROL (green on the base tree by design): the same reading on ANOTHER day is its own row — collapse is per calendar day', () => {
@@ -562,7 +562,7 @@ describe('HistoryScreen — yesterday stays open on the 1st, when it is last mon
    changes. */
 describe('HistoryScreen — a broad search in a long history', () => {
   const LONG = Array.from({ length: 250 }, (_, i) => chapter('psalms', 'Psalms', i + 1, today(i + 1)));
-  const shown = () => document.querySelectorAll('.chapter-card-title').length;
+  const shown = () => document.querySelectorAll('.ui-row-title').length;
   const more = () => document.querySelector('.history-show-all');
 
   it('draws the newest 100 matches and offers the rest', () => {

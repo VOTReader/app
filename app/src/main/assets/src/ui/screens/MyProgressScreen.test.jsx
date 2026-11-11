@@ -105,10 +105,21 @@ const GROUP = {
 /* The redesign (2026-09-25): the grid of stat boxes became one summary sentence and label / value
    rows (.prg-fact) in the section each fact belongs to. `fact` reads a row's value by its label. */
 const fact = (container, label) => {
-  const row = [...container.querySelectorAll('.prg-fact')].find((r) => r.querySelector('dt').textContent === label);
-  return row ? row.querySelector('dd').textContent : null;
+  const row = [...container.querySelectorAll('.prg-fact')].find((r) => r.querySelector('.ui-row-title').textContent === label);
+  return row ? row.querySelector('.ui-row-value').textContent : null;
 };
-const summaryOf = (container) => container.querySelector('.prg-summary').textContent;
+// The filled screen keeps the sentence for a screen reader (the tiles say it to the eye); a new profile is the
+// empty state's title and line (mock v2 l-prog, rule 15).
+// The three tiles (mock v2 l-prog): a tile's number by its words.
+const tile = (container, words) => {
+  const t = [...container.querySelectorAll('.prg-tile')].find((n) => n.querySelector('span').textContent === words);
+  return t ? t.querySelector('b').textContent : null;
+};
+const summaryOf = (container) => {
+  const s = container.querySelector('.prg-summary');
+  if (s) return s.textContent;
+  return container.querySelector('.ui-empty-title').textContent + '. ' + container.querySelector('.ui-empty-text').textContent;
+};
 
 describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
   /* n117 (A08.3): a new profile was the sentence and then a page of zero rows saying the same thing ten
@@ -134,7 +145,7 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
   it('one kept thing (a note) brings the rows back, zeros included', () => {
     setupGlobals({ notes: 1 });
     const { container, queryByRole } = renderScreen({ onStartReading: () => {} });
-    expect(fact(container, 'Chapters & letters read')).toBe('0');
+    expect(tile(container, 'chapters and letters read')).toBe('0');
     expect(fact(container, 'Notes')).toBe('1');
     expect(queryByRole('button', { name: 'Start with Volume One, Letter 1' })).toBeNull();
   });
@@ -143,9 +154,9 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
     setupGlobals({ streak: 6, journal: 4, readStreak: 12 });
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1, 'v1:mark:2': 1 } });
     expect(summaryOf(container)).toBe('2 chapters and letters read, a 12-day reading streak and 4 journal entries.');
-    expect(fact(container, 'Chapters & letters read')).toBe('2');
-    expect(fact(container, 'Reading streak')).toBe('12 days');
-    expect(fact(container, 'Journal streak')).toBe('6 days');
+    expect(tile(container, 'chapters and letters read')).toBe('2');
+    expect(tile(container, 'days in a row')).toBe('12');
+    expect(fact(container, 'Days in a row')).toBe('6');
     expect(fact(container, 'Entries')).toBe('4');
   });
 
@@ -165,7 +176,7 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
     setupGlobals({ readStreak: 1 });
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1 } });
     expect(summaryOf(container)).toBe('1 chapter or letter read.');
-    expect(fact(container, 'Reading streak')).toBe('1 day');
+    expect(tile(container, 'day in a row')).toBe('1');
   });
 
   it('a day that counted with nothing finished says the 1-day streak, never "Nothing read yet" (U01.2)', () => {
@@ -348,7 +359,7 @@ describe('MyProgressScreen — historyEnabled', () => {
   it('shows the reading-history row when history is enabled', () => {
     setupGlobals();
     const { container } = renderScreen({ historyCount: 7, historyEnabled: true });
-    expect(container.querySelector('.prg-history-row').textContent).toContain('7 entries');
+    expect(container.querySelector('.prg-history-row').textContent).toContain('7 visits');
   });
 
   it('hides the reading-history row when the user disabled history', () => {
@@ -365,7 +376,7 @@ describe('MyProgressScreen — library counts + most annotated', () => {
     } });
     const { container } = renderScreen();
     const rows = [...container.querySelectorAll('[aria-labelledby="prg-h-library"] .prg-fact')].map((r) => r.textContent);
-    expect(rows).toEqual(['Notes3', 'Highlights & Underlines1', 'Bookmarks1', 'Links2']);
+    expect(rows).toEqual(['Notes3', 'Highlights1', 'Bookmarks1', 'Links2']);
   });
 
   it('renders the most-annotated list through the real aggregator (title + collection + count)', () => {
@@ -377,8 +388,8 @@ describe('MyProgressScreen — library counts + most annotated', () => {
     const { container } = renderScreen();
     const rows = [...container.querySelectorAll('.prg-src-row')];
     expect(rows.length).toBe(1); // the journal key never surfaces
-    expect(rows[0].querySelector('.prg-src-title').textContent).toBe('Psalms');
-    expect(rows[0].querySelector('.prg-src-col').textContent).toBe('Scripture');
+    expect(rows[0].querySelector('.ui-row-title').textContent).toBe('Psalms');
+    expect(rows[0].querySelector('.ui-row-meta').textContent).toBe('Scripture');
     expect(rows[0].textContent).toContain('2 marks');
   });
 });
@@ -391,8 +402,8 @@ describe('MyProgressScreen — listening block', () => {
     const block = container.querySelector('.prg-listening');
     if (!block) return null;
     return [...block.querySelectorAll('.prg-fact')].map((r) => ({
-      label: r.querySelector('dt').textContent,
-      value: r.querySelector('dd').textContent,
+      label: r.querySelector('.ui-row-title').textContent,
+      value: r.querySelector('.ui-row-value').textContent,
     }));
   };
 
@@ -426,7 +437,7 @@ describe('MyProgressScreen — listening block', () => {
     const { container } = renderScreen({ historyCount: 1 });
     expect(listenRows(container)).toBeNull();
     // …and the reading rows are untouched by its absence.
-    expect(fact(container, 'Chapters & letters read')).toBe('0');
+    expect(tile(container, 'chapters and letters read')).toBe('0');
   });
 
   it('omits a single row whose reader the store cannot answer', () => {
@@ -477,7 +488,7 @@ describe('MyProgressScreen — large libraries', () => {
     for (let n = 1; n <= 3; n++) rerender(at(n));
     expect(annWalks).toBe(1);
     expect(jrnWalks).toBe(1);
-    expect(fact(container, 'Highlights & Underlines')).toBe('1');
+    expect(fact(container, 'Highlights')).toBe('1');
     expect(fact(container, 'Words written')).toBe(_fmtWords(3));
     expect(container.querySelectorAll('.prg-src-row').length).toBe(1);
   });
@@ -517,9 +528,9 @@ describe('MyProgressScreen — reading plans', () => {
     const { container } = renderScreen({ historyEnabled: false });
     const sec = container.querySelector('[aria-labelledby="prg-h-plans"]');
     expect(sec.textContent).toContain('Bible in a Year');
-    expect(sec.textContent).toMatch(/Day 1 of 365 · 1 of 1,189 chapters/);
+    expect(sec.textContent).toMatch(/Day 1 of 365.*1 of 1,189 chapters/);
     expect(sec.querySelector('.prg-history-row').textContent).toMatch(/Proverbs in 31 days.*Started .* · finished .* · 1 day/);
     // Proverbs 1-31 sit in both plans: 1,189 chapters in all, proverbs:1 read once.
-    expect(sec.querySelector('.prg-section-meta').textContent).toBe('1 of 1,189 read');
+    expect(sec.querySelector('.ui-label-aside').textContent).toBe('1 of 1,189 read');
   });
 });
