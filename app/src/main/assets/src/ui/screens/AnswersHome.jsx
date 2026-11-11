@@ -518,7 +518,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
     } else if (st.kind === 'again') {
       path = { k: 'Start again', title: 'Main Page', sub: 'in the site’s order', id: main.id };
     } else {
-      path = { k: 'Start here', title: 'Main Page', sub: answersSizeWords(main, meta && meta[main.id]), id: main.id };
+      path = { k: 'Start here', title: 'Main Page', sub: answersSizeWords(main, meta && meta[main.id], { about: true }), id: main.id };
     }
   }
 
@@ -553,6 +553,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   }, [asking]);
   const field = (
     <div className={'ans-search' + (query ? ' has-q' : '') + (asking ? ' ans-bar-field' : '')}>
+      {asking ? <span className="ans-search-lead" aria-hidden="true"><AnsIcon name="search" /></span> : null}
       <input ref={inputRef} className="ans-search-input" type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false}
         value={query} placeholder={placeholder} aria-label="Search Answers"
         onChange={(e) => { hadFocus.current = true; setQuery(e.target.value); }}

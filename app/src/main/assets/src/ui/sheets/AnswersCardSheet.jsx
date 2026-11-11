@@ -62,7 +62,10 @@ export function drawAnswersCard(canvas, card, theme, family) {
   for (const f of L.foot) {
     c2.font = f.font;
     c2.fillStyle = f.gold ? theme.gold : theme.text;
+    const ls = /** @type {any} */ (c2);
+    if (f.caps && 'letterSpacing' in ls) ls.letterSpacing = '3px';
     c2.fillText(f.text, L.pad, f.y);
+    if (f.caps && 'letterSpacing' in ls) ls.letterSpacing = '0px';
   }
   return true;
 }
@@ -136,7 +139,7 @@ export function AnswersCardSheet({ card, onClose }) {
   // view (app.css .ans-card); on a short screen (a phone held sideways) it keeps a readable size and the sheet scrolls.
   // Over 80 words there is no card: no theme control, and the sheet only as tall as its message.
   return (
-    <AnsSheet label="Share as a card" tall={fits} onClose={onClose} head={<h2 className="ans-sh-t">Share as a card</h2>}>
+    <AnsSheet label="Share as a card" onClose={onClose} head={<h2 className="ans-sh-t">Share as a card</h2>}>
       {fits ? (
         <div className="ans-tabs ans-seg" role="radiogroup" aria-label="Card theme">
           {ANSWERS_CARD_THEMES.map((t) => (

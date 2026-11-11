@@ -203,27 +203,27 @@ describe('Charts & videos words (f13)', () => {
 describe('search words (f06)', () => {
   const g = { entry: E('god-speaks-about-the-sabbath'), n: 18, total: 19, prose: false };
   it('a group\'s sub, the header, a title-only match and an index of categories', () => {
-    expect(show(answersSearchSub(A, g))).toBe('18~of 19~passages~· The Fourth Commandment');
-    expect(show(answersSearchSub(A, { ...g, n: 0 }))).toBe('Title match~· The Fourth Commandment');
+    expect(show(answersSearchSub(A, g))).toBe('The Fourth Commandment~· 18~of 19~passages match');
+    expect(show(answersSearchSub(A, { ...g, n: 0 }))).toBe('The Fourth Commandment~· Title match');
     expect(show(answersSearchSub(A, { entry: E('false-doctrines-within-the-churches-of-men-regarding'), n: 6, total: 46, prose: true })))
-      .toBe('6~of 46~categories~· False Doctrines index');
+      .toBe('False Doctrines index~· 6~of 46~categories match');
     expect(show(answersSearchSum({ matches: 73, groups: new Array(22) }))).toBe('In Answers~· 73~matches in 22~topics');
   });
   it('a topic the engine ranked (answers-ranked.js) with no passage holding every word: its place, and the topics found', () => {
     expect(show(answersSearchSub(A, { ...g, n: 0, titleHit: false }))).toBe('The Fourth Commandment');
-    expect(show(answersSearchSub(A, { ...g, n: 0, titleHit: true }))).toBe('Title match~· The Fourth Commandment');
+    expect(show(answersSearchSub(A, { ...g, n: 0, titleHit: true }))).toBe('The Fourth Commandment~· Title match');
     expect(show(answersSearchSum({ matches: 0, groups: new Array(5), ranked: true }))).toBe('In Answers~· 5~topics');
     expect(show(answersSearchSum({ matches: 4, groups: new Array(5), ranked: true }))).toBe('In Answers~· 4~matches in 5~topics');
   });
   it('only the False Doctrines index counts categories; other pages of prose count sections', () => {
     // Regarding the Trinity and the Mormons page have no source lines either: they are not indexes.
     expect(show(answersSearchSub(A, { entry: E('regarding-the-church-of-jesus-christ-of-latter-day-saints-mormons'), n: 1, total: 2, prose: true })))
-      .toBe('1~of 2~sections~· The churches');
+      .toBe('The churches~· 1~of 2~sections match');
     // One section (or one passage) to the page: "1 of 1" says nothing, so it is a match.
     expect(show(answersSearchSub(A, { entry: E('regarding-the-trinity'), n: 1, total: 1, prose: true })))
-      .toBe('1~match~· Scripture & doctrine');
+      .toBe('Scripture & doctrine~· 1~match');
     expect(show(answersSearchSub(A, { entry: E('regarding-the-united-church-of-god'), n: 1, total: 1, prose: false })))
-      .toBe('1~match~· The churches');
+      .toBe('The churches~· 1~match');
   });
   it('a title-only result is not "0 matches"', () => {
     expect(show(answersSearchSum({ matches: 0, groups: new Array(1) }))).toBe('In Answers~· 1~topic by its title');

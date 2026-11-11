@@ -100,7 +100,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     const second = render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
     expect(path().querySelector('.ans-k').textContent).toBe('Start here');
     expect(path().querySelector('.ans-row-title').textContent).toBe('Main Page');
-    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · ~12 min');
+    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · about 12 min');
     second.unmount();
     render(<AnswersHome {...base} pathOn={false} />);
     expect(path().querySelector('.ans-k').textContent).toBe('Start here');
@@ -243,8 +243,8 @@ describe('AnswersHome — search (f06)', () => {
     fireEvent.change(field(), { target: { value: 'sabbath' } });
     expect(NB(document.querySelector('.ans-results .ans-sechead .ans-count').textContent)).toBe('73 matches in 22 topics');
     const subs = texts('.ans-results .ans-res .ans-row-sub').map(NB);
-    expect(subs[0]).toBe('18 of 19 passages · The Fourth Commandment');
-    expect(subs[1]).toBe('1 of 18 passages · The Second Commandment');
+    expect(subs[0]).toBe('The Fourth Commandment · 18 of 19 passages match');
+    expect(subs[1]).toBe('The Second Commandment · 1 of 18 passages match');
     expect(subs.length).toBe(8);
     expect(document.querySelector('.ans-res mark').textContent).toBe('Sabbath');
     expect(NB(document.querySelector('.ans-hit-src').textContent)).toBe('“You Shall Not Desecrate the Sabbath” · Volume 3 · 3/29/06');
@@ -425,7 +425,7 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
     const titles = texts('.ans-row .ans-row-title');
     expect(titles[0]).toBe('Regarding the Mistranslation and Misinterpretation of the Scriptures');
     expect(titles[4]).toBe('Regarding The Trinity');
-    expect(NB([...document.querySelectorAll('.ans-row .ans-row-sub')][4].textContent)).toBe('See: 6 links');
+    expect(NB([...document.querySelectorAll('.ans-row .ans-row-sub')][4].textContent)).toBe('6 links');
     fireEvent.click(screen.getByText('Read all 9 in order'));
     expect(onOpenTopic).toHaveBeenCalledWith('regarding-adding-to-or-taking-away-from-the-word-of-god', null, 'Scripture & doctrine');
     expect(navProps.backLabel).toBe('Answers');

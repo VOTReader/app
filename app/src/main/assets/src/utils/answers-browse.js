@@ -12,7 +12,7 @@
    - a number and its unit never part: U+00A0 between them ("12 passages");
    - a line never starts with a middot: every separator is U+00A0 + "· " (A29);
    - a row's sub: its size ("12 passages · ~12 min", "46 categories",
-     "3 letters · ~4 min", "See: 6 links" or "~3 min"), then its media words
+     "3 letters · ~4 min", "6 links" or "~3 min"), then its media words
      in one fixed order (video · audio · PDF · chart · downloads);
    - a place: the commandment ("The Fourth Commandment"), the numbered group
      with our short name ("5 · Scripture & doctrine"), "Other Topics" or
@@ -119,21 +119,22 @@ export function answersTopSections(meta) {
 }
 
 /**
- * A topic's size: "12 passages · ~12 min", "46 categories", "3 letters · ~4 min", "See: 6 links", "~3 min".
+ * A topic's size: "12 passages · ~12 min", "46 categories", "3 letters · ~4 min", "6 links", "~3 min";
+ * "about 12 min" with opts.about (FA: the mock's words on a card or a topic's head, "~" in a list row).
  * @param {any} entry
  * @param {any} meta its sidecar (null before answers-meta.js lands)
- * @param {{ minutes?: boolean }} [opts]
+ * @param {{ minutes?: boolean, about?: boolean }} [opts]
  */
 export function answersSizeWords(entry, meta, opts) {
   const minutes = !(opts && opts.minutes === false) && !!meta;
-  const min = '~' + answersMinutes(meta) + NBSP + 'min';
+  const min = (opts && opts.about ? 'about' + NBSP : '~') + answersMinutes(meta) + NBSP + 'min';
   const n = answersPassageCount(entry);
   if (n) return pl(n, 'passage') + (minutes ? SEP + min : '');
   if (entry && entry.id === ANSWERS_FD_INDEX_ID) return meta ? pl(answersTopSections(meta).length, 'category') : '';
   const d = answersLetterCount(entry);
   if (d) return pl(d, 'letter') + (minutes ? SEP + min : '');
   const L = answersLinkCount(meta);
-  if (L) return 'See:' + NBSP + pl(L, 'link');
+  if (L) return pl(L, 'link');
   return meta ? min : '';
 }
 
@@ -141,10 +142,11 @@ export function answersSizeWords(entry, meta, opts) {
  * A topic row's sub without its read mark: size, then media words.
  * @param {any} entry
  * @param {any} meta
+ * @param {{ about?: boolean }} [opts]
  */
-export function answersRowSub(entry, meta) {
+export function answersRowSub(entry, meta, opts) {
   const k = answersMediaKinds(meta);
-  return [answersSizeWords(entry, meta)].concat(k).filter(Boolean).join(SEP);
+  return [answersSizeWords(entry, meta, opts)].concat(k).filter(Boolean).join(SEP);
 }
 
 /* ── Places ────────────────────────────────────────────────────────── */
@@ -544,10 +546,11 @@ export function answersSearchSum(r) {
 export function answersSearchSub(entries, g) {
   const place = answersPlaceOf(entries, g.entry.id);
   // A topic the engine found (answers-ranked.js) by other words or by meaning, its title not matched: its place alone.
-  if (!g.n) return g.titleHit === false ? place : 'Title match' + SEP + place;
-  if (g.total === 1) return pl(g.n, 'match') + SEP + place;
+  // FA (a-query): the place first, then the count ("The Fourth Commandment · 18 of 19 passages match", the mock's)
+  if (!g.n) return g.titleHit === false ? place : place + SEP + 'Title match';
+  if (g.total === 1) return place + SEP + pl(g.n, 'match');
   const unit = !g.prose ? 'passage' : (g.entry.id === ANSWERS_FD_INDEX_ID ? 'category' : 'section');
-  return g.n + NBSP + 'of ' + pl(g.total, unit) + SEP + place;
+  return place + SEP + g.n + NBSP + 'of ' + pl(g.total, unit) + ' match';
 }
 
 /**

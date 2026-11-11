@@ -220,7 +220,7 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'answers-group', letterId: '5' })).toEqual({ title: 'Scripture & doctrine', subtitle: '5. Thus Says The Lord...', resolved: true });
       expect(describeTab({ screen: 'answers-group', letterId: 'other' }).title).toBe('Other Topics');
       expect(describeTab({ screen: 'answers-group', letterId: 'gone' }).title).toBe('Answers');
-      expect(describeTab({ screen: 'answers-media' }).title).toBe('Charts & videos');
+      expect(describeTab({ screen: 'answers-media' }).title).toBe('Charts and videos');
       expect(describeTab({ screen: 'answers-saved' })).toEqual({ title: 'Saved answers', subtitle: 'Answers Only God Can Give', resolved: true });
       // The retired screens are named for where they reopen (answers-retired.js).
       expect(describeTab({ screen: 'answers-az' }).title).toBe('Answers');

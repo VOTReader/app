@@ -9105,6 +9105,18 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-end-step{margin-top:10px}
 .ans-end-step .ans-tile-btn{border-radius:var(--r-pill)}
 .ans-end-step .ans-tile-btn:only-child{grid-column:1/-1}
+/* ── FA answers (FLAGS-answers-search: the bar title whole, the lead words lighter, the topic and commandment titles
+   at the mock's size, the field's magnifier, a shorter card sheet, Saved's second door; mock v2 answers.html) ── */
+.top-nav .ans-bar-title{margin:0 -6px 0 -2px}
+.ans-row-title .ans-lead,.ans-h2 .ans-lead{font-weight:400}
+.ans-hero .ans-display:not(.is-long){font-size:min(31px,8vw);line-height:1.13}
+.ans-ts2 .ans-hero .ans-display:not(.is-long){font-size:min(var(--fs-36),10vw);line-height:1.1}
+.ans-sheet .ans-cmd-t{text-wrap:wrap}
+.ans-bar-field .ans-search-lead{position:absolute;top:0;left:0;width:40px;height:var(--tap);display:grid;place-items:center;color:var(--text-2);pointer-events:none}
+.ans-bar-field .ans-search-lead+.ans-search-input{padding-left:40px}
+.ans-sheet .ans-card{max-width:min(100%,280px)}
+.ans-saved-surprise{margin:0 auto;font-family:var(--font-ui);font-size:var(--ts-control);font-weight:500;color:var(--text-1)}
+/* ── end FA answers ── */
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */

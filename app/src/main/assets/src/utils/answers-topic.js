@@ -87,7 +87,7 @@ function pageMedia(meta) {
 
 /**
  * The hero's meta line: "26 passages · ~31 min · 15 sections · 2 playlists · 1 video · audio · PDF · 2 charts";
- * "See: 6 links" for a page of links (never "0 passages"). '' before the sidecar lands.
+ * "6 links" for a page of links (never "0 passages"). '' before the sidecar lands.
  * @param {any} entry
  * @param {any} meta
  */
@@ -97,7 +97,7 @@ export function answersHeroMeta(entry, meta) {
   const top = answersTopSections(meta).length;
   const size = fd ? pl(top, 'category') : answersSizeWords(entry, meta, { minutes: false });
   const parts = [size];
-  if (!size.startsWith('See:') && !size.startsWith('~')) parts.push('~' + answersMinutes(meta) + NBSP + 'min');
+  if (!/link$|links$/.test(size) && !size.startsWith('~')) parts.push('about' + NBSP + answersMinutes(meta) + NBSP + 'min');
   if (!fd && top === 2) parts.push(pl(top, 'section')); // WA1 (a-topic): 3 or more are counted by the sections strip
   const pos = (m) => (m.at === 'end' ? 1e9 : m.at);
   return parts.concat(mediaWords(pageMedia(meta).slice().sort((a, b) => pos(a) - pos(b)))).filter(Boolean).join(SEP);
@@ -151,7 +151,7 @@ export function answersSectionNums(meta) {
  * @property {boolean} [synthetic]
  * @property {number} end     the paragraph after its last
  * @property {string} num     '' for the Trumpet Call
- * @property {string} sub     "7 passages", "1 chart", "See: 2 links", "3 false doctrines"
+ * @property {string} sub     "7 passages", "1 chart", "2 links", "3 false doctrines"
  * @property {{ at: number, title: string, collection: string }[]} ex  its passages' source lines
  * @property {boolean} trumpet
  */
@@ -189,7 +189,7 @@ export function answersTocRows(entry, meta) {
         for (const [p, arr] of Object.entries((meta && meta.links) || {})) {
           if (+p >= s.at && +p < end) links += /** @type {any[]} */ (arr).filter((l) => l.kind !== 'contents').length;
         }
-        if (links) sub = 'See:' + NBSP + pl(links, 'link');
+        if (links) sub = pl(links, 'link');
       }
     }
     return { ...s, end, num: nums.get(s.at) || '', sub, ex, trumpet: isTrumpetSection(s) };
