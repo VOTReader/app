@@ -55,6 +55,7 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
   const idx = React.useMemo(() => (meta ? answersMediaIndex(entries, meta) : null), [entries, meta]);
   const [chart, setChart] = React.useState(/** @type {any} */ (null));
   const [about, setAbout] = React.useState(false);
+  const [open, setOpen] = React.useState(/** @type {{ v?: boolean, l?: boolean, f?: boolean }} */ ({}));
   const place = (id) => answersMediaPlace(entries, id, answersShortTitle);
   const closeChart = React.useCallback(() => setChart(null), []);
   const closeAbout = React.useCallback(() => setAbout(false), []);
@@ -62,16 +63,13 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
   const channels = idx ? idx.lists.length - playlists : 0;
   return (
     <ScreenLayout className={answersLayoutClass(fontScale, false)}
-      navChildren={LibraryNav({ onBack, backLabel: 'Answers', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange })}>
-      <div className="ans-page">
-        <header className="ans-hero">
-          <p className="ans-label">Answers Only God Can Give</p>
-          <h1 className="ans-display">Charts &amp; videos</h1>
-          <p className="ans-lede">Charts open here and zoom. Videos, playlists, audio and PDFs open outside the app.</p>
-        </header>
+      navChildren={LibraryNav({ onBack, backLabel: 'Answers', showHome: false, onSettings, onHistory, onSearch, theme, onThemeChange,
+        leftExtras: <h1 className="ans-bar-title is-on">Charts &amp; videos</h1> })}>
+      <div className="ans-page ans-media-page">
         {idx ? (
           <>
-            <div className="ans-sechead"><h2 className="ans-h2">Charts</h2><span className="ans-count">{pl(idx.charts.length, 'chart')}</span></div>
+            {/* WA2 (a-media): eyebrow heads, charts as two-up tiles, videos and lists in cards; the long lists open in place */}
+            <div className="ans-sechead"><h2 className="ans-h2">Charts</h2><span className="ans-count">Open here · pinch to zoom</span></div>
             <div className="ans-gallery">
               {idx.charts.map((c) => (
                 <button key={c.src} type="button" className="ans-thumb" aria-haspopup="dialog" onClick={() => setChart(c)}>
@@ -81,12 +79,28 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
                 </button>
               ))}
             </div>
-            <div className="ans-sechead"><h2 className="ans-h2">Videos</h2><span className="ans-count">{pl(idx.videos.length, 'video')}</span></div>
-            {idx.videos.map((m, i) => <MediaRow key={'v' + i} m={m} place={place(m.id)} />)}
-            <div className="ans-sechead"><h2 className="ans-h2">Playlists</h2><span className="ans-count">{pl(playlists, 'playlist') + (channels ? SEP + pl(channels, 'channel') : '')}</span></div>
-            {idx.lists.map((m, i) => <MediaRow key={'l' + i} m={m} place={place(m.id)} />)}
-            <div className="ans-sechead"><h2 className="ans-h2">Audio &amp; PDF</h2><span className="ans-count">{pl(idx.files.length, 'item')}</span></div>
-            {idx.files.map((m, i) => <MediaRow key={'f' + i} m={m} place={place(m.id)} />)}
+            <div className="ans-sechead"><h2 className="ans-h2">Videos</h2><span className="ans-count">Open in your browser</span></div>
+            <div className="ans-box">
+              {(open.v ? idx.videos : idx.videos.slice(0, 3)).map((m, i) => <MediaRow key={'v' + i} m={m} place={place(m.id)} />)}
+              {idx.videos.length > 3 && !open.v ? (
+                <button type="button" className="ans-textbtn ans-media-all" aria-expanded="false" onClick={() => setOpen({ ...open, v: true })}>{'All ' + pl(idx.videos.length, 'video')}<Chev /></button>
+              ) : null}
+            </div>
+            <div className="ans-sechead"><h2 className="ans-h2">Playlists, audio and PDFs</h2></div>
+            <div className="ans-box">
+              <button type="button" className="ans-row" aria-expanded={!!open.l} onClick={() => setOpen({ ...open, l: !open.l })}>
+                <span className="ans-disc" aria-hidden="true"><AnsIcon name="list" /></span>
+                <span className="ans-row-body"><span className="ans-row-title">Playlists</span><span className="ans-row-sub">{pl(playlists, 'playlist') + (channels ? SEP + pl(channels, 'channel') : '')}</span></span>
+                <Chev dir={open.l ? 'down' : 'chev'} />
+              </button>
+              {open.l ? idx.lists.map((m, i) => <MediaRow key={'l' + i} m={m} place={place(m.id)} />) : null}
+              <button type="button" className="ans-row" aria-expanded={!!open.f} onClick={() => setOpen({ ...open, f: !open.f })}>
+                <span className="ans-disc" aria-hidden="true"><AnsIcon name="doc" /></span>
+                <span className="ans-row-body"><span className="ans-row-title">Audio &amp; PDF</span><span className="ans-row-sub">{pl(idx.files.length, 'item') + SEP + 'By topic'}</span></span>
+                <Chev dir={open.f ? 'down' : 'chev'} />
+              </button>
+              {open.f ? idx.files.map((m, i) => <MediaRow key={'f' + i} m={m} place={place(m.id)} />) : null}
+            </div>
           </>
         ) : failed ? (
           <p className="ans-meta" role="status">

@@ -21,7 +21,8 @@ import { AnsSheet } from './AnswersSheets.jsx';
 import {
   ANSWERS_CARD_THEMES, ANSWERS_CARD_MAX_WORDS, ANSWERS_CARD_W, ANSWERS_CARD_H, ANSWERS_CARD_SITE, answersCardWords, answersCardLayout,
 } from '../../utils/answers-extras.js';
-import { shareCanvasImage } from '../../utils/copy-share.js';
+import { shareCanvasImage, copyText } from '../../utils/copy-share.js';
+import { AnsIcon } from '../components/AnswersParts.jsx';
 
 /** The last theme picked, for the next card this session. */
 let _theme = ANSWERS_CARD_THEMES[0].id;
@@ -113,6 +114,12 @@ export function AnswersCardSheet({ card, onClose }) {
       if (outcome === 'shared' || outcome === 'saved') onClose();
     });
   };
+  const copyWords = () => {
+    copyText('“' + card.passage + '”\n' + card.cite + (card.date ? ' · ' + card.date : '') + '\n' + ANSWERS_CARD_SITE).then((out) => {
+      if (typeof showToast === 'function') showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: out === 'failed' ? 'Couldn’t copy the words.' : 'Words copied.' });
+      if (out !== 'failed') onClose();
+    });
+  };
   // A radio group (one of three, repainting the one card): arrows step and wrap, Home and End jump, focus follows.
   const onKey = (/** @type {any} */ e) => {
     const n = ANSWERS_CARD_THEMES.length;
@@ -129,9 +136,9 @@ export function AnswersCardSheet({ card, onClose }) {
   // view (app.css .ans-card); on a short screen (a phone held sideways) it keeps a readable size and the sheet scrolls.
   // Over 80 words there is no card: no theme control, and the sheet only as tall as its message.
   return (
-    <AnsSheet label="Share as a card" tall={fits} onClose={onClose} head={<p className="ans-label">Share as a card</p>}>
+    <AnsSheet label="Share as a card" tall={fits} onClose={onClose} head={<h2 className="ans-sh-t">Share as a card</h2>}>
       {fits ? (
-        <div className="ans-tabs" role="radiogroup" aria-label="Card theme">
+        <div className="ans-tabs ans-seg" role="radiogroup" aria-label="Card theme">
           {ANSWERS_CARD_THEMES.map((t) => (
             <button key={t.id} type="button" className="ans-tab" role="radio" aria-checked={t.id === themeId}
               tabIndex={t.id === themeId ? 0 : -1} onClick={() => setThemeId(t.id)} onKeyDown={onKey}>{t.label}</button>
@@ -147,7 +154,11 @@ export function AnswersCardSheet({ card, onClose }) {
           <p className="ans-note">{'A card holds ' + ANSWERS_CARD_MAX_WORDS + ' words at most; this passage has ' + words + '.'}</p>
         </div>
       )}
-      <button type="button" className="ans-btn" disabled={!fits || busy} onClick={share}>Share</button>
+      <div className="ans-card-foot">
+        <button type="button" className="ans-btn" disabled={!fits || busy} onClick={share}><AnsIcon name="share" />Share</button>
+        {/* WA2 (a-card): the words alone, as the passage and its citation, when a picture is not wanted */}
+        <button type="button" className="ans-textbtn ans-card-copy" onClick={copyWords}>Copy the words instead</button>
+      </div>
     </AnsSheet>
   );
 }

@@ -9332,6 +9332,96 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-runhead .ans-runhead-text{flex:0 1 auto}
 .ans-sec-strip .ans-az-key.ans-contents-line{flex:none;width:auto;margin:0}
 .ans-runhead:not(.is-hidden){z-index:1000}
+/* ── WA2 answers (AnswersSheets.jsx, AnswersContents.jsx: a-onpage, a-cmd, a-more, a-card, a-about; mock v2 answers.html, WA2-answers 2026-11-11) ──
+   Every Answers sheet: grab bar, then × | title | count on one row; rows in one inset card. */
+.ans-sheet .ans-sheet-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 -10px 4px;padding:0;border:0;background:inherit}
+.ans-sheet .ans-sheet-head .sheet-handle-row{display:contents}
+.select-sheet.ans-sheet .sheet-handle-grab{order:-1;flex:0 0 100%;height:14px;padding:0;display:flex;align-items:flex-start;justify-content:center}
+.select-sheet.ans-sheet .sheet-handle-bar{width:36px;height:4px;margin:0;border-radius:2px;background:var(--surface-3)}
+.select-sheet.ans-sheet .sheet-handle-back{flex:none;width:var(--tap);height:48px;color:var(--text-1)}
+.ans-sheet-head>h2.ans-row-title{flex:1;min-width:0}
+.ans-sh-t{flex:1;min-width:0;margin:0;padding-left:2px;font-family:var(--font-serif);font-size:var(--ts-sheet);line-height:1.2;font-weight:700;color:var(--text-1)}
+.ans-sheet-head .ans-sh-k{flex:1;min-width:0;padding-left:2px}
+.ans-sh-m{flex:none;padding-right:12px;font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);color:var(--text-2)}
+.ans-sheet-head+.ans-box{margin-top:8px}
+.ans-box.is-inset{background:var(--surface-2)}
+.ans-sheet .ans-box .ans-row-title{font-size:var(--ts-body)}
+.ans-sheet .ans-box .ans-row-sub,.ans-sheet .ans-head .ans-meta,.ans-sheet .ans-count{font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);font-style:normal;color:var(--text-2)}
+.ans-sheet .ans-chev{color:var(--text-3)}
+.ans-sheet .ans-sechead{margin:22px 0 10px}
+.ans-sheet .ans-sechead .ans-h2{font-family:var(--font-ui);font-size:var(--ts-label);line-height:var(--lh-label);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent)}
+/* a-onpage: numbered rows, the current one gold-edged with its passages under it */
+.ans-toc .ans-row{gap:12px}
+.ans-toc .ans-toc-sec{min-height:var(--row-h-1)}
+.ans-toc .ans-num{flex:0 0 26px;font-family:var(--font-ui);font-size:var(--ts-control);font-weight:600;text-align:center;color:var(--accent)}
+.ans-toc .ans-toc-sec.is-current::before{display:none}
+.ans-toc .ans-toc-sec.is-l2{padding-left:40px}
+.ans-toc-cur{box-shadow:inset 3px 0 var(--accent);border-bottom:1px solid var(--hairline);padding-bottom:6px}
+.ans-toc-cur:last-child{border-bottom:0}
+.ans-toc-cur .ans-row{border-bottom:0}
+.ans-toc-cur .ans-toc-sec{align-items:flex-start;padding-top:14px}
+.ans-toc-cur .ans-num{padding-top:3px}
+.ans-toc-cur .ans-toc-sec .ans-row-sub,.ans-toc .ans-now{font-style:normal;color:var(--accent)}
+.ans-toc .ans-toc-ex,.ans-toc .ans-toc-more{min-height:var(--tap);padding:2px 12px 2px 54px}
+.ans-toc .ans-toc-ex.is-l2,.ans-toc .ans-toc-more.is-l2{padding-left:78px}
+.ans-toc .ans-toc-ex .ans-row-sub{font-family:var(--font-serif);font-size:var(--ts-value);line-height:1.5;color:var(--text-1)}
+.ans-toc .ans-toc-more{border:0;color:var(--accent);font-family:var(--font-ui);font-size:var(--ts-value)}
+/* a-cmd: the heading, the verse, its topics, then the commandments either side */
+.ans-sheet .ans-cmd-t{margin-top:6px;font-family:var(--font-serif);font-weight:600;color:var(--text-1)}
+.ans-sheet .ans-verse{margin-top:10px;font-family:var(--font-serif);font-size:var(--ts-headline);line-height:1.45;color:var(--text-1)}
+.ans-sheet .ans-head{margin-top:10px}
+.ans-sheet .ans-head .ans-textbtn{min-height:var(--tap);gap:2px;font-family:var(--font-ui);font-size:var(--ts-value);font-weight:500;color:var(--accent)}
+.ans-sheet .ans-head .ans-textbtn .ans-chev{color:var(--accent)}
+.ans-cmd-step{margin-top:24px}
+.ans-cmd-step .ans-tile-btn{min-width:0;padding:0 12px;gap:4px;border-radius:var(--r-pill);background:var(--surface-2);white-space:nowrap;overflow:hidden}
+.ans-cmd-step .ans-tile-btn .ans-chev{flex:none;color:var(--accent)}
+/* a-card: the theme as a segmented control, Share as the primary button, the words as a text button */
+.ans-sheet .ans-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:8px;padding:3px;border:0;border-radius:var(--r-chip);background:var(--surface-2)}
+.ans-sheet .ans-seg .ans-tab{min-height:var(--seg-h);border-radius:calc(var(--r-chip) - 2px);background:none;font-family:var(--font-ui);font-size:var(--ts-value);color:var(--text-2)}
+.ans-sheet .ans-seg .ans-tab[aria-checked=true]{background:var(--surface-3);color:var(--text-1)}
+.ans-sheet .ans-seg .ans-tab::after{display:none}
+.ans-sheet .ans-card{border:0;border-radius:var(--r-field)}
+.ans-card-foot{margin-top:20px}
+.ans-sheet .ans-card-foot .ans-btn{display:flex;align-items:center;justify-content:center;gap:9px;min-height:var(--btn-h);margin:0;border:0;border-radius:var(--r-pill);background:var(--accent);color:var(--accent-ink);font-family:var(--font-ui);font-size:var(--ts-control);font-weight:600}
+.ans-sheet .ans-card-foot .ans-btn .ans-ico{color:var(--accent-ink)}
+.ans-card-copy{display:flex;justify-content:center;width:100%;min-height:var(--btn-h);margin-top:4px;font-family:var(--font-ui);font-size:var(--ts-control);color:var(--text-2)}
+/* a-about: the page's title, one line on what this is, then two cards */
+.ans-about-t{margin:6px 0 0;font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1)}
+.ans-about-lede{margin:6px 0 14px;font-family:var(--font-ui);font-size:var(--ts-value);line-height:1.5;color:var(--text-2)}
+.ans-sheet .ans-foot-h3{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;font-style:normal;color:var(--accent)}
+/* a-media, a-saved: the title in the bar, eyebrow heads, rows in cards */
+.ans-bar-title.is-on{opacity:1}
+:is(.ans-media-page,.ans-saved-page,.ans-foot) .ans-sechead{margin:24px 0 10px}
+:is(.ans-media-page,.ans-saved-page,.ans-foot) .ans-sechead .ans-h2,.ans-foot-k{margin:0;font-family:var(--font-ui);font-size:var(--ts-label);line-height:var(--lh-label);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent)}
+:is(.ans-media-page,.ans-saved-page,.ans-foot) .ans-count{font-family:var(--font-ui);font-size:var(--ts-meta);font-style:normal;color:var(--text-2)}
+.ans-media-page{padding-top:4px}
+.ans-media-page .ans-gallery{display:grid;grid-template-columns:1fr 1fr;gap:var(--grid-gap)}
+.ans-media-page .ans-thumb{display:block;overflow:hidden;border-radius:var(--r-card);background:var(--surface-1);color:var(--text-1)}
+.ans-media-page .ans-thumb img{display:block;width:100%;height:112px;object-fit:cover}
+.ans-media-page .ans-thumb .ans-thumb-t{display:block;padding:10px 12px 0;font-family:var(--font-serif);font-size:var(--ts-body);line-height:1.25;font-weight:600}
+.ans-media-page .ans-thumb .ans-row-sub{display:block;padding:4px 12px 12px;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
+:is(.ans-media-page,.ans-foot) .ans-box .ans-media{display:flex;align-items:center;gap:12px;min-height:var(--row-h);padding:10px 12px 10px 14px;border-bottom:1px solid var(--hairline);color:var(--text-1)}
+:is(.ans-media-page,.ans-foot) .ans-disc{display:flex;align-items:center;justify-content:center;flex:none;width:var(--icon-chip);height:var(--icon-chip);border-radius:50%;background:var(--surface-2);color:var(--accent)}
+.ans-media-page .ans-media-sub{display:block;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
+.ans-media-page .ans-box>.ans-row{gap:12px;padding-left:14px}
+.ans-media-all{min-height:var(--tap);padding:0 16px;gap:2px;font-family:var(--font-ui);font-size:var(--ts-value);color:var(--accent)}
+.ans-saved-note{margin:6px 0 0;font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);color:var(--text-2)}
+.ans-saved-row{position:relative;display:flex;align-items:flex-start;gap:4px;padding:14px 4px 14px 14px;border-bottom:1px solid var(--hairline)}
+.ans-saved-row:last-child{border-bottom:0}
+.ans-saved-row .ans-hit{flex:1;min-width:0;padding:0 0 0 14px;border:0;box-shadow:inset 4px 0 var(--accent);border-radius:0;background:none;color:var(--text-1)}
+.ans-saved-row .ans-hit-snip{display:block;font-family:var(--font-serif);font-size:var(--ts-headline);line-height:1.4;color:var(--text-1)}
+.ans-saved-row .ans-hit-src{display:block;margin-top:4px;font-family:var(--font-ui);font-size:var(--ts-meta);font-style:normal;color:var(--text-2)}
+.ans-saved-menu{display:flex;align-items:center;justify-content:center;flex:none;width:var(--tap);height:var(--tap);margin-top:-10px;color:var(--text-3)}
+/* a-end: see also and the next topic in cards, then Previous topic | All answers */
+.ans-foot .ans-box .ans-row{padding:10px 12px 10px 16px}
+.ans-foot-nav .ans-foot-k{margin:24px 0 10px}
+.ans-foot-nav>.ans-row{padding:14px 12px 14px 16px;border:0;border-radius:var(--r-card);background:var(--surface-1)}
+.ans-foot-nav>.ans-row .ans-row-sub:first-child{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent)}
+.ans-foot-nav>.ans-row .ans-row-title{margin-top:5px;font-size:var(--ts-sheet);font-weight:700}
+.ans-foot-nav>.ans-row+.ans-row{margin-top:10px}
+.ans-end-step{margin-top:10px}
+.ans-end-step .ans-tile-btn{border-radius:var(--r-pill)}
+.ans-end-step .ans-tile-btn:only-child{grid-column:1/-1}
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */

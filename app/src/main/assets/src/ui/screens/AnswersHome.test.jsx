@@ -176,12 +176,16 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     render(<AnswersHome {...base} onOpenTopic={onOpenTopic} />);
     fireEvent.click(screen.getByRole('button', { name: /^2\. You Shall Not Commit Idolatry\. 3 topics$/ }));
     const dialog = screen.getByRole('dialog');
-    expect(dialog.querySelector('.ans-label').textContent).toBe('The Second Commandment');
-    expect(dialog.querySelector('.ans-h2').textContent).toBe('2. You Shall Not Commit Idolatry.');
+    expect(dialog.querySelector('.ans-k').textContent).toBe('The Second Commandment');
+    expect(dialog.querySelector('.ans-sh-m').textContent).toBe('2 of 10');
+    expect(dialog.querySelector('.ans-h2').textContent).toBe('You Shall Not Commit Idolatry.');
     expect(dialog.querySelector('.ans-verse').textContent).toMatch(/^You shall not make for yourself a carved image—.*earth;$/);
     expect(texts('.ans-row-title', dialog)).toEqual(['God Speaks About Idolatry', 'God Speaks About Materialism', 'Regarding Another Messiah']);
     fireEvent.click(within(dialog).getByText('Idolatry').closest('button'));
     expect(onOpenTopic).toHaveBeenCalledWith('god-speaks-about-idolatry', null, 'Answers');
+    // WA2 (a-cmd): step to the next commandment without closing
+    fireEvent.click(screen.getByRole('button', { name: /^Next commandment: III/ }));
+    expect(screen.getByRole('dialog').querySelector('.ans-k').textContent).toBe('The Third Commandment');
     act(() => { window.__closeSheet(); });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -220,10 +224,10 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     render(<AnswersHome {...base} />);
     fireEvent.click(screen.getByText('About this collection'));
     const d = screen.getByRole('dialog');
-    expect(d.querySelector('.ans-h2').textContent).toBe('About Answers Only God Can Give');
+    expect(d.querySelector('.ans-about-t').textContent).toBe('About Answers Only God Can Give');
+    // WA2 (a-about): the site's own row first, then the Sister Sites, in one card under their head
     const sister = [...d.querySelectorAll('h3')].find((h) => h.textContent === 'Sister Sites');
-    const rows = [];
-    for (let n = sister.nextElementSibling; n && n.tagName === 'A'; n = n.nextElementSibling) rows.push(n.querySelector('.ans-row-title').textContent);
+    const rows = [...sister.parentNode.nextElementSibling.querySelectorAll('a .ans-row-title')].map((n) => n.textContent).slice(1);
     expect(rows).toEqual(SITE.sisterSites.map((s) => s.label));
     expect(d.textContent).toContain('Copyright © 2004-2024 ~ All Rights Reserved.');
     expect(d.textContent).toContain('2026-10-19');
@@ -456,9 +460,15 @@ describe('AnswersMedia — Charts & videos (f13)', () => {
   });
   it('lists every chart, video, playlist, channel, audio and PDF; only charts stay in the app', () => {
     render(<AnswersMedia {...base} />);
-    expect(texts('.ans-sechead .ans-h2')).toEqual(['Charts', 'Videos', 'Playlists', 'Audio & PDF']);
-    expect(texts('.ans-sechead .ans-count').map(NB)).toEqual(['2 charts', '4 videos', '11 playlists · 2 channels', '7 items']);
+    // WA2 (a-media): three eyebrow heads; three videos, then "All 4 videos"; playlists and audio open in place
+    expect(texts('.ans-sechead .ans-h2')).toEqual(['Charts', 'Videos', 'Playlists, audio and PDFs']);
+    expect(texts('.ans-sechead .ans-count').map(NB)).toEqual(['Open here · pinch to zoom', 'Open in your browser']);
     expect(document.querySelectorAll('.ans-thumb').length).toBe(2);
+    expect(document.querySelectorAll('a.ans-media').length).toBe(3);
+    fireEvent.click(screen.getByRole('button', { name: /^All 4.videos/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Playlists/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Audio & PDF/ }));
+    expect(texts('.ans-media-page .ans-box > .ans-row .ans-row-sub').map(NB)).toEqual(['11 playlists · 2 channels', '7 items · By topic']);
     const links = [...document.querySelectorAll('a.ans-media')];
     expect(links.length).toBe(4 + 13 + 7);
     for (const a of links) { expect(a.getAttribute('target')).toBe('_blank'); expect(a.getAttribute('href')).toMatch(/^https?:\/\//); }

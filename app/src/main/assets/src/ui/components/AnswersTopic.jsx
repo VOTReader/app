@@ -27,7 +27,7 @@ import { h, Fragment } from '../jsx-h.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from './AnswersParts.jsx';
 import { FoldRow, TocRows, AnswersContentsSheet } from './AnswersContents.jsx';
 import { AnsSheet, ChartViewer, CommandmentSheet } from '../sheets/AnswersSheets.jsx';
-import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
+import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, answersBrowseShelves, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
@@ -664,6 +664,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       ) : null}
       {sheet && sheet.kind === 'cmd' && entries ? (
         <CommandmentSheet shelf={sheet.shelf} meta={metaAll} isRead={(id) => !!pathOn && isRead(id)} tall={ts2} onClose={() => setSheet(null)}
+          onStep={(n) => { const c = answersBrowseShelves(entries).commandments.find((x) => x.num === n); if (c) setSheet({ kind: 'cmd', shelf: c }); }}
           onOpenTopic={(id) => { setSheet(null); nav.openTopic(id, null); }} onGoToRef={nav.goToRef ? (ref) => { setSheet(null); nav.goToRef(ref); } : undefined} />
       ) : null}
       {sheet && sheet.kind === 'chart' ? (
@@ -773,7 +774,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
             {groups.map((g, gi) => (
               <React.Fragment key={'g' + gi}>
                 {g.label ? <h3 className="ans-foot-h3">{g.label}</h3> : null}
-                {g.items.map((it, j) => (it.anchor ? moreRow(it, gi + ':' + j) : topicRow(it.id, gi + ':' + j)))}
+                <div className="ans-box">{g.items.map((it, j) => (it.anchor ? moreRow(it, gi + ':' + j) : topicRow(it.id, gi + ':' + j)))}</div>
               </React.Fragment>
             ))}
           </React.Fragment>,
@@ -786,7 +787,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       parts.push(
         <React.Fragment key="r">
           <div className="ans-sechead"><h2 className="ans-h2">Related Topics</h2></div>
-          {vis.map((r, k) => (r.more ? moreRow(r, 'm' + k) : topicRow(r.id, 't' + k)))}
+          <div className="ans-box">{vis.map((r, k) => (r.more ? moreRow(r, 'm' + k) : topicRow(r.id, 't' + k)))}</div>
           {R.length > RELATED_SHOWN ? (
             <button type="button" className="ans-textbtn" aria-expanded={all} onClick={() => setAll(!all)}>
               {all ? 'Show fewer' : 'Show all ' + R.length}<Chev dir={all ? 'up' : 'down'} />
@@ -799,13 +800,15 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       const fd = entry.id === ANSWERS_FD_INDEX_ID;
       const main = entry.id === ANSWERS_MAIN_PAGE_ID;
       const rows = [];
+      // WA2 (a-end): "Keep reading", the next topic as a card, then worded Previous topic | All answers
+      const step = [];
       if (sn && sn.next && byId.has(sn.next)) {
         const nx = byId.get(sn.next);
         rows.push(<KRow key="n" kicker={'Next in ' + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next)} onClick={() => nav.go(sn.next)} />);
       }
       if (sn && sn.prev && byId.has(sn.prev)) {
         const pv = byId.get(sn.prev);
-        rows.push(<KRow key="p" prev title={<LeadTitle title={pv.title} />} sub={topicSub(sn.prev)} onClick={() => nav.go(sn.prev)} />);
+        step.push(<button key="p" type="button" className="ans-tile-btn" aria-label={'Previous topic: ' + pv.title} onClick={() => nav.go(sn.prev)}><AnsIcon name="left" />Previous topic</button>);
       }
       if (sn && sn.end && sn.proceed) {
         const pr = sn.proceed;
@@ -824,12 +827,13 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
         // the count the shelf it opens shows (Other Topics lists the page outside the site's menu too)
         const browse = shelf.kind === 'commandment' ? null : answersShelfByKey(entries, shelf.kind === 'other' ? 'other' : String(shelf.num));
         const n = (browse ? browse.topics : shelf.topics).length;
-        rows.push(<AnsRow key="g" title="All topics in this group" sub={answersPlaceOf(entries, entry.id) + SEP + pl(n, 'topic')} onClick={() => onShelf(shelf)} />);
+        step.push(<button key="g" type="button" className="ans-tile-btn" aria-label={'All answers: ' + answersPlaceOf(entries, entry.id) + ', ' + pl(n, 'topic').replace(NBSP, ' ')} onClick={() => onShelf(shelf)}><AnsIcon name="list" />All answers</button>);
       }
-      if (!main && !fd) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
+      if (step.length) rows.push(<div key="st" className="ans-two ans-end-step">{step}</div>);
+      if (!main && !fd && !step.length) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
       parts.push(
         <nav key="nav" className="ans-foot-nav" aria-labelledby={'ans-nav-' + entry.id}>
-          <h2 className="sr-only" id={'ans-nav-' + entry.id}>Navigation</h2>
+          <h2 className="ans-foot-k" id={'ans-nav-' + entry.id}>Keep reading</h2>
           {rows}
         </nav>,
       );

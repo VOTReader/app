@@ -20,6 +20,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { h, Fragment } from '../jsx-h.js';
+import { ANSWERS_COMMANDMENTS } from '../../utils/answers-shelves.js';
 import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource } from '../../utils/answers-browse.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from '../components/AnswersParts.jsx';
 import { sheetReference } from '../../utils/passage-copy.js';
@@ -57,47 +58,70 @@ export function AnsSheet({ label, head, tall, viewer, onClose, children }) {
  * @param {{ byId: Map<string, any>, meta: any, onOpenTopic: Function, onClose: () => void, tall?: boolean }} props
  */
 export function MoreQuestionsSheet({ byId, meta, onOpenTopic, onClose, tall }) {
+  // WA2 (a-more): the question is the sheet's title; the rows sit in one inset card
   return (
-    <AnsSheet label="Start with a question" tall={tall} onClose={onClose} head={<p className="ans-label">Start with a question</p>}>
-      <h2 className="ans-h2">What does The Lord say about…</h2>
-      {ANSWERS_QUESTIONS.map(([q, id]) => {
-        const e = byId.get(id);
-        if (!e) return null;
-        const size = answersSizeWords(e, meta && meta[id], { minutes: false });
-        return <AnsRow key={id} title={q} sub={[e.title, size].filter(Boolean).join(SEP)} onClick={() => onOpenTopic(id, null, 'Answers')} />;
-      })}
+    <AnsSheet label="Start with a question" tall={tall} onClose={onClose} head={<h2 className="ans-sh-t">What does The Lord say about…</h2>}>
+      <div className="ans-box is-inset">
+        {ANSWERS_QUESTIONS.map(([q, id]) => {
+          const e = byId.get(id);
+          if (!e) return null;
+          const size = answersSizeWords(e, meta && meta[id], { minutes: false });
+          return <AnsRow key={id} title={q} sub={[e.title, size].filter(Boolean).join(SEP)} onClick={() => onOpenTopic(id, null, 'Answers')} />;
+        })}
+      </div>
     </AnsSheet>
   );
 }
 
 /**
- * f03: one commandment. The title is the site's sidebar heading word for word (C13); the verse is the
- * app's NKJV, its quotation marks drawn by CSS so a copy carries the words alone, then the reference
- * (data-copy-ref: "Exodus 20:13 (NKJV)", whatever Settings picks).
+ * f03: one commandment. The title is the site's sidebar heading word for word (C13), without its number
+ * (WA2, a-cmd: "4 of 10" sits in the head); the verse is the app's NKJV, its quotation marks drawn by CSS so a
+ * copy carries the words alone, then the reference (data-copy-ref: "Exodus 20:13 (NKJV)", whatever Settings
+ * picks). With onStep, the foot steps to the commandment before and after without closing the sheet.
  * @param {{ shelf: any, meta: any, isRead: (id: string) => boolean, onOpenTopic: Function,
- *   onGoToRef?: Function, onClose: () => void, tall?: boolean }} props
+ *   onGoToRef?: Function, onStep?: (n: number) => void, onClose: () => void, tall?: boolean }} props
  */
-export function CommandmentSheet({ shelf, meta, isRead, onOpenTopic, onGoToRef, onClose, tall }) {
+export function CommandmentSheet({ shelf, meta, isRead, onOpenTopic, onGoToRef, onStep, onClose, tall }) {
   const cmd = shelf.commandment;
   const raw = String(cmd.verse || '');
   const closed = raw.endsWith('”');
   const verse = raw.slice(raw.startsWith('“') ? 1 : 0, closed ? -1 : raw.length);
   const label = `The ${cmd.ordinal} Commandment`;
+  const num = Number(shelf.num) || 0;
+  const prev = num > 1 ? ANSWERS_COMMANDMENTS[num - 2] : null;
+  const next = num && num < ANSWERS_COMMANDMENTS.length ? ANSWERS_COMMANDMENTS[num] : null;
   const n = shelf.topics.length;
   return (
-    <AnsSheet label={label} tall={tall} onClose={onClose} head={<p className="ans-label">{label}</p>}>
-      <h2 className="ans-h2">{shelf.label}</h2>
+    <AnsSheet label={label} tall={tall} onClose={onClose}
+      head={<><p className="ans-k ans-sh-k">{label}</p>{num ? <span className="ans-sh-m">{num + ' of ' + ANSWERS_COMMANDMENTS.length}</span> : null}</>}>
+      <h2 className="ans-h2 ans-cmd-t">{String(shelf.label).replace(/^\d+\.\s*/, '')}</h2>
       <p className={'ans-verse' + (closed ? ' is-closed' : '')} data-copy-ref={sheetReference(cmd.ref)}>{verse}</p>
       <div className="ans-head">
         <span className="ans-meta">{cmd.ref + SEP + 'NKJV'}</span>
         {onGoToRef ? <button type="button" className="ans-textbtn" onClick={() => onGoToRef(cmd.ref)}>Go to Scripture<Chev /></button> : null}
       </div>
       <div className="ans-sechead"><h3 className="ans-h2">Topics</h3><span className="ans-count">{n === 1 ? '1' + NBSP + 'topic' : n + NBSP + 'topics'}</span></div>
-      {shelf.topics.map((e) => (
-        <AnsRow key={e.id} title={<LeadTitle title={e.title} />}
-          sub={<>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>}
-          onClick={() => onOpenTopic(e.id, null, 'Answers')} />
-      ))}
+      <div className="ans-box is-inset">
+        {shelf.topics.map((e) => (
+          <AnsRow key={e.id} title={<LeadTitle title={e.title} />}
+            sub={<>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>}
+            onClick={() => onOpenTopic(e.id, null, 'Answers')} />
+        ))}
+      </div>
+      {onStep && (prev || next) ? (
+        <div className="ans-two ans-cmd-step">
+          {prev ? (
+            <button type="button" className="ans-tile-btn" aria-label={'Previous commandment: ' + prev.numeral + ', ' + prev.label} onClick={() => onStep(prev.n)}>
+              <Chev dir="left" />{prev.numeral + SEP + prev.label}
+            </button>
+          ) : <span />}
+          {next ? (
+            <button type="button" className="ans-tile-btn" aria-label={'Next commandment: ' + next.numeral + ', ' + next.label} onClick={() => onStep(next.n)}>
+              {next.numeral + SEP + next.label}<Chev />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </AnsSheet>
   );
 }
@@ -121,17 +145,23 @@ export function AboutSheet({ site, onOpenTopic, onClose }) {
   const at = inline ? text.indexOf(inline.label) : -1;
   const lines = (s) => s.split('\n').flatMap((l, i) => (i ? [<br key={'b' + i} />, l] : [l]));
   return (
-    <AnsSheet label="About this collection" tall onClose={onClose} head={<p className="ans-label">About this collection</p>}>
-      <h2 className="ans-h2">{about.title}</h2>
-      {(about.see || []).map((r) => (
-        <AnsRow key={'s' + r.id} one title={<><span className="ans-lead">See:</span>{' ' + r.title}</>} onClick={() => onOpenTopic(r.id, null, 'Answers')} />
-      ))}
-      {(about.alsoSee || []).map((r) => (
-        <AnsRow key={'a' + r.id} one title={<><span className="ans-lead">Also See:</span>{' ' + r.title}</>} onClick={() => onOpenTopic(r.id, null, 'Answers')} />
-      ))}
-      <AnsRow title={'Visit ' + answersDomain(site.site)} sub="Opens in your browser" href={site.site} />
-      <h3 className="ans-foot-h3">Sister Sites</h3>
-      {(site.sisterSites || []).map((s) => <AnsRow key={s.url} title={s.label} sub={answersDomain(s.url)} href={s.url} />)}
+    <AnsSheet label="About this collection" tall onClose={onClose} head={<h2 className="ans-sh-t">About this collection</h2>}>
+      {/* WA2 (a-about): what this is, the two in-app doors in one card, then the web links in another */}
+      <h3 className="ans-about-t">{about.title}</h3>
+      <p className="ans-about-lede">{'Passages from The Volumes of Truth gathered by topic, as arranged on ' + answersDomain(site.site) + '. Captured' + NBSP + site.capturedAt + '.'}</p>
+      <div className="ans-box is-inset">
+        {(about.see || []).map((r) => (
+          <AnsRow key={'s' + r.id} one title={<><span className="ans-lead">See:</span>{' ' + r.title}</>} onClick={() => onOpenTopic(r.id, null, 'Answers')} />
+        ))}
+        {(about.alsoSee || []).map((r) => (
+          <AnsRow key={'a' + r.id} one title={<><span className="ans-lead">Also See:</span>{' ' + r.title}</>} onClick={() => onOpenTopic(r.id, null, 'Answers')} />
+        ))}
+      </div>
+      <div className="ans-sechead"><h3 className="ans-h2">Sister Sites</h3><span className="ans-count">Open in your browser</span></div>
+      <div className="ans-box is-inset">
+        <AnsRow title={'Visit ' + answersDomain(site.site)} sub="Opens in your browser" href={site.site} />
+        {(site.sisterSites || []).map((s) => <AnsRow key={s.url} title={s.label} sub={answersDomain(s.url)} href={s.url} />)}
+      </div>
       {site.promotion ? (
         <>
           <h3 className="ans-foot-h3">Site Promotion</h3>

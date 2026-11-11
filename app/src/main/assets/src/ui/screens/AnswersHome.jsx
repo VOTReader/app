@@ -635,7 +635,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
         </div>
       </div>
       {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onClose={closeSheet} tall={ts2} /> : null}
-      {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onClose={closeSheet} tall={ts2} /> : null}
+      {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onStep={(n) => openSheet({ kind: 'cmd', n })} onClose={closeSheet} tall={ts2} /> : null}
       {sheet && sheet.kind === 'about' && site ? <AboutSheet site={site} onOpenTopic={openTopic} onClose={closeSheet} /> : null}
       {sheet && sheet.kind === 'card' && loaded ? <AnswersCardSheet card={sheet.card} onClose={closeSheet} /> : null}
     </ScreenLayout>

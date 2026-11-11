@@ -47,14 +47,16 @@ export function TocRows({ rows, cur, withEx, onSection, onExcerpt }) {
     const l2 = r.level === 2 ? ' is-l2' : '';
     const ex = current && withEx ? r.ex : [];
     const shown = ex.length > 4 && !more ? ex.slice(0, 3) : ex;
+    // WA2 (a-onpage): the current section and its passages share one gold-edged row
+    const Wrap = current && withEx ? 'div' : React.Fragment;
     return (
-      <React.Fragment key={r.at + ':' + r.anchor}>
+      <Wrap key={r.at + ':' + r.anchor} {...(current && withEx ? { className: 'ans-toc-cur' } : {})}>
         <a className={'ans-row ans-toc-sec' + l2 + (current ? ' is-current' : '')} href={'#' + r.anchor} aria-current={current ? 'location' : undefined}
           onClick={(e) => { e.preventDefault(); onSection(k); }}>
           <span className="ans-num">{r.num}</span>
           <span className="ans-row-body">
             <span className="ans-row-title">{r.title}</span>
-            {r.sub || current ? <span className="ans-row-sub">{r.sub}{current ? <>{r.sub ? SEP : ''}<span className="ans-now">Reading now</span></> : null}</span> : null}
+            {r.sub || current ? <span className="ans-row-sub">{current ? <><span className="ans-now">You are here</span>{r.sub ? SEP : ''}</> : null}{r.sub}</span> : null}
           </span>
         </a>
         {shown.map((x) => (
@@ -65,7 +67,7 @@ export function TocRows({ rows, cur, withEx, onSection, onExcerpt }) {
         {ex.length > 4 && !more ? (
           <button type="button" className={'ans-textbtn ans-toc-more' + l2} aria-expanded="false" onClick={() => setMoreAt(cur)}>{'Show ' + (ex.length - 3) + ' more'}<Chev dir="down" /></button>
         ) : null}
-      </React.Fragment>
+      </Wrap>
     );
   });
 }
@@ -88,11 +90,12 @@ export function AnswersContentsSheet({ title, rows, cur, meta, foldable, foldOn,
     if (!shown) sheet.scrollTop = Math.max(0, row.offsetTop - (head ? head.offsetHeight : 0) - 8);
   }, [cur]);
   return (
-    <AnsSheet label="On this page" tall={!!ts2} onClose={onClose} head={<p className="ans-label">On this page</p>}>
-      <h2 className="ans-h2" ref={ref}>{title}</h2>
-      <p className="ans-meta">{meta}</p>
+    <AnsSheet label={'On this page: ' + title} tall={!!ts2} onClose={onClose}
+      head={<><h2 className="ans-sh-t" ref={ref}>On this page</h2><span className="ans-sh-m">{meta}</span></>}>
       {foldable ? <FoldRow on={foldOn} onChange={onFold} /> : null}
-      <TocRows rows={rows} cur={cur} withEx={true} onSection={onSection} onExcerpt={onExcerpt} />
+      <div className="ans-box is-inset ans-toc">
+        <TocRows rows={rows} cur={cur} withEx={true} onSection={onSection} onExcerpt={onExcerpt} />
+      </div>
     </AnsSheet>
   );
 }
