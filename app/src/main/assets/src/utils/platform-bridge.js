@@ -682,7 +682,6 @@ function webPickImportFile() {
 const SCREENSHOT_IGNORE_CLASSES = [
   'tabs-overview-layer', 'top-nav', 'back-hint-row',
   'chapter-nav-sticky', 'surprise-fab',
-  'mode-toggle-wrap',
 ];
 
 /**

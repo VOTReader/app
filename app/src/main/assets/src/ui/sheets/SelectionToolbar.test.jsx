@@ -1573,8 +1573,8 @@ describe('dockTop: the toolbar measures its room below the selection against the
     box('audio-bar', 845, 70); box('audio-bar-pull', 822, 26); box('ascroll-pill', 745, 52);
     expect(dockTop(document, 915)).toBe(745);
   });
-  it('skips a hidden control (the Study Notes toggle while find is open)', () => {
-    box('audio-bar', 845, 70); box('mode-toggle-wrap', 600, 51, 'none');
+  it('skips a hidden control (a stopped auto-scroll pill while find is open)', () => {
+    box('audio-bar', 845, 70); box('ascroll-pill', 600, 51, 'none');
     expect(dockTop(document, 915)).toBe(845);
   });
 });

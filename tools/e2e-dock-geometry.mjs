@@ -20,12 +20,13 @@
  * tall: 277px cannot hold the player, the open dwell row, find and a toast, whatever the stack does.
  * It asserts:
  *   G1  no two visible controls' rects intersect (a control nested in another is one control);
- *   G2  every visible control lies inside the viewport, below the top bar (inset-top + 67.4 px) and above
+ *   G2  every visible control lies inside the viewport, below the top bar (inset-top + --bar-h, 56 px since the UI pass) and above
  *       the gesture inset (the player's own padding is the one thing allowed under it);
  *   G4  scrolled to its end, the reading text's last line rests clear above every control that stays up (the
  *       scroller's end padding is the dock's live height; toasts and the first-run hint come and go);
- *   G3  every control the case expects is visible, and the Study Notes toggle is hidden while find is open
- *       (and, on a short screen, while the dwell row is open).
+ *   G3  every control the case expects is visible (a stopped auto-scroll pill and the tour prompt step aside
+ *       while find is open). The Study Notes toggle and the prophecy Expand FAB left the dock (POL1/POL2, 2026-11-11):
+ *       both are in the page now.
  * It cannot see a control whose size grows past its stand-in: the sizes are the measured ones, and a
  * redesign that changes them must change them here.
  *
@@ -58,7 +59,6 @@ const PARTS = {
   stopped:    '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
   expanded:   '<div class="ascroll-pill is-running is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
-  toggle:     '<div class="mode-toggle-wrap"><div class="mode-toggle-label">Study Notes</div><div class="mode-toggle"><div style="height:33px;width:229px"></div></div></div>',
   hint:       '<div class="ann-hint-pill"><div style="height:57px;width:100vw"></div></div>',            // 79px with its padding
   toast:      '<div class="vot-toast show"><div style="height:38px;width:100vw"></div></div>',          // two lines: 68px
   rootexit:   `<div id="vot-root-exit-toast" style="${ROOT_EXIT};opacity:1"><div style="height:20px;width:200px"></div></div>`,
@@ -66,13 +66,13 @@ const PARTS = {
   fab:        '<button class="jrn-fab jrn-fab-newentry"></button>',
 };
 // What can be on screen at once. Reading screens: hint yields to the player (AnnotationHint), autoscroll and
-// find hide it (app.css); find hides the toggle. Home and first run's Letter 1: the tour prompt, which stacks on
-// the reading screen's rows and steps aside while find is open, and on a short screen for the pill or the toggle
+// find hide it (app.css). Home and first run's Letter 1: the tour prompt, which stacks on
+// the reading screen's rows and steps aside while find is open, and on a short screen for the pill
 // (tour-dock). Journal: the FAB.
 const CASES = [];
 for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'stopped']) for (const find of [0, 1])
-  for (const toggle of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
-    const c = [player && 'player', as, find && 'find', toggle && 'toggle', msg].filter(Boolean);
+  for (const msg of ['', 'toast', 'rootexit']) {
+    const c = [player && 'player', as, find && 'find', msg].filter(Boolean);
     CASES.push(c);
     if (!player && !as && !find) CASES.push([...c, 'hint']);
   }
@@ -81,9 +81,9 @@ for (const player of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
   CASES.push(['fab', player && 'player', msg].filter(Boolean));
 }
 for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded']) for (const find of [0, 1])
-  for (const toggle of [0, 1]) for (const msg of ['', 'toast']) {
-    if (!as && !find && !toggle) continue;   // the plain tour cases above
-    CASES.push(['tour', player && 'player', as, find && 'find', toggle && 'toggle', msg].filter(Boolean));
+  for (const msg of ['', 'toast']) {
+    if (!as && !find) continue;   // the plain tour cases above
+    CASES.push(['tour', player && 'player', as, find && 'find', msg].filter(Boolean));
   }
 const VIEWPORTS = [[412, 915], [360, 740], [915, 412]];
 const insetsFor = (w, h) => [null, w > h ? [28, 24] : [68, 24]];
@@ -123,8 +123,8 @@ try {
             document.documentElement.style.setProperty('--audio-bar-h', Math.round(bar.getBoundingClientRect().height - share) + 'px');
           }
           const sys = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-bottom')) || 0;
-          const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + 67.4;
-          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
+          const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 67.4);
+          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
           const vis = els.map((el) => ({ el, k: el.className || el.id, cs: getComputedStyle(el), q: el.getBoundingClientRect() }))
             .filter((o) => o.cs.display !== 'none' && o.q.width && o.q.height);
           const out = { hits: [], off: [], missing: [], shown: [], text: [] };
@@ -147,13 +147,12 @@ try {
             if (o.q.left < -0.5 || o.q.top < navBottom - 0.5 || o.q.right > innerWidth + 0.5 || o.q.bottom > floor + 0.5)
               out.off.push(`${o.k} [${[o.q.left, o.q.top, o.q.right, o.q.bottom].map(Math.round)}]`);
           }
-          const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', stopped: '.ascroll-pill', find: '.find-pill', toggle: '.mode-toggle-wrap',
+          const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', stopped: '.ascroll-pill', find: '.find-pill',
             hint: '.ann-hint-pill', toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
           for (const k of c) {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);
-            const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)))
-              && !(k === 'tour' && (c.includes('find') || (innerHeight <= 500 && c.some((x) => ['autoscroll', 'expanded', 'toggle'].includes(x)))))
+            const expect = !(k === 'tour' && (c.includes('find') || (innerHeight <= 500 && c.some((x) => ['autoscroll', 'expanded'].includes(x)))))
               && !(k === 'stopped' && c.includes('find'));
             if (shown !== expect) out.missing.push(`${k} ${shown ? 'shown' : 'hidden'}`);
           }

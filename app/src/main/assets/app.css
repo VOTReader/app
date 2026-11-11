@@ -679,8 +679,7 @@
            sys        the gesture bar / home indicator (env() on iOS, Kotlin's --inset-bottom on the APK)
            player     the mini player, 70px + its 23px pull tab (+3 gap), while body.audio-bar-open
            transport  the auto-scroll pill, while body.autoscroll-on (taller when its dwell row is open)
-           context    the screen's own control: Study Notes / prophecy Expand (.mode-toggle-wrap, right),
-                      the journal FAB
+           context    the journal FAB
            message    toasts (.vot-toast, the root-exit toast) ride on top of everything above, the find
                       pill included. While the tour prompt fills the bottom, and on a short screen (landscape:
                       412px cannot hold player + pill + find + a toast under a 67px nav), they drop in under the nav
@@ -720,14 +719,13 @@
          third of the text and the find pill takes its row; a running one stays, so it can still be paused. */
       body:has(.find-pill) .ascroll-pill:not(.is-running) { display: none; }
       body.autoscroll-on:has(.find-pill):not(:has(.ascroll-pill.is-running)) { --dock-transport: 0px; }
-      body:has(.mode-toggle-wrap) { --dock-context: 72px; }  /* the 59px Study Notes card + 8 + air */
       body:has(.jrn-fab) { --dock-context: 72px; }
       /* cz5 (Corbin 02:59: "Media player should be auto hidden when viewing ... the garden images"): a full-screen
          image view hides the mini player and the whole dock, and they come back on leaving. The Scripture Web too
          (Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like scripture web"), and its
          load-error panel, the screen's root when WebGL fails. Audio does not play on either (23:5x): entering one
          pauses it (useNoAudioHere), so the bar is back on leaving paused at the same spot, one tap from resuming. */
-      body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
+      body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill) { display: none; }
       body:has(.garden-fullscreen, .sw-root, .sw-fallback) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
       /* The keyboard is up (use-keyboard-inset.js marks html.kb-up): the mini player steps aside and gives its lane
          back, so nothing being typed sits under it; the notification, lock screen and headset still control the
@@ -736,7 +734,7 @@
       html.kb-up body { --dock-player: 0px; }
       html.kb-up .tabbar { display: none; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
-      body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
+      body:is(.audio-bar-open, .autoscroll-on, :has(.jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
       }
       /* The message lane: where a toast's bottom edge goes (restated for the hint below). A toast reads
@@ -747,13 +745,11 @@
         --dock-under-nav: calc(var(--dock-nav-bottom) + var(--offline-strip-h, 0px) + 8px);
       }
       /* A short screen cannot stack all of them: the auto-scroll dwell row (an adjuster the reader opened)
-         folds while find is open, and the Study Notes toggle steps aside while that row is open, as it does for find. */
+         folds while find is open. */
       @media (max-height: 500px) {
         body { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
         body:has(.find-pill) .ascroll-dwell-row { display: none; }
         body.autoscroll-on:has(.ascroll-pill.is-expanded):has(.find-pill) { --dock-transport: 60px; }
-        body:has(.ascroll-pill.is-expanded) .mode-toggle-wrap { display: none; }
-        .mode-toggle-label { display: none; }  /* the caption goes before a button does (cz7) */
       }
 
       /* ── LIGHT THEME OVERRIDES ── */
@@ -2601,8 +2597,6 @@
       /* ── ANIMATIONS ── */
       @media (max-width: 500px) {
         .vol-index-title { font-size: var(--fs-30); }
-        .mode-toggle-wrap { right: 1rem; }
-        .mode-btn { padding: 0.5rem 0.75rem; font-size: var(--fs-10); }
       }
       /* ── INLINE NOTES ── */
       .inline-notes {
@@ -2671,50 +2665,6 @@
       .inline-echo-pill svg { width: 10px; height: 10px; opacity: 0.7; }
       .inline-echo-pill .echo-arrow { font-size: var(--fs-11); line-height: 1; }
 
-      /* ── PDF/INLINE TOGGLE ── */
-      /* The context row of the bottom dock (cz1): above the player and the auto-scroll pill, and off the
-         gesture bar. It steps aside while find is open (the find pill takes the row over the transport). */
-      .mode-toggle-wrap {
-        position: fixed; bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport)); right: 1.5rem; z-index: 200;
-        display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-      }
-      body:has(.find-pill) .mode-toggle-wrap { display: none; }
-      /* (column-pin lives NEXT TO the base rule — same specificity, so it
-         must come after it in the cascade; see .link-sidebar note above.) */
-      @media (min-width: 768px) {
-        .mode-toggle-wrap { right: calc(50vw - var(--col-max) / 2 + 1.5rem); }
-      }
-
-      /* cz7: caption and segments are ONE opaque card (the caption floated over verse text with no backing,
-         and the segments let the text show through). The card is the surface; the caption is its top line. */
-      .mode-toggle-wrap {
-        background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 22px;
-        padding: 5px 4px 3px; box-shadow: 0 4px 24px rgba(0,0,0,0.55);
-      }
-      body.light .mode-toggle-wrap { box-shadow: 0 4px 18px rgba(0,0,0,0.16); }
-      .mode-toggle-label {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
-        letter-spacing: 0.18em; text-transform: uppercase;
-        color: var(--gold-dim);
-        padding: 0 14px;
-      }
-      .mode-toggle {
-        display: flex; align-items: center; gap: 0; border-radius: 40px;
-        background: var(--bg3);
-        overflow: hidden;
-      }
-      .mode-btn {
-        display: flex; align-items: center; gap: 0.45rem;
-        padding: 0.55rem 1rem; border: none; background: transparent;
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.16em;
-        text-transform: uppercase; color: var(--cream-muted);
-        cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
-      }
-      .mode-btn svg { width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.25s; }
-      .mode-btn.active { background: var(--gold-faint); color: var(--gold-bright); }
-      .mode-btn.active svg { opacity: 1; }
-      @media (hover: hover) { .mode-btn:hover:not(.active) { color: var(--cream); } }
-      .mode-divider { width: 1px; height: 28px; background: var(--gold-border); flex-shrink: 0; }
       .verses-inline { display: flex; flex-direction: column; }
       .verse-row { margin-bottom: 0.15rem; }
       .verse-line { display: inline; }
@@ -6990,14 +6940,11 @@
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
     .sel-style-btn { font-size: var(--fsc-16); }
-    .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }
     .ascroll-cancel { font-size: var(--fsc-10); }
     .ascroll-readout { font-size: var(--fsc-11); }
     .ascroll-dwell-label { font-size: var(--fsc-10); }
     .ascroll-dwell-value { font-size: var(--fsc-11); }
-    .mode-btn { font-size: var(--fsc-10); padding: 8.8px 16px; gap: 7.2px; }
-    @media (max-width: 500px) { .mode-btn { font-size: var(--fsc-10); padding: 8px 12px; } }
 
     /* ── Text Size slider row (Settings) ── */
     .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 0 0.95rem; }   /* A01.8: the row inset */
@@ -7065,7 +7012,7 @@
        opt back in explicitly. Programmatic Ranges (annotation engine,
        pickers, tests) ignore user-select entirely. */
     button, .top-nav, .sheet-handle-row, .fn-sheet-num-row, .sc-sheet-tag,
-    .settings-section-label, .bottom-nav-card, .mode-toggle-wrap,
+    .settings-section-label, .bottom-nav-card,
     .back-hint-row, .mini-title, .tabs-overview-meta,
     .audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .chapter-nav-sticky, .vot-toast, .scroll-notch-marker,
     .ornament-divider, .install-card-sentinel {
@@ -7080,7 +7027,7 @@
        and the player, selected at once (S22, 2026-10-22). The selection toolbar
        steps aside too. */
     body.sel-dragging .top-nav, body.sel-dragging .audio-bar, body.sel-dragging .audio-bar-pull,
-    body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill, body.sel-dragging .mode-toggle-wrap,
+    body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill,
     body.sel-dragging .chapter-nav-sticky, body.sel-dragging .mini-title,
     body.sel-dragging .back-hint-row, body.sel-dragging .vot-toast, body.sel-dragging .sel-toolbar {
       pointer-events: none;
@@ -8421,7 +8368,7 @@
       /* Over the tab bar (the layout pass): the bar holds the gesture inset, so the strip starts from its top. */
       body.tabbar-on { --dock-tour: calc(var(--dock-tabbar) + 10px + var(--dock-player) + var(--dock-transport) + var(--dock-context)); }
       body:has(.find-pill) .tour-prompt { display: none; }
-      @media (max-height: 500px) { body.autoscroll-on .tour-prompt, body:has(.mode-toggle-wrap) .tour-prompt { display: none; } }
+      @media (max-height: 500px) { body.autoscroll-on .tour-prompt { display: none; } }
       .tour-prompt { bottom: var(--dock-tour); z-index: 310; padding: 14px 16px 10px; }
       /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
          While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):

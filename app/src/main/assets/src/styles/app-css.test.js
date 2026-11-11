@@ -773,12 +773,11 @@ describe('bottom dock stack (cz1)', () => {
     expect(bare).toMatch(/--dock-floor:\s*max\(1\.4rem, calc\(var\(--dock-sys\) \+ 0\.4rem\)\)/);
     expect(decl('body.audio-bar-open {', '--dock-player')).toBe('var(--audio-bar-h, 65px)');   // the bar's measured height (AudioPlayerBar)
     expect(decl('body.autoscroll-on {', '--dock-transport')).toBe('60px');
-    expect(decl('body:has(.mode-toggle-wrap) {', '--dock-context')).toBe('72px');
+    expect(decl('body:has(.jrn-fab) {', '--dock-context')).toBe('72px');
   });
   it('each control stands on the rows under it', () => {
     expect(decl('\n    .ascroll-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player))');
     expect(decl('\n    .find-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
-    expect(decl('\n      .mode-toggle-wrap {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
     expect(decl('.vot-toast {', 'bottom')).toBe('var(--dock-toast-bottom)');
     expect(decl('.vot-toast {', 'top')).toBe('var(--dock-toast-top)');
     // tour-dock: the strip stacks on the reading rows and steps aside while find is open.
@@ -786,32 +785,31 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('body { --dock-tour:', '--dock-tour')).toMatch(/var\(--dock-player\) \+ var\(--dock-transport\) \+ var\(--dock-context\)/);
     expect(decl('body:has(.find-pill) .tour-prompt {', 'display')).toBe('none');
   });
-  it('the pairwise lifts are gone, and find hides the Study Notes toggle', () => {
+  it('the pairwise lifts are gone', () => {
     expect(bare).not.toMatch(/body\.audio-bar-open \.ascroll-pill/);
     expect(bare).not.toMatch(/\.find-pill \{ bottom: calc\(max\(1\.4rem/);
     expect(bare).not.toMatch(/\+ (58|72|130)px\)/);
-    expect(decl('body:has(.find-pill) .mode-toggle-wrap {', 'display')).toBe('none');
   });
   it('a full-screen Garden image hides the player and the whole dock (cz5)', () => {
-    expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) {', 'display')).toBe('none');
+    expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill) {', 'display')).toBe('none');
     expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-player')).toBe('0px');
   });
   /* Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like scripture web". The web is
      a full-screen view like the Garden: the same rule hides the bar over it (and over its load-error panel, the
      screen's root when WebGL fails). Entering either also pauses the audio (useNoAudioHere, 23:5x). */
   it('the Scripture Web hides the player and the whole dock, as the Garden does', () => {
-    const rule = bare.match(/body:has\(([^)]*)\) :is\(\.audio-bar, \.ascroll-pill, \.find-pill, \.mode-toggle-wrap\)\s*\{\s*display:\s*none/);
+    const rule = bare.match(/body:has\(([^)]*)\) :is\(\.audio-bar, \.ascroll-pill, \.find-pill\)\s*\{\s*display:\s*none/);
     expect(rule && rule[1].split(',').map((s) => s.trim())).toEqual(['.garden-fullscreen', '.sw-root', '.sw-fallback']);
     expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-transport')).toBe('0px');
   });
   it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
     expect(decl('\n    .find-pill {', 'background')).toBe('var(--bg)'); // r-find (W2h): the find row is the page's own ground
-    for (const sel of ['\n    .ascroll-pill {', '.mode-toggle {']) {
+    for (const sel of ['\n    .ascroll-pill {']) {
       expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
     }
     expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');
     expect(bare).not.toMatch(/\.ascroll-pill\.is-dim\s*\{\s*opacity/);
-    expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {', 'padding-bottom'))
+    expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.jrn-fab, .find-pill)) .screen-scroll {', 'padding-bottom'))
       .toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px)');
   });
   it('the root-exit toast and the journal FAB ride the same stack', () => {
