@@ -32,6 +32,26 @@ function itemName(run, k) {
   return (bookTitle(r.bid) || r.bid) + ' ' + r.cid;
 }
 
+/**
+ * The first section heading of the first Bible chapter among these items (Day done's Tomorrow, P2 3.6), when the
+ * Bible corpus is loaded and the chapter has one. Letter items have no heading here (their label is their title).
+ * @param {any[]} items @returns {string}
+ */
+export function firstHeading(items) {
+  const B = /** @type {any} */ (globalThis).BOOKS;
+  if (!B) return '';
+  for (const it of items || []) {
+    const m = /^([a-z0-9-]+):(\d+)$/.exec(String(it && it.k));
+    const book = m && B[m[1]];
+    const n = m ? Number(m[2]) : -1;
+    const ch = book && Array.isArray(book.chapters) ? book.chapters.find((/** @type {any} */ c) => Number(c.num) === n) : null;
+    const sec = ch && Array.isArray(ch.sections) ? ch.sections.find((/** @type {any} */ x) => x && x.heading) : null;
+    if (sec) return String(sec.heading);
+    if (m) return '';
+  }
+  return '';
+}
+
 /** The strip under the top bar while the open item is part of a session. @param {{ bid: string, cid: any, inert?: boolean }} props */
 export function PlanSessionStrip({ bid, cid, inert }) {
   const s = usePlanSession();
@@ -106,6 +126,7 @@ export function DayDone({ runId, day, name, onClose }) {
           <div className="ui-card plan-daydone-next">
             <p className="root-eyebrow">Tomorrow</p>
             <p className="plan-today-title">{itemsLabel(next, bookTitle)}</p>
+            {firstHeading(next) ? <p className="plan-daydone-head">{firstHeading(next)}</p> : null}
             <p className="plan-today-sub">{'about ' + minutesFor(itemsWords(next)) + ' min'}</p>
           </div>
         ) : st.finished ? <p className="plan-daydone-sub">{'That was the last day. You finished ' + name + '.'}</p> : null}
@@ -187,11 +208,15 @@ export function PlanRibbon({ bid, cid, inert }) {
   }
   if (!row || !run) return null;
   const done = row.items.filter((/** @type {any} */ it) => it.done).length;
+  const here = row.items.find((/** @type {any} */ it) => keys.includes(it.k));
   const nextItem = row.items.find((/** @type {any} */ it) => !it.done && !keys.includes(it.k)) || null;
   const open = /** @type {any} */ (globalThis).__votOpenPlanItem;
   return (
     <aside className="plan-ribbon" aria-label="Reading plan">
-      <span className="plan-ribbon-text">{'Counts for ' + runName(run, null) + ' · Day ' + (row.day + 1) + ' · ' + done + ' of ' + row.items.length}</span>
+      <span className="plan-ribbon-copy">
+        <span className="plan-ribbon-text">{'Counts for ' + runName(run, null) + ' · Day ' + (row.day + 1) + ' · ' + done + ' of ' + row.items.length}</span>
+        {here && !here.done ? <span className="plan-ribbon-why">Ticks off after a little while reading here</span> : null}
+      </span>
       {nextItem && typeof open === 'function' ? (
         <button type="button" className="plan-text-btn plan-link plan-ribbon-next" onClick={() => open(itemRef(nextItem.k))}>Next</button>
       ) : null}

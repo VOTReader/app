@@ -354,6 +354,9 @@ export function JournalEditorScreen(props) {
   // Always-fresh refs that mirror the latest state. Used by the unmount
   // cleanup to flush, since useEffect cleanup closures capture stale state.
   var titleRef = useRef(title); titleRef.current = title;
+  // POL3: the title the entry opened with. A new entry that opened titled (a plan day's note) and is left with that
+  // title and nothing written is pruned like a blank one, so a tap on "Write a note" alone keeps nothing.
+  var openedTitleRef = useRef(title);
   var blocksRef = useRef(blocks); blocksRef.current = blocks;
   var moodRef = useRef(mood); moodRef.current = mood;
   var entryIdRef = useRef(entryId); entryIdRef.current = entryId;
@@ -415,7 +418,10 @@ export function JournalEditorScreen(props) {
       // backgrounding keeps the editor mounted, and removing the entry under
       // it would orphan the user's next keystroke.
       var photoComing = photosInFlightRef.current > 0;
-      if (!(t || '').trim() && !_blocksHaveContent(bs) && !photoComing) {
+      var untouchedNew = false;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- a string set once at mount, not a node: the cleanup wants that first title
+      try { untouchedNew = !!(t || '').trim() && t === openedTitleRef.current && localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid; } catch (_e) { /* best-effort */ }
+      if ((!(t || '').trim() || untouchedNew) && !_blocksHaveContent(bs) && !photoComing) {
         // W16: blank because a block delete's Undo is still on screen? Keep what
         // that Undo needs to re-add the entry (deleteBlock's restore), and leave
         // its marks until the window closes.

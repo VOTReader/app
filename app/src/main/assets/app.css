@@ -3605,7 +3605,9 @@
     .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
     .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
-    .plan-ribbon-text { flex:1 1 auto; }
+    .plan-ribbon-copy { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .plan-ribbon-why { color:var(--text-3); font-size:var(--ts-meta); }
+    .plan-daydone-head { margin:2px 0 0; color:var(--text-2); font-family:var(--font-serif); font-style:italic; font-size:var(--ts-meta); }
     .plan-ribbon-next { min-height:44px; padding:0 0.4rem; border:0; background:transparent; color:var(--gold); font:inherit; cursor:pointer; text-align:left; }
     /* ══ READING PLANS (plans2, branch ui-plans, 2026-11-11) ═════════════════════════════════════════════════════════
        The plans screens only: PlansHub.jsx and its views (list, preview, plan page, schedule, finished, builder), the
@@ -6739,10 +6741,12 @@
     .select-sheet-option.has-code { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
     .rd-genre .ui-row.chapter-card-btn { gap: 14px; padding: 10px 12px 10px var(--card-pad); border: 0; border-radius: 0; background: transparent; container-type: normal; }
     .rd-genre .ui-row.chapter-card-btn:active { background: var(--surface-2); }
-    /* a book name never gives way to its chapter count: the count wraps instead (textzoom: "Matthew" crushed at 2) */
+    /* a book name never gives way to its chapter count: the count wraps instead (textzoom: "Matthew" crushed at 2).
+       POL3: the Bible's group rows too ("Poetry & Wisdom" lost to "5 books · 243 chapters" at 360 px), and the
+       Library's rows at large text ("Highlights" lost to "None yet", which ran off the card at 2). */
     .rd-bindex.rd-genre { justify-content: flex-start; min-height: 0; }
-    .rd-genre .ui-row-text { flex: 1 0 auto; max-width: 100%; }
-    .rd-genre .ui-row-value { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: right; }
+    .rd-bindex .ui-row-text, .vot-large-text .lib-row .ui-row-text { flex: 1 0 auto; max-width: 100%; }
+    .rd-bindex .ui-row-value, .vot-large-text .lib-row .ui-row-value { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: right; }
     /* ── end W2i readers (r-book, r-bindex, r-trans, gospels) ── */
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);
