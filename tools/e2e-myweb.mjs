@@ -7,7 +7,7 @@
  * about PIXELS and one about TIME, and a unit test over the ink law cannot see
  * either: the law can be right and the screen can still draw one path (R1's
  * defect on main) or cover the web with a panel (R3). This walk reaches My Web
- * the way a reader does (Home -> Personal Study -> Scripture Web -> My
+ * the way a reader does (Home -> Explore's Scripture Web -> My
  * web), makes five links THROUGH THE REAL UI (words selected in Genesis 1,
  * Link, a reference typed into the picker, Enter), and reads the 2D canvas.
  *
@@ -198,13 +198,14 @@ async function boot(page, url) {
 async function goHome(page) {
   await page.evaluate(() => { location.hash = ''; });
   for (let i = 0; i < 6; i++) { if (await clickIfPresent(page, 'Back')) { await sleep(250); continue; } break; }
-  await clickIfPresent(page, 'Home');
+  // The three-tab layout: Home is the Read tab's root; a full-screen reader has its own Home button instead.
+  const tab = await page.evaluate(() => { const t = [...document.querySelectorAll('.tabbar-tab')].find((b) => b.textContent.trim() === 'Read'); if (t) t.click(); return !!t; });
+  if (!tab) await clickIfPresent(page, 'Home');
   await sleep(300);
 }
 async function toMyWeb(page) {
-  await clickLabel(page, 'Personal Study');
-  await sleep(400);
-  await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
+  // Scripture Web is the Read tab's Explore button (three-tab layout; it was a Personal Study row).
+  await clickLabel(page, 'Scripture Web');
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });

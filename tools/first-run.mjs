@@ -54,11 +54,12 @@ export async function throughFirstRun(page, opts = {}) {
   });
   await press('Begin Reading');
   // Begin Reading opens the first letter; its top bar's Home goes on to Home.
-  const landed = await until('the first letter or Home', () => page.evaluate(() => (document.querySelector('.home-nav-item') ? 'home'
+  // Home is the Read tab's root (.home-root) since the three-tab layout; .home-nav-item is the older Home's.
+  const landed = await until('the first letter or Home', () => page.evaluate(() => (document.querySelector('.home-root, .home-nav-item') ? 'home'
     : document.querySelector('.letter-para') && document.querySelector('button[aria-label="Home"]') ? 'letter' : null)));
   if (landed === 'letter') {
     await press('Home');
-    await until('Home', () => page.evaluate(() => !!document.querySelector('.home-nav-item')));
+    await until('Home', () => page.evaluate(() => !!document.querySelector('.home-root, .home-nav-item')));
   }
   return landed;
 }

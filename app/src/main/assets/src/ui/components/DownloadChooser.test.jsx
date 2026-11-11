@@ -83,7 +83,16 @@ describe('Choose: ticks and the footer', () => {
       { url: U('v1-warning'), key: 'v1:warning', title: 'A Word of Warning' },
       { url: U('xmas-1'), key: 'v1:christmas', title: 'Christmas · Part 1' },
       { url: U('xmas-2'), key: 'v1:christmas', title: 'Christmas · Part 2' },
-    ]);
+    ], { priority: 'bulk' });
+  });
+
+  it('one letter by itself is handed over as a tap, ahead of a set', () => {
+    const { container, getByRole } = render(<DownloadChooser off={off} />);
+    fireEvent.click(within(container).getByRole('button', { name: /^Volume Two/ }));
+    fireEvent.click(box(container, 'Letter One'));
+    fireEvent.click(within(footer(container)).getByRole('button'));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    expect(off.download).toHaveBeenCalledWith([{ url: U('v2-one'), key: 'v2:one', title: 'Letter One' }], { priority: 'tap' });
   });
 
   it('a tap on a dash selects everything under it', () => {
@@ -126,6 +135,97 @@ describe('Choose: ticks and the footer', () => {
     fireEvent.click(box(container, 'Volume Two'));
     expect(footer(container).textContent).toMatch(/Needs 300 MB more room\. Untick some, or remove downloads you’ve finished\./);
     expect(within(footer(container)).getByRole('button', { name: 'Apply' }).disabled).toBe(true);
+  });
+});
+
+/* dl-rework A, B, C (defects 1-8): readings are things of their own; one voice setting; the fallback said out loud. */
+describe('Choose: voices and readings', () => {
+  /** Benjamin read every letter; Timothy only Christmas (one file). */
+  const renditions = (volKey, item) => {
+    const primary = tracksOf(volKey, item).map((t) => ({ ...t, readerCode: volKey === 'bible-kjv' ? '' : 'B' }));
+    if (!primary.length) return [];
+    const out = [{ reader: primary[0].readerCode, tracks: primary }];
+    if (item.id === 'christmas') out.push({ reader: 'T', tracks: [{ url: U('xmas-tim'), key: 'v1:christmas', readerCode: 'T' }] });
+    return out;
+  };
+  beforeEach(() => {
+    globalThis.AudioPlayer = { playbackTracks: tracksOf, renditionsFor: renditions };
+    off.st.sizes.set(U('xmas-tim'), 4e6);
+  });
+  const openV1 = (c) => fireEvent.click(within(c).getByRole('button', { name: /^Volume One/ }));
+
+  it('the voice picker is the Letter Voice setting, above the groups, and says what it does from the data', () => {
+    const onVoice = vi.fn();
+    const { container } = render(<DownloadChooser off={off} letterReader="T" onLetterReader={onVoice} />);
+    const select = within(container).getByRole('combobox', { name: /Letter voice/ });
+    expect(select.value).toBe('T');
+    expect(container.querySelector('.dl-voicebar').compareDocumentPosition(container.querySelector('.dl-group')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.dl-voice-line').textContent)
+      .toBe('Timothy reads 1 letter. The other 2 will download in their default reading (2 Benjamin).');
+    fireEvent.change(select, { target: { value: 'B' } });
+    expect(onVoice).toHaveBeenCalledWith('B');
+    fireEvent.change(select, { target: { value: '' } });
+    expect(onVoice).toHaveBeenCalledWith('auto');
+  });
+
+  it('each letter row names the reading Apply fetches; "only" keeps just the voice\'s letters', () => {
+    const { container } = render(<DownloadChooser off={off} letterReader="T" onLetterReader={() => {}} />);
+    openV1(container);
+    const warning = container.querySelectorAll('.dl-unit')[0];
+    expect(warning.querySelector('.dl-reader').textContent).toMatch(/^Benjamin/);
+    expect(warning.querySelector('.dl-reader').className).toMatch(/is-fallback/);
+    const xmas = container.querySelectorAll('.dl-unit')[1];
+    expect(within(xmas).getByRole('button', { name: 'Timothy' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(within(container).getByRole('switch', { name: 'Only letters Timothy reads' }));
+    expect([...container.querySelectorAll('.dl-unit-title')].map((e) => e.textContent)).toEqual(['Christmas']);
+  });
+
+  it('a letter saved in one voice stays on the phone whatever voice is chosen, and its other reading can be added', () => {
+    off.st.saved.set(U('xmas-1'), {});
+    off.st.saved.set(U('xmas-2'), {});
+    const { container, getByRole } = render(<DownloadChooser off={off} letterReader="T" onLetterReader={() => {}} />);
+    openV1(container);
+    expect(box(container, 'Christmas').getAttribute('aria-checked')).toBe('true');
+    expect(footer(container).textContent).toMatch(/Tick what you want on this phone/);
+    const xmas = container.querySelectorAll('.dl-unit')[1];
+    expect(within(xmas).getByRole('button', { name: 'Benjamin, on this phone' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(within(xmas).getByRole('button', { name: 'Timothy' }));
+    expect(footer(container).textContent).toMatch(/Add 1 recording · 4 MB/);
+    fireEvent.click(within(footer(container)).getByRole('button'));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    expect(off.download).toHaveBeenCalledWith([{ url: U('xmas-tim'), key: 'v1:christmas', title: 'Christmas' }], { priority: 'tap' });
+    expect(off.remove).not.toHaveBeenCalled();
+  });
+
+  it('the Apply sheet repeats the split: so many in the voice, the rest in another reading by reader', () => {
+    const { container, getByRole } = render(<DownloadChooser off={off} letterReader="T" onLetterReader={() => {}} />);
+    fireEvent.click(box(container, 'The Volumes of Truth'));
+    fireEvent.click(within(footer(container)).getByRole('button'));
+    expect(getByRole('dialog').querySelector('.dl-sheet-split').textContent)
+      .toBe('1 in Timothy’s voice · 2 in another reading (2 Benjamin)');
+  });
+
+  it('the Bible header counts only the edition shown, and a chip names its reader', () => {
+    globalThis.BIBLE_AUDIO_EDITIONS = {
+      kjv: { volKey: 'bible-kjv', short: 'KJV · BRM', label: 'KJV' },
+      tsot: { volKey: 'bible-tsot', short: 'Matthew · TSOT', label: 'TSOT' },
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['ruth', 'Ruth'], ['matthew', 'Matthew']];
+    globalThis.AudioPlayer = {
+      renditionsFor: renditions,
+      playbackTracks: (volKey, item) => {
+        if (volKey !== 'bible-tsot') return tracksOf(volKey, item);
+        return item.id === 'matthew' ? [1, 2].map((n) => ({ url: U('mt-' + n), key: 'bible-tsot:matthew', partLabel: 'Chapter ' + n, readerCode: 'B' })) : [];
+      },
+    };
+    off.st.saved.set(U('mt-1'), {});
+    off.st.saved.set(U('mt-2'), {});
+    const { container } = render(<DownloadChooser off={off} bibleAudio="kjv" />);
+    const bible = within(container).getByRole('button', { name: /^The Bible/ });
+    expect(bible.textContent).not.toMatch(/on this phone/);   // the KJV is shown: none of it here
+    fireEvent.click(within(container).getByRole('radio', { name: 'Matthew · TSOT · Benjamin' }));
+    expect(within(container).getByRole('button', { name: /^The Bible/ }).textContent).toMatch(/2 chapters on this phone/);
+    expect(container.querySelector('.dl-edition-reader').textContent).toBe('Read by Benjamin');
   });
 });
 

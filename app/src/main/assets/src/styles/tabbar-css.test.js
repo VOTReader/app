@@ -29,6 +29,13 @@ describe('the tab bar CSS', () => {
     expect(css).toContain('html.kb-up .audio-bar { display: none; }');
   });
 
+  it('rests the Downloads foot bar on the tab bar: a sticky bottom counts from the scroller padding, which clears the bar', () => {
+    // Measured headless at 412x915 (W3a): with bottom = the bar's height the footer floated 76px over the bar and rows
+    // showed under it. The padding is the bar + 16px, so the footer's own bottom takes the 16px back.
+    expect(css).toContain('body.tabbar-on .screen-scroll { padding-bottom: calc(var(--dock-tabbar) + 16px); }');
+    expect(css).toContain('body.tabbar-on .dl-footer { bottom: calc(var(--dock-player) - 16px); }');
+  });
+
   it('is a left rail at 1024 css px and up, with the dock back at the page foot', () => {
     const i = css.indexOf('@media (min-width: 1024px) {\n      body.tabbar-on');
     expect(i).toBeGreaterThan(-1);

@@ -316,6 +316,41 @@ describe('AudioLibraryScreen -- the offline line counts what is on the phone (RC
   });
 });
 
+describe('AudioLibraryScreen -- the Downloads line speaks the dl-rework queue', () => {
+  /* The Listen root's "On this phone > Downloads" line is the Downloads strip's first line (stripModel), so the
+     rework's queue (batch counts, the will-try-again list) reaches the three-tab Listen screen. */
+  const store = (over) => {
+    globalThis.OfflineAudio = {
+      available: () => true, subscribe: () => () => {}, getVersion: () => 0, news: () => null, statusOf: () => 'none',
+      items: () => [], pending: () => ({ busy: 0, failed: [] }), totalBytes: () => 0, later: () => [],
+      ...over,
+    };
+  };
+  afterEach(() => { delete globalThis.OfflineAudio; });
+  const sub = () => document.querySelector('.listen-downloads').textContent;
+
+  it('counts a running batch with the bytes left', () => {
+    store({
+      pending: () => ({ busy: 3, failed: [] }), left: () => ({ count: 27, bytes: 191_000_000 }),
+      batch: () => ({ done: 3, total: 30 }),
+    });
+    renderScreen();
+    expect(sub()).toContain('Downloading · 3 of 30 recordings · 191 MB left');
+  });
+
+  it('names what did not download yet when only the will-try-again list is left', () => {
+    store({ pending: () => ({ busy: 0, failed: [{ url: 'a' }, { url: 'b' }] }), left: () => ({ count: 0, bytes: 0 }) });
+    renderScreen();
+    expect(sub()).toContain('Didn’t download yet · 2 recordings');
+  });
+
+  it('with nothing on its way, says what is on the phone', () => {
+    store({ items: () => [savedTrack], totalBytes: () => 5 * 1024 * 1024 });
+    renderScreen();
+    expect(sub()).toContain('1 on this phone');
+  });
+});
+
 describe('AudioLibraryScreen -- the read-along badge', () => {
   /* The editions say which ones light their words (hub order 2026-09-22). The John film is the one listening-only
      edition (audio-track.js declares `timed: false`). The badges ride the edition rows the Bible row opens; the

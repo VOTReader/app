@@ -60,7 +60,7 @@ describe('offline-audio — in the phone app', () => {
     const cb = vi.fn();
     const off = OfflineAudio.subscribe(cb);
     expect(OfflineAudio.download([{ url: U1, key: 'one:christmas', title: 'Christmas' }])).toBe(true);
-    expect(JSON.parse(b.offlineAudioSave.mock.calls[0][0])).toEqual([{ url: U1, key: 'one:christmas', title: 'Christmas' }]);
+    expect(JSON.parse(b.offlineAudioSave.mock.calls[0][0])).toEqual([{ url: U1, key: 'one:christmas', title: 'Christmas', pri: 'tap' }]);
     expect(OfflineAudio.statusOf(U1)).toBe('queued');
     expect(cb).toHaveBeenCalled();
     off();
@@ -222,7 +222,7 @@ describe('offline-audio — in the phone app', () => {
     expect(OfflineAudio.news().text).toBe('Downloading 2 recordings');
     send({ type: 'progress', url: U1, bytes: 1, total: 10 });
     send({ type: 'failed', url: U1, reason: 'space' });
-    expect(OfflineAudio.news().text).toBe('Download failed: not enough room on this phone');
+    expect(OfflineAudio.news().text).toBe('Not downloaded yet: not enough room on this phone');
     const seq = OfflineAudio.news().seq;
     send({ type: 'progress', url: U2, bytes: 1, total: 10 });
     expect(OfflineAudio.news().seq).toBe(seq);   // not per percent

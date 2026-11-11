@@ -136,8 +136,12 @@ class OfflineAudioStoreTest {
         s.enqueue(listOf(item(url1)))
         assertFalse(s.isSaved(url1))
         assertNull(s.intercept(url1, null))
-        assertTrue(File(tmp.root, "offline-audio").listFiles { f -> f.name.endsWith(".part") }.isNullOrEmpty())
+        // dl-rework: on the "will try again" list its bytes may stay for a Range resume, but only as resume.json names them.
+        val parts = File(tmp.root, "offline-audio").listFiles { f -> f.name.endsWith(".part") }?.map { it.name } ?: emptyList()
+        val resume = File(tmp.root, "offline-audio/resume.json").takeIf { it.isFile }?.readText() ?: ""
+        for (p in parts) assertTrue(resume.contains("one-christmas-B.mp3"), "a kept part is named in resume.json: $p")
         assertEquals("failed", events.last().getString("type"))
+        assertEquals(url1, JSONObject(s.stateJson()).getJSONArray("later").getJSONObject(0).getString("url"), "kept to try again, not dropped")
     }
 
     @Test

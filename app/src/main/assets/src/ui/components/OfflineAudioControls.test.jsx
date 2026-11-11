@@ -143,7 +143,7 @@ describe('a recording row: what the phone holds, and the next step', () => {
     s.st.status.set(U('a'), 'failed');
     s.st.failure.set(U('a'), 'network');
     const first = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(first.container.textContent).toMatch(/Download failed/);
+    expect(first.container.textContent).toMatch(/Didn’t download yet/);
     fireEvent.click(first.getByRole('button', { name: /retry/i }));
     expect(s.download).toHaveBeenCalledTimes(1);
     first.unmount();
@@ -336,6 +336,17 @@ describe('Download all, beside Play all', () => {
     expect(s.download.mock.calls[0][0].map((t) => t.url)).toEqual([U('b'), U('b2'), U('c')]);
   });
 
+  // dl-rework E (defect 17): "Keep VOTReader open" showed where the phone app downloads with the app closed.
+  it('says Keep VOTReader open only where it is true', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('b'), 60_000_000);
+    s.runsClosed = () => true;
+    const { getByRole, container } = render(<OfflineCollectionAction units={[[T('b')], [T('c')]]} label="Volume One" />);
+    fireEvent.click(getByRole('button', { name: /^Download all/ }));
+    expect(container.textContent).not.toMatch(/Keep VOTReader open/);
+    expect(container.textContent).toMatch(/It goes on with VOTReader closed\./);
+  });
+
   it('a size not known yet leaves the total open ("at least"), not hidden (brief section 7 item 9)', () => {
     const s = fakeStore();
     s.st.sizes.set(U('a'), 10_000_000); s.st.sizes.set(U('b'), 60_000_000);   // b2 and c not answered yet
@@ -507,7 +518,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(container.querySelector('h1').textContent).toBe('Downloads');
     expect(getByRole('tab', { name: 'On this phone' }).getAttribute('aria-selected')).toBe('true');
     expect(container.querySelector('.dl-storage-line').textContent).toBe('Recordings 30 MB · 5 GB free on this phone');
-    expect(container.querySelector('.dl-shelf-kicker').textContent).toBe('The Volumes of Truth');
+    expect(container.querySelector('.dl-shelf-section .dl-shelf-kicker').textContent).toBe('The Volumes of Truth');
     const head = container.querySelector('.dl-shelf-head');
     expect(head.textContent).toMatch(/Volume One2 recordings · 30 MB/);
     expect([...container.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['I Am The Passover', 'Matthew 1']);
@@ -577,7 +588,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     ch(10, 1); ch(2, 3); ch(1, 2);
     save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect([...container.querySelectorAll('.dl-shelf-kicker')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible · KJV · BRM']);
+    expect([...container.querySelectorAll('.dl-shelf-section .dl-shelf-kicker')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible · KJV · BRM']);
     fireEvent.click(getByRole('button', { name: /^Genesis3 chapters · 3 MB/ }));
     const book = container.querySelectorAll('.dl-shelf-branch')[1];
     expect([...book.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
@@ -634,11 +645,93 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     s.failureOf = () => 'network';
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.textContent).toMatch(/Downloading · 12 recordings to go/);
-    expect(container.textContent).toMatch(/Letter cServer didn’t answer/);
+    expect(container.textContent).toMatch(/Letter cNo connection when it tried/);
     fireEvent.click(getByRole('button', { name: /^cancel all/i }));
+    expect(s.cancelAll).not.toHaveBeenCalled();   // it asks first (dl-rework E, defect 30)
+    fireEvent.click(getByRole('button', { name: 'Cancel downloads' }));
     expect(s.cancelAll).toHaveBeenCalledTimes(1);
     fireEvent.click(getByRole('button', { name: 'Retry Letter c' }));
-    expect(s.download).toHaveBeenCalledWith(failed);
+    expect(s.download).toHaveBeenCalledWith(failed, { priority: 'tap' });
+  });
+
+  // dl-rework A (defect 2): every reading of a letter merged into one row with no reader, and × removed them all.
+  it('each reading of a letter is a row of its own, named by its reader; its × removes only that reading', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fakeStore();
+      globalThis.AudioPlayer = {
+        playTrack: vi.fn(),
+        renditionsFor: (volKey, item) => (volKey === 'one' && item.id === 'x'
+          ? [{ reader: 'B', tracks: [{ url: U('xb1') }, { url: U('xb2') }] }, { reader: 'T', tracks: [{ url: U('xt') }] }] : []),
+      };
+      s.st.saved.set(U('xb1'), { url: U('xb1'), key: 'one:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 1 });
+      s.st.saved.set(U('xt'), { url: U('xt'), key: 'one:x', title: 'Christmas', bytes: 4e6, savedAt: 2 });
+      const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      const rows = [...container.querySelectorAll('.dl-shelf-row')].map((r) => r.textContent);
+      expect(rows).toEqual(['ChristmasTimothy4 MB', 'Christmas · Part 1Benjamin1 of 2 parts · 5 MB']);
+      fireEvent.click(getByRole('button', { name: /^remove christmas · timothy from this phone/i }));
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(s.remove).toHaveBeenCalledWith([U('xt')]);
+      fireEvent.click(getByRole('button', { name: /^play christmas · part 1 · benjamin/i }));
+      expect(globalThis.AudioPlayer.playTrack).toHaveBeenCalledWith(expect.objectContaining({ url: U('xb1'), readerCode: 'B' }));
+    } finally { vi.useRealTimers(); }
+  });
+
+  // dl-rework E: the Choose tab showed the strip but not what did not download.
+  it('what did not download yet shows on the Choose tab too', () => {
+    const s = fakeStore();
+    s.pending = () => ({ busy: 0, failed: [{ url: U('c'), key: 'one:c', title: 'Letter c' }] });
+    s.later = () => [{ url: U('c'), key: 'one:c', title: 'Letter c', reason: 'server', status: 503, tries: 5, at: Date.now() + 12 * 60000 }];
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    fireEvent.click(getByRole('tab', { name: 'Choose' }));
+    expect(container.textContent).toMatch(/Didn’t download yet/);
+    expect(container.textContent).toMatch(/Letter cThe server had a problem \(503\) · tries again in 12 min/);
+  });
+
+  // dl-rework D (defect 10): the list stopped at 30, and a waiting row had no control.
+  it('the waiting list pages 50 at a time, and each waiting one can be taken off', () => {
+    const s = fakeStore();
+    const q = Array.from({ length: 61 }, (_, i) => ({ url: U('w' + i), key: 'one:w' + i, title: 'Letter ' + i }));
+    s.queue = () => q;
+    s.actives = () => [U('w0')];
+    s.pending = () => ({ busy: 61, failed: [] });
+    s.statusOf = (u) => (u === U('w0') ? 'downloading' : 'queued');
+    s.progressOf = () => null;
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(container.querySelectorAll('.dl-queue-row:not(.is-more)')).toHaveLength(51);
+    fireEvent.click(getByRole('button', { name: 'Show 10 more · 10 still waiting' }));
+    expect(container.querySelectorAll('.dl-queue-row:not(.is-more)')).toHaveLength(61);
+    fireEvent.click(getByRole('button', { name: 'Take Letter 60 off the queue' }));
+    expect(s.cancel).toHaveBeenCalledWith([U('w60')]);
+  });
+
+  // dl-rework E: nothing said what had finished.
+  it('Finished: each set with how much of it is on the phone, a whole set said plainly, the latest first', () => {
+    const s = fakeStore();
+    globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    globalThis.BIBLE_AUDIO_BOOKS = [['ruth', 'Ruth']];
+    globalThis.COLLECTIONS = [{ volKey: 'one', label: 'Volume One', cardId: 'one' }];
+    globalThis.colLetterArr = () => [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }];
+    globalThis.colPreface = () => null;
+    globalThis.AudioPlayer = {
+      playTrack: vi.fn(),
+      playbackTracks: (volKey, item) => (volKey === 'bible-brm-kjv'
+        ? (item.id === 'ruth' ? [1, 2].map((n) => ({ url: U('ruth' + n), partLabel: 'Chapter ' + n })) : [])
+        : [{ url: U(item.id), readerCode: 'B' }]),
+      renditionsFor: (volKey, item) => (volKey === 'one' ? [{ reader: 'B', tracks: [{ url: U(item.id) }] }] : []),
+    };
+    s.st.saved.set(U('ruth1'), { url: U('ruth1'), key: 'bible-brm-kjv:ruth', title: 'Ruth 1', bytes: 1e6, savedAt: 10 });
+    s.st.saved.set(U('ruth2'), { url: U('ruth2'), key: 'bible-brm-kjv:ruth', title: 'Ruth 2', bytes: 1e6, savedAt: 30 });
+    s.st.saved.set(U('a'), { url: U('a'), key: 'one:a', title: 'A', bytes: 1e6, savedAt: 20 });
+    try {
+      const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
+      const fin = container.querySelector('.dl-finished');
+      expect([...fin.querySelectorAll('.dl-finished-set')].map((x) => x.textContent))
+        .toEqual(['All of KJV · BRM is on this phone · 2 chapters', 'Volume One: 1 of 2 letters']);
+      expect([...fin.querySelectorAll('.dl-finished-title')].map((x) => x.textContent)).toEqual(['Ruth 2', 'A', 'Ruth 1']);
+    } finally {
+      delete globalThis.colLetterArr; delete globalThis.colPreface;
+    }
   });
 
   it('In line (picture 08): the one downloading with its bytes, then each waiting with its place', () => {
