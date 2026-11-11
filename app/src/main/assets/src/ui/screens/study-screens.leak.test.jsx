@@ -10,6 +10,7 @@
 
 import { describe, it, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { installLeakHarness, expectNoLeaks } from '../leak/leak-harness.js';
 
 import { LibraryScreen } from './LibraryScreen.jsx';
@@ -62,7 +63,8 @@ beforeEach(() => {
   modalRegistry._reset();
   localStorage.clear();
   document.documentElement.lang = 'en';
-  put('ScreenLayout', ({ children, navChildren }) => <div>{navChildren}<main>{children}</main></div>);
+  put('ScreenLayout', ({ children, navChildren, utility }) => <div>{navChildren}{utility && utility.menu}<main>{children}</main></div>);
+  put('ReactDOM', ReactDOM);   // the sheets portal to <body>
   put('LibraryNav', (opts) => <>{(opts && opts.leftExtras) || null}{(opts && opts.rightExtras) || null}</>);
   put('ConfirmStrip', ConfirmStrip);
   put('JrnExpandable', ExpandableText);
@@ -131,14 +133,15 @@ describe('leaks — Notes', () => {
   const show = () => render(<NotesIndexScreen {...navProps} onOpenNote={noop} onNavigateToSource={noop} historyEnabled />);
   it('all notes', async () => {
     setup();
-    await leakFree('NotesIndexScreen', show, () => { fireEvent.click(screen.getByRole('button', { name: 'All Notes' })); });
+    await leakFree('NotesIndexScreen', show, () => { fireEvent.click(screen.getByRole('radio', { name: 'All notes' })); });
   });
   it('a notebook drilled into, its rename field open', async () => {
     setup();
     await leakFree('NotesIndexScreen notebook', show, () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Notebooks' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Notebooks' }));
       fireEvent.click(screen.getByText('Faith').closest('button'));
-      fireEvent.click(screen.getByText('Rename'));
+      fireEvent.click(screen.getByRole('button', { name: 'Notebook options' }));
+      fireEvent.click(screen.getByText('Rename').closest('button'));
     });
   });
 });

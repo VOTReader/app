@@ -17,6 +17,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ActionSheet } from '../components/SelectField.jsx';
+import { _bookmarkSourcePlace } from '../../utils/bookmark-source.js';
 import { ListRow, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
 
@@ -30,9 +31,10 @@ function srcEndpoint(hlKey) {
   return (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(hlKey) : null;
 }
 
-/** Where a bookmark is, beyond its name: "Volume One" for a letter, "Studies", "Journal" (bookmark-source.js). */
+/** Where a bookmark is, beyond its name: "Volume One" for a letter, "Studies", "Journal" (bookmark-source.js,
+    imported: it is one bundle with this screen). */
 function srcPlace(hlKey) {
-  return (typeof _bookmarkSourcePlace === 'function') ? _bookmarkSourcePlace(hlKey) : '';
+  return _bookmarkSourcePlace(hlKey);
 }
 
 /**
