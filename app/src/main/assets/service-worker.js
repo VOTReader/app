@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-5d5afe0217';
+const CACHE_VERSION = 'v1.0.2-5440d157c7';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,7 +316,7 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': '6b484ddc2f88cf81b22582c43cc6435c260713278049b68778ffd525f7d74d23',
-  './dist/app.min.css': 'a3cab45945107f39b3e8545caa5a55cea4d37080f5fbef6aa241cc7c4a5d40a6',
+  './dist/app.min.css': 'f846888cd8082edfc0b1146044aa75aaf391b0a72472ddb7d8e26fd52cbb3679',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'c90568d38c879c1cbe52837ade7a00b60d3330e53f872ad0347bab3ed8004ff8',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',

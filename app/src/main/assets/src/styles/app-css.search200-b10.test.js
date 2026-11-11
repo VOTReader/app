@@ -175,7 +175,8 @@ describe('B10 item 3 — real 44px search tap targets, paid for by trimmed paddi
     const rm = decls('.srch-chip-remove');
     expect([rm.width, rm.height]).toEqual(['var(--tap)', 'var(--tap)']);
     const x = decls('.srch-clear-btn');
-    expect([x.width, x.height]).toEqual(['44px', '44px']);
+    // 48 x 48 (L3, 2026-10-05; e2e:phone T1), overhanging the 44px pill by 2px top and bottom.
+    expect([x.width, x.height]).toEqual(['48px', '48px']);
     for (const sel of ['.srch-row', '.srch-suggest-item', '.srch-songs-row']) expect(decls(sel)['min-height'], sel).toBe('var(--row-h-1)');
   });
 });

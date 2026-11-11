@@ -4614,7 +4614,7 @@
     .search-input { flex:1; min-width:0; height:100%; padding:0 4px 0 10px; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
     .search-input:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; border-radius:var(--r-pill); }
     .search-input::placeholder { color:var(--text-2); }
-    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; width:44px; height:44px; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
+    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; margin:-2px 0; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
     .srch-corpus-row { display:flex; margin:2px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-field); }
     .srch-corpus-btn { flex:1; min-height:var(--tap); border:4px solid transparent; background:none; background-clip:padding-box; border-radius:var(--r-field); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-control); cursor:pointer; }
     .srch-corpus-btn.active { background-color:var(--surface-3); color:var(--text-1); }
