@@ -60,9 +60,9 @@ describe('passage-link: the address', () => {
 });
 
 describe('passage-link: what Share sends', () => {
-  it('adds the reference and the link under the quote', () => {
+  it('adds the link alone under the quote (Corbin 2026-11-11: "Append only the link itself")', () => {
     expect(withPassageLink('For God so loved the world', 'bible:john:3:16', 'John 3:16'))
-      .toBe('For God so loved the world\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16');
+      .toBe('For God so loved the world\n\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16');
   });
 
   it('sends the quote alone when the passage may not travel', () => {

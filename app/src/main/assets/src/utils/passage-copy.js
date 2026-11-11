@@ -66,7 +66,8 @@
 
    THE QUOTE (cp4, Corbin 2026-10-05, from a note he pasted a verse into):
    a copy that names where it is from reads as a quotation: the words in
-   double quotes, a blank line, then the reference (and the link):
+   double quotes, a blank line, then the reference; where the passage has a
+   link, the link alone in its place (Corbin 2026-11-11):
 
        "For I know that this will turn out for my deliverance ..."
 
@@ -428,8 +429,10 @@ export function passageCopy(selected, { numbers = true, quote = highlightLinks()
     before.setEnd(clip.startContainer, clip.startOffset);
     parts.push({ el, key: el.getAttribute('data-hl-key') || '', body, clip, fromTop: !plainText(before.cloneContents()) });
   });
+  // share-link (Corbin 2026-11-11, "Append only the link itself"): a named passage with a link is the quoted words,
+  // a blank line, then the link alone; with no link the reference stays under the quote.
   const ending = (/** @type {string} */ body, /** @type {string} */ reference, /** @type {string} */ link) =>
-    (reference ? quotedPassage(body) + '\n\n' + reference : body) + (link ? '\n' + link : '');
+    reference ? quotedPassage(body) + '\n\n' + (link || reference) : body + (link ? '\n' + link : '');
   if (!parts.length) {
     // No verse block in it: words a page or a sheet declares a reference for
     // (a heading, an intro quote, a footnote's verse), or none of ours.
