@@ -40,7 +40,8 @@ import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
 import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
-import { DownloadWhenOnline, HeroDownload, NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
+import { NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -112,14 +113,13 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   return (
     <>
       <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
-        {/* D4b (pictures 15, 16, 21): offline and not on the phone, the pill says so; else the download control sits beside it. */}
+        {/* D4b: offline and not on the phone, the pill says so. No download beside it (Corbin 11-11: Downloads is the one place). */}
         {recorded && listenOff ? <NotOnPhonePill /> : null}
         {recorded && !listenOff ? (
           <button type="button" className={'hero-play-pill letter-listen-pill' + (face.pause ? ' is-playing' : '') + (face.busy ? ' is-loading' : '')} onClick={listen} aria-pressed={face.pause} aria-busy={face.busy || undefined} aria-label={face.label}>
             {face.pause ? PAUSE : PLAY}<span>{face.text}</span>
           </button>
         ) : null}
-        {recorded && !listenOff ? <HeroDownload tracks={tracks} name={letter.title || 'this letter'} /> : null}
         {songs.length ? (
           <button type="button" className={'hero-play-pill letter-sung-pill' + (singing ? ' is-playing' : '')} onClick={sing} disabled={singOff} aria-pressed={singing} aria-label={singing ? 'Pause the song' : 'Hear it sung'}>
             {singing ? PAUSE : MUSIC_NOTE}<span>{singing ? 'Pause song' : 'Hear it sung'}</span>
@@ -127,7 +127,6 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
         ) : null}
       </div>
       {offLine ? <p className="hero-offline-line" role="status">{offLine}</p> : null}
-      {recorded && listenOff ? <DownloadWhenOnline tracks={tracks} name={letter.title || 'this letter'} /> : null}
     </>
   );
 }
@@ -138,6 +137,7 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
  * that could not load, beside a Listen that had said why it could not play).
  * @param {{ letter: { audioUrl?: string, soundcloudUrl?: string } }} props
  */
+/* Readers mock r-end (W3b): the chips read "Audio recording" and "SoundCloud", each with its icon. */
 export function LetterAudioLinks({ letter }) {
   const online = useSongsOnline();
   if (!online || !(letter.audioUrl || letter.soundcloudUrl)) return null;
@@ -145,10 +145,10 @@ export function LetterAudioLinks({ letter }) {
     <div className="related-card">
       <div className="related-card-title">Audio</div>
       {letter.audioUrl && (
-        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer">♪ Audio Recording</a>
+        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="mic" size="sm" />Audio recording</a>
       )}
       {letter.soundcloudUrl && (
-        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer">♪ Listen on SoundCloud</a>
+        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="music" size="sm" />SoundCloud</a>
       )}
     </div>
   );

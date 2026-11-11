@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { markDay, newRun, pauseRun } from '../data/plan-engine.js';
 import { AUDIO_RELEASE_PREFIX } from './audio-track.js';
-import { _resetAutoDownload, autoDownloadPass, planWeekRefs, unmeteredNow, upNextTracks } from './auto-download.js';
+import { _resetAutoDownload, autoDownloadPass, planWeekRefs, starredTracks, unmeteredNow, upNextTracks } from './auto-download.js';
 
 const at = (key) => new Date(key + 'T09:00:00');
 /** A 30-day plan of one chapter a day: Psalms 1..30. */
@@ -155,5 +155,18 @@ describe('auto-download - a pass (dl-d5)', () => {
     } finally {
       if (had) Object.defineProperty(navigator, 'connection', had); else delete /** @type {any} */ (navigator).connection;
     }
+  });
+});
+
+/* W3-listen (Downloads > By themselves): "Keep what I star on this phone" wants every saved recording; songs keep
+   their own shelf, so they are left to it. */
+describe('starredTracks', () => {
+  it('is the saved shelf’s recordings, songs and broken entries left out, nothing without a store', () => {
+    const lib = { saved: () => [{ url: 'https://x/audio-v1/a.mp3', key: 'one:a' }, { url: 'https://x/songs-v1/s.mp3', key: 'song:s' }, null, { key: 'no-url' }] };
+    const got = starredTracks(lib).map((t) => t.url);
+    expect(got).toContain('https://x/audio-v1/a.mp3');
+    expect(got.every((u) => typeof u === 'string')).toBe(true);
+    expect(starredTracks(null)).toEqual([]);
+    expect(starredTracks({})).toEqual([]);
   });
 });

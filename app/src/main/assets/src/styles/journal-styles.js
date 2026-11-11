@@ -405,7 +405,10 @@
   R('.jrn-ebar { position: fixed; left: 0; right: 0; bottom: calc(max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); z-index: 40; display: flex; gap: var(--sp-2); padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--hairline); overflow-x: auto; }');
   R('.jrn-ebar .ui-btn { flex: 0 0 auto; gap: 6px; }');
   // Insert: ten tiles in four groups, one view.
-  R('.jrn-ins-groups { padding: 0 var(--sp-1) var(--sp-5); overflow-y: auto; }');
+  R('.jrn-ins-groups { padding: 0 0 var(--sp-5); overflow-y: auto; }');
+  // POL1: the mock's sheet: grabber on top, the gutter at the sides, tiles the sheet's full width.
+  R('.note-sheet.jrn-insert-sheet { padding: 8px var(--gutter) 24px; }');
+  R('.jrn-insert-sheet .sheet-handle-row { margin: 0 0 var(--sp-1); }');
   R('.jrn-ins-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin: 14px 2px 8px; }');
   R('.jrn-ins-label:first-child { margin-top: 0; }');
   R('.jrn-ins-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }');

@@ -78,7 +78,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);
-  const hasProphecyGroups = letter.blocks.some((b) => b.type === "prophecy-group");
+  // POL1 (rule: nothing floats over a reader): Expand / Collapse all sits in the page, just above the first group.
+  const firstProphecyGroup = letter.blocks.findIndex((b) => b.type === "prophecy-group");
   // W44: an expand/collapse-all belongs to the letter it was pressed on. This view
   // stays mounted from one letter (or study chapter) to the next.
   React.useEffect(() => { setExpandSignal(0); setAllExpanded(true); }, [letter.id]);
@@ -538,8 +539,20 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               );
 
               if (block.type === "prophecy-group") return (
+                <React.Fragment key={letter.id + ":" + bi}>
+                {bi === firstProphecyGroup ? (
+                  <ProphecyExpandToggle allExpanded={allExpanded} onToggle={(expand) => {
+                setAllExpanded(expand);
+                setExpandSignal(expand ? expandSignal >= 0 ? expandSignal + 1 : 1 : expandSignal <= 0 ? expandSignal - 1 : -1);
+                if (prophecyCardStatesRef) {
+                  // W44: every card of this letter, not only the keys already saved (the
+                  // cards someone toggled by hand): untouched ones came back expanded.
+                  prophecyCardKeysOf(letter).forEach((k) => { prophecyCardStatesRef.current[k] = expand; });
+                  saveProphecyCardStates && saveProphecyCardStates();
+                }
+              }} />
+                ) : null}
                 <ProphecyGroup
-                  key={letter.id + ":" + bi}
                   block={block}
                   fnProps={fnProps}
                   expandSignal={expandSignal}
@@ -547,6 +560,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   statesRef={prophecyCardStatesRef}
                   onSaveStates={saveProphecyCardStates}
                 />
+                </React.Fragment>
               );
 
               if (block.type === "cover-image") return (
@@ -797,21 +811,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       document.body
       )}
 
-      {hasProphecyGroups && (
-        <ProphecyExpandToggle
-          allExpanded={allExpanded}
-          onToggle={(expand) => {
-            setAllExpanded(expand);
-            setExpandSignal(expand ? expandSignal >= 0 ? expandSignal + 1 : 1 : expandSignal <= 0 ? expandSignal - 1 : -1);
-            if (prophecyCardStatesRef) {
-              // W44: every card of this letter, not only the keys already saved (the
-              // cards someone toggled by hand): untouched ones came back expanded.
-              prophecyCardKeysOf(letter).forEach((k) => { prophecyCardStatesRef.current[k] = expand; });
-              saveProphecyCardStates && saveProphecyCardStates();
-            }
-          }}
-        />
-      )}
       </>)}
     </ScreenLayout>
   );

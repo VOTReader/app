@@ -16,11 +16,10 @@
 
 import { useOnline } from '../components/OfflineAudioControls.jsx';
 import { SongVotePair, SongVoteAsk } from '../components/SongVoteParts.jsx';
+import { ListGroup, ListRow, UiButton } from '../components/UiParts.jsx';
 
 /** Version rows before "Show all N versions". */
 const VERSIONS_SHOWN = 4;
-/** Lyric lines in the preview before "Show all lyrics". */
-const LYRIC_PREVIEW = 4;
 /** Other songs of the same letter shown under MORE SONGS FROM THIS LETTER. */
 const MORE_SHOWN = 3;
 
@@ -36,10 +35,10 @@ function shelfWords(col) {
 function makersLine(versions) {
   const makers = [];
   for (const s of versions) if (s.cr && makers.indexOf(s.cr) < 0) makers.push(s.cr);
-  if (!makers.length) return 'Made with Suno · by members of the flock';
+  if (!makers.length) return 'made with Suno by members of the flock';
   const others = versions.some((s) => !s.cr) || makers.length > 2;
   const named = makers.slice(0, 2).join(' and ');
-  return 'Made with Suno · by ' + named + (others ? (makers.length > 1 ? ', and others' : ' and others') : '');
+  return 'made with Suno by ' + named + (others ? (makers.length > 1 ? ', and others' : ' and others') : '');
 }
 
 /**
@@ -51,7 +50,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
   const fam = cat.familyById(familyId);
   const versions = fam ? cat.versionsOf(fam) : [];
   const [allVersions, setAllVersions] = React.useState(false);
-  const [allLyrics, setAllLyrics] = React.useState(false);
+  const [lyricsOpen, setLyricsOpen] = React.useState(false);
   const lead = versions[0] || null;
   // The lyrics preview reads the first version that has words.
   const worded = versions.find((s) => s.lyr > 0) || null;
@@ -95,34 +94,45 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
   }
   const lines = lyrics ? lyrics.lines : [];
 
+  const instrumental = lead.dl === 'instrumental';
+  // listen.html au-song: the cover, the title, one line, Play | Save, the vote, From the letter and Lyrics, more songs.
+  const line = [letter ? letter.colLabel : shelfWords(fam.col), versions.length > 1 ? versions.length + ' versions' : songClock(lead.d), makersLine(versions)]
+    .filter(Boolean).join(' · ');
+
   return (
     <div className="song-page">
-      <div className="songs-eyebrow song-page-eyebrow">{versions.length > 1 ? 'Song · ' + versions.length + ' versions' : 'Song'}</div>
       <SongCover song={lead} large className="song-page-cover" />
       <h1>{fam.t}</h1>
-      {letter ? (
-        <button type="button" className="song-page-letter" onClick={openLetter}>
-          <span>{leadVerbatim ? 'From the letter:' : 'Inspired by the letter:'}</span> <em>{letter.title || 'Open the letter'}</em> <span aria-hidden="true">›</span>
-        </button>
-      ) : null}
-      <p className="song-page-shelf">{letter ? letter.colLabel : shelfWords(fam.col)}</p>
-      <p className="song-page-makers">{makersLine(versions)}</p>
-      <div className="song-page-actions">
-        <button type="button" className="songs-shuffle song-page-play" onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))}>
-          {isCurrent && active ? <PauseIcon /> : <PlayIcon />}<span>{isCurrent && active ? 'Pause' : 'Play'}</span>
-        </button>
-        <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} onClick={toggleSave}>
-          <StarIcon filled={saved} /><span>{saved ? 'Saved' : 'Save'}</span>
-        </button>
+      <p className="song-page-line">{line}</p>
+      <div className="ui-btn-row song-page-actions">
+        <UiButton kind="primary" icon={isCurrent && active ? 'pause' : 'play'} onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))}>
+          {isCurrent && active ? 'Pause' : 'Play'}
+        </UiButton>
+        <UiButton icon="star" className={'song-page-save' + (saved ? ' is-saved' : '')} onClick={toggleSave}>{saved ? 'Saved' : 'Save'}</UiButton>
       </div>
-      {/* K1 (picture r2-more-screens, third panel): the whole family, sized from the catalog. */}
       {versions.length === 1 ? <SongVoteAsk song={lead} title={fam.t} /> : null}
-      <SongKeepCard ids={versions.map((v) => v.id)} noteKey={'keep-fam-' + fam.id} versions={versions.length} title={fam.t} />
+      {letter || instrumental || lines.length ? (
+        <ListGroup ariaLabel="About this song" className="song-page-about">
+          {letter ? (
+            <ListRow icon="book" title={letter.title || 'Open the letter'} meta={leadVerbatim ? 'From the letter' : 'Inspired by the letter'} onClick={openLetter} />
+          ) : null}
+          {instrumental ? <ListRow icon="quote" title="Lyrics" meta="Instrumental" /> : lines.length ? (
+            <ListRow icon="quote" title="Lyrics" meta={songLyricsFoot(wordsVerbatim, letter)}
+              ariaLabel={(lyricsOpen ? 'Hide the lyrics of ' : 'Show the lyrics of ') + fam.t} onClick={() => setLyricsOpen(!lyricsOpen)} />
+          ) : null}
+        </ListGroup>
+      ) : null}
+      {lyricsOpen && lines.length ? (
+        <div className="song-page-lyrics" role="region" aria-label={'Lyrics of ' + fam.t}>
+          {/* a stanza break is an empty line: it keeps its space (U 8.6 bug list) */}
+          {lines.map((l, i) => (String(l.t || '').trim() ? <p key={i} dir="auto">{l.t}</p> : <p key={i} className="is-break" aria-hidden="true" />))}
+        </div>
+      ) : null}
 
       {versions.length > 1 ? (
         <section className="songs-section" aria-labelledby="song-versions">
-          <div className="songs-section-head"><h2 id="song-versions">Versions</h2></div>
-          <div className="song-versions">
+          <h2 className="ui-label" id="song-versions">Versions</h2>
+          <div className="ui-group song-versions">
             {shownVersions.map((s) => {
               const now = playingId === s.id;
               // Offline, a version not kept on this phone cannot play (2026-10-05); the one playing can always pause.
@@ -140,34 +150,15 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
             })}
           </div>
           {versions.length > VERSIONS_SHOWN && !allVersions ? (
-            <button type="button" className="songs-outline-action song-page-more" onClick={() => setAllVersions(true)}>
-              <span>Show all {versions.length} versions</span><ChevronRightIcon />
-            </button>
+            <UiButton kind="text" className="song-page-more" onClick={() => setAllVersions(true)}>Show all {versions.length} versions</UiButton>
           ) : null}
-        </section>
-      ) : null}
-
-      {lead.dl === 'instrumental' ? (
-        <section className="songs-section" aria-labelledby="song-lyrics"><div className="songs-section-head"><h2 id="song-lyrics">Lyrics</h2></div><p className="song-page-lyrics">Instrumental</p></section>
-      ) : lines.length ? (
-        <section className="songs-section" aria-labelledby="song-lyrics">
-          <div className="songs-section-head"><h2 id="song-lyrics">Lyrics</h2></div>
-          <div className="song-page-lyrics">
-            {(allLyrics ? lines : lines.slice(0, LYRIC_PREVIEW)).map((line, i) => <p key={i} dir="auto">{line.t}</p>)}
-          </div>
-          {lines.length > LYRIC_PREVIEW ? (
-            <button type="button" className="songs-see-all" onClick={() => setAllLyrics(!allLyrics)} aria-expanded={allLyrics}>
-              {allLyrics ? 'Show less' : 'Show all lyrics'}<ChevronRightIcon />
-            </button>
-          ) : null}
-          <p className="song-lyrics-foot">{songLyricsFoot(wordsVerbatim, letter)}</p>
         </section>
       ) : null}
 
       {more.length ? (
         <section className="songs-section" aria-labelledby="song-more">
-          <div className="songs-section-head"><h2 id="song-more">More songs from this letter</h2></div>
-          <div className="songs-list">
+          <h2 className="ui-label" id="song-more">More songs from this letter</h2>
+          <div className="ui-group songs-list">
             {more.slice(0, MORE_SHOWN).map((other) => (
               <FamilyRow key={other.id} fam={other} playingId={playingId} active={active}
                 onPlay={(s) => AudioPlayer.playSongs({ filter: { family: other.id }, startId: s.id, label: other.t })}
@@ -175,9 +166,9 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
             ))}
           </div>
           {more.length > MORE_SHOWN ? (
-            <button type="button" className="songs-see-all" onClick={() => onPush({ k: 'list', v: 'letter:' + letter.key })}>
-              All {more.length + 1} songs of this letter<ChevronRightIcon />
-            </button>
+            <UiButton kind="text" className="song-page-more" onClick={() => onPush({ k: 'list', v: 'letter:' + letter.key })}>
+              All {more.length + 1} songs of this letter
+            </UiButton>
           ) : null}
         </section>
       ) : null}

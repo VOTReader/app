@@ -20,8 +20,8 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
     <div className="study-panels">
       {hasScriptures && (
         <div className="study-panel-group">
-          <div className="study-panel-group-title">Scripture References</div>
-          <div className="scripture-refs">
+          <div className="study-panel-group-title ui-label">Scripture references</div>
+          <div className="scripture-refs ui-group">
             {scriptures.map((s, i) => {
               const hasVerse = !!MATTHEW_NKJV[s.cite];
               return hasVerse ? (
@@ -45,8 +45,8 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
 
       {hasVot && (
         <div className="study-panel-group">
-          <div className="study-panel-group-title">Volumes of Truth Notes</div>
-          <div className="vot-notes">
+          <div className="study-panel-group-title ui-label">From the Volumes of Truth</div>
+          <div className="vot-notes ui-group">
             {votNotes.map((n, i) => {
               const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
               const volLabel = votNoteVolLabel(n);
@@ -63,7 +63,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                     {volLabel && <span className="vot-note-vol">{volLabel}</span>}
                     {badge}
                   </div>
-                  <div className="vot-note-letter">“{n.letter}”</div>
+                  <div className="vot-note-letter">{n.letter}</div>
                   {n.excerpt && <div className="vot-note-excerpt">{n.excerpt}</div>}
                 </>
               );

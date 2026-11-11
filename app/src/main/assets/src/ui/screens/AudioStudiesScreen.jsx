@@ -15,6 +15,8 @@
    COVERAGE_* states live in bundle-d too and are read here as free globals at
    call time — one player, one shelf (see _entry-d.js). */
 
+import { EmptyState, ListGroup, ListRow, RowPlay } from '../components/UiParts.jsx';
+
 /** @returns {Array<any>} the loaded studies registry, [] until bible-studies.js lands */
 function studiesList() {
   return typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [];
@@ -63,14 +65,9 @@ function studyCountLine(study) {
  *   backLabel?: string,
  *   onOpenStudy: (studyId: string) => void,
  *   onReadStudy?: (studyId: string) => void,
- *   onSearch: () => void,
- *   onHistory: () => void,
- *   onSettings: () => void,
- *   theme: any,
- *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', onOpenStudy, onReadStudy, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpenStudy, onReadStudy }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   // The recordings ride the lazy VOT corpus (the manifest) and the studies are
@@ -101,67 +98,49 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
   }, [attempt]);
 
   const studies = studiesList();
-  const withAudio = studies.filter((study) => studyRecordedCount(study) > 0).length;
+  const heard = studies.filter((study) => studyRecordedCount(study) > 0);
+  const toRead = studies.filter((study) => studyRecordedCount(study) === 0);
   const state = AudioPlayer.getState();
   const current = Array.isArray(state.queue) ? state.queue[state.qi] : null;
   const currentKey = current && typeof current.key === 'string' ? current.key : '';
+  const live = state.status === 'playing' || state.status === 'loading';
+  const studiesWord = (/** @type {number} */ n) => n + (n === 1 ? ' study' : ' studies');
 
+  // listen.html au-studies: "With audio" first (play, title, "16 chapters · 14 recorded", opens the study's
+  // recordings), then "To read" (a book chip; opens the study in the reader).
   return (
-    <ScreenLayout
-      navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}
-    >
-      <div className="audio-library-screen">
-        <header className="audio-library-hero">
-          <div className="audio-library-eyebrow">Listening Library</div>
-          <h1>Bible/Letter Studies</h1>
-          {/* Codex critique 2 (2026-09-23): the old 'Choose a study to hear it'
-              promised audio for all seven while two had any. */}
-          <p className="audio-library-intro">Listen to a recorded study chapter by chapter, in reading order. The others open to read.</p>
-        </header>
-
-        <section className="audio-library-section" aria-labelledby="audio-studies-list">
-          <div className="audio-library-section-head">
-            <div><span>Study by study</span><h2 id="audio-studies-list">Studies</h2></div>
-            <strong><span aria-hidden="true">{studies.length}</span><span className="sr-only">{studies.length + ' studies'}</span></strong>
-          </div>
-          {studies.length ? (
-            <p className="audio-studies-split">{withAudio + ' with audio · ' + (studies.length - withAudio) + ' to read'}</p>
-          ) : null}
-          {studies.length ? (
-            <div className="audio-library-shelf">
-              {studies.map((study) => {
-                const recorded = studyRecordedCount(study);
-                const playing = !!currentKey && (study.chapters || []).find((chapter) => chapter && currentKey === 'study:' + chapter.id);
-                // Codex critique 1 (2026-09-23): a study with nothing to hear
-                // opened an empty recordings page; it opens its text instead.
-                const open = recorded || typeof onReadStudy !== 'function' ? () => onOpenStudy(study.id) : () => onReadStudy(study.id);
-                return (
-                  <button key={study.id} type="button" className="audio-library-shelf-row" onClick={open}>
-                    <span className="audio-library-shelf-mark" aria-hidden="true">{recorded ? '♪' : '○'}</span>
-                    <span className="audio-library-shelf-copy">
-                      <strong>{study.title}</strong>
-                      <small>{studyCountLine(study) + (playing ? ' · Playing chapter ' + (playing.num != null ? playing.num : '') : '')}</small>
-                      {recorded ? <CoverageBadge state={COVERAGE_READ_ALONG} /> : (
-                        <span className="coverage-badge-wrap">
-                          <span className="coverage-badge coverage-badge-read-study" title="Not recorded yet: opens the study to read">Read study</span>
-                        </span>
-                      )}
-                    </span>
-                    <span className="audio-library-shelf-tail"><ArrowIcon /></span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : studiesFailed ? (
-            <div className="audio-library-empty" role="alert">
-              Couldn’t load the studies.{' '}
-              <button type="button" className="audio-library-retry"
-                onClick={() => { setStudiesFailed(false); setAttempt((n) => n + 1); }}>Try again</button>
-            </div>
-          ) : (
-            <div className="audio-library-empty">Loading the studies…</div>
-          )}
-        </section>
+    <ScreenLayout utility={{ title: 'Studies', onBack, backLabel }}>
+      <div className="root-screen listen-studies">
+        {heard.length ? (
+          <ListGroup label="With audio" aside={studiesWord(heard.length)}>
+            {heard.map((study) => {
+              const chapters = Array.isArray(study.chapters) ? study.chapters : [];
+              const here = !!currentKey && chapters.some((chapter) => chapter && currentKey === 'study:' + chapter.id);
+              const playing = here && live;
+              return (
+                <ListRow key={study.id} current={here}
+                  lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + study.title} playing={playing}
+                    onClick={() => (here ? AudioPlayer.toggle() : AudioPlayer.playCollection({ volKey: 'study', items: chapters, collectionLabel: study.title }))} />}
+                  title={study.title} meta={studyCountLine(study)} onClick={() => onOpenStudy(study.id)}
+                  ariaLabel={'Open ' + study.title} chevron />
+              );
+            })}
+          </ListGroup>
+        ) : null}
+        {toRead.length ? (
+          <ListGroup label="To read" aside={studiesWord(toRead.length)}>
+            {toRead.map((study) => (
+              <ListRow key={study.id} icon="book" title={study.title} meta={studyCountLine(study)}
+                onClick={() => (typeof onReadStudy === 'function' ? onReadStudy(study.id) : onOpenStudy(study.id))} />
+            ))}
+          </ListGroup>
+        ) : null}
+        {!studies.length ? (
+          studiesFailed ? (
+            <EmptyState icon="info" title="Couldn’t load the studies" text="They come with the app; try once more."
+              action={{ label: 'Try again', onClick: () => { setStudiesFailed(false); setAttempt((n) => n + 1); } }} />
+          ) : <p className="listen-saved-note">Loading the studies…</p>
+        ) : null}
       </div>
     </ScreenLayout>
   );

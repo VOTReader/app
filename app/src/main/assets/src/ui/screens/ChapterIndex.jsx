@@ -2,12 +2,14 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { BarAction } from '../components/RootNav.jsx';
+import { countOf } from '../../utils/download-tree.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, currentChapter, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
   const currentRef = React.useRef(null);
   // Chapter-level bookmark indicator (owner report 2026-08-09): a chapter
   // holding a bookmark — the whole-chapter bookmark or any verse bookmark
@@ -51,7 +53,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // rows all render the SAME one. progressKeyFor threads the tracker's
   // v1:<bid>:<cid> key; absent (legacy caller) → cold chip only.
   const _wpm = readingChipWpm();
-  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
+  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm, { plain: true });
   // BACKLOG [29a] / C2-C [C7] — the SECOND signal, on the study screens that
   // pass a measured table (utils/matthew-note-weight.js). It answers a
   // question the minute chip is contractually forbidden to answer: study
@@ -75,16 +77,14 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   };
   return (
     <ScreenLayout
-      navChildren={LibraryNav({
-        onBack, backLabel: backDest,
-        onSettings, onHistory, onSearch, theme, onThemeChange,
-      })}
+      utility={{ title: book.title, onBack, backLabel: 'Back to ' + backDest,
+        actions: [onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null] }}
     >
-      <div className="vol-index">
-        <div className="vol-index-header">
-          <div className="vol-index-eyebrow">Scriptures of Truth</div>
-          <h1 className="vol-index-title">{book.title}</h1>
-          <div className="vol-index-subtitle">{book.subtitle}</div>
+      {/* r-book (W2h): the book's line and Listen, a strip of chapter numbers, then one list of chapters with their
+          headings and minutes. (.chapter-card-btn keeps its name: the e2e walks tap it.) */}
+      <div className="vol-index rd-book">
+        <div className="vol-index-header rd-book-head">
+          <p className="rd-book-sub">{book.subtitle ? book.subtitle + ' · ' : ''}{countOf(book.chapters.length, 'chapter')}</p>
           {/* Recorded Bible edition (per-chapter since 2026-08-09; comment
               corrected 2026-08-10). No chapter is named here — this is the
               book index — so the book starts at its first chapter and
@@ -95,16 +95,20 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
             <HeroListen {...bibleHero(bibleAudio, book)} />
           )}
-          <div className="vol-index-ornament">
-            <div className="vol-index-ornament-line" />
-            <div className="vol-index-ornament-diamond" />
-            <div className="vol-index-ornament-line r" />
-          </div>
           {/* A02.11: the chip's tooltip is the only thing that said what it meant, and a phone shows no tooltips */}
           {noteWeights && Object.values(noteWeights).some((r) => r > 0) ? (
             <div className="idx-note-legend">{"\xD7"} notes: how long a chapter{"\u2019"}s study notes run, against its verses</div>
           ) : null}
         </div>
+        {book.chapters.length > 1 ? (
+          <nav className="rd-book-strip" aria-label="Chapters">
+            {book.chapters.map((ch) => (
+              <button key={ch.num} type="button" className={'rd-book-num' + (ch.num === currentChapter ? ' is-current' : '')}
+                aria-label={'Chapter ' + ch.num} aria-current={ch.num === currentChapter ? 'true' : undefined}
+                onClick={() => onSelect(ch.num)}>{ch.num}</button>
+            ))}
+          </nav>
+        ) : null}
         <div className="chapter-cards">
           {book.chapters.map((ch, _i) => {
             const isCurrent = ch.num === currentChapter;

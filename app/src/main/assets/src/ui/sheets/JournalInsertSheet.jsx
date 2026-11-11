@@ -4,6 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { UiIcon } from '../components/UiIcon.jsx';
+import { SheetHandle } from '../components/SheetHandle.jsx';
 import { openJournalLinkPicker } from '../../utils/journal-link-picker.js';
 
 /** The note picker lists the newest this many (a long list is slow to draw). */
@@ -410,6 +411,8 @@ export function JournalInsertSheet(props) {
   return (
     <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) close(); }}>
       <div className="note-sheet jrn-insert-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-insert-title" onClick={function(e) { e.stopPropagation(); }} style={{ maxWidth: '480px' }}>
+        {/* the grabber (rule 13); its x is hidden here, the header keeps the one Close */}
+        <SheetHandle onClose={close} />
         <div className="note-sheet-header">
           {mode !== 'menu' && (
             <button className="note-sheet-menu-btn" onClick={back} aria-label="Back" style={{ fontSize: 'var(--fsc-18)' }}>‹</button>

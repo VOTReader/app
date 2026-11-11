@@ -413,16 +413,15 @@ describe('axe — TabsOverview + TabActionSheet', () => {
   it('three tabs in the overview dialog; each card’s buttons name their tab', async () => {
     tabGlobals();
     render(
-      <div role="dialog" aria-modal="true" aria-labelledby="tabs-overview-title">
+      <div role="dialog" aria-modal="true" aria-label="Tabs">
         <TabsOverview tabs={TABS} activeTabIdx={1} onSelect={noop} onClose={noop} onNewTab={noop} onMenu={noop}
-          onReorder={noop} onClearAll={noop} onDedupe={noop} MAX_TABS={9} thumbnails={null} />
+          onReorder={noop} onClearAll={noop} onDedupe={noop} MAX_TABS={9} thumbnails={null} clearAsk onClearAsk={noop} />
       </div>,
     );
+    expect(screen.getByText('Close 2 tabs? Pinned tabs stay open.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Close tab: Genesis 1' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Tab actions: Home' }).getAttribute('aria-haspopup')).toBe('dialog');
     expect(screen.getByRole('img', { name: 'Pinned' })).toBeTruthy();
-    expect(await seriousViolations(document)).toEqual([]);
-    fireEvent.click(screen.getByText('Clear All'));
     expect(await seriousViolations(document)).toEqual([]);
   });
 

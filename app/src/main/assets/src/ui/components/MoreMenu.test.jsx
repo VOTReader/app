@@ -324,7 +324,7 @@ describe('MoreMenuBtn — Bible translation (mw17 A02.1)', () => {
     act(() => { fireEvent.click(row); });
     expect(menu()).toBeNull();
     const dialog = document.querySelector('[role="dialog"]');
-    expect(dialog && dialog.textContent).toMatch(/Bible Translation/);
+    expect(dialog && dialog.textContent).toMatch(/Bible translation/);
     const rvr = [...dialog.querySelectorAll('button')].find((b) => /Reina-Valera/.test(b.textContent));
     act(() => { fireEvent.click(rvr); });
     expect(onTranslation).toHaveBeenCalledWith('rvr');

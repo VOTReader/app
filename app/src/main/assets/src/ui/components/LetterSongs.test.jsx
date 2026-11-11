@@ -29,6 +29,7 @@ import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-ca
 import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { NetStatus } from '../../utils/net-status.js';
 import { SongKeep } from '../../utils/song-keep.js';
+import * as ReactDOM from 'react-dom';
 
 const WTLB = { id: 'come-love-awaits-you', title: 'Come, Love Awaits You' };
 const ONE = { id: 'the-letter', title: 'The Letter' };
@@ -109,7 +110,7 @@ describe('the hero row: LISTEN and HEAR IT SUNG', () => {
 });
 
 describe('SONGS FROM THIS LETTER', () => {
-  it('lists the letter\'s songs as in-app rows: a tap on the row plays (W-02), N versions opens its song', () => {
+  it('lists the letter\'s songs as in-app rows: a tap on the row plays (W-02), its menu opens the song page', () => {
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     const card = document.querySelector('.letter-songs-card');
     expect(card.querySelector('.related-card-title').textContent).toBe('Songs from this letter');
@@ -118,11 +119,17 @@ describe('SONGS FROM THIS LETTER', () => {
     fireEvent.click(within(row).getByRole('button', { name: /Play Come, Love Awaits You/ }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
     player.playSongs.mockClear();
-    fireEvent.click(row.querySelector('.songs-row-hit'));                  // the row body: sound, not a page
-    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
-    expect(window.__openSongs).not.toHaveBeenCalled();
-    fireEvent.click(within(row).getByRole('button', { name: 'All 2 versions of Come, Love Awaits You' }));
-    expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], 'Come, Love Awaits You');
+    expect(window.__openSongs).not.toHaveBeenCalled();                     // the row body: sound, not a page
+    expect(within(row).queryByRole('button', { name: /versions/ })).toBeNull();   // no "N versions ›" link on the row
+    // The song page is in the row's menu (W3d): Song page and lyrics.
+    globalThis.ReactDOM = ReactDOM;
+    globalThis.useModalRegistry = () => {};
+    globalThis.useFocusTrap = () => null;
+    try {
+      fireEvent.click(within(row).getByRole('button', { name: 'More for Come, Love Awaits You' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Song page and lyrics' }));
+      expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], 'Come, Love Awaits You');
+    } finally { for (const k of ['ReactDOM', 'useModalRegistry', 'useFocusTrap']) delete globalThis[k]; }
     expect(screen.queryByRole('button', { name: /All .* of this letter/ })).toBeNull();   // one song: no "All"
   });
 
@@ -193,7 +200,7 @@ describe('the verbatim gate', () => {
     cleanup();
     player.playSongs.mockClear();
     render(<LetterSongsCard volKey="wtlb1" letterId={KINGDOM.id} letterTitle={KINGDOM.title} />);
-    fireEvent.click(document.querySelector('.letter-songs-card .songs-row-hit'));
+    fireEvent.click(document.querySelector('.letter-songs-card .songs-row .ui-row-main'));
     expect(player.playSongs).toHaveBeenLastCalledWith(expect.objectContaining({ ids: ['00000000cab2'], startId: '00000000cab2' }));
   });
 
@@ -214,7 +221,7 @@ describe('the verbatim gate', () => {
     adoptSongCatalog({ ...VERBATIM_FIXTURE, songs: VERBATIM_FIXTURE.songs.concat(extra),
       families: VERBATIM_FIXTURE.families.concat(extra.map((s) => ({ id: s.f, t: s.t, feat: s.id, n: 1, col: 'wtlb1', src: s.src, lb: '', vs: s.vs, vfeat: s.vs ? s.id : null, nvs: s.vs ? 1 : 0 }))) });
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
-    expect(Array.from(document.querySelectorAll('.letter-songs-card .songs-row strong')).map((n) => n.textContent)).not.toContain('Extra i1');
+    expect(Array.from(document.querySelectorAll('.letter-songs-card .songs-row .ui-row-title')).map((n) => n.textContent)).not.toContain('Extra i1');
     expect(screen.getByRole('button', { name: /All 4 songs of this letter/ })).toBeTruthy();
   });
 });
@@ -364,15 +371,15 @@ describe('the outside audio links of a letter', () => {
   const LINKS = { audioUrl: 'https://example.org/a.mp3', soundcloudUrl: 'https://soundcloud.com/x/y' };
   it('online: both links show', () => {
     render(<LetterAudioLinks letter={LINKS} />);
-    expect(screen.getByRole('link', { name: '♪ Audio Recording' }).getAttribute('href')).toBe(LINKS.audioUrl);
-    expect(screen.getByRole('link', { name: '♪ Listen on SoundCloud' }).getAttribute('href')).toBe(LINKS.soundcloudUrl);
+    expect(screen.getByRole('link', { name: 'Audio recording' }).getAttribute('href')).toBe(LINKS.audioUrl);
+    expect(screen.getByRole('link', { name: 'SoundCloud' }).getAttribute('href')).toBe(LINKS.soundcloudUrl);
   });
   it('offline: the card is gone, and it comes back with the network', () => {
     NetStatus.reportFailure();
     const { container } = render(<LetterAudioLinks letter={LINKS} />);
     expect(container.textContent).toBe('');
     act(() => { NetStatus.reportOk(); });
-    expect(screen.queryByRole('link', { name: '♪ Listen on SoundCloud' })).not.toBeNull();
+    expect(screen.queryByRole('link', { name: 'SoundCloud' })).not.toBeNull();
   });
   it('a letter with neither link renders nothing', () => {
     const { container } = render(<LetterAudioLinks letter={{}} />);

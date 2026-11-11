@@ -78,7 +78,7 @@ describe('Library "open the text" on a study recording', () => {
     expect(p.navigateToLink).toHaveBeenCalledTimes(1);
     expect(p.navigateToLink).toHaveBeenCalledWith(
       { type: 'study-letter', studyId: 'purity', studyChapterId: 'purity-ch1' },
-      { sourceLetterTitle: 'Listening Library', silent: true },
+      { sourceLetterTitle: 'Listen', silent: true },
     );
     // Same tracking as selectStudyChapter (an index open) and the History arm:
     // a Library open must not be distinguishable to the reading dot.
@@ -101,7 +101,7 @@ describe('Library "open the text" on a study recording', () => {
     window.__openAudioText({ key: 'bible-brm-kjv:john', partLabel: 'Chapter 3' });
     expect(p.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'john', chapter: 3 },
-      { sourceLetterTitle: 'Listening Library', silent: true },
+      { sourceLetterTitle: 'Listen', silent: true },
     );
   });
 });

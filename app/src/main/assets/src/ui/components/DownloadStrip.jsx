@@ -12,6 +12,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { formatBytes, useOnline } from './OfflineAudioControls.jsx';
+import { UiButton } from './UiParts.jsx';
 import { countOf, formatLength } from '../../utils/download-tree.js';
 
 /** @param {any} off @param {string} name @returns {any} the store's answer, or undefined where it has no such call */
@@ -96,9 +97,12 @@ export function stripModel(off, online) {
 }
 
 /**
- * @param {{ off: any, onMakeRoom?: () => void }} props onMakeRoom = show what is on the phone (the On this phone tab)
+ * W3b listen (listen.html au-dlrun): a card with the state as its eyebrow ("Downloading"), the set's name when one set is
+ * on its way, the counts and bytes, its bar, and Pause | Cancel; Cancel asks first.
+ * @param {{ off: any, name?: string, onMakeRoom?: () => void }} props onMakeRoom = show what is on the phone (the On
+ *   this phone tab); name = the one set on its way ("Volume Two"), else ''
  */
-export function DownloadStrip({ off, onMakeRoom }) {
+export function DownloadStrip({ off, name = '', onMakeRoom }) {
   const online = useOnline();
   const [asking, setAsking] = React.useState(false);
   const m = stripModel(off, online);
@@ -107,18 +111,27 @@ export function DownloadStrip({ off, onMakeRoom }) {
   const canPause = typeof off.pause === 'function';
   const stop = () => { off.cancelAll(); setAsking(false); };
   const n = count + later;
+  const cut = line1.indexOf(' · ');
+  const head = cut > 0 ? line1.slice(0, cut) : line1;
+  const rest = cut > 0 ? line1.slice(cut + 3) : '';
+  const title = name || rest || head;
+  const sub = [name ? rest : '', line2].filter(Boolean).join(' · ');
   return (
-    <div className={'dl-strip ' + cls} role="status" aria-live="polite">
-      <div className="dl-strip-text">
-        <p className="dl-strip-line1">{line1}</p>
-        {line2 ? <p className="dl-strip-line2">{line2}</p> : null}
-      </div>
+    <div className={'ui-card dl-strip ' + cls} role="status" aria-live="polite">
+      <p className="dl-strip-head">{head}</p>
+      <p className="dl-strip-line1">{title}</p>
+      {sub ? <p className="dl-strip-line2">{sub}</p> : null}
+      {pct != null && (reason == null || reason === 'paused') ? (
+        <span className="ui-progress dl-strip-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={'Downloads ' + pct + '% done'}>
+          <span style={{ width: Math.max(2, pct) + '%' }} />
+        </span>
+      ) : null}
       <div className="dl-strip-actions">
-        {reason === 'space' && onMakeRoom ? <button type="button" className="dl-link" onClick={onMakeRoom}>Make room</button> : null}
-        {reason === 'later' && typeof off.retryAll === 'function' ? <button type="button" className="dl-link" onClick={() => off.retryAll()}>Retry now</button> : null}
-        {canPause && reason === 'paused' ? <button type="button" className="dl-link" onClick={() => off.resume()}>Resume all</button> : null}
-        {canPause && count && reason !== 'paused' && reason !== 'space' ? <button type="button" className="dl-link" onClick={() => off.pause()}>Pause all</button> : null}
-        <button type="button" className="dl-link" onClick={() => setAsking(true)} aria-expanded={asking}>{canPause ? 'Cancel' : 'Cancel all'}</button>
+        {reason === 'space' && onMakeRoom ? <UiButton small onClick={onMakeRoom}>Make room</UiButton> : null}
+        {reason === 'later' && typeof off.retryAll === 'function' ? <UiButton small onClick={() => off.retryAll()}>Retry now</UiButton> : null}
+        {canPause && reason === 'paused' ? <UiButton small icon="play" onClick={() => off.resume()}>Resume</UiButton> : null}
+        {canPause && count && reason !== 'paused' && reason !== 'space' ? <UiButton small icon="pause" onClick={() => off.pause()}>Pause</UiButton> : null}
+        <button type="button" className="ui-btn is-small" onClick={() => setAsking(true)} aria-expanded={asking}>{canPause ? 'Cancel' : 'Cancel all'}</button>
       </div>
       {asking ? (
         <div className="offline-confirm dl-cancel-ask" role="group" aria-label="Cancel downloads">
@@ -129,11 +142,6 @@ export function DownloadStrip({ off, onMakeRoom }) {
             <button type="button" className="offline-confirm-go" onClick={stop}>Cancel downloads</button>
           </div>
         </div>
-      ) : null}
-      {pct != null && (reason == null || reason === 'paused') ? (
-        <span className="dl-strip-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={'Downloads ' + pct + '% done'}>
-          <span style={{ width: Math.max(2, pct) + '%' }} />
-        </span>
       ) : null}
     </div>
   );

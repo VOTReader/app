@@ -5,6 +5,9 @@
      run.autoAudio === false turns it off).
    - Up next: "Keep the next 3 ready" (Settings > Listening, off by default) keeps the 3 recordings after the one
      playing on the phone.
+   - Starred: "Keep what I star on this phone" (Downloads > By themselves, W3-listen 2026-11-11, off by default) keeps
+     every saved recording on the phone. Songs keep their own shelf (Songs kept on this phone), so a pass takes
+     letters and chapters only, as it always has.
    They go into the same download queue as a tap on Download, marked wifi: the phone app's queue and the browser's
    start them only on an unmetered network (with the app closed too), letting the listener's own go first. They are
    queued only on Wi-Fi, and on mobile data the ones still waiting are taken back out and come back on Wi-Fi (the
@@ -55,6 +58,15 @@ export function upNextTracks(state) {
   const qi = state && Number.isInteger(state.qi) ? state.qi : 0;
   // Letters and chapters: songs are kept by their own shelf (Songs kept on this phone).
   return q.slice(qi + 1).filter((t) => t && typeof t.url === 'string' && !isSongUrl(t.url)).slice(0, UP_NEXT_COUNT);
+}
+
+/**
+ * The saved shelf's recordings (AudioLibraryStore, the stores bundle), for "Keep what I star on this phone".
+ * @param {any} library @returns {any[]}
+ */
+export function starredTracks(library) {
+  const list = library && typeof library.saved === 'function' ? library.saved() : [];
+  return (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && !isSongUrl(t.url));
 }
 
 /** @returns {boolean} the phone is on an unmetered network now (Wi-Fi); a browser that cannot tell says no */
@@ -160,6 +172,11 @@ const EVERY_MS = 60_000;
 let _tracksOf = () => [];
 /** Settings' "Keep the next 3 ready". */
 let _keepNext = false;
+/** Downloads' "Keep what I star on this phone". */
+let _keepStarred = false;
+/** @type {null | (() => void)} */
+let _offLibrary = null;
+const _library = () => { const s = /** @type {any} */ (globalThis).AudioLibraryStore; return s && typeof s.saved === 'function' ? s : null; };
 let _started = false;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _timer = null;
@@ -171,12 +188,13 @@ let _playing = '';
  * The app hands over what a pass needs as it renders (as it does Download only on Wi-Fi): a plan's tracks and the
  * Keep the next 3 ready switch. The first hand-over starts the watcher where downloads work: a pass after any change
  * to the plans, the download store, the track playing or the network, and once a minute.
- * @param {(refs: any[]) => any[]} tracksOf @param {boolean} keepNext
+ * @param {(refs: any[]) => any[]} tracksOf @param {boolean} keepNext @param {boolean} [keepStarred]
  */
-export function setAutoDownloads(tracksOf, keepNext) {
+export function setAutoDownloads(tracksOf, keepNext, keepStarred = false) {
   if (typeof tracksOf === 'function') _tracksOf = tracksOf;
-  const flipped = keepNext !== _keepNext;
+  const flipped = keepNext !== _keepNext || keepStarred !== _keepStarred;
   _keepNext = keepNext === true;
+  _keepStarred = keepStarred === true;
   if (!_started) _start();
   else if (flipped) _soon();
 }
@@ -189,6 +207,10 @@ function _run() {
     if (plans && !_offPlans) _offPlans = plans.subscribe(_soon);
     const tracks = [..._tracksOf(planWeekRefs(plans ? plans.all() : [], new Date()))];
     if (_keepNext) tracks.push(...upNextTracks(AudioPlayer.getState()));
+    // A new star makes a pass of its own (the store's global can come after the first render, like the plans').
+    const library = _library();
+    if (library && !_offLibrary && typeof library.subscribe === 'function') _offLibrary = library.subscribe(() => { if (_keepStarred) _soon(); });
+    if (_keepStarred) tracks.push(...starredTracks(library));
     autoDownloadPass({ off: OfflineAudio, tracks, unmetered: unmeteredNow() });
   } catch (_e) { /* a pass that cannot run waits for the next */ }
 }

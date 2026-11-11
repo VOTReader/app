@@ -1357,7 +1357,6 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
   it('LS_SKIP_LIST exports the permanent LS exceptions (every live vot-* key that is not a migrated store)', () => {
     expect(LS_SKIP_LIST).toContain('vot-state');
     expect(LS_SKIP_LIST).toContain('vot-audio-pos');            // audio-player.js PERSIST_KEY
-    expect(LS_SKIP_LIST).toContain('vot-audio-recent-open');    // AudioLibraryScreen RECENT_OPEN_KEY
     expect(LS_SKIP_LIST).toContain('vot-recent-searches');      // search/recent-searches.js
     expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
     expect(LS_SKIP_LIST).toContain('vot-note-draft');           // utils/note-draft.js (dl4)
@@ -1381,7 +1380,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-notes-tab');
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
-    expect(LS_SKIP_LIST.length).toBe(33);   // plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×)
+    expect(LS_SKIP_LIST.length).toBe(32);   // plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×)
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
@@ -1394,7 +1393,6 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     // is what keeps that retry from eating the reader's place in a 90-minute track.
     const resume = JSON.stringify({ trackId: 'brm-kjv:jeremiah', t: 4211.5, mode: 'collection' });
     localStorage.setItem('vot-audio-pos', resume);
-    localStorage.setItem('vot-audio-recent-open', '1');
     localStorage.setItem('vot-audio-stale-example', 'legacy');  // control: a vot-* key NOT skipped
 
     /** @type {Record<string, any>} */
@@ -1405,7 +1403,6 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     await clearLegacyLs();
 
     expect(localStorage.getItem('vot-audio-pos')).toBe(resume);
-    expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
     expect(localStorage.getItem('vot-audio-stale-example')).toBeNull();  // control cleared
   });
 

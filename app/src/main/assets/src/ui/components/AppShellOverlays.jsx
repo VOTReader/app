@@ -23,6 +23,7 @@
 
 import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
 import { navOriginLabel } from '../../utils/tabs.js';
+import { BarTextAction } from './RootNav.jsx';
 import { OPEN_YOUR_DATA_EVENT } from '../../utils/your-data-link.js';
 
 export function AppShellOverlays({
@@ -50,6 +51,11 @@ export function AppShellOverlays({
   // overlays are always mounted (AppShellOverlays is always rendered)
   // so we can't conditionally call the hook; instead we toggle active
   // off when the modal is closed.
+  // r-tabs (W2h): "Close all" sits in the bar; it asks first, in the overview (TabsOverview's ConfirmStrip).
+  const [tabsClearAsk, setTabsClearAsk] = React.useState(false);
+  React.useEffect(() => { if (!tabsOverviewOpen) setTabsClearAsk(false); }, [tabsOverviewOpen]);
+  const tabsUnpinned = (tabs || []).filter((t) => !(t && t.pinned)).length;
+  const tabsCanClear = tabsUnpinned > 0 && (tabs || []).length > 1;
   useModalRegistry({
     id: 'tabs-overview',
     dismiss: () => setTabsOverviewOpen(false),
@@ -111,14 +117,13 @@ export function AppShellOverlays({
               overlay, so close it too or the tap looks like a dead button. */}
           {/* landmarks={false}: the live screen underneath owns the document's
               one main landmark and its nav; this dialog must not add a second pair. */}
-          <ScreenLayout trackScroll={false} landmarks={false} navChildren={LibraryNav({
+          <ScreenLayout trackScroll={false} landmarks={false} hideTabsBtn utility={{
+            title: 'Tabs', titleId: 'tabs-overview-title',
             onBack: () => setTabsOverviewOpen(false),
-            backTitle: 'Back',
             // n177: Back closes the overview onto the tab underneath; it says which.
-            backLabel: tabs[activeTabIdx] ? (tabs[activeTabIdx].customTitle || navOriginLabel(tabs[activeTabIdx])) : undefined,
-            onHomeBefore: () => setTabsOverviewOpen(false),
-            hide: ['settings', 'history', 'search', 'theme'],
-          })}>
+            backLabel: tabs[activeTabIdx] ? 'Back to ' + (tabs[activeTabIdx].customTitle || navOriginLabel(tabs[activeTabIdx])) : 'Back',
+            actions: [<BarTextAction key="clear" label="Close all" disabled={!tabsCanClear} onClick={() => setTabsClearAsk(true)} />],
+          }}>
             <TabsOverview
               tabs={tabs}
               activeTabIdx={activeTabIdx}
@@ -129,6 +134,8 @@ export function AppShellOverlays({
               onReorder={(from, to) => reorderTabs(from, to)}
               onClearAll={() => { closeAllTabs(); lastTabCloseStrikesRef.current = 0; }}
               onDedupe={() => deduplicateTabs()}
+              clearAsk={tabsClearAsk}
+              onClearAsk={setTabsClearAsk}
               MAX_TABS={MAX_TABS}
               thumbnails={tabThumbnails}
             />

@@ -56,8 +56,9 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
    Renders nothing while closed; picking an option calls onChange, then
    onClose. `portal` moves it to <body> for callers inside the top bar. */
 /** @param {{ id?: string, open: boolean, onClose: () => void, eyebrow?: string, title: string, value: string,
-     options: any[], onChange: (v: string) => void, portal?: boolean }} props */
-export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false }) {
+     options: any[], onChange: (v: string) => void, portal?: boolean, note?: string }} props
+   `note`: one muted line under the options (listen.html au-voicepref: "Your pick is used wherever that reading exists."). */
+export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false, note = '' }) {
   const ownId = React.useId();
   const sheetId = id || `select-sheet-${ownId}`;
   const titleId = `select-sheet-title-${ownId}`;
@@ -104,11 +105,13 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
               {heading}
               <button
                 type="button"
-                className={`select-sheet-option${isSelected ? " selected" : ""}`}
+                className={`select-sheet-option${isSelected ? " selected" : ""}${opt.code ? " has-code" : ""}`}
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => { onChange(opt.id); onClose(); }}
               >
+                {/* r-trans (W2h): an option may lead with a short code ("NKJV") in its own column */}
+                {opt.code ? <span className="select-sheet-option-code">{opt.code}</span> : null}
                 <div className="select-sheet-option-main">
                   <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
                   {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
@@ -122,6 +125,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
             );
           })}
         </div>
+        {note ? <p className="select-sheet-note">{note}</p> : null}
       </div>
     </>
   );
@@ -148,7 +152,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                  { id: 'del', icon: 'trash', label: 'Delete note', danger: true, onSelect: askDelete }]} />
    ──────────────────────────────────────────────────────────────────────── */
 /** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any,
-     actions?: Array<{ id: string, label: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
+     actions?: Array<{ id: string, label: any, sub?: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
      confirm?: { label: string, onConfirm: () => (void | boolean), danger?: boolean, disabled?: boolean } | null, cancelLabel?: string,
      children?: any, portal?: boolean, className?: string }} props */
 export function ActionSheet({ id, open, onClose, title, label, sub, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
@@ -180,7 +184,7 @@ export function ActionSheet({ id, open, onClose, title, label, sub, actions = []
         {actions.length ? (
           <div className="ui-sheet-actions" role="group" aria-labelledby={titleId}>
             {actions.map((a) => (
-              <ListRow key={a.id} icon={a.icon} noLead={!a.icon} one title={a.label} value={a.value} chevron={a.value != null ? true : false}
+              <ListRow key={a.id} icon={a.icon} noLead={!a.icon} one={!a.sub} title={a.label} meta={a.sub} value={a.value} chevron={a.value != null ? true : false}
                 className={'ui-sheet-action' + (a.danger ? ' is-danger' : '')}
                 onClick={() => { a.onSelect(); if (!a.keepOpen) onClose(); }} />
             ))}

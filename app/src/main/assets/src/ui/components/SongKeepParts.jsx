@@ -4,13 +4,9 @@
    ═══════════════════════════════════════════════════════════════════════
    The keep controls every songs surface draws, over utils/song-keep.js:
 
-     SongKeepCard     the song page's card, in the picture's three states:
-                      KEEP FOR OFFLINE LISTENING with a filled KEEP · 64 MB,
-                      KEEPING… with "Keeping 3 of 19…", a thin bar and
-                      Cancel, AVAILABLE OFFLINE with a check and "On this
-                      phone"
-     SongKeepAction   the same states on one line, for a list or shelf
-                      ("Keep all 110 · 380 MB") and a letter's songs card
+     SongKeepAction   keep, keeping and kept on one line, for a letter's
+                      songs card (the song page's own card went with the
+                      redesign: Downloads is the one place to download)
 
    Sizes are the catalog's bytes. A refusal ("Not enough room: needs 380 MB,
    212 MB free.") shows under the control that asked. An iPhone in a Safari
@@ -70,92 +66,6 @@ const WAITING_WORDS = 'Waiting for Wi-Fi';
 /** @param {any} keep @returns {boolean} */
 function waitsForWifi(keep) {
   return !!keep && typeof keep.waiting === 'function' && keep.waiting();
-}
-
-/**
- * The song page's keep card (the picture's third panel). On the phone, a quiet Remove takes the song off it
- * (W2-06: the Kept list and Settings were the only ways).
- * @param {{ ids: string[], noteKey: string, versions?: number, title?: string }} props
- */
-export function SongKeepCard({ ids, noteKey, versions = 1, title = '' }) {
-  const keep = useSongKeep();
-  const online = useSongsOnline();
-  const avail = keep.availability();
-  const list = Array.isArray(ids) ? ids : [];
-  if (avail === 'none' || !list.length) return null;
-  const p = keep.progressOf(list);
-  const note = keep.noteFor(noteKey);
-  const noteLine = note ? <p className="song-keep-note" role="status">{note}</p> : null;
-
-  if (avail === 'ios-tab') {
-    return (
-      <section className="song-keep-card" aria-labelledby={noteKey + '-h'}>
-        <h2 id={noteKey + '-h'} className="song-keep-head">Keep for offline listening</h2>
-        <div className="song-keep-body">
-          <span className="song-keep-icon"><KeepIcon /></span>
-          <div className="song-keep-copy">
-            <p className="song-keep-text">{IOS_TAB_TEXT}.</p>
-            <p className="song-keep-sub">An iPhone clears songs kept in Safari after about a week.</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-  if (p.kept === p.total) {
-    return (
-      <section className="song-keep-card is-kept" aria-labelledby={noteKey + '-h'}>
-        <h2 id={noteKey + '-h'} className="song-keep-head">Available offline</h2>
-        <div className="song-keep-body">
-          <span className="song-keep-icon is-round"><KeptIcon /></span>
-          <div className="song-keep-copy">
-            <p className="song-keep-text">On this phone</p>
-            <div className="song-keep-kept-line">
-              <p className="song-keep-sub">{(p.total > 1 ? p.total + ' versions · ' : '') + formatSongBytes(p.bytes)}</p>
-              <button type="button" className="song-keep-quiet" onClick={() => { void keep.remove(list); }}
-                aria-label={'Remove ' + (title || (p.total > 1 ? 'these songs' : 'this song')) + ' from this phone'}>Remove</button>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-  if (p.busy) {
-    return (
-      <section className="song-keep-card is-busy" aria-labelledby={noteKey + '-h'}>
-        <h2 id={noteKey + '-h'} className="song-keep-head">{waitsForWifi(keep) ? WAITING_WORDS : 'Keeping…'}</h2>
-        <div className="song-keep-body">
-          <span className="song-keep-icon"><KeepIcon /></span>
-          <div className="song-keep-copy">
-            <p className="song-keep-text" role="status">{keepingWords(p, keep)}</p>
-            <div className="song-keep-progress">
-              <KeepBar kept={p.kept} total={p.total} />
-              <button type="button" className="song-keep-cancel" onClick={() => keep.cancel(list)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-  const what = versions > 1 ? (p.kept ? 'Keep the other ' + (p.total - p.kept) + ' versions' : 'Keep all ' + versions + ' versions')
-    : 'Keep this song';
-  return (
-    <section className="song-keep-card" aria-labelledby={noteKey + '-h'}>
-      <h2 id={noteKey + '-h'} className="song-keep-head">Keep for offline listening</h2>
-      <div className="song-keep-body">
-        <span className="song-keep-icon"><KeepIcon /></span>
-        <div className="song-keep-copy">
-          <p className="song-keep-text">{what} on your phone to listen without internet.</p>
-          {p.kept ? <p className="song-keep-sub">{p.kept + ' of ' + p.total + ' on this phone'}</p> : null}
-          {p.failed ? <p className="song-keep-sub">{p.failed === 1 ? 'One did not keep. Try again.' : p.failed + ' did not keep. Try again.'}</p> : null}
-          <button type="button" className="songs-shuffle song-keep-go" disabled={!online} onClick={() => { void keep.keep(list, noteKey); }}>
-            <KeepIcon /><span>{'Keep · ' + formatSongBytes(p.needBytes)}</span>
-          </button>
-          {!online ? <p className="song-keep-sub">Needs a connection</p> : null}
-          {noteLine}
-        </div>
-      </div>
-    </section>
-  );
 }
 
 /**

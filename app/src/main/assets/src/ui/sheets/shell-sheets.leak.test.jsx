@@ -138,9 +138,9 @@ describe('leaks — reader tabs', () => {
     await leakFree('TabsOverview', () => render(
       <div role="dialog" aria-modal="true" aria-label="Tabs">
         <TabsOverview tabs={TABS} activeTabIdx={1} onSelect={noop} onClose={noop} onNewTab={noop} onMenu={noop}
-          onReorder={noop} onClearAll={noop} onDedupe={noop} MAX_TABS={9} thumbnails={null} />
+          onReorder={noop} onClearAll={noop} onDedupe={noop} MAX_TABS={9} thumbnails={null} clearAsk onClearAsk={noop} />
       </div>,
-    ), () => { fireEvent.click(screen.getByText('Clear All')); });
+    ), () => { fireEvent.click(screen.getByText('Cancel')); });
   });
   it('a tab card pressed (the press-drag armed) when the overview closes', async () => {
     tabGlobals();

@@ -22,13 +22,12 @@ import { useOfflineAudio, formatBytes, OfflineNote, useOnline } from '../compone
 import { stripModel } from '../components/DownloadStrip.jsx';
 import { showUndoToast } from '../../utils/toast.js';
 import { secondsOf } from '../../utils/audio-lengths.js';
-import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { SelectSheet } from '../components/SelectField.jsx';
+import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
+import { remainingLabel, relativePlayedAt } from '../components/AudioShelf.jsx';
 
-/** Recent list disclosure state. Deliberately localStorage, not the tab state:
- *  it is a shelf preference, not a place the reader navigated to. */
-const RECENT_OPEN_KEY = 'vot-audio-recent-open';
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
 const RECENT_PREVIEW = 8;
@@ -75,24 +74,9 @@ function clock(value) {
   return mins + ':' + (rest < 10 ? '0' : '') + rest;
 }
 
-/** @returns {boolean} */
-function readRecentOpen() {
-  try {
-    if (typeof localStorage === 'undefined') return true;
-    return localStorage.getItem(RECENT_OPEN_KEY) !== '0';
-  } catch (_e) { return true; }   // private mode / blocked storage — default open
-}
-
-/** @param {boolean} open @returns {void} */
-function writeRecentOpen(open) {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(RECENT_OPEN_KEY, open ? '1' : '0');
-  } catch (_e) { /* the disclosure still works for this session */ }
-}
-
 /** Books this Bible edition actually ships, counted off the manifest rather
  *  than assumed to be 66 — a partial edition must not overstate itself. @param {string} volKey */
-function bibleBookCount(volKey) {
+export function bibleBookCount(volKey) {
   if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return 0;
   const prefix = volKey + ':';
   let count = 0;
@@ -100,33 +84,6 @@ function bibleBookCount(volKey) {
     if (key.lastIndexOf(prefix, 0) === 0) count++;
   }
   return count;
-}
-
-/** The reader code the manifest carries for this edition's first row, or ''
- *  when it names none (the KJV/NKJV/WEB editions carry no code). @param {string} volKey */
-function bibleReaderCode(volKey) {
-  if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return '';
-  const prefix = volKey + ':';
-  for (const key in BIBLE_AUDIO_MANIFEST) {
-    if (key.lastIndexOf(prefix, 0) === 0) { const row = BIBLE_AUDIO_MANIFEST[key][0]; return row && row[1] ? String(row[1]) : ''; }
-  }
-  return '';
-}
-
-/**
- * An edition row's true second line (mt1, 2026-09-21): a noun that agrees with its count, the registry's
- * description where the edition has one, and the reader when the manifest names one (unless the label already
- * does: at 360 px the repeat pushed the line past its ellipsis). @param {any} edition @returns {string}
- */
-export function editionLine(edition) {
-  const books = bibleBookCount(edition.volKey);
-  const description = edition.description || '';
-  const parts = [books ? books + (books === 1 ? ' book' : ' books') : 'Read chapter by chapter'];
-  if (description) parts.push(description);
-  const reader = /read by/i.test(edition.label) ? null : audioReaderLabel(bibleReaderCode(edition.volKey));
-  if (reader) parts.push(reader);
-  else if (!description && books) parts.push('chapter by chapter');
-  return parts.join(' · ');
 }
 
 /** The Downloads row's live line, the Downloads strip's own words (picture 02): 'Downloading · 3 of 30 recordings ·
@@ -138,7 +95,8 @@ function downloadsLine(/** @type {any} */ offline, /** @type {any} */ queueLine,
   }
   if (busy) return 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go';
   if (!downloads.length) return 'Download for offline listening';
-  return downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes());
+  // listen.html au-root: "29 recordings · 238 MB".
+  return (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes());
 }
 
 /** The Letter Voice choices, one list for Settings > Listening and the Listen tab's row: Automatic, then every reader
@@ -152,11 +110,23 @@ export function letterVoiceOptions() {
   ];
 }
 
+/** The Letter voice sheet on the Listen root (listen.html au-voicepref): the five choices, the rule said once under
+ *  them, Automatic's own line kept. Settings > Listening keeps letterVoiceOptions as it is. */
+export function rootVoiceOptions() {
+  return letterVoiceOptions().map((o) => ({ id: o.id, label: o.label, desc: o.id === 'auto' ? 'Each recording’s own reader' : '' }));
+}
+
 /** The Letter voice row's value: the current choice in its own words. @param {string | undefined} code @returns {string} */
 export function letterVoiceLabel(code) {
   if (!code || code === 'auto') return 'Automatic · each recording’s own reader';
   const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
   return readers[code] ? String(readers[code]) : 'Automatic · each recording’s own reader';
+}
+
+/** The Letter voice row's value at the right (au-root): "Automatic", or the reader. @param {string | undefined} code */
+export function letterVoiceValue(code) {
+  const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
+  return code && code !== 'auto' && readers[code] ? String(readers[code]) : 'Automatic';
 }
 
 /** A Bible edition's short name for The Bible row's line ("KJV · NKJV · WEB · Matthew"). @param {any} edition */
@@ -211,7 +181,6 @@ const SONGS_ICON = <svg {...ICON}><path d="M9 18V5l11-2v13" /><circle cx="6.5" c
 const DOWNLOAD_ICON = <svg {...ICON}><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></svg>;
 const SAVED_ICON = <svg {...ICON}><path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" /></svg>;
 const VOICE_ICON = <svg {...ICON}><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3zM6 11v1a6 6 0 0012 0v-1M12 18v3" /></svg>;
-const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /></svg>;
 
 /**
  * The LISTEN tab's root (the layout pass, 2026-11-10, mock listen.png): Continue listening; "Listen to": the
@@ -219,7 +188,7 @@ const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5"
  * Saved recordings with their count and the Letter voice setting with its value; then Recently played, as before.
  * Every destination the hub had is still one tap away; only the arrangement changed.
  * @param {{
- *   onOpenCollection: (volKey: string) => void,
+ *   onOpenBible?: () => void,
  *   onOpenVolumes: () => void,
  *   onOpenSaved: () => void,
  *   onOpenStudies?: () => void,
@@ -232,7 +201,7 @@ const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5"
  *   onSettings: () => void,
  * }} props
  */
-export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenSongs, onOpenTrack, onSetLetterReader, letterReader, onSearch, onSettings }) {
+export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, onOpenBible, onOpenOffline, onOpenSongs, onOpenTrack, onSetLetterReader, letterReader, onSearch, onSettings }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -260,9 +229,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
     return () => { live = false; };
   }, []);
 
-  const [recentOpen, setRecentOpen] = React.useState(readRecentOpen);
   const [recentAll, setRecentAll] = React.useState(false);
-  const [bibleOpen, setBibleOpen] = React.useState(false);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
 
   const state = AudioPlayer.getState();
@@ -298,12 +265,6 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
   const resume = current || recent[0] || null;
   const left = current ? minutesLeft(state) : '';
 
-  const toggleRecent = () => {
-    const next = !recentOpen;
-    setRecentOpen(next);
-    writeRecentOpen(next);
-  };
-
   return (
     <ScreenLayout root navChildren={rootNavStart({ title: 'Listen', onSearch })} navEnd={<RootGear onSettings={onSettings} />}>
       <div className="root-screen listen-root">
@@ -315,7 +276,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
               <button type="button" className="listen-art" disabled={!hasTextDestination(resume)} onClick={() => onOpenTrack(resume)}
                 aria-label={'Open the text of ' + trackName(resume)} title="Open text">{BIBLE_ICON}</button>
               <div className="listen-continue-text">
-                <span className="root-eyebrow">{current && isPlaying ? 'Now playing' : 'Continue listening'}</span>
+                <span className="root-eyebrow">Continue listening</span>
                 <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>
                 <span className="listen-continue-meta">{[resume.sub || trackMeta(resume), left].filter(Boolean).join(' · ')}</span>
               </div>
@@ -334,17 +295,8 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
           <ListRow icon={LETTERS_ICON} title="The Volumes of Truth" onClick={() => onOpenVolumes()}
             sub={collections.length ? collections.length + (collections.length === 1 ? ' collection' : ' collections') + ' · the Letters read aloud' : 'The Letters read aloud'} />
           {editions.length ? (
-            <ListRow icon={BIBLE_ICON} title="The Bible" expanded={bibleOpen} onClick={() => setBibleOpen((v) => !v)}
+            <ListRow icon={BIBLE_ICON} title="The Bible" onClick={() => { if (onOpenBible) onOpenBible(); }}
               sub={editions.map(editionShort).join(' · ')} />
-          ) : null}
-          {bibleOpen ? (
-            <div className="root-sublist" role="group" aria-label="Bible recordings">
-              {editions.map((edition) => (
-                <ListRow key={edition.volKey} className="root-row-sub-item" icon={EDITION_ICON} title={edition.label}
-                  sub={editionLine(edition)} onClick={() => onOpenCollection(edition.volKey)}
-                  badge={<CoverageBadge state={bibleEditionCoverage(edition.volKey)} detail={bibleEditionPartialDetail(edition.volKey)} />} />
-              ))}
-            </div>
           ) : null}
           {studies.recorded > 0 ? (
             <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => { if (onOpenStudies) onOpenStudies(); }}
@@ -362,10 +314,12 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
             <ListRow icon={DOWNLOAD_ICON} title="Downloads" className="listen-downloads" onClick={() => { if (onOpenOffline) onOpenOffline(); }}
               sub={downloadsLine(offline, queueLine, busy, downloads)} />
           ) : null}
-          <ListRow icon={SAVED_ICON} title="Saved recordings" count={saved.length} onClick={() => onOpenSaved()}
-            sub={saved.length ? 'Kept · travels with your backup' : 'Tap the star beside any recording to keep it'} />
+          <ListRow icon={SAVED_ICON} title="Saved" count={saved.length} onClick={() => onOpenSaved()}
+            sub="Recordings and songs you starred" />
           {onSetLetterReader ? (
-            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)} sub={letterVoiceLabel(letterReader)} />
+            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)}
+              count={letterVoiceValue(letterReader)} className="is-valued"
+              sub={!letterReader || letterReader === 'auto' ? 'Each recording’s own reader' : 'Prefer this reading wherever it exists'} />
           ) : null}
         </div>
 
@@ -373,35 +327,38 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
         <section className="listen-recent" aria-labelledby="audio-library-recent">
           <div className="root-section-row">
             <h2 className="root-section" id="audio-library-recent">Recently played</h2>
-            {recent.length ? <button type="button" className="root-link" onClick={() => clearHistory(library)}>Clear history</button> : null}
-            <button type="button" className={'audio-library-disclosure' + (recentOpen ? ' is-open' : '')} onClick={toggleRecent}
-              aria-expanded={recentOpen} aria-controls="audio-library-recent-list"
-              aria-label={recentOpen ? 'Collapse recently played' : 'Expand recently played'}>
-              <ChevronIcon />
-            </button>
+            {recent.length ? <button type="button" className="root-link" onClick={() => clearHistory(library)} aria-label="Clear recently played">Clear</button> : null}
           </div>
-          <div id="audio-library-recent-list">
-            {recentOpen ? (
-              shownRecent.length ? (
-                <>
-                  {/* Per-row × (owner directive 2026-08-09): one stray start no longer needs the whole history cleared. */}
-                  <div className="audio-library-list">{shownRecent.map((track) => <AudioShelfRow key={track.url} track={track} source="recent" onOpenTrack={onOpenTrack} onRemove={(item) => library && library.removeRecent(item.url)} />)}</div>
-                  {recent.length > shownRecent.length ? (
-                    <button type="button" className="audio-library-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
-                  ) : null}
-                </>
-              ) : (
-                <div className="audio-library-empty">Start a recording and it will appear here, ready for an easy return.</div>
-              )
-            ) : null}
+          {/* listen.html au-root: round play, title, "Volume Two · Just now", star, a visible × (owner 2026-08-09). */}
+          <div className="ui-group" role="group" aria-labelledby="audio-library-recent">
+            {shownRecent.map((track) => {
+              const name = trackName(track);
+              const isCur = !!(current && current.url === track.url);
+              const playing = isCur && active;
+              const starred = !!(library && typeof library.isSaved === 'function' && library.isSaved(track));
+              const opens = hasTextDestination(track);
+              return (
+                <UiRow key={track.url} current={isCur}
+                  lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + name} playing={playing}
+                    onClick={() => (isCur ? AudioPlayer.toggle() : AudioPlayer.playTrack(track))} />}
+                  title={name} meta={[track.sub || trackMeta(track), remainingLabel(track) || relativePlayedAt(track.playedAt)].filter(Boolean).join(' · ')}
+                  onClick={opens ? () => onOpenTrack(track) : undefined} ariaLabel={opens ? 'Open text for ' + name : undefined}
+                  star={{ on: starred, label: starred ? 'Remove ' + name + ' from Saved' : 'Save ' + name, onClick: () => toggleSavedRecording(library, track) }}
+                  remove={{ label: 'Remove ' + name + ' from recently played', onClick: () => { if (library) library.removeRecent(track.url); } }} />
+              );
+            })}
           </div>
+          {recent.length > shownRecent.length ? (
+            <button type="button" className="ui-link listen-recent-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
+          ) : null}
         </section>
         ) : null}
       </div>
       {/* The same choice as Settings > Listening > Letter Voice, picked here (the hub, 2026-11-10). */}
       {onSetLetterReader ? (
-        <SelectSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} eyebrow="Listening" title="Letter Voice"
-          value={letterReader || 'auto'} options={letterVoiceOptions()} onChange={onSetLetterReader} portal />
+        <SelectSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} title="Letter voice"
+          value={letterReader || 'auto'} options={rootVoiceOptions()} onChange={onSetLetterReader} portal
+          note="Your pick is used wherever that reading exists." />
       ) : null}
     </ScreenLayout>
   );

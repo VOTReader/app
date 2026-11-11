@@ -34,7 +34,7 @@ const narrow = {
 };
 
 function installGlobals({ saved = [wide, narrow] } = {}) {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <h1>{utility.title}</h1> : null}{children}</main>;
   globalThis.LibraryNav = () => null;
   /* The bundle-d slots these screens read across the bundle boundary since
      landing 24 (AudioShelf's rows and icons, the seek slider, the coverage
@@ -84,59 +84,87 @@ function installPositions(forUrl, record) {
   };
 }
 
-describe('AudioSavedScreen', () => {
-  it('lists every kept recording with play, text, and un-save at hand', () => {
+describe('AudioSavedScreen (listen.html au-saved, au-saved0)', () => {
+  it('lists every saved recording with play, star and one menu, under "Saved" in the bar', () => {
     renderScreen();
-    expect(screen.getByRole('heading', { name: 'Saved recordings' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Saved' })).toBeTruthy();
+    expect(screen.getByText('2 saved')).toBeTruthy();
+    expect(screen.getByText('Newest first')).toBeTruthy();
     expect(screen.getByText('The Wide Path')).toBeTruthy();
     expect(screen.getByText('The Narrow Path')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Play The Wide Path' }));
     expect(player.playTrack).toHaveBeenCalledWith(wide);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove The Narrow Path from saved recordings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove The Narrow Path from Saved' }));
     expect(globalThis.AudioLibraryStore.toggleSaved).toHaveBeenCalledWith(narrow);
   });
 
-  it('search filters the shelf and reports the narrowed count honestly', () => {
+  it('search filters the list and says the narrowed count', () => {
     renderScreen();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search saved recordings' }), { target: { value: 'narrow' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search what you saved' }), { target: { value: 'narrow' } });
     expect(screen.queryByText('The Wide Path')).toBeNull();
     expect(screen.getByText('The Narrow Path')).toBeTruthy();
-    expect(screen.getByText('2 saved recordings').parentElement.querySelector('[aria-hidden]').textContent).toBe('1 of 2');
+    expect(screen.getByText('1 of 2 saved')).toBeTruthy();
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search saved recordings' }), { target: { value: 'zzz' } });
-    expect(screen.getByText(/No saved recordings match/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear recording search' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search what you saved' }), { target: { value: 'zzz' } });
+    expect(screen.getByText(/Nothing you saved matches/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the search' }));
     expect(screen.getByText('The Wide Path')).toBeTruthy();
   });
 
-  it('the text affordance hands the full track to the coordinator wiring', () => {
+  it('the row menu opens the letter with the full track', () => {
     const onOpenTrack = vi.fn();
     renderScreen({ onOpenTrack });
-    fireEvent.click(screen.getByRole('button', { name: 'Open text for The Wide Path' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More for The Wide Path' }));
+    fireEvent.click(screen.getByRole('button', { name: /Open the letter/ }));
     expect(onOpenTrack).toHaveBeenCalledWith(wide);
   });
 
   it('says how much of a recording is left once the positions store knows', () => {
     installPositions(wide.url, { t: 1290, d: 1800 });
     renderScreen();
-    expect(screen.getByText('8:30 left')).toBeTruthy();
-    // The row the store knows nothing about is untouched — no invented figure.
-    expect(screen.getAllByText('8:30 left')).toHaveLength(1);
+    // The row the store knows nothing about is untouched: no invented figure.
+    expect(screen.getAllByText(/8:30 left/)).toHaveLength(1);
   });
 
   it('marks a recording the reader reached the end of as finished', () => {
-    // Past the same 97% the player refuses to resume from, so the row never
-    // promises "0:04 left" for a tap that will restart from the top.
+    // Past the same 97% the player refuses to resume from, so the row never promises "0:04 left".
     installPositions(wide.url, { t: 1750, d: 1800 });
     renderScreen();
-    expect(screen.getByText('Finished')).toBeTruthy();
+    expect(screen.getByText(/Finished/)).toBeTruthy();
   });
 
-  it('an empty shelf explains how recordings arrive here', () => {
+  it('empty: says how it fills, and its one button goes to the Volumes', () => {
     installGlobals({ saved: [] });
-    renderScreen();
-    expect(screen.getByText(/Use the star beside any recording/)).toBeTruthy();
+    const onOpenVolumes = vi.fn();
+    renderScreen({ onOpenVolumes });
+    expect(screen.getByText('Nothing saved yet')).toBeTruthy();
+    expect(screen.getByText(/Tap the star beside any recording or song/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Browse The Volumes of Truth' }));
+    expect(onOpenVolumes).toHaveBeenCalled();
+  });
+
+  it('a saved song sits in the same list, with its own play and star', () => {
+    globalThis.SongCatalog = {
+      loaded: true, subscribe: () => () => {}, getVersion: () => 0, load: vi.fn(),
+      songById: (id) => (id === 's1' ? { id: 's1', t: 'A Test Song', cr: 'The flock', d: 125 } : null),
+      songAlbumLabel: () => '',
+    };
+    globalThis.AudioLibraryStore.songSaved = () => ['s1', 'gone'];
+    globalThis.AudioLibraryStore.toggleSongSaved = vi.fn();
+    player.playSongs = vi.fn();
+    try {
+      renderScreen();
+      expect(screen.getByText('3 saved')).toBeTruthy();
+      expect(screen.getByText('Song · The flock · 2:05')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Play A Test Song' }));
+      expect(player.playSongs).toHaveBeenCalledWith({ ids: ['s1'], startId: 's1', label: 'Saved' });
+      fireEvent.click(screen.getByRole('button', { name: 'Remove A Test Song from Saved' }));
+      expect(globalThis.AudioLibraryStore.toggleSongSaved).toHaveBeenCalledWith('s1');
+    } finally {
+      delete globalThis.SongCatalog;
+      delete player.playSongs;
+    }
   });
 });

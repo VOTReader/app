@@ -13,7 +13,7 @@ import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse
 import { studyHlKey } from '../../utils/hl-keys.js';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, heroExtra = null, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
   /* The eyebrow ("Book · Chapter N") is what the narrator says before verse 1:
      the read-along's lead-in (ReadAlongHighlight, 2026-09-22). */
@@ -166,19 +166,16 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           {/* A02.12: the heading said "Chapter N" under an eyebrow that already said it. It is the chapter's title,
               as the Bible hero's is (tap it to hide it; the book's subtitle stands in), and the eyebrow names the
               study edition (A02.2), so it never reads as the plain Matthew. */}
-          <div className="hero-eyebrow">{bookLabel ? <>{bookLabel} Study Bible {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
-          <h1 className="hero-title">
-            {chapter.title && showChapterTitle && !titleFocusHidden ? (
-              <button
-                type="button"
-                className="hero-title-action"
-                onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))}
-                title="Tap to hide summary"
-              >
-                {chapter.title}
-              </button>
-            ) : (book.subtitle || `Chapter ${chapter.num}`)}
-          </h1>
+          {/* r-study (W2h): place "Matthew Study Bible", title "Matthew 1", the chapter's summary in italics under it
+              (tap to hide; the book's subtitle stands in), then Listen and the study-notes switch in words. */}
+          <div className="hero-eyebrow">{bookLabel ? bookLabel + ' Study Bible' : 'Study Bible'}</div>
+          <h1 className="hero-title">{(bookLabel || book.title || '') + ' ' + chapter.num}</h1>
+          {chapter.title && showChapterTitle && !titleFocusHidden ? (
+            <button type="button" className="hero-title-action rd-hero-sub"
+              onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))} title="Tap to hide summary">
+              {chapter.title}
+            </button>
+          ) : (book.subtitle ? <p className="rd-hero-sub">{book.subtitle}</p> : null)}
           {chapter.title && showChapterTitle && titleFocusHidden && (
             <button
               className="hero-subtitle-restore"
@@ -195,6 +192,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
             <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
           )}
+          {heroExtra}
         </div>
       </header>
 
@@ -264,7 +262,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
 
           {showStudy && hasLinks && (
             <div className="study-panel-group" style={{ marginTop: "2rem" }}>
-              <div className="study-panel-group-title">Further Study</div>
+              <div className="study-panel-group-title ui-label">Further Study</div>
               <div className="study-links">
                 {chapter.links.map((link, i) => (
                   <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="study-link">
@@ -275,42 +273,37 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             </div>
           )}
 
-          <div className="ornament-divider" aria-hidden="true">
-            <div className="ornament-divider-line" />
-            <div className="ornament-divider-symbol">✦</div>
-            <div className="ornament-divider-line" />
-          </div>
           <div className="bottom-nav">
             {prevCh ? (
               <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
-                <div className="bottom-nav-label">‹ Previous</div>
+                <div className="bottom-nav-label">Previous</div>
                 <div className="bottom-nav-title">{chapterRef(prevCh.num)}</div>
               </button>
             ) : prevBoundary ? (
               <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                <div className="bottom-nav-label">‹ Previous Book</div>
+                <div className="bottom-nav-label">Previous book</div>
                 <div className="bottom-nav-title">{prevBoundary.title}</div>
               </button>
             ) : (
               <div className="bottom-nav-card placeholder">
-                <div className="bottom-nav-label">‹ Previous</div>
+                <div className="bottom-nav-label">Previous</div>
                 <div className="bottom-nav-title">—</div>
               </div>
             )}
 
             {nextCh ? (
               <button className="bottom-nav-card next" onClick={() => onNavigate(nextCh.num)}>
-                <div className="bottom-nav-label">Next ›</div>
+                <div className="bottom-nav-label">Next</div>
                 <div className="bottom-nav-title">{chapterRef(nextCh.num)}</div>
               </button>
             ) : nextBoundary ? (
               <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                <div className="bottom-nav-label">Next Book ›</div>
+                <div className="bottom-nav-label">Next book</div>
                 <div className="bottom-nav-title">{nextBoundary.title}</div>
               </button>
             ) : (
               <div className="bottom-nav-card next placeholder">
-                <div className="bottom-nav-label">Next ›</div>
+                <div className="bottom-nav-label">Next</div>
                 <div className="bottom-nav-title">—</div>
               </div>
             )}

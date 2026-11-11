@@ -98,8 +98,6 @@ export function ReadWithMusic({ state }) {
   return (
     <>
       <header className="songs-hero songs-list-hero">
-        <div className="songs-eyebrow">Read with music</div>
-        <h1>Letters read with music</h1>
         <p className="songs-intro">Letters of The Volumes, read aloud over music. The words light up as they are read.</p>
       </header>
       <section className="songs-section reading-list" aria-label="Letters read with music">

@@ -82,121 +82,75 @@ const props = {
 
 const renderAt = (layout, extra) => render(<ScripturesHome {...props} layout={layout} {...extra} />);
 
-describe('ScripturesHome layout branches', () => {
-  it.each([
-    ['genre', '.genre-columns'],
-    ['compact', '.compact-list'],
-    ['grid', '.flat-grid'],
-    ['canonical', '.canon-scroll'],
-  ])('renders the %s branch', (layout, sel) => {
+/* r-bindex (W2h): one screen, two views behind a Groups | All books switch. Groups is 'genre'; every other
+   persisted value (compact, grid, canonical, unknown) reads as All books, so nothing renders blank. */
+describe('ScripturesHome Groups | All books', () => {
+  const titles = (c) => [...c.querySelectorAll('.ui-row-title')].map((e) => e.textContent);
+
+  it('Groups lists the genres under Old and New Testament, with books and chapters counted', () => {
+    const { container } = renderAt('genre');
+    expect([...container.querySelectorAll('.ui-label')].map((e) => e.textContent.trim()).join('|')).toMatch(/Old Testament.*New Testament/);
+    expect(titles(container)).toEqual(['The Law', 'The Gospels']);
+    expect(container.textContent).toContain('2 books · 90 chapters');
+    expect(container.textContent).toContain('1 book · 28 chapters');
+  });
+
+  it.each(['compact', 'grid', 'canonical', 'something-old'])('%s reads as All books: every book, its chapters', (layout) => {
     const { container } = renderAt(layout);
-    expect(container.querySelector(sel)).not.toBeNull();
+    expect(titles(container)).toEqual(['Genesis', 'Exodus', 'Matthew']);
+    expect(container.textContent).toContain('50 chapters');
   });
 
-  it('adds the fill-screen .scriptures-landing class only on the genre branch', () => {
+  it('a missing value is Groups', () => {
+    expect(titles(renderAt(undefined).container)).toEqual(['The Law', 'The Gospels']);
+  });
+
+  it('keeps the fill-screen .scriptures-landing class', () => {
     expect(renderAt('genre').container.querySelector('.home-screen.scriptures-landing')).not.toBeNull();
-    cleanup();
-    expect(renderAt('compact').container.querySelector('.scriptures-landing')).toBeNull();
   });
 
-  it('falls through to the canonical scroll for an unknown persisted value', () => {
-    const { container } = renderAt('some-retired-value');
-    expect(container.querySelector('.canon-scroll')).not.toBeNull();
-    expect(container.querySelector('.genre-columns')).toBeNull();
-  });
-
-  it('treats a missing value as the genre default', () => {
-    const { container } = renderAt(undefined);
-    expect(container.querySelector('.genre-columns')).not.toBeNull();
-  });
-});
-
-describe('ScripturesHome layout cycle button', () => {
-  const btn = (c) => c.querySelector('.scripture-layout-cycle-btn');
-
-  it('carries the aria-label and names the CURRENT layout in its title', () => {
-    const { container } = renderAt('grid');
-    expect(btn(container).getAttribute('aria-label')).toBe('Change Scripture layout');
-    expect(btn(container).getAttribute('title')).toBe('Layout: Book Grid — tap to change');
-  });
-
-  it('is present in every one of the four layouts', () => {
-    for (const l of ['genre', 'compact', 'grid', 'canonical']) {
-      const { container } = renderAt(l);
-      expect(btn(container)).not.toBeNull();
-      cleanup();
-    }
-  });
-
-  it('fires onCycleLayout with the NEXT option id, in table order', () => {
-    for (const [from, to] of [['genre', 'compact'], ['compact', 'grid'], ['grid', 'canonical']]) {
-      const onCycleLayout = vi.fn();
-      const { container } = renderAt(from, { onCycleLayout });
-      fireEvent.click(btn(container));
-      expect(onCycleLayout).toHaveBeenCalledWith(to);
-      cleanup();
-    }
-  });
-
-  it('wraps the last option back to the first', () => {
-    const wrap = vi.fn();
-    const { container } = renderAt('canonical', { onCycleLayout: wrap });
-    fireEvent.click(btn(container));
-    expect(wrap).toHaveBeenCalledWith('genre');
-  });
-
-  /* The silent-desync guard: an unknown persisted value resolves to
-     options[0] exactly like SelectField does, so the FIRST tap lands on
-     options[1] — never on an id outside the table. */
-  it('cycles an unknown persisted value from the head of the table', () => {
+  it('the switch writes genre or canon through onCycleLayout', () => {
     const onCycleLayout = vi.fn();
-    const { container } = renderAt('some-retired-value', { onCycleLayout });
-    expect(btn(container).getAttribute('title')).toBe('Layout: Genre Grid — tap to change');
-    fireEvent.click(btn(container));
-    expect(onCycleLayout).toHaveBeenCalledWith('compact');
+    const { getByRole } = renderAt('genre', { onCycleLayout });
+    act(() => { fireEvent.click(getByRole('radio', { name: 'All books' })); });
+    expect(onCycleLayout).toHaveBeenCalledWith('canon');
+    cleanup();
+    const again = renderAt('canon', { onCycleLayout });
+    act(() => { fireEvent.click(again.getByRole('radio', { name: 'Groups' })); });
+    expect(onCycleLayout).toHaveBeenLastCalledWith('genre');
   });
 
-  it('shows the new layout label as a transient caption inside a polite live region', () => {
-    vi.useFakeTimers();
-    const { container } = renderAt('genre');
-
-    const live = container.querySelector('.scripture-layout-cycle-caption');
-    expect(live.getAttribute('role')).toBe('status');
-    expect(live.getAttribute('aria-live')).toBe('polite');
-    expect(live.textContent).toBe('');
-
-    fireEvent.click(btn(container));
-    expect(live.textContent).toBe('Compact List');
-
-    act(() => { vi.advanceTimersByTime(1600); });
-    expect(live.textContent).toBe('');
-    vi.useRealTimers();
-  });
-
-  it('is omitted entirely when the option table is unavailable', () => {
-    delete window.SCRIPTURE_LAYOUT_OPTIONS;
-    const { container } = renderAt('genre');
-    expect(btn(container)).toBeNull();
-    expect(container.querySelector('.genre-columns')).not.toBeNull();
+  it('a genre row opens the genre, a single-book genre opens its book, a book row opens the book', () => {
+    const onGenre = vi.fn(); const onSelect = vi.fn();
+    const g = renderAt('genre', { onGenre, onSelect });
+    act(() => { fireEvent.click(g.getByText('The Law')); });
+    expect(onGenre).toHaveBeenCalledWith('law');
+    cleanup();
+    const b = renderAt('canon', { onGenre, onSelect });
+    act(() => { fireEvent.click(b.getByText('Exodus')); });
+    expect(onSelect).toHaveBeenCalledWith('exodus');
   });
 });
 
-describe('ScripturesHome — the translation eyebrow (mw17 A02.1)', () => {
-  const OPTS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version — the default' }, { id: 'rvr', label: 'Reina-Valera 1960', desc: 'Reina-Valera 1960 — Spanish' }];
+describe('ScripturesHome — the translation pill (mw17 A02.1, r-bindex)', () => {
+  const OPTS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' }, { id: 'rvr', label: 'RVR1960', desc: 'Reina-Valera 1960 (Español) — Spanish · menus stay in English' }];
   beforeEach(() => {
     window.TRANSLATION_OPTIONS = OPTS;
     window.ReactDOM = ReactDOM;
   });
   afterEach(() => { delete window.TRANSLATION_OPTIONS; });
 
-  it('is a button that opens the Settings picker and switches the translation', () => {
+  it('is a button that opens "Bible translation" and switches the translation', () => {
     const onTranslation = vi.fn();
     const { getByRole } = renderAt('genre', { onTranslation });
     const btn = getByRole('button', { name: /Bible translation: .*Change/ });
+    expect(btn.textContent).toContain('NKJV');
     act(() => { fireEvent.click(btn); });
     const dialog = document.querySelector('[role="dialog"]');
-    expect(dialog && dialog.textContent).toMatch(/Bible Translation/);
+    expect(dialog && dialog.textContent).toMatch(/Bible translation/);
+    expect(dialog.textContent).toContain('The default');
     const rvr = [...dialog.querySelectorAll('button')].find((b) => /Reina-Valera/.test(b.textContent));
+    expect(rvr.textContent).toContain('RVR1960');
     act(() => { fireEvent.click(rvr); });
     expect(onTranslation).toHaveBeenCalledWith('rvr');
     expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -204,7 +158,7 @@ describe('ScripturesHome — the translation eyebrow (mw17 A02.1)', () => {
 
   it('stays plain text without a writer', () => {
     const { container } = renderAt('genre');
-    expect(container.querySelector('div.home-eyebrow')).not.toBeNull();
-    expect(container.querySelector('button.home-eyebrow')).toBeNull();
+    expect(container.querySelector('span.rd-trans-pill')).not.toBeNull();
+    expect(container.querySelector('button.rd-trans-pill')).toBeNull();
   });
 });

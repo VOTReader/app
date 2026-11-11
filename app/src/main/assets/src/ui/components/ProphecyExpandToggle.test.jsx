@@ -20,37 +20,30 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); });
 
-it('portals the FAB OUT of a transformed .pager-track to <body>', () => {
+it('renders in place, in the page flow (nothing floats over a reader)', () => {
   const { container } = render(
-    <div className="pager-track" style={{ transform: 'translateX(0px)' }}>
+    <div className="pager-track">
       <ProphecyExpandToggle allExpanded={false} onToggle={() => {}} />
     </div>,
   );
-  const track = container.querySelector('.pager-track');
-  // The fixed FAB must NOT be a descendant of the transformed track.
-  expect(track.querySelector('.mode-toggle-wrap')).toBeNull();
-  // It still exists in the document — portaled onto <body>.
-  expect(document.body.querySelector('.mode-toggle-wrap')).not.toBeNull();
+  expect(container.querySelector('.pager-track .prophecy-expand-row')).not.toBeNull();
+  expect(document.body.querySelector('.mode-toggle-wrap')).toBeNull();
 });
 
 it('fires onToggle with the flipped state', () => {
   const onToggle = vi.fn();
   render(<ProphecyExpandToggle allExpanded={false} onToggle={onToggle} />);
-  document.body.querySelector('.mode-btn')
+  document.body.querySelector('.prophecy-expand-btn')
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
   expect(onToggle).toHaveBeenCalledWith(true);
 });
 
-it('labels Collapse when expanded, Expand when collapsed', () => {
+it('labels Collapse when expanded, Expand when collapsed, and says which', () => {
   const { rerender } = render(<ProphecyExpandToggle allExpanded={false} onToggle={() => {}} />);
-  expect(document.body.querySelector('.mode-btn').textContent).toContain('Expand');
+  const btn = () => document.body.querySelector('.prophecy-expand-btn');
+  expect(btn().textContent).toBe('Expand all cards');
+  expect(btn().getAttribute('aria-expanded')).toBe('false');
   rerender(<ProphecyExpandToggle allExpanded={true} onToggle={() => {}} />);
-  expect(document.body.querySelector('.mode-btn').textContent).toContain('Collapse');
-});
-
-it('removes the portaled FAB from <body> on unmount (no leak)', () => {
-  const { unmount } = render(<ProphecyExpandToggle allExpanded={false} onToggle={() => {}} />);
-  expect(document.body.querySelector('.mode-toggle-wrap')).not.toBeNull();
-  unmount();
-  expect(document.body.querySelector('.mode-toggle-wrap')).toBeNull();
+  expect(btn().textContent).toBe('Collapse all cards');
+  expect(btn().getAttribute('aria-expanded')).toBe('true');
 });

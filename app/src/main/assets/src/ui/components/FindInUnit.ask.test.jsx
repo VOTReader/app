@@ -177,7 +177,7 @@ describe('Find in this letter: it closes, and leaves nothing behind', () => {
     render(<Host />);
     openFromMenu();
     typeIn('flood');
-    fireEvent.click(document.querySelector('[aria-label="Close find"]'));
+    fireEvent.click(document.querySelector('.find-pill-done'));
     expect(pill()).toBeNull();
     expect(globalThis.CSS.highlights.size).toBe(0);
   });
@@ -200,7 +200,7 @@ describe('Find in this letter: it closes, and leaves nothing behind', () => {
     openFromMenu();
     expect(field()).not.toBeNull();
     typeIn('flood');
-    fireEvent.click(document.querySelector('[aria-label="Close find"]'));
+    fireEvent.click(document.querySelector('.find-pill-done'));
     expect(pill()).toBeNull();
   });
 

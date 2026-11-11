@@ -113,7 +113,7 @@ describe('locate — where the landing excerpt starts', () => {
 describe('FindInUnit', () => {
   it('marks every place, the landing one as current, and the pill counts them', () => {
     render(<Host anchor={anchor('flooding rain, a great deluge.')} />);
-    expect(pill().textContent).toBe('flood1 of 3‹›×');
+    expect(pill().textContent).toBe('flood1 of 3Done');
     expect(pill().getAttribute('aria-label')).toBe('Search words in this letter');
     expect(marked('vot-find-current')).toEqual(['flooding']);
     expect(marked('vot-find')).toEqual(['flood', 'flood', 'flood']);
@@ -133,7 +133,7 @@ describe('FindInUnit', () => {
     try {
       render(<Host anchor={anchor('I shall bring upon them a flooding rain, a great', { top: true })} />);
       act(() => { vi.advanceTimersByTime(1500); });
-      expect(pill().textContent).toBe('flood3 places‹›×');
+      expect(pill().textContent).toBe('flood3 placesDone');
       expect(marked('vot-find-current')).toEqual([]);
       expect(marked('vot-find')).toEqual(['flooding', 'flood', 'flood', 'flood']);
       expect(Element.prototype.scrollTo).not.toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe('FindInUnit', () => {
 
   it('× closes it: no pill, no marks', () => {
     render(<Host anchor={anchor('flooding rain')} />);
-    fireEvent.click(pill().querySelector('[aria-label="Close"]'));
+    fireEvent.click(pill().querySelector('.find-pill-done'));
     expect(pill()).toBeNull();
     expect(globalThis.CSS.highlights.has('vot-find')).toBe(false);
     expect(globalThis.CSS.highlights.has('vot-find-current')).toBe(false);

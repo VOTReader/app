@@ -17,7 +17,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
   return { player, setPlayerState: (next) => { playerState = next; } };
 });
 
-vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
+vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player, AUDIO_TOAST_ID: 'vot-toast-audio' }));   // the song menu's Save toasts
 
 import { AudioSongsScreen } from './AudioSongsScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
@@ -26,11 +26,15 @@ import * as KeepParts from '../components/SongKeepParts.jsx';
 import { SongKeep, formatSongBytes } from '../../utils/song-keep.js';
 import { SongCatalog, adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
+import { utilityNav } from '../components/RootNav.jsx';
+import * as ReactDOM from 'react-dom';
 
 let library;
 
 function installGlobals({ saved = [], recent = [] } = {}) {
-  globalThis.ScreenLayout = ({ children, navChildren }) => <main>{navChildren}{children}</main>;
+  globalThis.ReactDOM = ReactDOM;                                                     // the song menu is a portal sheet
+  // The screen draws a utility bar (W3d): Back named after the frame below, and the frame's title.
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <nav>{utilityNav(utility)}</nav> : null}{children}</main>;
   globalThis.LibraryNav = ({ backLabel }) => <nav>{backLabel}</nav>;
   globalThis.useModalRegistry = () => {};
   globalThis.useFocusTrap = () => null;
@@ -58,7 +62,11 @@ function renderScreen(route = [{ k: 'hub' }], overrides = {}) {
   return { ...render(<AudioSongsScreen {...props} />), props };
 }
 
-const rowOf = (title) => [...document.querySelectorAll('.songs-row')].find((r) => r.querySelector('strong').textContent === title) || null;
+const rowOf = (title) => [...document.querySelectorAll('.songs-row')].find((r) => r.querySelector('.ui-row-title').textContent === title) || null;
+const barTitle = () => document.querySelector('.bar-title').textContent;
+/** A ListGroup's row by its title: the row button and its value. */
+const groupRow = (group, title) => [...within(screen.getByRole('group', { name: group })).getAllByRole('button')]
+  .find((b) => b.querySelector('.ui-row-title') && b.querySelector('.ui-row-title').textContent === title) || null;
 
 beforeEach(() => {
   _resetSongCatalogForTests();
@@ -78,35 +86,59 @@ afterEach(() => {
 
 describe('AudioSongsScreen -- the hub', () => {
   it('opens on one filled Shuffle all songs that plays one version of every song, shuffled', () => {
-    renderScreen();
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Songs of the Letters');
+    const { props } = renderScreen();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Songs of the Letters');   // the bar's title
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }));
+    expect(props.onBack).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: /Shuffle all songs/i }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ filter: {}, shuffle: true, onePerFamily: true }));
   });
 
-  it('a style chip turns the button into Shuffle <style> (<songs>) and shuffles only that style', () => {
-    renderScreen();
+  it('a style chip opens the style as its own frame: Shuffle <style> · <songs>, only that style, All goes back', () => {
+    const { props } = renderScreen();
     fireEvent.click(screen.getByRole('button', { name: 'Worship' }));
-    const button = screen.getByRole('button', { name: /Shuffle Worship \(2\)/ });   // fam-b and fam-c each have a worship version
+    expect(props.onReplaceTop).toHaveBeenCalledWith({ k: 'hub' });
+    expect(props.onPush).toHaveBeenCalledWith({ k: 'hub', st: 'worship' });
+    cleanup();
+
+    const style = renderScreen([{ k: 'hub' }, { k: 'hub', st: 'worship' }]).props;
+    expect(barTitle()).toBe('Worship');
+    expect(screen.getByRole('button', { name: 'Back to Songs of the Letters' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Worship' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByPlaceholderText('Find a song in Worship')).toBeTruthy();
+    const button = screen.getByRole('button', { name: 'Shuffle Worship · 2 songs' });   // fam-b and fam-c each have a worship version
     fireEvent.click(button);
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ filter: { style: 'worship' }, shuffle: true }));
-    // The chip also lists the style's songs, each led by its worship version.
+    // The style lists its songs, each led by its worship version.
     expect(rowOf('The Letter')).toBeTruthy();
     expect(rowOf('Come, Love Awaits You')).toBeNull();
+    // Another chip takes the style's place; All goes back to the hub.
+    fireEvent.click(screen.getByRole('button', { name: 'Pop' }));
+    expect(style.onReplaceTop).toHaveBeenCalledWith({ k: 'hub', st: 'pop' });
+    expect(style.onPush).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(style.onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the rarer styles behind More, in a select sheet', () => {
-    renderScreen();
+  it('keeps the rarer styles behind More styles, in a sheet that opens the style', () => {
+    const { props } = renderScreen();
     expect(screen.queryByRole('button', { name: 'Country' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /More/ }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Country/ }));
-    expect(screen.getByRole('button', { name: /Shuffle Country \(1\)/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /More styles/ }));
+    const sheet = screen.getByRole('dialog', { name: 'More styles' });
+    fireEvent.click(within(sheet).getByRole('button', { name: /^Country/ }));
+    expect(props.onPush).toHaveBeenCalledWith({ k: 'hub', st: 'country' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    cleanup();
+    renderScreen([{ k: 'hub' }, { k: 'hub', st: 'country' }]);
+    expect(screen.getByRole('button', { name: 'Country' }).getAttribute('aria-pressed')).toBe('true');   // its chip stays in sight
+    expect(screen.getByRole('button', { name: 'Shuffle Country · 1 song' })).toBeTruthy();
   });
 
   it('Find filters songs in memory by title, maker or letter, and says so when nothing matches', () => {
     renderScreen();
     const input = screen.getByPlaceholderText('Find a song, a letter, or a maker');
     fireEvent.change(input, { target: { value: 'love awaits' } });
+    expect(screen.getByText('1 song').getAttribute('aria-live')).toBe('polite');    // the count is announced (n3-11)
     const row = rowOf('Come, Love Awaits You');
     expect(row.textContent).toContain('2 versions');
     fireEvent.click(within(row).getByRole('button', { name: /Play Come, Love Awaits You/ }));
@@ -120,32 +152,42 @@ describe('AudioSongsScreen -- the hub', () => {
     expect(screen.getByText('No song by that name. Try a word from the letter.')).toBeTruthy();
   });
 
-  it('a row whose song is playing shows a FILLED pause, and a tap pauses rather than restarting', () => {
+  it('a row whose song is playing is marked current and says Pause, and a tap pauses rather than restarting', () => {
     setPlayerState({ queue: [{ key: 'song:aaaaaaaaaaa2', url: 'x' }], qi: 0, status: 'playing', time: 3, duration: 100 });
     renderScreen([{ k: 'list', v: 'col:wtlb1' }]);
-    const button = within(rowOf('Come, Love Awaits You')).getByRole('button', { name: /Pause Come, Love Awaits You/ });
-    expect(button.className).toContain('is-playing');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
+    const row = rowOf('Come, Love Awaits You');
+    expect(row.className).toContain('is-current');
+    const button = within(row).getByRole('button', { name: 'Pause Come, Love Awaits You' });
+    expect(button.getAttribute('aria-current')).toBe('true');
     fireEvent.click(button);
     expect(player.toggle).toHaveBeenCalledTimes(1);
     expect(player.playSongs).not.toHaveBeenCalled();
   });
 
-  it('shows New from the flock, Your songs, the letter collections as tiles and the shelves', () => {
+  it('shows New from the flock, Your songs, the letter collections as rows and the shelves', () => {
     const { props } = renderScreen();
     expect(screen.getByRole('heading', { name: 'New from the flock' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Saved songs/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Recently played songs/ })).toBeTruthy();
-    expect(screen.queryByText(/Kept on this phone/)).toBeNull();                       // no keep store here (AudioSongsScreen.keep.test)
-    const tile = screen.getByRole('button', { name: /Words to Live By, Part One/ });
-    expect(tile.textContent).toContain('2 songs');                                     // visible recordings, the hidden twin not counted
-    expect(tile.querySelectorAll('.song-cover').length).toBe(4);                      // the 2x2 mosaic
-    fireEvent.click(tile);
+    expect(groupRow('Your songs', 'Saved songs').textContent).toContain('None yet');
+    expect(groupRow('Your songs', 'Recently played').textContent).toContain('None yet');
+    expect(screen.queryByText(/Kept on this phone/)).toBeNull();                       // Downloads is the one place to keep songs (U 8.6)
+    const col = groupRow('From the letters', 'Words to Live By, Part One');
+    expect(col.querySelector('.ui-row-value').textContent).toBe('2 songs');          // visible recordings, the hidden twin not counted
+    fireEvent.click(col);
     expect(props.onReplaceTop).toHaveBeenCalledWith({ k: 'hub' });
     expect(props.onPush).toHaveBeenCalledWith({ k: 'list', v: 'col:wtlb1' });
-    expect([...document.querySelectorAll('.songs-shelf')].map((b) => b.textContent)).toEqual(['Inspired by the letters1 song', 'Letters read with music1 letter']);
+    const more = within(screen.getByRole('group', { name: 'More to hear' })).getAllByRole('button');
+    expect(more.map((b) => b.querySelector('.ui-row-title').textContent + ' ' + b.querySelector('.ui-row-value').textContent))
+      .toEqual(['Inspired by the letters 1 song', 'Letters read with music 1 letter']);
     // fam-d's only song has no shard: nothing to hear, so no shelf that opens onto it.
     expect(screen.queryByRole('button', { name: /Flock originals and prayers/ })).toBeNull();
+  });
+
+  it('Your songs counts the saved and recent songs and opens their lists', () => {
+    installGlobals({ saved: ['aaaaaaaaaaa1', 'ccccccccccc2'], recent: ['bbbbbbbbbbb1'] });
+    const { props } = renderScreen();
+    expect(groupRow('Your songs', 'Saved songs').querySelector('.ui-row-value').textContent).toBe('2');
+    fireEvent.click(groupRow('Your songs', 'Recently played'));
+    expect(props.onPush).toHaveBeenCalledWith({ k: 'list', v: 'recent' });
   });
 
   it('leaving the hub keeps its Find box and chip, so Back returns to the same results', () => {
@@ -165,12 +207,14 @@ describe('AudioSongsScreen -- the hub', () => {
 });
 
 describe('AudioSongsScreen -- lists', () => {
-  it('a collection lists its songs with Play all, and the back pill names the hub', () => {
-    renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Words to Live By, Part One');
-    expect(screen.getByRole('navigation').textContent).toBe('Songs of the Letters');   // the nav's back label
+  it('a collection lists its songs with Play all, and the bar\'s Back names the hub', () => {
+    const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual(['Words to Live By, Part One']);   // the bar's title, no hero
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Songs of the Letters' }));
+    expect(props.onBack).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: /Play all/ }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: ['aaaaaaaaaaa1'], shuffle: false }));
+    expect(screen.queryByRole('button', { name: /^Keep all/ })).toBeNull();          // Downloads is the one place to keep songs (U 8.6)
   });
 
   /* n3-09 (sweep 2): the header counted every VERSION ("109 songs" for WTLB Part
@@ -185,7 +229,8 @@ describe('AudioSongsScreen -- lists', () => {
      versions filled three of its places. One place per song now. */
   it('(n3-09) New from the flock lists a song once, whatever its versions', () => {
     renderScreen([{ k: 'hub' }, { k: 'list', v: 'new' }]);
-    const titles = [...document.querySelectorAll('.songs-section strong, .songs-section .song-title')].map((e) => e.textContent);
+    const titles = [...document.querySelectorAll('.songs-section .ui-row-title')].map((e) => e.textContent);
+    expect(titles.length).toBeGreaterThan(0);
     expect(titles.filter((t) => t === 'Come, Love Awaits You').length).toBe(1);
   });
 
@@ -250,38 +295,68 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
     expect(saved.hasAttribute('aria-pressed')).toBe(false);
   });
 
-  it('a row PLAYS on a tap (W-02); N versions opens its song; the page names its versions, its letter and its makers', async () => {
+  it('a row PLAYS on a tap (W-02); its menu opens the song page; the page names its versions, its letter and its makers', async () => {
     const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
-    fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-hit'));
+    const row = rowOf('Come, Love Awaits You');
+    expect(row.querySelector('.ui-row-meta').textContent).toContain('2 versions');
+    expect(within(row).queryByRole('button', { name: /versions/ })).toBeNull();      // no "N versions ›" link on the row
+    fireEvent.click(within(row).getByRole('button', { name: 'Play Come, Love Awaits You' }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
     expect(props.onPush).not.toHaveBeenCalled();
-    fireEvent.click(within(rowOf('Come, Love Awaits You')).getByRole('button', { name: 'All 2 versions of Come, Love Awaits You' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'More for Come, Love Awaits You' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Song page and lyrics' }));
     expect(props.onPush).toHaveBeenCalledWith({ k: 'song', v: 'fam-a' });
+    expect(screen.queryByRole('dialog')).toBeNull();
     player.playSongs.mockClear();
     cleanup();
 
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
-    expect(screen.getByText('Song · 2 versions')).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Come, Love Awaits You');
-    fireEvent.click(screen.getByRole('button', { name: /From the letter/ }));
+    expect(barTitle()).toBe('Song');
+    expect(screen.getByRole('button', { name: 'Back to Songs of the Letters' })).toBeTruthy();
+    expect(document.querySelector('.song-page h1').textContent).toBe('Come, Love Awaits You');
+    expect(document.querySelector('.song-page-line').textContent).toBe('Words to Live By, Part One · 2 versions · made with Suno by hmarie777 and others');
+    const about = screen.getByRole('group', { name: 'About this song' });
+    const letterRow = within(about).getByRole('button', { name: /Come, Love Awaits You \(the letter\)/ });
+    expect(letterRow.textContent).toContain('From the letter');
+    fireEvent.click(letterRow);
     expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'wtlb1:come-love-awaits-you', title: 'Come, Love Awaits You (the letter)' });
-    expect(screen.getByText('Made with Suno · by hmarie777 and others')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Keep/ })).toBeNull();                // no keep store here (the keep test has one)
+    expect(screen.queryByRole('button', { name: /Keep/ })).toBeNull();                // Downloads is the one place to keep songs (U 8.6)
     fireEvent.click(screen.getByRole('button', { name: /^Play$/ }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa1' }));
     fireEvent.click(screen.getByRole('button', { name: /Play Come, Love Awaits You, Pop/ }));
     expect(player.playSongs).toHaveBeenLastCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa2' }));
-    fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+    fireEvent.click(document.querySelector('.song-page-save'));
     expect(library.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa1');
-    expect(await screen.findByText('Come, love awaits you')).toBeTruthy();            // the lyrics preview
+    // The lyrics wait behind their row, which opens them.
+    const lyricsRow = await screen.findByRole('button', { name: 'Show the lyrics of Come, Love Awaits You' });
+    expect(screen.queryByRole('region', { name: 'Lyrics of Come, Love Awaits You' })).toBeNull();
+    fireEvent.click(lyricsRow);
+    expect(within(screen.getByRole('region', { name: 'Lyrics of Come, Love Awaits You' })).getByText('Come, love awaits you')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the lyrics of Come, Love Awaits You' }));
+    expect(screen.queryByRole('region', { name: 'Lyrics of Come, Love Awaits You' })).toBeNull();
+  });
+
+  it('a row\'s star saves it; its menu (⋯ or a long-press) saves it too and opens its letter', () => {
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
+    const row = rowOf('Come, Love Awaits You');
+    fireEvent.click(within(row).getByRole('button', { name: 'Save Come, Love Awaits You' }));
+    expect(library.toggleSongSaved).toHaveBeenLastCalledWith('aaaaaaaaaaa1');
+    fireEvent.contextMenu(row);
+    const sheet = screen.getByRole('dialog', { name: 'Come, Love Awaits You' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }));
+    expect(library.toggleSongSaved).toHaveBeenCalledTimes(2);
+    fireEvent.click(within(row).getByRole('button', { name: 'More for Come, Love Awaits You' }));
+    const letter = within(screen.getByRole('dialog')).getByRole('button', { name: /Open the letter/ });
+    expect(letter.querySelector('.ui-row-meta').textContent).toBe('Come, Love Awaits You (the letter)');
+    fireEvent.click(letter);
+    expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'wtlb1:come-love-awaits-you', title: 'Come, Love Awaits You (the letter)' });
   });
 
   it('a song with no letter says which shelf it is from, and has no letter link', () => {
     renderScreen([{ k: 'song', v: 'fam-b' }]);
-    expect(screen.getByText('Song')).toBeTruthy();
-    expect(screen.getByText('Inspired by the letters')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /From the letter/ })).toBeNull();
-    expect(screen.getByText('Made with Suno · by members of the flock')).toBeTruthy();
+    expect(barTitle()).toBe('Song');
+    expect(document.querySelector('.song-page-line').textContent).toBe('Inspired by the letters · 3:00 · made with Suno by members of the flock');
+    expect(screen.queryByRole('button', { name: /From the letter|Inspired by the letter/ })).toBeNull();
   });
 });
 
@@ -294,7 +369,7 @@ describe('AudioSongsScreen -- letters read with music (final-06)', () => {
 
   it('lists the catalog readings and the reader-M letters in reading order; play is the READING in reader M', () => {
     renderScreen([{ k: 'hub' }, { k: 'readings' }]);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Letters read with music');
+    expect(barTitle()).toBe('Letters read with music');
     const rows = [...document.querySelectorAll('.reading-row')];
     expect(rows.map((r) => r.querySelector('strong').textContent)).toEqual(['Come, Love Awaits You (the letter)', 'Blessed Are Those Who Worship Me']);
     expect(rows[1].textContent).toContain('3:16');                                   // the catalog's length
@@ -308,8 +383,8 @@ describe('AudioSongsScreen -- letters read with music (final-06)', () => {
 
   it('the hub shelf counts the letters and opens the list', () => {
     const { props } = renderScreen();
-    const shelf = [...document.querySelectorAll('.songs-shelf')].find((b) => b.textContent.includes('Letters read with music'));
-    expect(shelf.textContent).toContain('2 letters');
+    const shelf = groupRow('More to hear', 'Letters read with music');
+    expect(shelf.querySelector('.ui-row-value').textContent).toBe('2 letters');
     fireEvent.click(shelf);
     expect(props.onPush).toHaveBeenCalledWith({ k: 'readings' });
   });
@@ -358,13 +433,23 @@ describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
   });
   afterEach(() => { delete window.__openAudioText; });
 
+  /** The song page's letter row (title = the letter, meta = how the song uses it) and its Lyrics row, once the words land. */
+  const aboutRows = async (title) => {
+    const lyrics = await screen.findByRole('button', { name: 'Show the lyrics of ' + title });
+    const letter = [...document.querySelectorAll('.song-page-about button')].find((b) => b !== lyrics && b.querySelector('.ui-row-title')) || null;
+    fireEvent.click(lyrics);
+    return { letter, lyrics };
+  };
+
   it('(golden) "Born Again" says Inspired by the letter, keeps the way there, and never claims the letter\'s words', async () => {
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'born-again' }]);
-    const link = screen.getByRole('button', { name: /Inspired by the letter: Born Again/ });
-    fireEvent.click(link);
+    const { letter, lyrics } = await aboutRows('Born Again');
+    expect(letter.querySelector('.ui-row-title').textContent).toBe('Born Again');
+    expect(letter.querySelector('.ui-row-meta').textContent).toBe('Inspired by the letter');
+    fireEvent.click(letter);
     expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'three:born-again', title: 'Born Again' });
-    expect(await screen.findByText('A line the song sings')).toBeTruthy();
-    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
+    expect(within(screen.getByRole('region', { name: 'Lyrics of Born Again' })).getByText('A line the song sings')).toBeTruthy();
+    expect(lyrics.querySelector('.ui-row-meta').textContent).toBe('Lyrics transcribed from the song');
     const page = document.querySelector('.song-page').textContent;
     expect(page).not.toMatch(/From the letter/i);
     expect(page).not.toMatch(/Words from the letter/i);
@@ -372,18 +457,22 @@ describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
 
   it('a verbatim song keeps From the letter and Words from the letter', async () => {
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'come-love-awaits-you' }]);
-    expect(screen.getByRole('button', { name: /^From the letter: Come, Love Awaits You/ })).toBeTruthy();
-    expect(await screen.findByText('A line the song sings')).toBeTruthy();
-    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
+    const { letter, lyrics } = await aboutRows('Come, Love Awaits You');
+    expect(letter.querySelector('.ui-row-title').textContent).toBe('Come, Love Awaits You');
+    expect(letter.querySelector('.ui-row-meta').textContent).toBe('From the letter');
+    expect(screen.getByText('A line the song sings')).toBeTruthy();
+    expect(lyrics.querySelector('.ui-row-meta').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
 
   it('a catalog row without vs claims nothing', async () => {
     globalThis.colLetterArr = () => [{ id: 'old-letter', title: 'Old Letter' }];
     globalThis.COL_BY_KEY = new Map([['one', { label: 'Volume One', volKey: 'one' }]]);
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'no-vs' }]);
-    expect(screen.getByRole('button', { name: /Inspired by the letter: Old Letter/ })).toBeTruthy();
-    expect(await screen.findByText('A line the song sings')).toBeTruthy();
-    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
+    const { letter, lyrics } = await aboutRows('Old Catalog Song');
+    expect(letter.querySelector('.ui-row-title').textContent).toBe('Old Letter');
+    expect(letter.querySelector('.ui-row-meta').textContent).toBe('Inspired by the letter');
+    expect(screen.getByText('A line the song sings')).toBeTruthy();
+    expect(lyrics.querySelector('.ui-row-meta').textContent).toBe('Lyrics transcribed from the song');
   });
 
   it('the letter card\'s list ("sung:") holds only the verbatim versions; the song page\'s "letter:" list keeps every song', () => {

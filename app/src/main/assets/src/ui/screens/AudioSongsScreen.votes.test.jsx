@@ -22,6 +22,8 @@ import { SongKeep, formatSongBytes } from '../../utils/song-keep.js';
 import { SongCatalog, adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SongVotes, _resetSongVotesForTests } from '../../utils/song-votes.js';
 import { bigSongCatalog } from '../../utils/song-catalog.fixture.js';
+import { utilityNav } from '../components/RootNav.jsx';
+import * as ReactDOM from 'react-dom';
 
 const BIG = bigSongCatalog(12);
 // Family 0 has three versions; its third is the one listeners like.
@@ -30,7 +32,8 @@ BIG.songs.push(...extra);
 const ids = BIG.songs.map((s) => s.id);
 
 function installGlobals() {
-  globalThis.ScreenLayout = ({ children, navChildren }) => <main>{navChildren}{children}</main>;
+  globalThis.ReactDOM = ReactDOM;                                                     // the song menu is a portal sheet
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <nav>{utilityNav(utility)}</nav> : null}{children}</main>;
   globalThis.LibraryNav = ({ backLabel }) => <nav>{backLabel}</nav>;
   globalThis.useModalRegistry = () => {};
   globalThis.useFocusTrap = () => null;
@@ -199,9 +202,32 @@ describe('Liked Songs (so-liked, Corbin 10-24)', () => {
     await act(async () => { await SongVotes.load(); });
     act(() => { for (let i = 0; i < 6; i++) SongVotes.setVote(ids[i + 1], 1, 1000 + i); });
     renderScreen([{ k: 'hub' }, { k: 'list', v: 'liked' }]);
-    expect(screen.getByRole('heading', { name: 'Liked Songs' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Liked Songs' })).toBeTruthy();   // the bar's title
     expect(document.querySelectorAll('.songs-list .songs-row').length).toBe(6);
     fireEvent.click(screen.getByRole('button', { name: 'Play all' }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: [6, 5, 4, 3, 2, 1].map((i) => ids[i]), label: 'Liked Songs' }));
+  });
+});
+
+/* W3d (listen.html au-songmenu): a row carries no vote pair; the vote is the first thing in its ⋯ menu. */
+describe('the vote lives in the song menu (W3d)', () => {
+  it('a row has no vote buttons; its menu votes I like it | Not for me and shows the vote', async () => {
+    await tally(null);
+    await act(async () => { await SongVotes.load(); });
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
+    const row = document.querySelector('.songs-list .songs-row');
+    const id = BIG.families.find((f) => f.t === row.querySelector('.ui-row-title').textContent).feat;   // the row plays its lead
+    expect(row.querySelector('.song-vote-up, .song-vote-down')).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: /^More for / }));
+    const menu = () => screen.getByRole('dialog');
+    const votes = () => within(menu()).getByRole('group', { name: /^Your vote on / });
+    expect(within(votes()).getByRole('button', { name: 'I like it' }).getAttribute('aria-pressed')).toBe('false');
+    act(() => { fireEvent.click(within(votes()).getByRole('button', { name: 'I like it' })); });
+    expect(SongVotes.voteOf(id)).toBe(1);
+    expect(within(votes()).getByRole('button', { name: 'I like it' }).getAttribute('aria-pressed')).toBe('true');
+    act(() => { fireEvent.click(within(votes()).getByRole('button', { name: 'Not for me' })); });
+    expect(SongVotes.voteOf(id)).toBe(-1);
+    expect(within(votes()).getByRole('button', { name: 'Not for me' }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(votes()).getByRole('button', { name: 'I like it' }).getAttribute('aria-pressed')).toBe('false');
   });
 });

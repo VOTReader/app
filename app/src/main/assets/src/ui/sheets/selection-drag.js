@@ -99,11 +99,11 @@ export function edgeScrollSpeed({ y, top, bottom, band = DRAG_BAND, min = SPEED_
 }
 
 /** The top edge of the bottom dock: the highest visible floating bottom control (the mini player and its pull
-    tab, the auto-scroll and find pills, the Study Notes toggle), or the viewport's bottom when none shows.
+    tab, the auto-scroll and find pills), or the viewport's bottom when none shows.
     @param {Document} [doc] @param {number} [vh] @returns {number} */
 export function dockTop(doc = document, vh = window.innerHeight) {
   let top = vh;
-  for (const el of doc.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap')) {
+  for (const el of doc.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill')) {
     const r = el.getBoundingClientRect();
     if (r.width && r.height && r.top < top && getComputedStyle(el).display !== 'none') top = r.top;
   }

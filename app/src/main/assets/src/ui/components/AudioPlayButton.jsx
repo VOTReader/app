@@ -25,7 +25,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC } from '../../utils/audio-track.js';
 import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
-import { HeroDownload, NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
+import { NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
 
 /**
  * The Listen pill's words when a tap would resume (ra4): "Resume · N min left", N the nearest whole minute
@@ -183,7 +183,6 @@ export function HeroListen({ onClick, canPlay, resume, here, tracks, name = '', 
     <>
       <div className="hero-play-row">
         <AudioPlayButton onClick={isHere ? () => AudioPlayer.toggle() : other ? other.onClick : onClick} resume={pickUp} face={face} minutes={minutes} />
-        {list.length && !other ? <HeroDownload tracks={list} name={name} /> : null}
       </div>
       {other ? <p className="hero-alt-line">{'Playing ' + other.short + ', the copy on this phone'}</p> : null}
     </>

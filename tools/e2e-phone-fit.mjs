@@ -342,7 +342,7 @@ async function main() {
     await step('listening', async () => { await goHome(); await clickText(/^Listen$/, '.tabbar-tab'); await check('listening'); });
     await step('bible', async () => {
       await goHome(); await clickText(/^The Holy Bible/); await check('bible');
-      await clickText(/^The Law/); await clickText(/Genesis$/); await check('genesis');
+      await clickText(/^The Law/); await clickText(/^Genesis/); await check('genesis');
       await clickText(/^1\D/); await check('chapter-top');
       if (!(await toEnd())) throw new Error('no end of text'); await sleep(700); await toEnd(); await check('chapter-end');
     });

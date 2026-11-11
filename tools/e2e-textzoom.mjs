@@ -79,7 +79,8 @@ try {
     await page.goto(BASE, { waitUntil: 'load' });
     await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
     await sleep(700);
-    const setScale = () => page.evaluate((s) => { document.documentElement.style.setProperty('--font-scale', String(s)); }, scale);
+    // The app sets the root class vot-large-text with the scale from 1.8 up (use-settings LARGE_TEXT_SCALE); so does the walk.
+    const setScale = () => page.evaluate((s) => { document.documentElement.style.setProperty('--font-scale', String(s)); document.documentElement.classList.toggle('vot-large-text', s >= 1.8); }, scale);
     await setScale();
     const click = async (l) => { await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim().replace(/\s+/g, ' ')).startsWith(l) && b.getBoundingClientRect().width > 0); if (b) b.click(); }, l); await sleep(600); await setScale(); await sleep(150); };
     // The three-tab layout (Read, Listen, Library; Settings is the gear): a tab by its label, else the reader's Home.
@@ -108,7 +109,16 @@ try {
         if (a.e.contains(b.e) || b.e.contains(a.e)) continue;
         // The tab bar is fixed over the page's foot and the page scrolls under it (its end padding lets the last row
         // clear it), so a row passing beneath the bar is not two controls overlapping. Everything else still counts.
-        if (!!a.e.closest('.tabbar') !== !!b.e.closest('.tabbar')) continue;
+        // The top bar is the same at the head (POL3: volume-index at 1.8 opens scrolled to the reader's letter, and Play
+        // All sits half under the bar): a page control counts against a bar control only where the page one shows, so
+        // what is covered at the middle of the overlap must not be the bar.
+        const barOf = (e) => e.closest('.tabbar, .top-nav');
+        if (!!barOf(a.e) !== !!barOf(b.e)) {
+          if (a.e.closest('.tabbar') || b.e.closest('.tabbar')) continue;
+          const bar = barOf(a.e) || barOf(b.e);
+          const top = document.elementFromPoint((Math.max(a.r.left, b.r.left) + Math.min(a.r.right, b.r.right)) / 2, (Math.max(a.r.top, b.r.top) + Math.min(a.r.bottom, b.r.bottom)) / 2);
+          if (top && bar.contains(top)) continue;
+        }
         const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
         if (ix > 6 && iy > 6) overlaps.push(`${label(a.e)} × ${label(b.e)}`);
       }

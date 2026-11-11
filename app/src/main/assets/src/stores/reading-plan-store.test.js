@@ -34,6 +34,13 @@ describe('ReadingPlanStore', () => {
     expect(Object.keys(ReadingPlanStore.get(a.id).ticks)).toEqual(['genesis:1']);
   });
 
+  it('a paused run is not ticked and does not hold the read (P2 3.8: counts nothing while paused)', () => {
+    const a = { ...run(['genesis:1', 'genesis:2']), status: /** @type {'paused'} */ ('paused'), paused: '2026-10-22' };
+    ReadingPlanStore.put(a);
+    expect(ReadingPlanStore.noteRead('genesis', 1, at('2026-10-23'))).toBe(false);
+    expect(ReadingPlanStore.get(a.id).ticks).toEqual({});
+  });
+
   it('a stopped or finished run is not ticked', () => {
     const a = { ...run(['genesis:1', 'genesis:2']), status: /** @type {'stopped'} */ ('stopped') };
     ReadingPlanStore.put(a);

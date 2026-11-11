@@ -79,7 +79,8 @@ describe('BibleChapterView — the sticky mini title (U04.7)', () => {
   it('says the hero’s words: the book subtitle when chapter titles are off', () => {
     render(at(3, { showChapterTitle: false }));
     expect(band().querySelector('.mini-title-name').textContent).toBe('The Gospel According to John');
-    expect(document.querySelector('.hero-title').textContent).toBe('The Gospel According to John');
+    // r-bible (W2h): the hero is titled "John 3"; the book subtitle is its italic line
+    expect(document.querySelector('.rd-hero-sub').textContent).toBe('The Gospel According to John');
   });
 
   it('hangs under the "Back to" row when there is one', () => {

@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   LiveLine — the full player's "Now reading" card (player brief 3b, pl-l2;
-   picture 05): the sentence the voice is in, the clause being read bright and
-   the clauses before it in the same sentence dim, and "Open the reading ›".
+   LiveLine — the full player's "Reading now" card (player brief 3b, pl-l2;
+   picture 05, listen.html au-player): the sentence the voice is in, the clause
+   being read bright and the clauses before it in the same sentence dim, and
+   "Open the letter ›" ("Open the chapter ›" for a Bible chapter).
    Cluster D, beside AudioManagerSheet.
 
    The words come from the same two places the read-along wash uses: the
@@ -336,11 +337,13 @@ export function LiveLine({ track, time, title, onOpen }) {
     if (more.trim()) box.setAttribute('data-more', more.trim()); else box.removeAttribute('data-more');
   });
   if (!line && !onOpen) return null;
+  const cueWords = track && typeof track.key === 'string' && track.key.indexOf('bible-') === 0 ? 'Open the chapter' : 'Open the letter';
+  const cue = onOpen ? <span className="np-live-cue audio-manager-jump-cue">{cueWords} <span aria-hidden="true">›</span></span> : null;
   const body = (
     <>
+      <span className="np-live-head">{line ? <span className="np-live-kicker">Reading now</span> : null}{cue}</span>
       {line ? (
         <>
-          <span className="np-live-kicker">Now reading</span>
           <span className="np-live-text" ref={boxRef}>
             <span className="np-live-roll" ref={rollRef}>
               {line.lead ? <span className="np-live-lead">{line.lead} </span> : null}
@@ -349,13 +352,12 @@ export function LiveLine({ track, time, title, onOpen }) {
           </span>
         </>
       ) : null}
-      {onOpen ? <span className="np-live-cue audio-manager-jump-cue">Open the reading <span aria-hidden="true">›</span></span> : null}
     </>
   );
   if (!onOpen) return <div className="np-live">{body}</div>;
   return (
     <button type="button" className="np-live audio-manager-jump" onClick={onOpen}
-      aria-label={'Open the reading — ' + (title || 'this recording') + '; playback continues'}>
+      aria-label={cueWords + ' — ' + (title || 'this recording') + '; playback continues'}>
       {body}
     </button>
   );
