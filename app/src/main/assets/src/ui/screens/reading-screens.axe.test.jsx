@@ -485,7 +485,7 @@ describe('axe — Answers browse screens', () => {
 
   it('the About sheet', async () => {
     render(<AnswersHome {...base} />);
-    act(() => { fireEvent.click(document.querySelector('button[aria-label="About this collection"]')); });
+    act(() => { fireEvent.click(document.querySelector('.ans-credit a') /* WA1: About's door is the credit link */); });
     expectModal('About this collection');
     await clean();
   });

@@ -201,7 +201,7 @@ describe('AnswersTopic — hero words (f07)', () => {
       .toBe('26 passages · ~31 min · 2 playlists · 1 video · audio · PDF · 2 charts');
     expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('See: 6 links');
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
-      .toBe('12 passages · ~12 min · 6 sections · 2 videos · downloads · YouTube channel');
+      .toBe('12 passages · ~12 min · 2 videos · downloads · YouTube channel');
   });
 });
 
