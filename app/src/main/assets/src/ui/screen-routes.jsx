@@ -68,6 +68,7 @@ import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
+import { readKind } from '../utils/read-kind.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1287,7 +1288,7 @@ export function buildScreenRoutes({
           onOpenProgress={goProgress}
           onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={(typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore ? ReadingPlanStore.active().length : 0) || (Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0)}
-          totalReadCount={Object.keys(readItems || {}).length}
+          totalReadCount={Object.keys(readItems || {}).length} readKind={readKind(readItems)}
           onSearch={goSearch}
           onSettings={goSettings}
           historyEnabled={settings.historyEnabled !== false}

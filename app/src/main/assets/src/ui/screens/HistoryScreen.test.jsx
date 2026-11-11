@@ -271,7 +271,7 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
   it('shows the cold estimate for a chapter with no frontier', () => {
     setupGlobals({ progress: {} });
     renderScreen([chapter('psalms', 'Psalms', 1, today(5))]);
-    expect(chipText()).toEqual([expect.stringMatching(/^~\d+ min$/)]);
+    expect(chipText()).toEqual([expect.stringMatching(/^about \d+ min$/)]);   // POL5: mock l-hist words it
     expect(document.querySelector('.idx-min-chip.in-progress')).toBeNull();
   });
 
@@ -323,7 +323,7 @@ describe('HistoryScreen — resume chips on letter rows', () => {
   it('shows the cold estimate on a letter row (it showed nothing before)', () => {
     setupGlobals({ progress: {} });
     renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5))]);
-    expect(chipText()).toEqual([expect.stringMatching(/^~\d+ min$/)]);
+    expect(chipText()).toEqual([expect.stringMatching(/^about \d+ min$/)]);   // POL5: mock l-hist words it
   });
 
   it('shows percent-read and time-left for a letter left part-way', () => {

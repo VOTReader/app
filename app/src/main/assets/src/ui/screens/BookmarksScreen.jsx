@@ -17,7 +17,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ActionSheet } from '../components/SelectField.jsx';
-import { _bookmarkSourcePlace } from '../../utils/bookmark-source.js';
+import { _bookmarkSourcePlace, _bookmarkSourceNumber } from '../../utils/bookmark-source.js';
 import { ListRow, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
 
@@ -46,7 +46,7 @@ export function bookmarkWords(bkm, source) {
   var label = String(bkm.label || '').trim();
   var same = !label || label.toLowerCase() === String(source || '').trim().toLowerCase();
   var place = srcPlace(bkm.hlKey);
-  return { name: same ? (source || label || 'Bookmark') : label, where: [same ? '' : source, place].filter(Boolean).join(' · ') };
+  return { name: same ? (source || label || 'Bookmark') : label, where: [same ? '' : source, place, _bookmarkSourceNumber(bkm.hlKey)].filter(Boolean).join(' · ') };
 }
 
 /* ── BookmarkRow (mock v2 l-book): the bookmark icon, the name once, then where it is and when; ONE menu ── */

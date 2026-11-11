@@ -482,10 +482,17 @@ describe('axe — Journal hub', () => {
     expect(await seriousViolations(document.body)).toEqual([]);
   });
 
-  it('empty, both tabs; the tabs say which is pressed', async () => {
+  it('empty: no All entries | Pinned switch (POL5, mock l-jrn0)', async () => {
     journalGlobals([]);
     const { container } = render(<JournalHubScreen {...navProps} onOpenEntry={noop} onCreateEntry={noop} />);
     expect(await seriousViolations(container)).toEqual([]);
+    expect(screen.queryByRole('radio', { name: 'All entries' })).toBeNull();
+  });
+
+  it('with entries, both tabs; the tabs say which is pressed', async () => {
+    journalGlobals();
+    const { container } = render(<JournalHubScreen {...navProps} onOpenEntry={noop} onCreateEntry={noop} />);
+    await act(async () => {});
     const all = screen.getByRole('radio', { name: 'All entries' });
     const pinned = screen.getByRole('radio', { name: 'Pinned' });
     expect(all.getAttribute('aria-checked')).toBe('true');

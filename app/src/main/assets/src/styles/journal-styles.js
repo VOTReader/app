@@ -207,8 +207,8 @@
   R('.jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }');
   R('.jrn-viewer-meta { padding: 22px 22px 12px; }');
   R('.jrn-viewer-blocks { padding: 8px 22px 100px; display: flex; flex-direction: column; gap: 12px; }');
-  R('.jrn-viewer-blocks .jrn-p { font-family: var(--font-garamond); font-size: var(--fs-16); line-height: 1.7; color: var(--cream-dim); margin: 4px 0; }');
-  R('body.light .jrn-viewer-blocks .jrn-p { color: #3a3528; }');
+  // POL5: the mock's reading text (base.css .read: serif 19/29, --t1), not a 16 px dim line.
+  R('.jrn-viewer-blocks .jrn-p { font-family: var(--font-garamond); font-size: calc(var(--fs-16) * 1.1875); line-height: 1.53; color: var(--text-1); margin: 4px 0; }');
   R('.jrn-viewer-blocks .jrn-h2 { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-18); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin: 18px 0 4px; }');
   R('.jrn-inline-letter, .jrn-inline-bookmark, .jrn-inline-journal { color: var(--gold); border-bottom: 1px dotted var(--gold-border); cursor: pointer; padding-bottom: 1px; }');
   R('.jrn-inline-letter:hover, .jrn-inline-bookmark:hover, .jrn-inline-journal:hover { color: var(--gold); border-bottom-color: var(--gold); }');

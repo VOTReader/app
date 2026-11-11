@@ -6694,10 +6694,12 @@
     .rd-trans-pill:active { background: var(--surface-2); }
     .rd-trans-code { color: var(--accent); font-weight: 700; font-size: var(--ts-label); letter-spacing: 0.04em; }
     .rd-trans-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .select-sheet-option.has-code { display: grid; grid-template-columns: 64px 1fr; column-gap: var(--sp-2); align-items: center; }
+    /* POL5: the mock's translation rows: the code is gold on every row (13 px 600, a 54 px column) and the chosen
+       one is marked by its tick alone (its name stays white). */
+    .select-sheet-option.has-code { display: grid; grid-template-columns: 54px 1fr; column-gap: var(--sp-2); align-items: center; }
     .select-sheet-option.has-code > :not(.select-sheet-option-code) { grid-column: 2; }
-    .select-sheet-option-code { grid-row: 1 / span 2; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 700; letter-spacing: 0.04em; }
-    .select-sheet-option.selected .select-sheet-option-code { color: var(--accent); }
+    .select-sheet-option-code { grid-row: 1 / span 2; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 600; letter-spacing: 0; }
+    .select-sheet-option.has-code.selected .select-sheet-option-label { color: var(--text-1); }
     /* ── end W2h readers (r-bindex, r-trans) ── */
     /* ── W2h readers (r-bible, r-study, r-book): Bible and study chapters are titled "John 3" with the headings as the
        italic line; Listen and the translation pill share a row; the study-notes switch sits under them, in words. ── */

@@ -320,15 +320,16 @@ export function JournalHubScreen(props) {
 
   var pinnedEntries = allEntries.filter(function(e) { return e.pinned; });
   // The pill shows wherever the empty state's own button does not (mock v2 l-jrn0: the button is in the middle).
-  var showPill = !!onCreateEntry && (tab === 'pinned' || allEntries.length > 0);
+  var showPill = !!onCreateEntry && allEntries.length > 0;
 
   return (
     <ScreenLayout utility={{ title: 'Journal', onBack: onBack, backLabel: 'Back to Library' }}>
       <div className="jrn-hub lib-screen">
-        <Segmented label="Show" options={[{ id: 'all', label: 'All entries' }, { id: 'pinned', label: 'Pinned' }]} value={tab} onChange={setTab} />
+        {/* POL5: no switch while there is nothing to switch between (mock v2 l-jrn0 draws none) */}
+        {allEntries.length > 0 ? <Segmented label="Show" options={[{ id: 'all', label: 'All entries' }, { id: 'pinned', label: 'Pinned' }]} value={tab} onChange={setTab} /> : null}
         {renderUnclaimed()}
-        {tab === 'all' && renderEntries(allEntries, false)}
-        {tab === 'pinned' && renderEntries(pinnedEntries, true)}
+        {(tab === 'all' || allEntries.length === 0) && renderEntries(allEntries, false)}
+        {tab === 'pinned' && allEntries.length > 0 && renderEntries(pinnedEntries, true)}
         {showPill ? (
           <button className="jrn-fab jrn-fab-newentry" onClick={function() { onCreateEntry(); }} aria-label="New entry">
             <UiIcon name="pen" />

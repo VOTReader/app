@@ -89,6 +89,16 @@ export function _bookmarkSourcePlace(hlKey) {
   return '';
 }
 
+/* POL5: a letter's number for that line ("Volume One · Letter 1", mock v2 l-book); '' where it has none (a
+   preface, a Holy Days or Blessed entry, a chapter, which already says its number in its name). */
+export function _bookmarkSourceNumber(hlKey) {
+  var parts = String(hlKey || '').split(':');
+  if (parts[0] !== 'letter' && parts[0] !== 'wtlb') return '';
+  var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], parts[0]) : null;
+  var num = ctx && ctx.entry ? ctx.entry.num : null;
+  return num ? 'Letter ' + num : '';
+}
+
 export function _bookmarkSourceEndpoint(hlKey) {
   if (!hlKey) return null;
   var parts = hlKey.split(':');
