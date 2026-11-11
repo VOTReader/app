@@ -12,6 +12,7 @@ import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions
 import { openWhatsNew } from '../../utils/whats-new.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { InstallRow } from '../components/InstallCard.jsx';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -1891,6 +1892,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
                 controller on the page the note states no number rather than a stale one. */}
             <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes'}. It points at the real buttons; you can leave at any time.</p>
+            {/* PO2 19: the one place to install (never in the reading flow); drawn only while the app can be installed. */}
+            <InstallRow />
             {/* A09.10: the group's summary promises About; this is it (the same screen Home's ⓘ opens). */}
             {typeof onAbout === 'function' ? (
               <button type="button" className="settings-help-about" onClick={onAbout}>

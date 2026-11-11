@@ -244,6 +244,37 @@ export function InstallCard({ unitKey, inert = false }) {
 }
 
 /**
+ * Settings > Help > "Install VOTReader" (PO2 item 19). The end-of-chapter card is gone from the reading flow;
+ * this row is where a reader installs. Only drawn while this browser can install the app and it has not:
+ * never in the APK, an installed app or an in-app browser (installFlow says null), never after an install.
+ * A Chromium that handed over beforeinstallprompt opens the browser's own dialog; everyone else gets the steps.
+ */
+export function InstallRow() {
+  React.useSyncExternalStore(subscribeInstall, hasInstallPrompt);
+  const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
+  const [stepsFor, setStepsFor] = React.useState(/** @type {string | null} */ (null));
+  const flow = _flow();
+  const onTap = async () => {
+    if (flow !== 'prompt') { setStepsFor(flow); return; }
+    const outcome = await promptInstall();
+    if (outcome === 'accepted') _writeState(dismiss(_readState(), 'installed', Date.now()));
+    else if (outcome !== 'dismissed') setStepsFor(PROMPT_FALLBACK());
+  };
+  if (!flow || installed) return null;
+  return (
+    <>
+      <button type="button" className="settings-help-about settings-help-install" onClick={onTap}>
+        <span>Install VOTReader</span>
+        <span className="settings-select-chev" aria-hidden="true">{'›'}</span>
+      </button>
+      {stepsFor && STEPS[/** @type {keyof typeof STEPS} */ (stepsFor)] && (
+        <InstallSteps flow={/** @type {keyof typeof STEPS} */ (stepsFor)} onDone={() => setStepsFor(null)} onClose={() => setStepsFor(null)} />
+      )}
+    </>
+  );
+}
+
+/**
  * The SHOW ME HOW sheet: numbered steps, a picture each, Done.
  * @param {{ flow: keyof typeof STEPS, onDone: () => void, onClose: () => void }} props
  */

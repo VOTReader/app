@@ -129,3 +129,20 @@ describe('Text Size reset (A01.8 / A09.11)', () => {
     expect(onSetting).toHaveBeenCalledWith('fontScale', '1');
   });
 });
+
+describe('Install VOTReader in Help (PO2 19)', () => {
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+  it('a browser that can install gets the row; one that cannot gets none', () => {
+    renderSettings({}, {});
+    expect(screen.queryByRole('button', { name: /Install VOTReader/ })).toBeNull();
+    cleanup();
+    const was = navigator.userAgent;
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => iphone });
+    try {
+      renderSettings({}, {});
+      expect(screen.getByRole('button', { name: /Install VOTReader/ })).toBeTruthy();
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => was });
+    }
+  });
+});

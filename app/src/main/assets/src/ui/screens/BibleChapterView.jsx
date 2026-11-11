@@ -9,7 +9,6 @@ import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { InstallCard } from '../components/InstallCard.jsx';
 import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
@@ -451,8 +450,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               </div>
             )}
           </div>
-          {/* U01.3: the install offer is one line under Previous/Next, so the chapter ends on Next. */}
-          <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>
       </div>
       {/* Find in this chapter (idea 160): the ⋯ menu's field and the find pill, over the chapter's verses only.

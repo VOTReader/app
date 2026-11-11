@@ -14,7 +14,6 @@ import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { InstallCard } from '../components/InstallCard.jsx';
 import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
@@ -741,7 +740,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 </div>
               )}
             </div>
-            <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
           </div>
         </div>
       </div>
