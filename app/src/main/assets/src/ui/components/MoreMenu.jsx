@@ -6,9 +6,8 @@
    search, bookmark, theme, tabs). A UX walk of seven reader journeys ranked
    that the #1 friction — a newcomer cannot tell the icons apart — and all
    three directions of the Codex image mockups (D:/Swarm/calls/ux-0925/)
-   folded them into one "more" menu. With settings.compactTopBar on (the
-   default), Settings, History and the theme switch leave the bar
-   (app.css `body.compact-topbar`) and live here, with names, beside a
+   folded them into one "more" menu. Settings, History and the theme switch
+   are never in a reader's bar (app.css "the reader bar holds no gear") and live here, with names, beside a
    Text size stepper; Back, Home, Search, the bookmark and Tabs stay.
 
    ScreenLayout mounts the button at the end of every top bar. Its actions
@@ -46,10 +45,11 @@ import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
 import { SelectSheet } from './SelectField.jsx';
 import { translationName } from '../../data/translations.js';
 import { pageMenu } from '../../utils/page-menu.js';
+import { AnnotationHintItem } from './AnnotationHint.jsx';
 
 /**
  * @typedef {Object} NavMenuValue
- * @property {boolean} enabled          settings.compactTopBar !== false
+ * @property {boolean} enabled          always true since the three tabs (2026-11-10)
  * @property {boolean} historyEnabled   settings.historyEnabled !== false
  * @property {string} theme             'dark' | 'light'
  * @property {(t: string) => void} onThemeChange
@@ -242,6 +242,8 @@ export function MoreMenuBtn() {
           style={{ top: pos.top + 'px', right: pos.right + 'px' }}
           onKeyDown={onKeyDown}
         >
+          {/* The first-run tip, as a row (W2d r-letter: it no longer floats over the text). */}
+          <AnnotationHintItem onDone={() => close(true)} />
           {pageItems ? pageItems.map((it) => (
             <button key={it.key} type="button" role="menuitem" className={'more-menu-item more-menu-page-item' + (it.danger ? ' danger' : '')} onClick={go(it.onSelect)}>
               {it.icon === 'find' ? (

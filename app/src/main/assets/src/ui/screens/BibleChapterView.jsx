@@ -308,11 +308,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   aria-label="Show chapter title"
                 >+ Show chapter title</button>
               )}
-              <div className="hero-ornament">
-                <div className="hero-ornament-line" />
-                <div className="hero-ornament-diamond" />
-                <div className="hero-ornament-line r" />
-              </div>
               {/* Recorded Bible edition (comment corrected 2026-08-10): every
                   shipped edition is one track per CHAPTER, so this pill starts
                   the book's queue positioned at THIS chapter and auto-advance

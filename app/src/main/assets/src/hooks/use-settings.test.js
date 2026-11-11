@@ -201,32 +201,26 @@ describe('useSettings — body-class mirror', () => {
   it('feature-off flags map to their no-* classes', () => {
     mount({
       savedSettings: {
-        showSettingsGear: false, searchEnabled: false, historyEnabled: false,
-        showBookmarkNav: false, showThemeBtn: false,
+        searchEnabled: false, historyEnabled: false,
+        showBookmarkNav: false,
       },
     });
-    for (const c of ['no-gear', 'no-search', 'no-history', 'no-bookmark-nav', 'no-theme-nav']) {
+    for (const c of ['no-search', 'no-history', 'no-bookmark-nav']) {
       expect(cls().contains(c)).toBe(true);
     }
   });
 
-  /* The compact top bar (the redesign, 2026-09-25): a NEW key, so a profile saved before it
-     existed (every settings key but this one present) still gets the calmer bar, and only an
-     explicit false brings the old icon row back. */
-  it('the compact bar is the only bar since the three tabs (2026-11-10): a stored false is kept but changes nothing', () => {
+  /* W2d (X-hidden 116): the old icon-row switches are orphans since the three tabs drew one bar. Their keys are
+     dropped as the settings load and no body class reads them any more. */
+  it('the old icon-row switches are retired: dropped on load, no class', () => {
     document.body.className = '';
-    const { unmount } = mount({ savedSettings: { showSettingsGear: true, historyInNav: true, showThemeBtn: true } });
-    expect(cls().contains('compact-topbar')).toBe(true);
-    unmount();
-    document.body.className = '';
-    const { result } = mount({ savedSettings: { compactTopBar: false } });
-    expect(cls().contains('compact-topbar')).toBe(true);
-    expect(result.current.settings.compactTopBar).toBe(false);
+    const { result } = mount({ savedSettings: { compactTopBar: false, showSettingsGear: false, historyInNav: true, showThemeBtn: false } });
+    for (const k of ['compactTopBar', 'showSettingsGear', 'historyInNav', 'showThemeBtn']) expect(result.current.settings[k], k).toBeUndefined();
+    for (const c of ['compact-topbar', 'no-gear', 'history-in-nav', 'no-theme-nav']) expect(cls().contains(c), c).toBe(false);
   });
 
   /* Settings hunt (2026-11-04): the mirror ran as a PASSIVE effect, i.e. after the App's first paint.
-     The body classes decide what that paint shows: the compact bar hides three icons only through
-     body.compact-topbar, `body:not(.arrows-nav):not(.arrows-off) .letter-body` adds 4rem of padding,
+     The body classes decide what that paint shows: `body:not(.arrows-nav):not(.arrows-off) .letter-body` adds 4rem of padding,
      vot-large-text re-lays the large sizes. So each launch painted the default bar and arrows first,
      and the scroll restore (a layout effect later in App) measured that wrong page. Probe: a layout
      effect after useSettings in the same component, which runs before any passive effect. */
@@ -235,7 +229,6 @@ describe('useSettings — body-class mirror', () => {
     function Probe() {
       useSettings({ savedSettings: { arrowLayout: 'off', fontScale: '2', showScrollNotch: true }, theme: 'light' });
       React.useLayoutEffect(() => {
-        seen.compact = cls().contains('compact-topbar');
         seen.arrowsOff = cls().contains('arrows-off');
         seen.notch = cls().contains('scroll-notch');
         seen.light = cls().contains('light');
@@ -245,7 +238,7 @@ describe('useSettings — body-class mirror', () => {
       return null;
     }
     render(React.createElement(Probe));
-    expect(seen).toEqual({ compact: true, arrowsOff: true, notch: true, light: true, large: true, scale: true });
+    expect(seen).toEqual({ arrowsOff: true, notch: true, light: true, large: true, scale: true });
   });
 
   it('arrowLayout maps to exactly one arrows-* class', () => {

@@ -89,18 +89,6 @@ describe('app.css — the update toast\'s tap (utils/update-toast.js showListeni
   });
 });
 
-describe('app.css — annotation-hint coach-mark (P1-1)', () => {
-  it('pill container is click-through and its text is not selectable', () => {
-    const block = ruleBlock(CSS, '.ann-hint-pill');
-    expect(block).toContain('pointer-events: none');
-    expect(block).toContain('user-select: none');
-  });
-  it('close ✕ restores interactivity (only interactive child)', () => {
-    const block = ruleBlock(CSS, '.ann-hint-close');
-    expect(block).toContain('pointer-events: auto');
-  });
-});
-
 describe('app.css — gold :focus-visible ring coverage', () => {
   it.each([
     '[role="tab"]',
@@ -231,7 +219,7 @@ describe('app.css — no reading page draws a banner', () => {
   it('has no banner rule left, and the hero keeps only the plain padding', () => {
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(bare).not.toMatch(/\.hero-bg\b/);
-    expect(ruleBlock(CSS, '.hero {')).toMatch(/padding:\s*min\(2\.5rem, 52px\)/);
+    expect(ruleBlock(CSS, '.hero {')).toMatch(/padding:\s*var\(--sp-2\)/);   // W2d r-letter: the calm top
   });
   it('none of the four reading views draws one', () => {
     for (const f of ['LetterView.jsx', 'WtlbEntryView.jsx', 'BibleChapterView.jsx', 'ChapterView.jsx']) {
@@ -438,8 +426,8 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     const hero = ruleBlock(CSS, '.hero {');
     // Sides too (2026-09-22): 1.8rem, capped at the phone size (29 px, or 7vw
     // where that is wider) — 86 px a side at Text Size 3 left a 187 px title.
-    // Top and bottom are the banner-less 2.5rem / 2.25rem since 2026-11-01 (was 5.5rem / 4rem).
-    expect(hero).toMatch(/padding:\s*min\(2\.5rem,\s*\d+px\)\s+min\(1\.8rem,\s*max\(\d+px,\s*\d+vw\)\)\s+min\(2\.25rem,\s*\d+px\)/);
+    // Top and bottom are fixed px since W2d (mock v2 r-letter), so Text Size cannot grow them at all.
+    expect(hero).toMatch(/padding:\s*var\(--sp-2\)\s+min\(1\.8rem,\s*max\(var\(--gutter\),\s*\d+vw\)\)\s+\d+px/);
   });
   it('the reading column pads in rem up to the phone size, never past it', () => {
     const wrap = ruleBlock(CSS, '.page-wrapper {');
@@ -725,10 +713,9 @@ describe('app.css — the Answers A–Z letters and the footnote "Read more" are
    toggles match them, and the menu's rows keep a full finger. */
 describe('app.css — the compact top bar and its ⋯ menu', () => {
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-  it('hides exactly Settings, History and the theme switch in the bar, and only in compact mode', () => {
-    const m = bare.match(/body\.compact-topbar \.top-nav \.settings-gear-btn,\s*body\.compact-topbar \.top-nav \.nav-search-btn\[title="History"\],\s*body\.compact-topbar \.top-nav \.nav-theme-btn\s*\{\s*display:\s*none;\s*\}/);
-    expect(m, 'the three compact-bar hides').toBeTruthy();
-    expect(bare).not.toMatch(/body\.compact-topbar [^{]*(nav-bookmark-btn|tabs-nav-btn|\[title="Search"\]|\[title="Home"\])[^{]*\{\s*display:\s*none/);
+  it('the reader bar hides exactly Settings, History and the theme switch, with no switch left to undo it (W2d)', () => {
+    expect(bare).toMatch(/\.top-nav :is\(\.settings-gear-btn, \.nav-search-btn\[title="History"\], \.nav-theme-btn\) \{\s*display:\s*none;\s*\}/);
+    expect(bare).not.toMatch(/compact-topbar|history-in-nav|no-theme-nav|no-gear/);
   });
   it('the ⋯ button and every menu row are at least 44 px', () => {
     expect(ruleBlock(CSS, '.nav-more-btn {')).toMatch(/min-width:\s*44px;[^}]*min-height:\s*44px/);
@@ -784,7 +771,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     expect(block).toMatch(/letter-spacing:\s*\.14em/);
   });
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
-    expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*clamp\(var\(--fs-12\),/);
+    expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*var\(--ts-meta\)/);   // 13 px, sentence case since W2d
   });
   it('a column label is tracked tight enough to stay on one line in half a phone', () => {
     // 176 px at 360: "THE SEVEN VOLUMES" wrapped at 0.18em (the 09-25 walk, labels-volumes-home.png).
@@ -818,7 +805,6 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('\n    .ascroll-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player))');
     expect(decl('\n    .find-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
     expect(decl('\n      .mode-toggle-wrap {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
-    expect(decl('.ann-hint-pill', 'bottom')).toBe('calc(max(1.2rem, var(--dock-sys)) + var(--dock-context))');
     expect(decl('.vot-toast {', 'bottom')).toBe('var(--dock-toast-bottom)');
     expect(decl('.vot-toast {', 'top')).toBe('var(--dock-toast-top)');
     // tour-dock: the strip stacks on the reading rows and steps aside while find is open.
@@ -845,7 +831,7 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-transport')).toBe('0px');
   });
   it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
-    for (const sel of ['\n    .ascroll-pill {', '\n    .find-pill {', '.ann-hint-pill', '.mode-toggle {']) {
+    for (const sel of ['\n    .ascroll-pill {', '\n    .find-pill {', '.mode-toggle {']) {
       expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
     }
     expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');

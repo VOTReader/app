@@ -402,11 +402,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{position}</div>
           <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
-          <div className="hero-ornament">
-            <div className="hero-ornament-line" />
-            <div className="hero-ornament-diamond" />
-            <div className="hero-ornament-line r" />
-          </div>
           {/* Streaming audio letter (2026-08-05). Presence + reader come from
               the AUDIO_MANIFEST lazy-corpus global (same bundle as the letter
               corpus, so it's loaded whenever a letter renders). A study chapter

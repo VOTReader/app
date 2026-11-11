@@ -1352,7 +1352,7 @@ describe('dependency-gated rows unmount with their dependency', () => {
   // chips changed nothing and left Settings (their stored keys stay); the bookmark is the one icon left to choose.
   it('the Top bar group holds the reading page’s bookmark switch and nothing that does nothing', () => {
     const onToggle = vi.fn();
-    renderSettings({ compactTopBar: false }, { onToggle });
+    renderSettings({}, { onToggle });
     expect(screen.queryByRole('radiogroup', { name: 'Top Bar' })).toBeNull();
     for (const name of ['Settings Gear', 'Theme', 'Compact Top Bar']) expect(screen.queryByRole('switch', { name })).toBeNull();
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only

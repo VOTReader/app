@@ -569,11 +569,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         <div className="hero-content">
           <div className="hero-eyebrow">{eyebrow}</div>
           <h1 className="hero-title">{entry.title}</h1>
-          <div className="hero-ornament">
-            <div className="hero-ornament-line" />
-            <div className="hero-ornament-diamond" />
-            <div className="hero-ornament-line r" />
-          </div>
           {/* Streaming audio entry — see LetterView's hero pill note (manifest
               rides the same lazy corpus bundle; inert peeks keep the pill for
               pixel parity, it can never fire there). */}

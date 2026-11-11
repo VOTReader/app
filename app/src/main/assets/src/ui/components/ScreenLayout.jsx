@@ -4,7 +4,6 @@
 
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
-import { AnnotationHint } from './AnnotationHint.jsx';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 import { MoreMenuBtn } from './MoreMenu.jsx';
 import { NavGearHost } from './NavButtons.jsx';
@@ -369,14 +368,8 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
         </Main>
       )}
       {stickyNav}
-      {/* First-run annotation tip — reading screens only (`pager` is passed
-          exclusively by the 4 reading screens). Sits OUTSIDE .pager-track as
-          a stickyNav sibling so swipe-settle transforms can't displace it;
-          renders null unless the user has zero annotations (see the
-          component header). Keyed by the visit (placeKey): the pill shows on the
-          one unit it first appeared on, and Next into the following letter or
-          topic is a new screen, where its recorded flag keeps it away (U15). */}
-      {pager ? <AnnotationHint key={placeKey} /> : null}
+      {/* The first-run tip "Hold your finger on any line" no longer floats over the text (W2d, mock v2
+          r-letter: nothing floats over a reader): it is a row of the reader's More menu (MoreMenu.jsx). */}
       {/* Hands-free reading transport — reading screens only, and never in
           an inert peek (the inert branch returns above). Portals itself to
           <body>, so a swipe-settle transform on .pager-track can't displace

@@ -68,7 +68,7 @@ export function isFullscreenGestureTarget(target) {
   // A modal owns the whole visible surface, including its backdrop.
   if (document.querySelector('[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]')) return false;
   const interactiveAncestor = /** @type {Element} */ (target).closest(INTERACTIVE_SELECTOR);
-  // `body.history-in-nav` describes a layout mode, not an interactive
+  // A body-wide layout class is not an interactive
   // surface. Never let a broad class convention turn the whole app inert.
   return !interactiveAncestor || interactiveAncestor === document.body || interactiveAncestor === document.documentElement;
 }

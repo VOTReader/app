@@ -821,40 +821,23 @@
          floats instead of hugging the right. */
       .top-nav .nav-search-btn[title="Home"] { margin-right: auto; }
       .top-nav .nav-home:not(:has(~ [title="Home"])):not(:has(~ .srch-input-row)) { margin-right: auto; }
-      /* Gear is hidden in the top nav by default (toggle: "Settings Gear in Top Nav"). */
-      body.no-gear .settings-gear-btn { display: none; }
       /* Search + history can be disabled in Settings. Target by title attr to
          avoid editing every button instance. */
       body.no-search .nav-search-btn[title="Search"] { display: none; }
       body.no-history .nav-search-btn[title="History"] { display: none; }
-      /* History button in the top nav: shown only when "History in Top Nav" is
-         on. Universal across EVERY nav (reading / index / settings / about) —
-         matched by title, not a per-screen class — so the toggle is the single
-         source of truth. History stays reachable from the Home "Recently
-         Visited" card, which is not a nav button and so is unaffected. */
-      body:not(.history-in-nav) .nav-search-btn[title="History"] { display: none; }
       /* Bookmark button: hidden in the top nav when "Bookmark Button in Top
          Nav" is off. Saved bookmarks stay reachable from Library; this only
          hides the per-chapter quick-bookmark icon. */
       body.no-bookmark-nav .nav-bookmark-btn { display: none; }
-      /* Theme switcher: hidden in the top nav when "Theme Button in Top Nav" is
-         off. Theme stays changeable via the Light Theme setting (Text & Translation). */
-      body.no-theme-nav .nav-theme-btn { display: none; }
 
       .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
       @media (hover: hover) { .nav-theme-btn:hover { color: var(--gold-bright); } }
       .nav-theme-btn svg { width: 22px; height: 22px; }
 
-      /* ── THE COMPACT TOP BAR + its ⋯ menu (the redesign, 2026-09-25; ui/components/MoreMenu.jsx) ──
-         The bar carried six to eight equal-weight gold icons; a UX walk ranked "a newcomer cannot tell
-         them apart" the #1 friction, and every direction of the Codex mockups folded them into one menu.
-         With settings.compactTopBar on (body.compact-topbar, the default) Settings, History and the theme
-         switch leave the bar — matched the way the per-icon toggles above match them — and the ⋯ menu
-         names them, beside a Text size stepper. Back, Home, Search, the bookmark and Tabs stay. Off
-         restores the old row exactly: nothing here applies and the ⋯ button renders nothing. */
-      body.compact-topbar .top-nav .settings-gear-btn,
-      body.compact-topbar .top-nav .nav-search-btn[title="History"],
-      body.compact-topbar .top-nav .nav-theme-btn { display: none; }
+      /* ── The reader bar holds no gear, no History and no theme icon (W2d, X-hidden 116: the old icon-row
+         switches compactTopBar / showSettingsGear / historyInNav / showThemeBtn are gone). The ⋯ menu
+         (ui/components/MoreMenu.jsx) names them. The tab screens' bar shows its gear (ONE TOP-BAR RULE). ── */
+      .top-nav :is(.settings-gear-btn, .nav-search-btn[title="History"], .nav-theme-btn) { display: none; }
       .nav-more-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); min-width: 44px; min-height: 44px; flex-shrink: 0; transition: color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
       .nav-more-btn svg { width: 22px; height: 22px; }
       .nav-more-btn.open, .nav-more-btn:active { background: var(--gold-faint); color: var(--gold-bright); }
@@ -1154,12 +1137,6 @@
          targets cannot fit at 360px without clipping Back/Home. History is
          already a first-class Home card, so keep it there on compact phones;
          on the smallest supported tier Settings follows the same rule. */
-      @media (max-width: 380px) {
-        .top-nav .nav-search-btn[title="History"] { display: none; }
-      }
-      @media (max-width: 339px) {
-        .top-nav .settings-gear-btn { display: none; }
-      }
       .nav-home {
         font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.18em;
         text-transform: uppercase; color: var(--gold); background: none; border: none;
@@ -2422,47 +2399,18 @@
       .vot-large-text .hero-play-row.is-off > .hero-play-pill, .vot-large-text .hero-play-row.is-off > .hero-dl-when { flex: 1 1 100%; justify-content: center; }
 
       /* ── HERO ── */
-      .hero {
-        position: relative; overflow: hidden;
-        /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
-           hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
-        padding: min(2.5rem, 52px) min(1.8rem, max(29px, 7vw)) min(2.25rem, 44px); text-align: center;
-        border-bottom: 1px solid var(--gold-border);
-      }
       /* No banner on any reading page (Corbin 2026-11-01: "get rid of blue banner on each
          letter", then the amber ones on studies and Bible chapters, "one consistent page
          top"; the redesign's round 2 take 1). The centred eyebrow, title, ornament and
          Listen sit on plain black, and the padding the band needed is taken back so the
          text starts sooner. */
       .hero-content { position: relative; z-index: 3; }
-      .hero-eyebrow {
-        font-family: 'Cinzel', serif;
-        /* Fluid: the ENDS are scale tokens, the vw term between them is the
-           point (see the type-scale block's documented clamp exception). */
-        font-size: clamp(var(--fs-12), 2.3vw, var(--fs-13));   /* was 10-12: every phone got the 10 px floor */
-        letter-spacing: 0.2em; text-transform: uppercase;
-        color: var(--gold); opacity: 0.85; margin-bottom: 0.85rem;
-        overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
-      }
       /* Bible chapter: the text follows the recording's translation while it
          plays (BibleChapterView); one calm line says so. */
       .hero-audio-text {
         font-family: var(--font-body); font-style: italic;   /* s00.7: the Reading Font, like the text it describes */
         font-size: var(--fs-14); color: var(--cream-muted);
         opacity: 0.9; margin: -0.45rem 0 0.7rem;
-      }
-      .hero-title {
-        font-family: 'Cinzel Decorative', serif;
-        /* Standardized reading-title size — gentle responsive scale that sits
-           just above the index titles (.vol-index-title) and never balloons
-           past its top token. Length-independent: a long title wraps at the
-           same size as a short one (the old .hero-title-long shrink is gone).
-           Fluid ends are tokens; the vw term between them is the point. */
-        font-size: clamp(var(--fs-30), 5vw, var(--fs-36));
-        font-size: min(clamp(var(--fs-30), 5vw, var(--fs-36)), 9vw);   /* U05.4: Text Size never pushes a title past the screen */
-        color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
-        overflow-wrap: break-word; word-wrap: break-word;
-        hyphens: auto;
       }
       .hero-subtitle {
         font-family: var(--font-body); font-size: var(--fs-16); font-style: italic;
@@ -2544,14 +2492,6 @@
         .section-heading.section-heading-tappable:hover { color: var(--gold); }
         .section-heading-psalm119.section-heading-tappable:hover { background: rgba(200,164,86,0.04); }
       }
-      .hero-ornament { display: flex; align-items: center; gap: 0.75rem; max-width: 280px; margin: 0 auto; }
-      .hero-ornament-line {
-        flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-line.r {
-        background: linear-gradient(to left, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-diamond { width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0; }
       /* ── PAGE / CHAPTER BODY ── */
       .page-wrapper {
         /* The sides stop growing at their phone size (the hero's rule, above):
@@ -2796,62 +2736,6 @@
       @media (min-width: 768px) {
         .mode-toggle-wrap { right: calc(50vw - var(--col-max) / 2 + 1.5rem); }
       }
-      /* ── First-run annotation tip (AnnotationHint) ── */
-      .ann-hint-pill {
-        /* U05.6 (UX wave 3): a full-width strip along the bottom, not a centred pill (at 300% the pill was a 646 px
-           column with its close half off-screen). */
-        position: fixed; left: 0; right: 0;
-        /* Message lane, above the context row (cz1: the Study Notes toggle sat on its ✕). */
-        bottom: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context));
-        z-index: 190; /* under the mode-toggle pill (200) + sheets */
-        display: flex; align-items: center; gap: 10px;
-        justify-content: center;
-        padding: 6px 6px 6px 14px;
-        /* No backdrop-filter (2026-07-28): floats over scrolling text; the
-           96%-opaque bg needs no blur. */
-        background: var(--bg3);  /* cz7: opaque */
-        border-top: 1px solid var(--gold-border);
-        box-shadow: 0 -4px 18px rgba(0,0,0,0.4);
-        animation: annHintIn 0.5s ease;
-        transition: opacity 0.6s ease;
-        /* Wave-0 (P1-1): the pill teaches the long-press gesture yet sat
-           ON TOP of the reading text — a long-press landing under the pill
-           selected the pill's own label and raised the native Copy menu,
-           punishing the exact gesture it advertises. pointer-events:none
-           makes the whole pill click-through so the gesture reaches the
-           verse text beneath (the ✕ close re-enables events on itself
-           below); user-select:none keeps the pill's label out of any
-           selection that starts inside it. */
-        pointer-events: none;
-        user-select: none;
-        -webkit-user-select: none;
-      }
-      body.light .ann-hint-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-      @keyframes annHintIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-      .ann-hint-pill.is-fading { opacity: 0; }   /* U10.7: it goes by itself */
-      /* ux3 (A15 critique, 2026-09-22): while this tip pill is up, a toast sits ABOVE it instead of on its words
-         ("Copied" covered "Long-press any text..."). The pill starts at the
-         same base offset and is up to three lines tall on a 320 px phone;
-         7.5rem clears that. Not while autoscroll hides the pill. Kept AFTER the
-         pill's own rule: app-css.test.js reads the first '.ann-hint-pill'. */
-      body:not(.autoscroll-on):has(.ann-hint-pill) {
-        --dock-message: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context) + 7.5rem);
-      }
-      .ann-hint-icon { width: 22px; height: 22px; color: var(--gold); flex-shrink: 0; }
-      .ann-hint-text {
-        font-family: var(--font-body); font-style: italic;
-        font-size: var(--fs-14); line-height: 1.35; color: var(--cream-dim);
-      }
-      .ann-hint-close {
-        /* Only interactive child of the click-through pill — re-enable
-           events here so the ✕ still dismisses (P1-1). */
-        pointer-events: auto;
-        background: none; border: none; cursor: pointer;
-        color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1;
-        min-height: 44px; padding: 0 12px; flex-shrink: 0; text-decoration: underline; text-underline-offset: 3px;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .ann-hint-close:active { color: var(--gold); }
 
       /* cz7: caption and segments are ONE opaque card (the caption floated over verse text with no backing,
          and the segments let the text show through). The card is the surface; the caption is its top line. */
@@ -2927,7 +2811,6 @@
       .tab-card-thumb.thumb-theme-flip { filter: invert(1) hue-rotate(180deg); }
     /* ── LETTER META ── */
     .letter-meta { padding:0 0 0.25rem; margin-bottom:2.5rem; }
-    .meta-date { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.5rem; }
     .meta-from { font-style:italic; color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.2rem; }
     .meta-spoken { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
     .meta-for { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
@@ -3503,6 +3386,25 @@
     .letter-listen-row { flex-wrap:wrap; gap:.75rem; }
     .letter-listen-row .hero-play-pill { min-height:40px; padding:.6em 1.1em; font-size:var(--fs-13); font-weight:600; letter-spacing:.1em; white-space:nowrap; }
     .letter-listen-row.has-songs .hero-play-pill { flex:1 1 9.5rem; max-width:15rem; justify-content:center; }
+
+    /* ═══ W2d readers (mock v2 r-letter): the calm page top. Place line, title, one gold Listen; the date line
+       in the UI face over a hairline. Shared by every reader's .hero (letters, studies, Bible, Words To Live By).
+       The letter's own text keeps its typography. ═══ */
+    .hero { position: relative; overflow: hidden; text-align: center; padding: var(--sp-2) min(1.8rem, max(var(--gutter), 7vw)) 18px; }
+    .hero-eyebrow { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin-bottom: 5px; overflow-wrap: break-word; }
+    .hero-title { font-family: var(--font-serif); font-weight: 600; font-size: min(var(--ts-display), 9vw); line-height: 1.17; color: var(--text-1); margin: 0; overflow-wrap: break-word; hyphens: auto; }
+    .hero .hero-play-row { margin-top: 14px; }
+    .hero .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .hero .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
+    .hero .hero-play-pill.letter-sung-pill { background: var(--surface-1); color: var(--text-1); }
+    .hero .hero-play-pill.letter-sung-pill svg { color: var(--accent); }
+    @media (hover: hover) { .hero .hero-play-pill:hover { transform: none; filter: brightness(1.06); } }
+    .hero + .page-wrapper:has(> .letter-meta:first-child) { padding-top: 0; }
+    .hero + .page-wrapper > .letter-meta:first-child { border-top: 1px solid var(--hairline); padding-top: 14px; }
+    .meta-date { font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; color: var(--text-2); margin-bottom: 0.15rem; }
+    /* The tip "Hold your finger on any line" is the More menu's first row (AnnotationHint.jsx), never a pill on the text. */
+    .more-menu-hint .more-menu-item-sub { color: var(--accent); }
+    /* ═══ end W2d r-letter ═══ */
     .letter-listen-pill { border-color:var(--gold); background:var(--gold); color:var(--bg); }
     .letter-listen-pill.is-playing { background:var(--gold-bright); border-color:var(--gold-bright); }
     .letter-sung-pill { border-color:var(--gold); background:transparent; }
@@ -7969,12 +7871,6 @@
        at the end of the file (--fs-10/--fsc-10 and --fs-11/--fsc-11). */
     .ascroll-dwell-label { font-size: var(--fs-10); text-transform: uppercase; padding-right: 2px; }
     .ascroll-dwell-value { font-size: var(--fs-11); min-width: 42px; text-align: center; color: var(--gold); }
-    /* A reader who has switched auto-scroll on is not the audience for the
-       first-run annotation tip, and both sit bottom-centre. */
-    body.autoscroll-on .ann-hint-pill { display: none; }
-    /* Nor is a reader stepping through search words (FindInUnit's pill sits in
-       the same bottom-centre spot). */
-    body:has(.find-pill) .ann-hint-pill { display: none; }
 
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top
@@ -8100,7 +7996,7 @@
        steps aside too. */
     body.sel-dragging .top-nav, body.sel-dragging .audio-bar, body.sel-dragging .audio-bar-pull,
     body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill, body.sel-dragging .mode-toggle-wrap,
-    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .ann-hint-pill, body.sel-dragging .mini-title,
+    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .mini-title,
     body.sel-dragging .back-hint-row, body.sel-dragging .vot-toast, body.sel-dragging .sel-toolbar {
       pointer-events: none;
     }
@@ -9317,7 +9213,7 @@
     .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 200px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
-         web beneath it — the same pattern as .ann-hint-close, and it works
+         web beneath it — a real <button> inside an inert panel, and it works
          for the same reason: this is a real <button> with its own onClick,
          nothing is delegated to the inert parent. */
       pointer-events: auto;
