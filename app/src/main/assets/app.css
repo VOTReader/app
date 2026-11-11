@@ -1779,192 +1779,150 @@
       .offline-confirm-go { background:var(--gold); color:#17130a; }
       body.light .offline-confirm-go { color:var(--bg); }
       .offline-confirm-go:disabled { opacity:.45; cursor:default; }
-      /* The Downloads screen (downloads brief 2026-10-23, D3; pictures 03-07 in D:/Swarm/calls/downloads-mockups/): tabs,
-         the Choose tree with tri-state boxes and a chapter grid, its sticky footer and the Apply / mobile-data sheets.
-         Brick = marked for removal (README #C4664A). */
-      .dl-screen, .dl-sheet { --dl-brick:#c4664a; --dl-surface:#14120e; }
-      body.light .dl-screen, body.light .dl-sheet { --dl-brick:#9b3a2a; --dl-surface:#ece5d4; }
-      .dl-phone-head { margin:.3rem 0 .6rem; }
-      .dl-choose { padding-bottom:.5rem; }
-      .dl-loading, .dl-held { margin:.8rem 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-held { color:var(--gold); font-style:normal; }
-      .dl-group { border-bottom:1px solid var(--gold-border); }
-      .dl-children > .dl-group:last-child, .dl-children > div:last-child > .dl-group { border-bottom:0; }
-      .dl-level-1 .dl-children, .dl-level-2 .dl-children { padding-left:.9rem; }
-      .dl-level-0 > .dl-children { border-top:1px solid var(--gold-border); }
-      .dl-row { display:flex; align-items:flex-start; gap:.35rem; min-height:56px; }
-      .dl-row-main { flex:1 1 auto; min-width:0; display:flex; align-items:flex-start; gap:.5rem; padding:.7rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .dl-row-copy { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
-      .dl-row-copy strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); line-height:1.25; overflow-wrap:anywhere; }
-      .dl-level-0 > .dl-row .dl-row-copy strong { font-size:var(--fs-20); }
-      .dl-row-copy small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); line-height:1.4; }
-      .dl-chevron { flex:0 0 auto; width:26px; height:26px; margin-top:.15rem; fill:none; stroke:var(--gold); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease; }
+      /* ── W3b listen: the Downloads screens (R/mock/v2/listen.html au-dl .. au-dlremove, 2026-11-11). The storage card,
+         Choose | On this phone, the voice row, the tree as shared row cards (tri-state boxes, a chapter grid), the foot
+         bar, the run card, the kept rows with a bin. Brick = marked for removal. ── */
+      .dl-screen, .dl-sheet { --dl-brick:#c4664a; }
+      body.light .dl-screen, body.light .dl-sheet { --dl-brick:#9b3a2a; }
+      .dl-store { margin:var(--sp-2) 0 0; }
+      .dl-store-top { display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-3); }
+      .dl-store-big { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-title); font-weight:600; line-height:1.2; }
+      .dl-store-free, .dl-store-line { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-store-line { margin:2px 0 var(--sp-3); }
+      .dl-store-bar.ui-progress { height:4px; }
+      .dl-choose { padding-bottom:var(--sp-2); }
+      .dl-loading, .dl-held { margin:var(--sp-3) 2px; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-held { color:var(--accent); }
+      .dl-voice-group { margin-bottom:var(--sp-2); }
+      .dl-voice-line { margin:0 2px var(--sp-2); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+      .dl-part { margin-top:var(--sp-4); }
+      .dl-tree { padding:0; }
+      .dl-group + .dl-group, .dl-tree > div + div > .dl-group, .dl-tree > div + .dl-group, .dl-unit + .dl-unit { border-top:1px solid var(--hairline); }
+      .dl-children { background:var(--surface-2); }
+      .dl-level-2 > .dl-children { background:none; padding:0 var(--card-pad) var(--sp-3); }
+      .dl-children > .dl-group.dl-level-2 { border-top:1px solid var(--hairline); }
+      .dl-row { display:flex; align-items:center; gap:2px; min-height:var(--row-h-1); padding-right:var(--sp-3); }
+      .dl-row-main { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-row-copy { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+      .dl-row-copy strong { color:var(--text-1); font-family:var(--font-serif); font-weight:500; font-size:var(--ts-body); line-height:1.25; overflow-wrap:anywhere; }
+      .dl-row-copy small { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+      .dl-chevron { flex:0 0 auto; width:var(--icon-sm); height:var(--icon-sm); fill:none; stroke:var(--text-3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease; }
       .dl-chevron.is-open { transform:rotate(180deg); }
-      .dl-box { flex:0 0 48px; width:48px; height:48px; margin-top:.25rem; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; cursor:pointer; }
-      .dl-box-mark { width:calc(12px + .625rem); height:calc(12px + .625rem); border:1.6px solid var(--gold-dim); border-radius:5px; display:inline-flex; align-items:center; justify-content:center; }
-      .dl-box-mark svg { width:80%; height:80%; fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
-      .dl-box.is-all .dl-box-mark { background:var(--gold); border-color:var(--gold); }
-      .dl-box.is-all svg { stroke:#17130a; }
-      body.light .dl-box.is-all svg { stroke:var(--bg); }
-      .dl-box.is-some .dl-box-mark { border-color:var(--gold); }
-      .dl-box.is-some svg { stroke:var(--gold); }
-      .dl-box.is-remove .dl-box-mark { border-color:var(--dl-brick); }
-      .dl-box:focus-visible .dl-box-mark, .dl-chip:focus-visible, .dl-tab:focus-visible, .dl-row-main:focus-visible, .dl-link:focus-visible, .dl-footer-go:focus-visible, .dl-range:focus-visible, .dl-edition:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
-      .dl-mark { display:inline-flex; align-items:center; gap:.4rem; margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
-      .dl-mark svg { flex:0 0 auto; width:20px; height:20px; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; }
-      .dl-mark.is-some .dl-mark-ring { stroke:var(--gold-border); }
-      .dl-mark.is-some .dl-mark-arc { stroke:var(--gold); stroke-width:2.2; }
-      .dl-remove-note { color:var(--dl-brick); font-size:var(--fs-14); }
-      .dl-unit { min-height:52px; border-top:1px solid var(--gold-faint); }
-      .dl-unit .dl-row-main { align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.2rem .8rem; padding:.55rem 0; }
-      .dl-unit-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
-      .dl-unit-meta { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-show-all { margin:.2rem 0 .5rem calc(48px + .35rem); }
-      .dl-tools { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; padding:0 0 .8rem calc(48px + .35rem); }
-      .dl-link { min-height:44px; padding:.3rem 0; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; text-align:left; }
-      .dl-voice { flex:0 1 auto; min-width:0; max-width:100%; }
-      .dl-voice select { min-height:44px; width:100%; max-width:100%; text-overflow:ellipsis; padding:.3rem 2rem .3rem .8rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); }
-      .dl-voice select option { background:var(--bg); color:var(--cream); }
-      /* dl-rework B, C: the one letter voice (Settings > Letter Voice), what it does said from the data, readers named. */
-      .dl-voicebar { margin:.6rem 0 .8rem; padding:.7rem .9rem .8rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--dl-surface); }
-      .dl-voicebar .dl-voice { display:flex; flex-direction:column; gap:.25rem; }
-      .dl-voice-label { color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.14em; text-transform:uppercase; }
-      .dl-voice-line { margin:.55rem 0 0; color:var(--cream); font-size:var(--fs-16); line-height:1.4; }
-      .dl-voice-note { margin:.35rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-only { display:flex; align-items:center; gap:.6rem; min-height:44px; margin-top:.3rem; color:var(--cream); font-size:var(--fs-16); cursor:pointer; }
-      .dl-only input { appearance:none; -webkit-appearance:none; position:relative; flex:0 0 auto; width:42px; height:26px; margin:0; border:1px solid var(--gold-dim); border-radius:13px; background:transparent; cursor:pointer; }
-      .dl-only input::after { content:''; position:absolute; top:4px; left:4px; width:16px; height:16px; border-radius:50%; background:var(--cream-dim); transition:left .15s ease; }
-      .dl-only input:checked { background:var(--gold); border-color:var(--gold); }
-      .dl-only input:checked::after { left:20px; background:var(--bg); }
-      .dl-reader { display:inline-block; margin-left:.45rem; padding:0 .45rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-style:normal; font-size:var(--fs-12); line-height:1.6; white-space:nowrap; vertical-align:middle; }
-      .dl-reader.is-fallback { border-style:dashed; color:var(--cream-dim); }
-      .dl-unit > .dl-row { min-height:52px; }
-      .dl-readings { display:flex; flex-wrap:wrap; gap:.4rem; padding:0 0 .6rem calc(48px + .35rem); }
-      .dl-reading { position:relative; min-height:40px; padding:.2rem .8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-      .dl-reading.is-kept { background:var(--gold-faint); border-color:var(--gold-dim); }
-      .dl-reading.is-add { background:var(--gold); border-color:var(--gold); color:#17130a; }
-      body.light .dl-reading.is-add { color:var(--bg); }
-      .dl-reading.is-remove { border-color:var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
-      .dl-reading.is-none.is-fetch { border-color:var(--gold); color:var(--gold); }
-      .dl-reading-tick { width:12px; height:12px; margin-right:.3rem; fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; vertical-align:-1px; }
-
-      .dl-reading:focus-visible, .dl-only input:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
-      .dl-edition-reader { margin:0 0 .5rem calc(48px + .35rem); color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-sheet-split { margin:.2rem 0 .4rem; color:var(--cream); font-size:var(--fs-16); line-height:1.4; }
-      .dl-editions { display:flex; flex-wrap:wrap; gap:.5rem; padding:0 0 .5rem calc(48px + .35rem); }
-      .dl-edition { min-height:44px; padding:.3rem .9rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
-      .dl-edition.is-on { background:var(--gold); color:#17130a; }
-      body.light .dl-edition.is-on { color:var(--bg); }
-      .dl-chapters { padding:0 0 1rem; }
-      .dl-chapters-head { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; margin:0 0 .6rem; }
-      .dl-chapters-hint { flex:1 1 8em; color:var(--cream-dim); font-size:var(--fs-14); }
-      .dl-range { min-height:40px; padding:.2rem 1rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
-      .dl-range.is-on { background:var(--gold); color:#17130a; }
-      body.light .dl-range.is-on { color:var(--bg); }
-      .dl-chip-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(max(44px, 2.6em), 1fr)); gap:.45rem; }
-      .dl-chip { position:relative; min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-      /* hub 03:14: on the phone = a tick on a quiet fill; picked to add = the strong gold. */
-      .dl-chip.is-kept { background:var(--gold-faint); border-color:var(--gold-dim); }
-      .dl-chip.is-add { background:var(--gold); border-color:var(--gold); color:#17130a; }
-      body.light .dl-chip.is-add { color:var(--bg); }
-      .dl-chip.is-remove { border-color:var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
-      .dl-chip.is-from { box-shadow:0 0 0 2px var(--gold-bright); }
-      .dl-chip-tick { position:absolute; top:2px; right:2px; width:12px; height:12px; fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
-      .dl-footer { position:sticky; bottom:calc(var(--dock-player) + var(--dock-sys)); z-index:3; display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1rem; margin:1rem -1rem 0; padding:.8rem 1rem; border-top:1px solid var(--gold-border); background:var(--dl-surface); }
-      .dl-footer-text { flex:1 1 12em; min-width:0; }
-      .dl-footer-text p { margin:0; color:var(--cream); font-size:var(--fs-16); line-height:1.35; }
-      .dl-footer-text .dl-footer-sub { margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-box { flex:0 0 var(--tap); width:var(--tap); height:var(--tap); display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; cursor:pointer; }
+      .dl-box-mark { width:20px; height:20px; border-radius:5px; background:var(--surface-3); display:inline-flex; align-items:center; justify-content:center; }
+      .dl-box-mark svg { width:80%; height:80%; fill:none; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-box.is-all .dl-box-mark, .dl-box.is-some .dl-box-mark { background:var(--accent); }
+      .dl-box.is-all svg, .dl-box.is-some svg { stroke:var(--accent-ink); }
+      .dl-box.is-remove .dl-box-mark { box-shadow:inset 0 0 0 1.5px var(--dl-brick); }
+      .dl-box:focus-visible .dl-box-mark, .dl-chip:focus-visible, .dl-tab:focus-visible, .dl-row-main:focus-visible, .dl-link:focus-visible, .dl-footer-go:focus-visible, .dl-range:focus-visible, .dl-reading:focus-visible, .dl-shelf-play:focus-visible, .dl-icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+      .dl-mark { display:inline-flex; align-items:center; gap:var(--sp-1); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-label); }
+      .dl-mark svg { flex:0 0 auto; width:14px; height:14px; fill:none; stroke:var(--accent); stroke-width:1.8; stroke-linecap:round; }
+      .dl-mark.is-some .dl-mark-ring { stroke:var(--hairline); }
+      .dl-mark.is-some .dl-mark-arc { stroke:var(--accent); stroke-width:2.4; }
+      .dl-remove-note { color:var(--dl-brick); font-family:var(--font-ui); font-style:normal; font-size:var(--ts-meta); }
+      .dl-level-2 > .dl-row .dl-row-copy { flex-direction:row; align-items:baseline; justify-content:space-between; gap:var(--sp-3); }
+      .dl-level-2 > .dl-row .dl-row-copy strong { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:400; }
+      .dl-auto .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-control); font-weight:500; }
+      .dl-unit .dl-row { min-height:46px; padding-left:var(--sp-1); }
+      .dl-unit .dl-row-main { justify-content:space-between; padding:var(--sp-2) 0; }
+      .dl-unit-num { flex:0 0 auto; min-width:1.2em; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-meta); font-variant-numeric:tabular-nums; }
+      .dl-unit-title { flex:1 1 auto; min-width:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .dl-unit-meta { flex:0 0 auto; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-variant-numeric:tabular-nums; }
+      .dl-link { min-height:var(--tap); padding:var(--sp-1) 0; border:0; background:none; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-value); cursor:pointer; text-align:left; }
+      .dl-reader { display:inline-block; margin-left:var(--sp-2); padding:0 var(--sp-2); border-radius:var(--r-pill); background:var(--surface-3); color:var(--accent); font-family:var(--font-ui); font-style:normal; font-size:var(--ts-label); line-height:1.6; white-space:nowrap; vertical-align:middle; }
+      .dl-reader.is-fallback { background:none; box-shadow:inset 0 0 0 1px var(--hairline); color:var(--text-2); }
+      .dl-readings { display:flex; flex-wrap:wrap; gap:var(--sp-2); padding:0 var(--sp-3) var(--sp-3) calc(var(--tap) + var(--sp-1)); }
+      .dl-reading, .dl-chip, .dl-range { position:relative; min-height:var(--tap); padding:0 var(--sp-3); border:0; border-radius:var(--r-chip); background:var(--surface-3); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); cursor:pointer; }
+      .dl-reading.is-kept, .dl-chip.is-kept { box-shadow:inset 0 0 0 1px var(--accent-ring); }
+      .dl-reading.is-add, .dl-chip.is-add, .dl-range.is-on { background:var(--accent); color:var(--accent-ink); }
+      .dl-reading.is-remove, .dl-chip.is-remove { box-shadow:inset 0 0 0 1px var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
+      .dl-reading.is-none.is-fetch { color:var(--accent); }
+      .dl-reading-tick, .dl-chip-tick { width:12px; height:12px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-reading-tick { margin-right:var(--sp-1); vertical-align:-1px; }
+      .dl-chip-tick { position:absolute; top:2px; right:2px; }
+      .dl-sheet-split { margin:var(--sp-1) 0 var(--sp-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); line-height:1.4; }
+      .ui-chips.dl-editions { flex-wrap:nowrap; overflow-x:auto; margin:0 calc(var(--gutter) * -1) var(--sp-3); padding:0 var(--gutter); scrollbar-width:none; }
+      .dl-editions .ui-chip { flex:0 0 auto; }
+      .dl-chapters-head { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2) var(--sp-3); margin:0 0 var(--sp-3); }
+      .dl-chapters-hint { flex:1 1 8em; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-chip-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--tap), 1fr)); gap:var(--sp-2); }
+      .dl-chip { padding:0; touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+      .dl-chip.is-from { box-shadow:0 0 0 2px var(--accent); }
+      .dl-footer { position:sticky; bottom:calc(var(--dock-player) + var(--dock-sys)); z-index:3; display:flex; align-items:center; gap:var(--sp-3); margin:var(--sp-4) calc(var(--gutter) * -1) 0; padding:var(--sp-3) var(--gutter); border-top:1px solid var(--hairline); background:var(--surface-1); }
+      .dl-footer-text { flex:1 1 auto; min-width:0; }
+      .dl-footer-text p { margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; line-height:1.35; }
+      .dl-footer-text .dl-footer-sub { margin-top:2px; color:var(--text-2); font-size:var(--ts-meta); font-weight:400; }
       .dl-footer-warn { color:var(--dl-brick); }
-      .dl-footer-go { flex:0 0 auto; min-height:48px; max-width:100%; padding:.4rem 1.2rem; border:1px solid var(--gold); border-radius:8px; background:var(--gold); color:#17130a; font:inherit; font-size:var(--fs-16); cursor:pointer; }
-      body.light .dl-footer-go { color:var(--bg); }
-      .dl-footer-go:disabled { background:transparent; border-color:var(--gold-dim); color:var(--cream-dim); cursor:default; }
+      .dl-footer-go { flex:0 0 auto; min-height:var(--btn-h-sm); padding:0 var(--sp-5); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--accent-ink); font-family:var(--font-ui); font-size:var(--ts-control); font-weight:600; cursor:pointer; }
+      .dl-footer-go:disabled { background:var(--surface-3); color:var(--text-3); cursor:default; }
       .dl-sheet .dl-sheet-title { text-align:left; }
-      .dl-sheet-body { max-height:50vh; overflow-y:auto; margin:.6rem 0 0; }
-      .dl-sheet-kicker { margin:.9rem 0 .2rem; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .dl-sheet-body { max-height:50vh; overflow-y:auto; margin:var(--sp-2) 0 0; }
+      .dl-sheet-kicker { margin:var(--sp-4) 0 var(--sp-1); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); font-weight:700; letter-spacing:var(--track-label); text-transform:uppercase; }
       .dl-sheet-kicker.is-remove { color:var(--dl-brick); }
-      .dl-sheet-row { display:flex; align-items:flex-start; gap:.8rem; padding:.6rem 0; border-bottom:1px solid var(--gold-border); color:var(--gold); }
+      .dl-sheet-row { display:flex; align-items:flex-start; gap:var(--sp-3); padding:var(--sp-2) 0; border-bottom:1px solid var(--hairline); color:var(--accent); }
       .dl-sheet-row.is-remove { color:var(--dl-brick); }
-      .dl-sheet-row .offline-icon { flex:0 0 auto; width:24px; height:24px; margin-top:.15rem; }
+      .dl-sheet-row .offline-icon { flex:0 0 auto; width:var(--icon); height:var(--icon); }
       .dl-sheet-row span { display:flex; flex-direction:column; min-width:0; }
-      .dl-sheet-row strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); overflow-wrap:anywhere; }
-      .dl-sheet-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-sheet-summary { margin:.8rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
-      .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
-      .dl-sheet-actions > button { flex:1 1 9em; min-height:48px; font-family:inherit; font-size:var(--fs-16); }
-      /* On this phone (pictures 11-13): the storage bar, sections like the tree, a × per recording, ⋯ per group. */
-      .dl-storage { margin:.9rem 0 .2rem; }
-      .dl-storage-bar { display:flex; height:14px; border-radius:7px; background:var(--gold-faint); border:1px solid var(--gold-border); overflow:hidden; }
-      .dl-storage-rec { background:var(--gold); }
-      .dl-storage-songs { background:var(--gold-dim); border-left:2px solid var(--bg); }
-      .dl-storage-line { margin:.45rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-sort { display:flex; justify-content:flex-end; margin:.2rem 0 0; }
-      .dl-sort select { min-height:44px; max-width:100%; padding:.2rem .4rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); text-align:right; }
-      .dl-sort select option { background:var(--bg); color:var(--cream); }
-      .dl-shelf-section { margin:.6rem 0 0; }
-      .dl-shelf-kicker { margin:.8rem 0 .1rem; color:var(--gold); font-family:'Cinzel',serif; font-weight:400; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
-      .dl-shelf-branch { border-bottom:1px solid var(--gold-border); }
-      .dl-shelf-head { display:flex; align-items:flex-start; gap:.5rem; }
-      .dl-shelf-mark { flex:0 0 auto; width:26px; height:26px; margin-top:.85rem; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
-      .dl-icon-btn { flex:0 0 48px; width:48px; height:48px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; color:var(--gold); cursor:pointer; }
-      .dl-shelf-head .dl-icon-btn { margin-top:.4rem; }
-      .dl-icon-btn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+      .dl-sheet-row strong { color:var(--text-1); font-family:var(--font-serif); font-weight:500; font-size:var(--ts-control); overflow-wrap:anywhere; }
+      .dl-sheet-row small { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-sheet-summary { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); text-align:center; }
+      .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-4); }
+      .dl-sheet-actions > button { flex:1 1 9em; min-height:var(--btn-h); font-family:var(--font-ui); font-size:var(--ts-control); }
+      /* On this phone (au-dlphone, au-dlphone0, au-dlremove): one card per part, a bin per set, its readings inside. */
+      .dl-phone .ui-row-main:disabled { cursor:default; }
+      .dl-kept + .dl-kept { border-top:1px solid var(--hairline); }
+      .dl-kept .ui-row { border-top:0; }
+      .dl-bin { color:var(--text-2); }
+      .dl-spin { flex:none; width:20px; height:20px; margin:0 var(--sp-3); border:2px solid var(--surface-3); border-top-color:var(--accent); border-radius:50%; animation:dl-spin 1s linear infinite; }
+      @keyframes dl-spin { to { transform:rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .dl-spin { animation:none; } }
+      .dl-icon-btn { flex:0 0 var(--tap); width:var(--tap); height:var(--tap); display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; color:var(--text-2); cursor:pointer; }
+      .dl-icon-btn svg { width:var(--icon-sm); height:var(--icon-sm); fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
       .dl-icon-btn svg circle { fill:currentColor; stroke:none; }
-      .dl-icon-btn:focus-visible, .dl-shelf-play:focus-visible, .dl-remove-all:focus-visible, .dl-menu-item:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
-      .dl-shelf-rows { padding:0 0 .4rem calc(26px + .5rem); }
-      .dl-shelf-row { display:flex; align-items:center; gap:.4rem; min-height:52px; border-top:1px solid var(--gold-faint); }
-      .dl-shelf-play { flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.1rem .8rem; padding:.5rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .dl-shelf-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
-      .dl-shelf-size { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-shelf-more { margin:.1rem 0 .3rem; }
-      .dl-remove-all { display:block; min-height:48px; margin:1.2rem auto .4rem; padding:.3rem 1rem; border:0; background:none; color:var(--dl-brick); font:inherit; font-size:var(--fs-18); cursor:pointer; }
-      .dl-remove-line { display:flex; align-items:flex-start; gap:.6rem; text-align:left; color:var(--cream-dim); }
-      .dl-remove-line .offline-icon { flex:0 0 auto; width:24px; height:24px; color:var(--dl-brick); }
-      .dl-sheet-actions .dl-remove-go { background:var(--dl-brick); border-color:var(--dl-brick); color:#17130a; }
-      body.light .dl-sheet-actions .dl-remove-go { color:#fff; }
-      .dl-menu { display:flex; flex-direction:column; margin:.6rem 0 0; }
-      .dl-menu-item { min-height:52px; padding:.4rem .2rem; border:0; border-bottom:1px solid var(--gold-border); background:none; color:var(--cream); font:inherit; font-size:var(--fs-18); text-align:left; cursor:pointer; }
-      .dl-menu-item.is-remove { color:var(--dl-brick); border-bottom:0; }
-      /* The progress strip (pictures 08-09): line 1 the state, line 2 bytes or the reason, a 3 px line, gold text buttons. */
-      .dl-strip { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:.3rem 1rem; margin:.8rem 0 .4rem; padding:.75rem .9rem 1rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--dl-surface); }
-      .dl-strip-text { flex:1 1 12em; min-width:0; }
-      .dl-strip-line1 { margin:0; color:var(--cream); font-size:var(--fs-16); line-height:1.35; }
-      .dl-strip-line2 { margin:.15rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-strip-actions { display:flex; flex-wrap:wrap; gap:0 1rem; }
-      .dl-strip-bar { position:absolute; left:.9rem; right:.9rem; bottom:.45rem; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
-      .dl-strip-bar > span { display:block; height:100%; background:var(--gold); transition:width .3s ease; }
-      .dl-strip.is-paused .dl-strip-bar > span { background:var(--gold-dim); }
-      .dl-strip .dl-footer-go { min-height:44px; }
-      /* In line (picture 08) */
-      .dl-queue { margin:.6rem 0 1rem; }
-      .dl-queue-head { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; padding-bottom:.35rem; border-bottom:1px solid var(--gold-faint); }
+      .dl-shelf-rows { background:var(--surface-2); padding:0 var(--sp-2) var(--sp-1) var(--card-pad); }
+      .dl-shelf-row { display:flex; align-items:center; gap:var(--sp-1); min-height:46px; border-top:1px solid var(--hairline); }
+      .dl-shelf-play { flex:1 1 auto; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); padding:var(--sp-2) 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-shelf-title { flex:1 1 auto; min-width:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); overflow-wrap:anywhere; }
+      .dl-shelf-size { flex:0 0 auto; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-shelf-more { margin:0 0 var(--sp-1); }
+      .dl-shelf-kicker { margin:var(--sp-4) 0 var(--sp-1); color:var(--accent); font-family:var(--font-ui); font-weight:700; font-size:var(--ts-label); letter-spacing:var(--track-label); text-transform:uppercase; }
+      .dl-remove-all { display:flex; justify-content:center; margin:var(--sp-4) 0 var(--sp-2); }
+      .dl-updates { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); }
+      /* The run card (au-dlrun): eyebrow, the set, counts and bytes, its bar, Pause | Cancel. */
+      .dl-strip { margin:var(--sp-2) 0 0; }
+      .dl-strip-head { margin:0 0 2px; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); font-weight:700; letter-spacing:var(--track-label); text-transform:uppercase; }
+      .dl-strip.is-waiting .dl-strip-head { color:var(--tone-warn); }
+      .dl-strip-line1 { margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-control); font-weight:600; line-height:1.3; }
+      .dl-strip-line2 { margin:2px 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-strip-bar.ui-progress { display:block; height:4px; margin:var(--sp-3) 0 0; }
+      .dl-strip-bar > span { transition:width .3s ease; }
+      .dl-strip.is-paused .dl-strip-bar > span { opacity:.5; }
+      .dl-strip-actions { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+      .dl-run-note { margin-bottom:0; }
+      /* The will-try-again list and a hand-over that stopped midway (dl-rework D). */
+      .dl-queue { margin:var(--sp-2) 0 var(--sp-4); }
+      .dl-queue-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--sp-4); padding-bottom:var(--sp-1); border-bottom:1px solid var(--hairline); }
       .dl-queue-head .dl-shelf-kicker { margin:0; }
-      .dl-queue-head h2 { margin:.1rem 0 0; color:var(--cream); font-weight:400; font-size:var(--fs-24); }
-      .dl-queue-count { color:var(--gold); font-size:var(--fs-20); }
+      .dl-queue-head h2 { margin:2px 0 0; color:var(--text-1); font-family:var(--font-serif); font-weight:600; font-size:var(--ts-headline); }
+      .dl-queue-count { color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-headline); }
       .dl-queue-rows { list-style:none; margin:0; padding:0; }
-      .dl-queue-row { display:flex; align-items:center; gap:.75rem; min-height:60px; padding:.45rem 0; border-bottom:1px solid var(--gold-faint); }
-      .dl-queue-mark { flex:0 0 36px; display:flex; align-items:center; justify-content:center; color:var(--cream-dim); }
-      .dl-queue-mark svg { width:32px; height:32px; }
-      .dl-queue-row.is-active .dl-queue-mark { color:var(--gold); }
-      .dl-queue-row.is-failed .dl-queue-mark, .dl-queue-row.is-failed small { color:var(--danger, #d0644a); }
+      .dl-queue-row { display:flex; align-items:center; gap:var(--sp-3); min-height:var(--row-h-1); padding:var(--sp-2) 0; border-bottom:1px solid var(--hairline); }
+      .dl-queue-mark { flex:0 0 36px; display:flex; align-items:center; justify-content:center; color:var(--text-2); }
+      .dl-queue-mark svg { width:28px; height:28px; }
+      .dl-queue-row.is-active .dl-queue-mark { color:var(--accent); }
+      .dl-queue-row.is-failed .dl-queue-mark, .dl-queue-row.is-failed small { color:var(--tone-danger); }
       .dl-queue-copy { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
-      .dl-queue-copy strong { color:var(--cream); font-weight:400; font-size:var(--fs-16); line-height:1.3; overflow-wrap:anywhere; }
-      .dl-queue-copy small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
-      .dl-queue-row.is-more { min-height:44px; }
+      .dl-queue-copy strong { color:var(--text-1); font-family:var(--font-ui); font-weight:500; font-size:var(--ts-value); line-height:1.3; overflow-wrap:anywhere; }
+      .dl-queue-copy small { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+      .dl-queue-row.is-more { min-height:var(--tap); }
       .dl-queue-row .dl-icon-btn { margin-left:auto; }
-      .dl-queue-retry-all { margin-top:.2rem; }
-      /* dl-rework D, E: the will-try-again list, a hand-over that stopped midway, Cancel's question, and Finished. */
-      .dl-queue-head.is-failed { margin-top:.8rem; }
-      .dl-queue.is-failed-only { margin:.2rem 0 .6rem; }
-      .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:.2rem 1rem; margin:.4rem 0 .6rem; padding:.6rem .9rem; border:1px solid var(--dl-brick); border-radius:10px; }
-      .dl-unsent p { flex:1 1 12em; margin:0; color:var(--cream); font-size:var(--fs-16); }
-      .dl-cancel-ask { margin-top:.6rem; }
-      .dl-finished { margin:.6rem 0 1rem; }
-      .dl-finished-sets, .dl-finished-rows { list-style:none; margin:0; padding:0; }
-      .dl-finished-set { padding:.5rem 0; border-bottom:1px solid var(--gold-faint); color:var(--cream); font-size:var(--fs-16); }
-      .dl-finished-set.is-whole { color:var(--gold); }
-      .dl-finished-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.1rem .8rem; min-height:44px; padding:.4rem 0; border-bottom:1px solid var(--gold-faint); }
-      .dl-finished-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
-      .dl-finished-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-queue-retry-all { margin-top:var(--sp-1); }
+      .dl-queue-head.is-failed { margin-top:var(--sp-3); }
+      .dl-queue.is-failed-only { margin:var(--sp-3) 0; }
+      .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-4); margin:var(--sp-2) 0; padding:var(--sp-3) var(--card-pad); border-radius:var(--r-card); background:var(--surface-1); box-shadow:inset 3px 0 0 var(--dl-brick); }
+      .dl-unsent p { flex:1 1 12em; margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
+      .dl-cancel-ask { margin-top:var(--sp-3); }
+      .related-link > .ui-i { margin-right:var(--sp-2); color:var(--accent); vertical-align:-3px; }
       .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .settings-downloads-row .settings-row-label { grid-column:1; }
       .settings-downloads-row .settings-select-chev { grid-column:2; grid-row:1 / span 3; color:var(--gold); }

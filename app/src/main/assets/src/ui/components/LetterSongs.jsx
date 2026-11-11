@@ -41,6 +41,7 @@ import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRigh
 import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -136,6 +137,7 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
  * that could not load, beside a Listen that had said why it could not play).
  * @param {{ letter: { audioUrl?: string, soundcloudUrl?: string } }} props
  */
+/* Readers mock r-end (W3b): the chips read "Audio recording" and "SoundCloud", each with its icon. */
 export function LetterAudioLinks({ letter }) {
   const online = useSongsOnline();
   if (!online || !(letter.audioUrl || letter.soundcloudUrl)) return null;
@@ -143,10 +145,10 @@ export function LetterAudioLinks({ letter }) {
     <div className="related-card">
       <div className="related-card-title">Audio</div>
       {letter.audioUrl && (
-        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer">♪ Audio Recording</a>
+        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="mic" size="sm" />Audio recording</a>
       )}
       {letter.soundcloudUrl && (
-        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer">♪ Listen on SoundCloud</a>
+        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="music" size="sm" />SoundCloud</a>
       )}
     </div>
   );

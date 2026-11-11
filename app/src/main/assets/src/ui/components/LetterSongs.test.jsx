@@ -364,15 +364,15 @@ describe('the outside audio links of a letter', () => {
   const LINKS = { audioUrl: 'https://example.org/a.mp3', soundcloudUrl: 'https://soundcloud.com/x/y' };
   it('online: both links show', () => {
     render(<LetterAudioLinks letter={LINKS} />);
-    expect(screen.getByRole('link', { name: '♪ Audio Recording' }).getAttribute('href')).toBe(LINKS.audioUrl);
-    expect(screen.getByRole('link', { name: '♪ Listen on SoundCloud' }).getAttribute('href')).toBe(LINKS.soundcloudUrl);
+    expect(screen.getByRole('link', { name: 'Audio recording' }).getAttribute('href')).toBe(LINKS.audioUrl);
+    expect(screen.getByRole('link', { name: 'SoundCloud' }).getAttribute('href')).toBe(LINKS.soundcloudUrl);
   });
   it('offline: the card is gone, and it comes back with the network', () => {
     NetStatus.reportFailure();
     const { container } = render(<LetterAudioLinks letter={LINKS} />);
     expect(container.textContent).toBe('');
     act(() => { NetStatus.reportOk(); });
-    expect(screen.queryByRole('link', { name: '♪ Listen on SoundCloud' })).not.toBeNull();
+    expect(screen.queryByRole('link', { name: 'SoundCloud' })).not.toBeNull();
   });
   it('a letter with neither link renders nothing', () => {
     const { container } = render(<LetterAudioLinks letter={{}} />);
