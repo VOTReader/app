@@ -6747,6 +6747,12 @@
     .rd-bindex.rd-genre { justify-content: flex-start; min-height: 0; }
     .rd-bindex .ui-row-text, .vot-large-text .lib-row .ui-row-text { flex: 1 0 auto; max-width: 100%; }
     .rd-bindex .ui-row-value, .vot-large-text .lib-row .ui-row-value { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: right; }
+    /* POL4: a Bible index name is never cut (it wraps), and at large text the count is its own line under the name
+       (it wrapped to four short lines beside it at 2). */
+    .rd-bindex .ui-row-title { white-space: normal; }
+    .vot-large-text .rd-bindex .ui-row { flex-wrap: wrap; row-gap: 2px; }
+    .vot-large-text .rd-bindex .ui-row-text { flex: 1 1 0; }
+    .vot-large-text .rd-bindex .ui-row-value { order: 3; flex: 1 0 100%; text-align: left; }
     /* ── end W2i readers (r-book, r-bindex, r-trans, gospels) ── */
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);
