@@ -24,6 +24,7 @@ import { showUndoToast } from '../../utils/toast.js';
 import { secondsOf } from '../../utils/audio-lengths.js';
 import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
+import { SelectSheet } from '../components/SelectField.jsx';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -140,7 +141,18 @@ function downloadsLine(/** @type {any} */ offline, /** @type {any} */ queueLine,
   return downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes());
 }
 
-/** The Letter voice row's value: the Settings choice in its own words. @param {string | undefined} code @returns {string} */
+/** The Letter Voice choices, one list for Settings > Listening and the Listen tab's row: Automatic, then every reader
+ *  in the registry's rank (utils/audio-track.js AUDIO_READERS). @returns {{ id: string, label: string, desc: string }[]} */
+export function letterVoiceOptions() {
+  return [
+    { id: 'auto', label: 'Automatic', desc: "Each recording's primary reading" },
+    ...Object.entries(/** @type {any} */ (globalThis).AUDIO_READERS || {}).map(([id, label]) => ({
+      id, label: String(label), desc: 'Prefer this reading wherever it exists',
+    })),
+  ];
+}
+
+/** The Letter voice row's value: the current choice in its own words. @param {string | undefined} code @returns {string} */
 export function letterVoiceLabel(code) {
   if (!code || code === 'auto') return 'Automatic · each recording’s own reader';
   const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
@@ -149,6 +161,16 @@ export function letterVoiceLabel(code) {
 
 /** A Bible edition's short name for The Bible row's line ("KJV · NKJV · WEB · Matthew"). @param {any} edition */
 const editionShort = (edition) => String(edition.short || edition.label || '').split(' · ')[0];
+
+/** The Continue card's title: the recording's name, with its part unless the name already says it (a per-chapter
+ *  Bible edition titles "Genesis 1"; its "Chapter 1" would say it twice). @param {any} track @returns {string} */
+export function continueTitle(track) {
+  const name = trackName(track);
+  const part = track && track.partLabel;
+  const ch = part ? /^Chapter (\d+)$/.exec(part) : null;
+  if (!part || (ch && name.endsWith(' ' + ch[1]))) return name;
+  return name + ' · ' + part;
+}
 
 /** "12 min left", from the player's clock, or '' while the length is unknown. @param {any} state */
 function minutesLeft(state) {
@@ -204,13 +226,13 @@ const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5"
  *   onOpenOffline?: () => void,
  *   onOpenSongs?: () => void,
  *   onOpenTrack: (track: any) => void,
- *   onOpenLetterVoice?: () => void,
+ *   onSetLetterReader?: (code: string) => void,
  *   letterReader?: string,
  *   onSearch: () => void,
  *   onSettings: () => void,
  * }} props
  */
-export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenSongs, onOpenTrack, onOpenLetterVoice, letterReader, onSearch, onSettings }) {
+export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenSongs, onOpenTrack, onSetLetterReader, letterReader, onSearch, onSettings }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -241,6 +263,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
   const [recentOpen, setRecentOpen] = React.useState(readRecentOpen);
   const [recentAll, setRecentAll] = React.useState(false);
   const [bibleOpen, setBibleOpen] = React.useState(false);
+  const [voiceOpen, setVoiceOpen] = React.useState(false);
 
   const state = AudioPlayer.getState();
   const queue = Array.isArray(state.queue) ? state.queue : [];
@@ -293,7 +316,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
                 aria-label={'Open the text of ' + trackName(resume)} title="Open text">{BIBLE_ICON}</button>
               <div className="listen-continue-text">
                 <span className="root-eyebrow">{current && isPlaying ? 'Now playing' : 'Continue listening'}</span>
-                <h2 id="listen-continue-title" className="listen-continue-title">{[trackName(resume), resume.partLabel].filter(Boolean).join(' · ')}</h2>
+                <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>
                 <span className="listen-continue-meta">{[resume.sub || trackMeta(resume), left].filter(Boolean).join(' · ')}</span>
               </div>
               <button type="button" className="listen-play" aria-busy={isLoading}
@@ -341,8 +364,8 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
           ) : null}
           <ListRow icon={SAVED_ICON} title="Saved recordings" count={saved.length} onClick={() => onOpenSaved()}
             sub={saved.length ? 'Kept · travels with your backup' : 'Tap the star beside any recording to keep it'} />
-          {onOpenLetterVoice ? (
-            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={onOpenLetterVoice} sub={letterVoiceLabel(letterReader)} />
+          {onSetLetterReader ? (
+            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)} sub={letterVoiceLabel(letterReader)} />
           ) : null}
         </div>
 
@@ -375,6 +398,11 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
         </section>
         ) : null}
       </div>
+      {/* The same choice as Settings > Listening > Letter Voice, picked here (the hub, 2026-11-10). */}
+      {onSetLetterReader ? (
+        <SelectSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} eyebrow="Listening" title="Letter Voice"
+          value={letterReader || 'auto'} options={letterVoiceOptions()} onChange={onSetLetterReader} portal />
+      ) : null}
     </ScreenLayout>
   );
 }

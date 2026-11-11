@@ -61,8 +61,9 @@ describe('useSettings — defaults + migration', () => {
     expect(s.doubleTapFullscreen).toBe(true);
     expect(s.fullscreenHintCount).toBe(0);
     expect(s.gardenTier).toBe(2); // GARDEN_DEFAULT_TIER global
-    // Corbin, 2026-09-10: the dice and the reading marker are on out of the box.
-    expect(s.showReadingDot).toBe(true);
+    // Corbin, 2026-09-10: the dice is on out of the box. The reading marker was too, until the three tabs
+    // (2026-11-10): Continue is a labelled row on the Read tab, so the marker is off where nothing is stored.
+    expect(s.showReadingDot).toBe(false);
     expect(s.showSurpriseButton).toBe(true);
     expect(s.autoScrollNext).toBe(true);
   });
@@ -212,14 +213,15 @@ describe('useSettings — body-class mirror', () => {
   /* The compact top bar (the redesign, 2026-09-25): a NEW key, so a profile saved before it
      existed (every settings key but this one present) still gets the calmer bar, and only an
      explicit false brings the old icon row back. */
-  it('compactTopBar is on for a profile saved before it existed, and off only when set off', () => {
+  it('the compact bar is the only bar since the three tabs (2026-11-10): a stored false is kept but changes nothing', () => {
     document.body.className = '';
     const { unmount } = mount({ savedSettings: { showSettingsGear: true, historyInNav: true, showThemeBtn: true } });
     expect(cls().contains('compact-topbar')).toBe(true);
     unmount();
     document.body.className = '';
-    mount({ savedSettings: { compactTopBar: false } });
-    expect(cls().contains('compact-topbar')).toBe(false);
+    const { result } = mount({ savedSettings: { compactTopBar: false } });
+    expect(cls().contains('compact-topbar')).toBe(true);
+    expect(result.current.settings.compactTopBar).toBe(false);
   });
 
   /* Settings hunt (2026-11-04): the mirror ran as a PASSIVE effect, i.e. after the App's first paint.
@@ -340,7 +342,8 @@ describe('useSettings — PlatformBridge mirror', () => {
 const ROUNDS = 2;
 
 describe('useSettings — the 2026-09-10 default flips reach every profile that never chose', () => {
-  const FLIPPED = { showSurpriseButton: true, showReadingDot: true, autoScrollNext: true };
+  // showReadingDot left the round with the three tabs (2026-11-10): its own case is at the end of this block.
+  const FLIPPED = { showSurpriseButton: true, autoScrollNext: true };
 
   it('a fresh profile reads the dice, the reading marker and Auto-Continue ON, stamped with the round', () => {
     const s = mount().result.current.settings;
@@ -360,13 +363,13 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
   it('a key the old profile never wrote flips too — absence is the old default', () => {
     const s = mount({ savedSettings: { translation: 'kjv' } }).result.current.settings;
     expect(s.showSurpriseButton).toBe(true);
-    expect(s.showReadingDot).toBe(true);
+    expect(s.autoScrollNext).toBe(true);
   });
 
   it("an OFF the reader chose (touched) keeps OFF across the flip; the untouched sibling still flips", () => {
-    const s = mount({ savedSettings: { showSurpriseButton: false, showReadingDot: false, touched: { showSurpriseButton: true } } }).result.current.settings;
+    const s = mount({ savedSettings: { showSurpriseButton: false, autoScrollNext: false, touched: { showSurpriseButton: true } } }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
-    expect(s.showReadingDot).toBe(true);
+    expect(s.autoScrollNext).toBe(true);
     expect(s.touched).toEqual({ showSurpriseButton: true });
   });
 
@@ -415,8 +418,15 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
     const saved = JSON.parse(JSON.stringify(first.result.current.settings));
     const s = mount({ savedSettings: saved }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
-    expect(s.showReadingDot).toBe(true);
+    expect(s.autoScrollNext).toBe(true);
     expect(s.defaultsRev).toBe(ROUNDS);
+  });
+
+  it('the reading marker (three tabs, 2026-11-10): off where nothing is stored, and a stored value is kept either way', () => {
+    expect(mount().result.current.settings.showReadingDot).toBe(false);
+    expect(mount({ savedSettings: { translation: 'kjv' } }).result.current.settings.showReadingDot).toBe(false);
+    expect(mount({ savedSettings: { showReadingDot: true, defaultsRev: 2 } }).result.current.settings.showReadingDot).toBe(true);
+    expect(mount({ savedSettings: { showReadingDot: false } }).result.current.settings.showReadingDot).toBe(false);
   });
 });
 

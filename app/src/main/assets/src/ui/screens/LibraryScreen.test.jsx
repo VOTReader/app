@@ -76,7 +76,7 @@ describe('LibraryScreen — the Library root', () => {
     expect(screen.queryByText(/Scripture Web/)).toBeNull();
   });
 
-  it('an empty tile says what it holds; a tile with something gives its real count', () => {
+  it('a tile gives its live count, and "None yet" while it is empty', () => {
     setupGlobals({
       NoteStore: fakeStore({ count: () => 23 }),
       BookmarkStore: fakeStore({ count: () => 1 }),
@@ -88,7 +88,7 @@ describe('LibraryScreen — the Library root', () => {
     expect(tileLine('Highlights')).toBe('1 marked passage');
     expect(tileLine('Bookmarks')).toBe('1 place');
     expect(tileLine('Journal')).toBe('4 entries');
-    expect(tileLine('Links')).toBe('Passages you joined together');
+    expect(tileLine('Links')).toBe('None yet');
   });
 
   it('a blank-colour note is not counted as a highlight (n363)', () => {

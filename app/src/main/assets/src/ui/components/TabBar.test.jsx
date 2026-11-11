@@ -11,7 +11,7 @@ afterEach(() => {
   delete globalThis.AboutSeenFlagStore;
   delete globalThis.__scrollEl;
   document.documentElement.classList.remove('kb-up');
-  document.body.classList.remove('tabbar-on');
+  document.body.classList.remove('tabbar-on', 'nav-tabbed');
 });
 
 const tabs = () => [...document.querySelectorAll('.tabbar-tab')].map((b) => b.textContent);
@@ -26,12 +26,22 @@ describe('TabBar', () => {
     expect(document.body.classList.contains('tabbar-on')).toBe(true);
   });
 
-  it('lights nothing on Settings, and is gone on a reader (the dock comes down with it)', () => {
-    const { rerender } = render(<TabBar screen="settings" onOpen={vi.fn()} />);
-    expect(document.querySelector('[aria-current]')).toBeNull();
+  it('Settings keeps the tab you came from lit; a reader has no bar and no tabbed top bar', () => {
+    const { rerender } = render(<TabBar screen="library" onOpen={vi.fn()} />);
+    rerender(<TabBar screen="settings" onOpen={vi.fn()} />);
+    expect(document.querySelector('[aria-current]').textContent).toBe('Library');
+    expect(document.body.classList.contains('nav-tabbed')).toBe(true);
     rerender(<TabBar screen="bible-ch" onOpen={vi.fn()} />);
     expect(document.querySelector('.tabbar')).toBeNull();
     expect(document.body.classList.contains('tabbar-on')).toBe(false);
+    expect(document.body.classList.contains('nav-tabbed')).toBe(false);
+  });
+
+  it('the keyboard takes the bar down but leaves the top bar as it was', async () => {
+    render(<TabBar screen="search" onOpen={vi.fn()} />);
+    await act(async () => { document.documentElement.classList.add('kb-up'); await Promise.resolve(); });
+    expect(document.body.classList.contains('tabbar-on')).toBe(false);
+    expect(document.body.classList.contains('nav-tabbed')).toBe(true);
   });
 
   it('a tab opens its root; the lit tab on its root scrolls the page to the top instead', () => {

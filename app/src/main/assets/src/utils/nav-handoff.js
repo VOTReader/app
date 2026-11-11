@@ -56,9 +56,6 @@
                 letterId is the PAGE's id, as LetterView's letter.id: a Bible
                 study chapter's own id there (reopenFootnoteOf)
         reader: LetterView (peek on mount; opens that footnote's sheet again, then clears)
-     settingsGroup      string (a Settings group id: 'listening', ...) | null
-        writer: screen-routes' audio-library route (the Listen tab's Letter voice row)
-        reader: SettingsScreen (take on mount: that group opens and scrolls into view)
      journalNewEntry    string (the entry's id) | null
         writer: use-journal-mutations (New entry, U03.6)
         reader: screen-routes' journal-editor route (take on Back: the list it was made from, not its read-only view)

@@ -6,7 +6,8 @@
    screen key in ui/screen-routes.jsx, the tab it belongs to and whether the
    bar shows on it. app-sections.test.js fails when a route has no entry.
 
-     tab    'read' | 'listen' | 'library' | null (shown, nothing lit)
+     tab    'read' | 'listen' | 'library', or 'keep': the screen keeps the tab
+            you came from lit (Search, Settings, About: places every tab reaches)
      bar    true: the bar shows; false: a full-height page (every reader,
             the Scripture Web, the journal's viewer and editor)
 
@@ -21,7 +22,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** @typedef {'read' | 'listen' | 'library'} SectionTab */
-/** @typedef {{ tab: SectionTab | null, bar: boolean }} Section */
+/** @typedef {{ tab: SectionTab | 'keep' | null, bar: boolean }} Section */
 
 /** The tabs, left to right, with their roots and their labels. */
 export const TABS = Object.freeze(/** @type {const} */ (['read', 'listen', 'library']));
@@ -32,7 +33,7 @@ export const TAB_LABELS = Object.freeze({ read: 'Read', listen: 'Listen', librar
 
 /** @param {SectionTab} tab @returns {Section} */
 const on = (tab) => Object.freeze({ tab, bar: true });
-const NO_TAB = Object.freeze({ tab: null, bar: true });
+const KEEP = Object.freeze({ tab: /** @type {'keep'} */ ('keep'), bar: true });
 const FULL = Object.freeze({ tab: null, bar: false });
 
 /** @type {Readonly<Record<string, Section>>} */
@@ -49,7 +50,6 @@ export const SECTIONS = Object.freeze({
   'answers-home': on('read'), 'answers-group': on('read'), 'answers-media': on('read'), 'answers-saved': on('read'),
   // Retired Answers shelves (no button reaches them; a saved place is rewritten on the way): Answers' own place.
   'answers-subject': on('read'), 'answers-az': on('read'),
-  'search': on('read'),
   // ── LISTEN ──
   'audio-library': on('listen'),
   'audio-library-volumes': on('listen'), 'audio-library-offline': on('listen'), 'audio-library-studies': on('listen'),
@@ -58,8 +58,8 @@ export const SECTIONS = Object.freeze({
   'library': on('library'), 'reading-plans': on('library'), 'my-progress': on('library'),
   'notes-index': on('library'), 'highlights-index': on('library'), 'bookmarks-index': on('library'),
   'links-index': on('library'), 'journal-home': on('library'), 'history': on('library'),
-  // ── the bar, nothing lit ──
-  'settings': NO_TAB, 'about': NO_TAB,
+  // ── the bar, the tab you came from still lit ──
+  'search': KEEP, 'settings': KEEP, 'about': KEEP,
   // ── full-height pages: every reader, the web, the journal's page ──
   'vot-one-letter': FULL, 'vot-letter': FULL, 'vot-three-letter': FULL, 'vot-four-letter': FULL, 'vot-five-letter': FULL,
   'vot-six-letter': FULL, 'vot-seven-letter': FULL, 'vot-timothy-letter': FULL, 'vot-flock-letter': FULL,
@@ -75,6 +75,16 @@ export const SECTIONS = Object.freeze({
  */
 export function sectionOf(screen) {
   return Object.prototype.hasOwnProperty.call(SECTIONS, screen) ? SECTIONS[screen] : SECTIONS.home;
+}
+
+/**
+ * The tab the bar lights on a screen: its own, or for a 'keep' screen the one lit before it (Read when none was).
+ * @param {string} screen @param {SectionTab | null} [previous] @returns {SectionTab | null}
+ */
+export function litTab(screen, previous = null) {
+  const tab = sectionOf(screen).tab;
+  if (tab === 'keep') return previous || 'read';
+  return tab;
 }
 
 /**

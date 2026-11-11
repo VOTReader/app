@@ -7,13 +7,20 @@
 
    While it shows, body.tabbar-on lifts the bottom dock above it (app.css,
    BOTTOM DOCK: --dock-tabbar), so the mini player sits directly on the bar
-   and toasts, the tour strip and the selection toolbar clear both.
+   and toasts, the tour strip and the selection toolbar clear both. At 1024
+   css px and wider it is a left rail instead (app.css), and the dock stays
+   at the bottom of the page column.
+
+   body.nav-tabbed marks every screen that has the bar (whether or not it is
+   up this moment, so the keyboard never reshapes the top bar): the top bar
+   there is Back, Search, Tabs and the Settings gear, and the Home icon and
+   the ⋯ menu are readers' only (app.css, ONE TOP-BAR RULE).
    It reads three things the app keeps elsewhere: the tour (TourController),
    the first-run About (AboutSeenFlagStore) and the keyboard (html.kb-up,
    use-keyboard-inset).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { TABS, TAB_LABELS, TAB_ROOTS, sectionOf, barShown, tabTap } from '../../utils/app-sections.js';
+import { TABS, TAB_LABELS, TAB_ROOTS, sectionOf, barShown, tabTap, litTab } from '../../utils/app-sections.js';
 
 const SVG = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeLinecap: /** @type {const} */ ('round'), strokeLinejoin: /** @type {const} */ ('round'), 'aria-hidden': true };
 
@@ -66,14 +73,22 @@ export function TabBar({ screen, overviewOpen = false, onOpen }) {
   const tourOn = !!(tour && tour.getState().active);
   const firstRunAbout = screen === 'about' && !!about && typeof about.is === 'function' && !about.is();
   const shown = barShown({ screen, firstRunAbout, overviewOpen, tourOn, keyboardUp });
+  const tabbed = sectionOf(screen).bar;
+  // Search, Settings and About keep the tab you came from lit.
+  const lastTab = React.useRef(/** @type {any} */ (null));
+  const lit = litTab(screen, lastTab.current);
+  React.useEffect(() => { if (lit) lastTab.current = lit; }, [lit]);
 
   React.useLayoutEffect(() => {
     document.body.classList.toggle('tabbar-on', shown);
     return () => { document.body.classList.remove('tabbar-on'); };
   }, [shown]);
+  React.useLayoutEffect(() => {
+    document.body.classList.toggle('nav-tabbed', tabbed);
+    return () => { document.body.classList.remove('nav-tabbed'); };
+  }, [tabbed]);
 
   if (!shown) return null;
-  const lit = sectionOf(screen).tab;
   return (
     <nav className="tabbar" aria-label="Sections">
       {TABS.map((tab) => (

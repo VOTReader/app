@@ -42,6 +42,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { h } from './jsx-h.js';
+import { bookTitle } from '../data/plan-catalog.js';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
 import { setAutoDownloads } from '../utils/auto-download.js';
@@ -363,7 +364,9 @@ export function buildScreenRoutes({
       } else {
         const bookId = ref.bid === 'matthew' ? 'matthew-plain' : ref.bid;
         const audio = bibleAudioFor(bookId);
-        if (audio) items.push({ volKey: audio.volKey, item: { id: bookId }, collectionLabel: audio.label, chapterNum: Number(ref.cid) });
+        // The book's title rides the item (the hub, 2026-11-10): without it a per-chapter edition titled the
+        // recording by its chapter alone, and the mini player, Continue listening and Recently played read "1 · Chapter 1".
+        if (audio) items.push({ volKey: audio.volKey, item: { id: bookId, title: bookTitle(bookId) }, collectionLabel: audio.label, chapterNum: Number(ref.cid) });
       }
     }
     return items;
@@ -1438,7 +1441,7 @@ export function buildScreenRoutes({
         onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
         letterReader={settings.letterReader}
-        onOpenLetterVoice={() => { window.navHandoff.set('settingsGroup', 'listening'); goSettings(); }}
+        onSetLetterReader={(/** @type {string} */ v) => updateSetting('letterReader', v)}
         onSearch={goSearch}
         onSettings={goSettings}
       />

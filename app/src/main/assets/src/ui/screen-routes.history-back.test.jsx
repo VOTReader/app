@@ -366,17 +366,13 @@ describe('screen-routes — bible-idx onBack consumes fromSearch', () => {
 });
 
 describe('screen-routes — the Listening Library returns to its actual origin', () => {
-  it('is the Listen tab root: no Back of its own (system Back goes to Read), Letter voice opens Settings at Listening', () => {
+  it('is the Listen tab root: no Back of its own (system Back goes to Read); Letter voice sets the one letterReader key', () => {
     const { routes, props } = makeRoutes();
     const audio = routes['audio-library']();
     expect(audio.props.onBack).toBeUndefined();
     expect(audio.props.backLabel).toBeUndefined();
-    const prev = window.navHandoff;
-    const set = vi.fn();
-    window.navHandoff = { set, clear: vi.fn(), take: vi.fn(), peek: vi.fn() };
-    try { audio.props.onOpenLetterVoice(); } finally { window.navHandoff = prev; }
-    expect(set).toHaveBeenCalledWith('settingsGroup', 'listening');
-    expect(props.goSettings).toHaveBeenCalledTimes(1);
+    audio.props.onSetLetterReader('B');
+    expect(props.updateSetting).toHaveBeenCalledWith('letterReader', 'B');
   });
 
   it('has no Milestones route, and neither Library nor My Progress offers one (removed 2026-10-05)', () => {
@@ -604,5 +600,30 @@ describe('screen-routes — a letter opened from a list drops an old search\'s f
     const { routes, props } = makeRoutes();
     routes['highlights-index']().props.onNavigateToSource(null);
     expect(props.setSurpriseAnchor).not.toHaveBeenCalled();
+  });
+});
+
+/* "1 · Chapter 1" (the hub, 2026-11-10): a plan's Bible chapter was queued with no book title, so a per-chapter
+   edition titled the recording by its number alone. The book's title now rides the item to the track builder. */
+describe('screen-routes — a plan portion queues its Bible chapters by book', () => {
+  it('hands the track builder the book title with the chapter', async () => {
+    const G = /** @type {any} */ (globalThis);
+    const { AudioPlayer } = await import('../utils/audio-player.js');
+    const spy = vi.spyOn(AudioPlayer, 'portionTracks').mockReturnValue([]);
+    const hadCols = 'COLLECTIONS' in G;
+    if (!hadCols) G.COLLECTIONS = [];   // no collection is called 'genesis': the Bible branch
+    const prevManifest = G.BIBLE_AUDIO_MANIFEST;
+    G.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:genesis': [['g', '']] };
+    try {
+      const { routes } = makeRoutes({ settings: { bibleAudio: 'brm-kjv' } });
+      routes.home().props.planTracks([{ bid: 'genesis', cid: 1 }]);
+      const items = spy.mock.calls[0][0];
+      expect(items).toHaveLength(1);
+      expect(items[0].item).toEqual({ id: 'genesis', title: 'Genesis' });
+      expect(items[0].chapterNum).toBe(1);
+    } finally {
+      spy.mockRestore(); if (!hadCols) delete G.COLLECTIONS;
+      if (prevManifest === undefined) delete G.BIBLE_AUDIO_MANIFEST; else G.BIBLE_AUDIO_MANIFEST = prevManifest;
+    }
   });
 });

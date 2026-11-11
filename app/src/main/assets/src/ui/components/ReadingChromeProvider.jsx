@@ -48,7 +48,7 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
   // this provider is App's always-mounted chrome and already holds the way to the plans.
   usePlanReminders(() => { if (screen !== 'reading-plans' && n.onPlans) n.onPlans(); });
   const menuValue = {
-    enabled: s.compactTopBar !== false,
+    enabled: true,   // the compact bar is the only bar since the three tabs (2026-11-10)
     historyEnabled: s.historyEnabled !== false,
     theme: n.theme || 'dark',
     onThemeChange: n.onThemeChange || (() => {}),

@@ -265,6 +265,20 @@
     if (el) { el.click(); return true; }
     return false;
   }
+  /** Tap a bottom tab by its label (the three tabs, 2026-11-10); false when the bar is not up. */
+  function openTab(label) {
+    var tab = [].slice.call(document.querySelectorAll('.tabbar-tab')).find(function (b) {
+      return (b.textContent || '').trim() === label;
+    });
+    if (tab) { tab.click(); return true; }
+    return false;
+  }
+  /** The Settings gear (a root's own, or the bar's): matched by name, as it has no text. */
+  function openSettings() {
+    var g = document.querySelector('.root-gear-btn, .settings-gear-btn');
+    if (g) { g.click(); return true; }
+    return false;
+  }
   function onHome() {
     // Home shows the main nav tiles. Detect via button TEXTCONTENT, not
     // body.innerText: the tile eyebrows ("Prophetic Letters", "Personal
@@ -281,6 +295,8 @@
   async function goHome() {
     for (var attempt = 0; attempt < 5; attempt++) {
       if (onHome()) return true;
+      // The three tabs (2026-11-10): the Read tab is the way home wherever the bar shows.
+      if (openTab('Read')) { await sleep(300); continue; }
       var btns = [].slice.call(document.querySelectorAll('button'));
       // Home affordance varies by screen: an icon button (title/aria
       // "Home") on reading screens, OR a text button "← Home" on index
@@ -343,22 +359,22 @@
     await sleep(250);
 
     var LEGS = [
-      { screen: 'notes-index', label: 'Personal Study → My Notes',
-        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
+      { screen: 'notes-index', label: 'Library tab → Notes',
+        open: async function () { await goHome(); openTab('Library'); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
         // The shared personal-study header titles the screen "Notes" (2026-09-25); any
         // pager peek of the Library beside it is titled "Library", so match the title exactly.
         there: function () {
           return [].slice.call(document.querySelectorAll('.study-head-title'))
             .some(function (h) { return (h.textContent || '').trim() === 'Notes'; });
         } },
-      { screen: 'audio-library', label: 'Audio Readings → Listening Library',
-        open: async function () { await goHome(); return clickByText(/Audio Readings/); },
+      { screen: 'audio-library', label: 'Listen tab',
+        open: async function () { await goHome(); return openTab('Listen'); },
         there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
-      { screen: 'settings', label: 'App Configuration → Settings',
-        open: async function () { await goHome(); return clickByText(/App Configuration|^Settings/); },
+      { screen: 'settings', label: 'the gear → Settings',
+        open: async function () { await goHome(); return openSettings(); },
         there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
-      { screen: 'scripture-web', label: 'Personal Study → Scripture Web',
-        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/Scripture Web/); },
+      { screen: 'scripture-web', label: 'Read › Explore → Scripture Web',
+        open: async function () { await goHome(); return clickByText(/Scripture Web/); },
         there: function () { return !!document.querySelector('.sw-root'); } },
     ];
 
@@ -411,8 +427,8 @@
       if (st.crashed) await goHome();
     }
     async function lib(tileRe) {
-      // Eyebrow-precise: a bare /Library/ would hit the Listening Library card.
-      clickByText(/Personal Study/); await sleep(320);
+      // The Library is a tab since the three tabs (2026-11-10).
+      openTab('Library'); await sleep(320);
       clickByText(tileRe); await sleep(340);
     }
 
@@ -551,21 +567,21 @@
     await step('Library hub', async function () {
       // "Personal Study" (the card's eyebrow) — a bare /Library/ would match
       // the Listening Library card that now sits before it on Home.
-      clickByText(/Personal Study/); await sleep(320);
-      // 95181e08 (the one-row Library) dropped the "My Notes" eyebrows; a row
-      // carries its title alone. Either shape passes.
-      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines/.test(document.body.textContent || '');
+      openTab('Library'); await sleep(320);
+      // The Library tab's root (2026-11-10): Reading plans, Progress, and the Yours tiles.
+      var t = document.body.textContent || '';
+      return /Reading plans/.test(t) && /Bookmarks/.test(t) && /Journal/.test(t);
     });
     await step('Listening Library', async function () {
       await goHome();
-      clickByText(/Audio Readings/); await sleep(360);
+      openTab('Listen'); await sleep(360);
       const body = document.body.textContent || '';
-      // The hub's own furniture: the saved doorway + one doorway per source.
-      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /Biblical Restoration Ministries/.test(body);
+      // The Listen tab's own furniture: the saved doorway + one doorway per source.
+      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /The Bible/.test(body);
     });
     await step('Listening → The Volumes', async function () {
       await goHome();
-      clickByText(/Audio Readings/); await sleep(360);
+      openTab('Listen'); await sleep(360);
       clickByText(/The Volumes of Truth/); await sleep(400);
       // The collection list lives one level in, not splayed across the hub.
       return /Volume One/.test(document.body.textContent || '') && /Collections/.test(document.body.textContent || '');
@@ -578,7 +594,6 @@
       // left with sw-chrome-r3). The CC-BY attribution moved to About with
       // that branch — the 'About' step below keeps the licence obligation gated.
       await goHome();
-      clickByText(/Personal Study/); await sleep(320);
       clickByText(/Scripture Web/); await sleep(2200);
       const root = document.querySelector('.sw-root');
       if (!root) return false;
@@ -594,6 +609,10 @@
       // sw-chrome-r3 (it printed over the book labels in landscape); do not let
       // this step go with it without equivalent credit somewhere the reader sees.
       await goHome();
+      // About lives in Settings > Help since the three tabs (2026-11-10).
+      openSettings(); await sleep(400);
+      var help = document.querySelector('[data-settings-group="help"] button');
+      if (help && !document.querySelector('[data-settings-group="help"].open')) { help.click(); await sleep(200); }
       if (!clickByText(/About VOTReader/)) return false;
       await sleep(400);
       const credit = document.querySelector('.about-credit');
@@ -612,7 +631,7 @@
       return /Most Annotated/i.test(document.body.textContent || '');
     });
     await step('Settings', async function () {
-      clickByText(/App Configuration|^Settings/); await sleep(360);
+      openSettings(); await sleep(360);
       return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');
     });
     await goHome();

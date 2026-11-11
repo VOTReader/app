@@ -1,7 +1,7 @@
 // @ts-nocheck — the routes are built with a stub prop bag, as the screen-routes tests do
 /* app-sections: every screen has a place at the bottom (the layout pass, 2026-11-10). */
 import { describe, it, expect, vi } from 'vitest';
-import { SECTIONS, TABS, TAB_ROOTS, sectionOf, barShown, tabTap } from './app-sections.js';
+import { SECTIONS, TABS, TAB_ROOTS, sectionOf, barShown, tabTap, litTab } from './app-sections.js';
 import { buildScreenRoutes } from '../ui/screen-routes.jsx';
 
 function routeKeys() {
@@ -36,6 +36,11 @@ describe('app-sections', () => {
     expect(missing, 'screens with no entry in SECTIONS').toEqual([]);
     const extra = Object.keys(SECTIONS).filter((k) => !keys.includes(k));
     expect(extra, 'SECTIONS entries with no route').toEqual([]);
+    // Each one belongs to exactly one tab, keeps the tab you came from, or is a full-height page (no bar).
+    for (const k of keys) {
+      const s = SECTIONS[k];
+      expect(s.bar ? ['read', 'listen', 'library', 'keep'].includes(s.tab) : s.tab === null, k).toBe(true);
+    }
   });
 
   it('puts the three roots on their own tabs, with the bar', () => {
@@ -44,7 +49,7 @@ describe('app-sections', () => {
   });
 
   it('places the brief\'s screens', () => {
-    for (const k of ['volumes-home', 'vot-rebuke-index', 'holy-days-index', 'scripture-genre', 'bible-idx', 'matthew-idx', 'bible-study-index', 'answers-group', 'answers-media', 'answers-saved', 'search']) {
+    for (const k of ['volumes-home', 'vot-rebuke-index', 'holy-days-index', 'scripture-genre', 'bible-idx', 'matthew-idx', 'bible-study-index', 'answers-group', 'answers-media', 'answers-saved']) {
       expect(sectionOf(k)).toEqual({ tab: 'read', bar: true });
     }
     for (const k of ['audio-library-volumes', 'audio-library-offline', 'audio-library-collection', 'audio-library-songs', 'audio-library-saved', 'audio-library-studies']) {
@@ -53,8 +58,15 @@ describe('app-sections', () => {
     for (const k of ['reading-plans', 'my-progress', 'notes-index', 'highlights-index', 'bookmarks-index', 'links-index', 'journal-home', 'history']) {
       expect(sectionOf(k)).toEqual({ tab: 'library', bar: true });
     }
-    expect(sectionOf('settings')).toEqual({ tab: null, bar: true });
-    expect(sectionOf('about')).toEqual({ tab: null, bar: true });
+    for (const k of ['search', 'settings', 'about']) expect(sectionOf(k)).toEqual({ tab: 'keep', bar: true });
+  });
+
+  it('Search, Settings and About keep the tab you came from lit (Read when there was none)', () => {
+    expect(litTab('settings', 'library')).toBe('library');
+    expect(litTab('search', 'listen')).toBe('listen');
+    expect(litTab('about', null)).toBe('read');
+    expect(litTab('notes-index', 'listen')).toBe('library');
+    expect(litTab('bible-ch', 'read')).toBeNull();
   });
 
   it('hides the bar on every reader and full-height page', () => {

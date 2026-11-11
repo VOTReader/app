@@ -61,7 +61,7 @@ export function settingsGlance(o) {
       'Read-along ' + onOff(s.readAlongHighlight !== false),
     ].join(' · '),
     autoscroll: s.autoScroll ? 'On · ' + lpm + ' lines a minute' : 'Off',
-    topnav: s.compactTopBar !== false ? 'Compact bar with the ⋯ menu' : 'Every icon in the bar',
+    topnav: 'Bookmark on reading pages ' + onOff(s.showBookmarkNav !== false),
     features: offs.length === 0 ? 'Search, tabs and history on'
       : offs.length === feats.length ? 'Search, tabs and history off'
         : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · '),

@@ -223,7 +223,7 @@ const STOPS = [
     title: 'Make it yours',
     /* Corbin, 2026-09-11: say too that whole features go quiet here — "control many UI
        features (like disabling search, history, other icons, etc)". Search and History are the
-       rows' own names; "the icons in the top bar" is the Top-Nav Buttons group's own subtitle. */
+       rows' own names; "the icons in the top bar" was the Top-Nav Buttons group's subtitle (the Top bar group since 2026-11-10). */
     /* n119 (A08.9): two short sentences, not one of fifty words; the names are the rows' own. */
     text: 'Most of what you have seen can be switched on or off here in Settings: Surprise Me, the Reading Position Marker, Auto-Scroll, Search, History and the icons in the top bar. Turn off what you do not use.',
     primary: 'Next',

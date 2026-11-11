@@ -22,7 +22,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { AudioLibraryScreen, lengthText } from './AudioLibraryScreen.jsx';
+import { AudioLibraryScreen, lengthText, continueTitle } from './AudioLibraryScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import * as AudioCoverage from '../../utils/audio-coverage.js';
@@ -215,16 +215,33 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     expect(openTrack).toHaveBeenCalledWith(savedTrack);
   });
 
-  it('Letter voice shows the setting and opens it', () => {
-    const onOpenLetterVoice = vi.fn();
-    renderScreen({ onOpenLetterVoice, letterReader: 'auto' });
-    const row = screen.getByRole('button', { name: /Letter voice/ });
-    expect(row.textContent).toContain('Automatic · each recording’s own reader');
-    fireEvent.click(row);
-    expect(onOpenLetterVoice).toHaveBeenCalledTimes(1);
-    cleanup();
-    renderScreen({ onOpenLetterVoice, letterReader: 'T' });
-    expect(screen.getByRole('button', { name: /Letter voice/ }).textContent).toContain('Read by Timothy');
+  it('Letter voice states the current choice and opens the voice picker in place; a pick sets it', () => {
+    const onSetLetterReader = vi.fn();
+    globalThis.useModalRegistry = () => {};
+    globalThis.useFocusTrap = () => ({ current: null });
+    globalThis.SheetHandle = () => null;
+    const hadDom = 'ReactDOM' in globalThis;
+    if (!hadDom) globalThis.ReactDOM = { createPortal: (node) => node };
+    try {
+      renderScreen({ onSetLetterReader, letterReader: 'auto' });
+      const row = screen.getByRole('button', { name: /Letter voice/ });
+      expect(row.textContent).toContain('Automatic · each recording’s own reader');
+      fireEvent.click(row);
+      fireEvent.click(screen.getByRole('radio', { name: /Read by Timothy/ }));
+      expect(onSetLetterReader).toHaveBeenCalledWith('T');
+      cleanup();
+      renderScreen({ onSetLetterReader, letterReader: 'T' });
+      expect(screen.getByRole('button', { name: /Letter voice/ }).textContent).toContain('Read by Timothy');
+    } finally {
+      delete globalThis.useModalRegistry; delete globalThis.useFocusTrap; delete globalThis.SheetHandle;
+      if (!hadDom) delete globalThis.ReactDOM;
+    }
+  });
+
+  it('the Continue title says a Bible chapter once ("Genesis 1"), and a letter’s part', () => {
+    expect(continueTitle({ title: 'Genesis 1', partLabel: 'Chapter 1' })).toBe('Genesis 1');
+    expect(continueTitle({ title: 'The Wide Path', partLabel: 'Part 2' })).toBe('The Wide Path · Part 2');
+    expect(continueTitle({ title: 'The Narrow Path', partLabel: null })).toBe('The Narrow Path');
   });
 
   it('drops one recent row without clearing the whole trail', () => {

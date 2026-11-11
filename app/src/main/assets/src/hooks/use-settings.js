@@ -86,7 +86,9 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
    never picked one (a reader who chose App Link in Settings is touched and keeps it).
    @type {ReadonlyArray<Readonly<Record<string, any[]>>>}  key → [old default, new default] */
 const DEFAULT_FLIPS = Object.freeze([
-  Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
+  // showReadingDot left round 1 with the three tabs (2026-11-10): the marker is off by default now (Continue is a
+  // labelled row on the Read tab), so a profile with no stored value gets the new default, not this round's true.
+  Object.freeze({ showSurpriseButton: [false, true], autoScrollNext: [false, true] }),
   Object.freeze({ shareLink: ['app', 'site'] }),
 ]);
 
@@ -187,7 +189,7 @@ export function useSettings({ savedSettings, theme }) {
     // Default flips (DEFAULT_FLIPS above): every round this profile has not been through.
     Object.assign(migrated, defaultFlipsFor(savedS));
     return withoutRetired({
-      showReadingDot: true, showSurpriseButton: true, markAsRead: true,
+      showReadingDot: false, showSurpriseButton: true, markAsRead: true,
       // The keys the reader set through the two mutators — a flip never overwrites one of these.
       touched: {},
       // Search defaults — only the values that are actually wired to
@@ -334,7 +336,8 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
     document.body.classList.toggle("no-bookmark-nav", settings.showBookmarkNav === false);
     document.body.classList.toggle("no-theme-nav", settings.showThemeBtn === false);
-    document.body.classList.toggle("compact-topbar", settings.compactTopBar !== false);
+    // The three tabs (2026-11-10): the compact bar is the only bar (its switch left Settings; the stored key stays).
+    document.body.classList.toggle("compact-topbar", true);
     document.body.classList.toggle("arrows-right", settings.arrowLayout === 'right');
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');

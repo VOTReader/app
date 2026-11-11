@@ -3,8 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════
    The layout pass (2026-11-10, mock library.png): Reading plans and
    Progress as rows; "Yours": Notes, Highlights, Bookmarks, Journal and
-   Links as tiles, each with a real count from its store (a plain line of
-   what it holds while it is empty); "Recently read": the three newest
+   Links as tiles, each with a live count from its store ("None yet" while
+   it is empty); "Recently read": the three newest
    History rows and See all (gone with History switched off). Scripture Web
    left for Read > Explore; Settings is the gear in the top bar.
 
@@ -90,12 +90,13 @@ export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpe
     [annVer],
   );
 
+  // Live counts (the hub, 2026-11-10): "23 notes", "118 marked passages"; "None yet" while a tile is empty.
   const TILES = [
-    { id: 'notes', title: 'Notes', line: counted(noteCount, 'note', 'notes') || 'Your notes on passages', onClick: onOpenNotes },
-    { id: 'highlights', title: 'Highlights', line: counted(highlightCount, 'marked passage', 'marked passages') || 'Passages you marked', onClick: onOpenHighlights },
-    { id: 'bookmarks', title: 'Bookmarks', line: counted(bookmarkCount, 'place', 'places') || 'Places to come back to', onClick: onOpenBookmarks },
-    { id: 'journal', title: 'Journal', line: counted(journalCount, 'entry', 'entries') || 'Your dated reflections', onClick: onOpenJournal },
-    { id: 'links', title: 'Links', line: counted(linkCount, 'link', 'links') || 'Passages you joined together', onClick: onOpenLinks },
+    { id: 'notes', title: 'Notes', line: counted(noteCount, 'note', 'notes') || 'None yet', onClick: onOpenNotes },
+    { id: 'highlights', title: 'Highlights', line: counted(highlightCount, 'marked passage', 'marked passages') || 'None yet', onClick: onOpenHighlights },
+    { id: 'bookmarks', title: 'Bookmarks', line: counted(bookmarkCount, 'place', 'places') || 'None yet', onClick: onOpenBookmarks },
+    { id: 'journal', title: 'Journal', line: counted(journalCount, 'entry', 'entries') || 'None yet', onClick: onOpenJournal },
+    { id: 'links', title: 'Links', line: counted(linkCount, 'link', 'links') || 'None yet', onClick: onOpenLinks },
   ];
 
   const recent = historyEnabled !== false && Array.isArray(history)

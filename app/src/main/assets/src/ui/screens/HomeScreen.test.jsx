@@ -50,13 +50,13 @@ const renderHome = (props = {}) => render(
 const tileTitles = () => [...document.querySelectorAll('.home-tile .root-tile-title')].map((t) => t.textContent);
 
 describe('HomeScreen — the Read root', () => {
-  it('is a root: its bar names VOTReader, has Search and the gear, and no About or Back', () => {
+  it('is a root: its bar names VOTReader and has the gear, and no Search icon (the field is under it), About or Back', () => {
     setupGlobals();
     const onSettings = vi.fn();
     renderHome({ onSettings });
     expect(screen.getByTestId('screen-layout').getAttribute('data-root')).toBe('1');
     expect(screen.getByRole('heading', { level: 1, name: 'VOTReader' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(onSettings).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: /About/ })).toBeNull();

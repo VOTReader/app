@@ -3598,6 +3598,29 @@
     .tabbar-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; border-radius: 10px; }
     @media (hover:hover) { .tabbar-tab:hover { color: var(--gold); } }
 
+    /* ── ONE TOP-BAR RULE (the three tabs, 2026-11-10). Every screen with the bar (body.nav-tabbed, TabBar.jsx):
+       Back where there is one, Search, Tabs, the Settings gear; no Home icon (the bar is the way home), no ⋯ menu,
+       no resume marker, no History or theme icon. Readers (no bar): Back, Home, Search, the bookmark, Tabs and the
+       ⋯ menu of page options. The gear is shown whatever the old gear switch says, and sits after Tabs. ── */
+    body.nav-tabbed .top-nav :is(.nav-more-btn, .reading-dot-nav, .nav-theme-btn, .nav-search-btn[title="Home"], .nav-search-btn[title="History"]) { display: none; }
+    body.nav-tabbed .top-nav :is(.settings-gear-btn, .root-gear-btn) { display: flex; order: 2; }
+    body.nav-tabbed .top-nav .tabs-hint-wrap, body.nav-tabbed .top-nav .tabs-nav-btn { order: 1; }
+    body.nav-tabbed .top-nav .nav-home { margin-right: auto; }
+    body.nav-tabbed .top-nav .nav-home ~ .nav-home { margin-right: 0; }
+
+    /* ── Wide screens (1024 css px and up): the three tabs are a left rail, and every page moves right of it. ── */
+    @media (min-width: 1024px) {
+      body.tabbar-on { --tabbar-rail: 96px; --dock-tabbar: 0px; --dock-floor: max(1.4rem, calc(var(--dock-sys) + 0.4rem)); }
+      body.tabbar-on .tabbar {
+        top: 0; bottom: 0; right: auto; width: var(--tabbar-rail); height: auto;
+        grid-template-columns: 1fr; grid-auto-rows: 84px; align-content: start;
+        padding: calc(var(--dock-nav-bottom) + 12px) 0 var(--dock-sys);
+        border-top: 0; border-right: 1px solid var(--border);
+      }
+      body.tabbar-on .screen-layout { padding-left: var(--tabbar-rail); box-sizing: border-box; }
+      body.tabbar-on .audio-bar { left: calc(var(--tabbar-rail) + 8px); bottom: 0; padding-bottom: calc(var(--dock-sys) + min(0.5rem, 8px)); border-bottom: 0; border-radius: 14px 14px 0 0; }
+    }
+
     /* ── A root's top bar (RootNav.jsx): the place's name, Search, Tabs, the gear. ── */
     .top-nav.top-nav-root { padding-left: 16px; }
     .root-title { flex: 1; min-width: 0; margin: 0; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fsc-20); font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3625,6 +3648,7 @@
     .root-tile-eyebrow { margin-bottom: 6px; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; }
     .root-tile-title { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-16); line-height: 1.25; letter-spacing: 0.02em; overflow-wrap: break-word; max-width: 100%; }
     .root-tile-detail { margin-top: auto; padding-top: 6px; color: var(--cream-muted); font-size: var(--fs-14); font-style: italic; line-height: 1.3; }
+    .home-tile .root-tile-detail { margin-top: 4px; padding-top: 0; }
     .lib-tiles .root-tile { min-height: 76px; }
     .lib-tiles .root-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
     @media (hover:hover) { .root-tile:hover, .root-explore-btn:hover, .root-row:hover { border-color: var(--gold); } }

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { settingsGlance, daysAgo } from '../../utils/settings-glance.js';
+import { letterVoiceOptions } from './AudioLibraryScreen.jsx';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell, networkType } from '../../utils/download-gate.js';
@@ -191,7 +192,7 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
   );
 }
 
-/* NavChip — compact pill toggle for the Top-Nav Buttons group. */
+/* NavChip — compact pill toggle for the Top bar group. */
 function NavChip({ label, checked, onToggle, disabled = false }) {
   return (
     <label className={"settings-chip" + (disabled ? " settings-row-disabled" : "")}>
@@ -209,34 +210,6 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
   );
 }
 
-/* TopBarStyleRow — Top-Nav Buttons' Compact | Icons choice (A09.5): a two-option radio group over the one
-   settings.compactTopBar switch. Picking the other option flips it; arrows move between the two, as radios do. */
-function TopBarStyleRow({ compact, onToggle }) {
-  const labelId = 'settings-topbar-style';
-  const pick = (/** @type {boolean} */ wantCompact) => { if (wantCompact !== compact) onToggle(); };
-  /** @param {any} e */
-  const onKey = (e) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-    e.preventDefault();
-    pick(!compact);
-    const other = e.currentTarget.querySelector('[aria-checked="false"]');
-    if (other) other.focus();
-  };
-  return (
-    <div className="settings-row">
-      <div className="settings-row-head">
-        <span className="settings-row-label" id={labelId}>Top Bar</span>
-      </div>
-      <div className="settings-seg" role="radiogroup" aria-labelledby={labelId} onKeyDown={onKey}>
-        <button type="button" role="radio" aria-checked={compact} tabIndex={compact ? 0 : -1} onClick={() => pick(true)}>Compact</button>
-        <button type="button" role="radio" aria-checked={!compact} tabIndex={compact ? -1 : 0} onClick={() => pick(false)}>Icons</button>
-      </div>
-      <div className="settings-row-desc settings-seg-desc">{compact
-        ? 'Settings, History and the light/dark switch move into the ⋯ menu at the end of the bar, with Text size beside them; Back, Home, Search, Bookmark and Tabs stay.'
-        : 'Every icon sits in the bar; choose which below.'}</div>
-    </div>
-  );
-}
 
 /* SettingsGroup — collapsible section shell (Settings redesign 2026-07-31).
    Every section is an accordion group: a tappable folio header (icon, Cinzel
@@ -697,7 +670,7 @@ const SETTINGS_TOPICS = {
   reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate skip seconds read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
-  topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
+  topnav: 'top bar nav buttons icons bookmark',
   features: 'search synonyms synonym filter stop words tabs history',
   share: 'copy share sharing link links website app highlight passage words thevolumesoftruth',
   garden: 'a return to the garden image quality pictures',
@@ -799,18 +772,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     take();
     window.addEventListener(OPEN_YOUR_DATA_EVENT, take);
     return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, take);
-  }, []);
-  // The layout pass (2026-11-10): a row elsewhere that IS a setting (the Listen tab's Letter voice) opens Settings
-  // with its group open and in view, through the navHandoff slot 'settingsGroup'.
-  React.useEffect(() => {
-    const hand = /** @type {any} */ (window).navHandoff;
-    const id = hand ? hand.take('settingsGroup') : null;
-    if (!id || !Object.prototype.hasOwnProperty.call(SETTINGS_TOPICS, id)) return;
-    setOpenGroups((prev) => (prev.has(id) ? prev : new Set([...prev, id])));
-    setTimeout(() => {
-      const el = document.querySelector('[data-settings-group="' + id + '"]');
-      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
-    }, 0);
   }, []);
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
@@ -1183,7 +1144,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           <div className="settings-card">
             <SettingsRow
               label="Light Theme"
-              desc="Switch between the dark (default) and light reading themes. Also in the top bar: the ⋯ menu with the compact bar (the default), or the sun/moon icon without it (Top-Nav Buttons)."
+              desc="Switch between the dark (default) and light reading themes. Also in a reading page's ⋯ menu."
               checked={theme === "light"}
               onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
             />
@@ -1407,15 +1368,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               label="Letter Voice"
               desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader plays every letter that reader has recorded in their voice, including the letters that play next. Letters they have not recorded play the primary reading. You can always switch voice for the recording that is playing from the listening desk."
               value={settings.letterReader || "auto"}
-              options={[
-                { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },
-                /* Registry source of truth: utils/audio-track.js (AUDIO_READERS,
-                   published as a global for this classic-globals screen), in
-                   the app's reader rank. */
-                ...Object.entries(/** @type {any} */ (globalThis).AUDIO_READERS || {}).map(([id, label]) => ({
-                  id, label: String(label), desc: 'Prefer this reading wherever it exists',
-                })),
-              ]}
+              /* One list with the Listen tab's Letter voice row (AudioLibraryScreen letterVoiceOptions: Automatic, then
+                 utils/audio-track.js AUDIO_READERS in the app's reader rank). */
+              options={letterVoiceOptions()}
               onChange={(v) => onSetting("letterReader", v)}
             />
             {/* Default Speed reads and writes the LISTENING LIBRARY, not a
@@ -1523,30 +1478,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Top-Nav Buttons" sub={glance.topnav} {...groupProps('topnav')}>
+        {/* The three tabs (2026-11-10): one top bar for every screen (app.css, ONE TOP-BAR RULE), so the
+            Compact | Icons choice and the gear, History and theme chips changed nothing and left; their stored keys
+            stay. The one optional icon left is a reading page's bookmark. */}
+        <SettingsGroup label="Top bar" sub={glance.topnav} {...groupProps('topnav')}>
           <div className="settings-card">
-            {/* The compact bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx). While
-                it is on, the three icons it moves live in the ⋯ menu, so their chips unmount
-                (the dependent-rows-unmount discipline) and only Bookmark is left to choose. */}
-            {/* A09.5 (mockup B-topbar A, 2026-10-23): one Compact | Icons choice in place of the switch with chips
-                nested under it; the same settings.compactTopBar key, and the chips below stay the icon picker. */}
-            <TopBarStyleRow compact={settings.compactTopBar !== false} onToggle={() => onToggle("compactTopBar")} />
-            <div className="settings-chip-note">{settings.compactTopBar !== false
-              ? "Which optional icon appears in the bar beside Search."
-              : "Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px."}</div>
+            <div className="settings-chip-note">On a reading page, the bookmark icon beside Search.</div>
             <div className="settings-chips">
-              {settings.compactTopBar === false && (
-                <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
-              )}
-              {/* Hidden (not greyed) while History itself is off — the chip
-                  returns with the feature (Search, Tabs & History group). */}
-              {settings.compactTopBar === false && settings.historyEnabled !== false && (
-                <NavChip label="History" checked={!!settings.historyInNav} onToggle={() => onToggle("historyInNav")} />
-              )}
               <NavChip label="Bookmark" checked={settings.showBookmarkNav !== false} onToggle={() => onToggle("showBookmarkNav")} />
-              {settings.compactTopBar === false && (
-                <NavChip label="Theme" checked={settings.showThemeBtn !== false} onToggle={() => onToggle("showThemeBtn")} />
-              )}
             </div>
           </div>
         </SettingsGroup>

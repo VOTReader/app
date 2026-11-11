@@ -226,10 +226,12 @@ async function auditPhoneTapTargets(page) {
   };
   const goHome = async () => {
     for (let i = 0; i < 5; i++) {
-      const home = await page.evaluate(() => !!document.querySelector('.home-shortcuts'));
+      const home = await page.evaluate(() => !!document.querySelector('.home-shortcuts, .home-root'));
       if (home) return;
       await page.evaluate(() => {
-        const b = document.querySelector('button[title="Home"]') ||
+        // The three tabs (2026-11-10): the Read tab is the way home wherever the bar shows; readers keep Home.
+        const tab = Array.from(document.querySelectorAll('.tabbar-tab')).find((x) => (x.textContent || '').trim() === 'Read');
+        const b = tab || document.querySelector('button[title="Home"]') ||
           Array.from(document.querySelectorAll('button')).find((x) => /back/i.test(x.getAttribute('aria-label') || ''));
         if (b) b.click(); else history.back();
       });
@@ -261,7 +263,7 @@ async function auditPhoneTapTargets(page) {
   if (!letter.probed) throw new Error('tap-target walk: probed nothing on the letter');
 
   await goHome();
-  await clickText(/^Search library/);
+  await clickText(/^Search (library|the letters and the Bible)/);
   const typed = await page.evaluate(() => {
     const box = document.querySelector('input[type="search"], .srch-input, input');
     if (!box) return false;

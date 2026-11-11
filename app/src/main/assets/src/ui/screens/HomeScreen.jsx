@@ -2,7 +2,7 @@
    HomeScreen — the READ tab's root (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
    The layout pass (2026-11-10, mock read.png): the top bar (VOTReader,
-   Search, Tabs, the Settings gear; RootNav.jsx), a search field, the up-next
+   Tabs, the Settings gear; RootNav.jsx; the search field is under it), a search field, the up-next
    card (today's plan rows and Continue; TodayCard.jsx), "Read" with four
    tiles in a 2 x 2 grid and "Explore" with Scripture Web and Surprise me.
    Listening, Songs, the Library, Settings and History left Home for their
@@ -158,7 +158,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   };
 
   return (
-    <ScreenLayout root navChildren={rootNavStart({ title: 'VOTReader', onSearch: searchEnabled !== false ? onSearch : undefined })}
+    // No Search icon in Read's bar: the search field is right under it (the hub, 2026-11-10).
+    <ScreenLayout root navChildren={rootNavStart({ title: 'VOTReader' })}
       navEnd={<RootGear onSettings={onSettings} />}>
       <div className="root-screen home-root">
         {searchEnabled !== false ? (

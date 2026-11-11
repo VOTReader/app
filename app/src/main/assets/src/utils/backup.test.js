@@ -1649,7 +1649,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(old.showSurpriseButton).toBe(false);
     const booted = boot(old);
     expect(booted.showSurpriseButton).toBe(true);
-    expect(booted.showReadingDot).toBe(true);
+    expect(booted.showReadingDot).toBe(false);   // stored, so kept: the marker left round 1 with the three tabs (2026-11-10)
     expect(booted.defaultsRev).toBe(2);   // every round since (round 2: share-fn)
     expect(booted.translation).toBe('kjv');
 
