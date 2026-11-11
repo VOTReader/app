@@ -243,14 +243,14 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     act(() => { vi.advanceTimersByTime(2000); });    // ~2s recorded
     const atPause = timeText();
 
-    fireEvent.click(screen.getByLabelText('Pause'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(screen.getByText('Paused')).toBeTruthy();
 
   // The bug: the tick kept firing here and the counter climbed. It must freeze.
     act(() => { vi.advanceTimersByTime(3000); });
     expect(timeText()).toBe(atPause);
 
-    fireEvent.click(screen.getByLabelText('Resume'));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
     expect(screen.getByText('Recording')).toBeTruthy();
 
   // Resumed → the counter advances again (past the pre-pause value), and the
@@ -271,7 +271,7 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     expect(MockBridge.nativeRecordPause).not.toHaveBeenCalled();   // the phone paused it already
     act(() => { vi.advanceTimersByTime(3000); });
     expect(timeText()).toBe(atPause);
-    fireEvent.click(screen.getByLabelText('Resume'));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
     expect(MockBridge.nativeRecordResume).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Recording')).toBeTruthy();
   });
@@ -286,7 +286,7 @@ describe('JournalRecordingSheet audio-session lifecycle', () => {
 
   it('acquires the web audio session before capture and releases it on Finish', () => {
     render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
-    expect(screen.getByRole('dialog', { name: 'Voice Recording' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Voice recording' })).toBeTruthy();
     act(() => { vi.advanceTimersByTime(10); });
 
     expect(MockBridge.startAudioSession).toHaveBeenCalledTimes(1);
@@ -294,7 +294,7 @@ describe('JournalRecordingSheet audio-session lifecycle', () => {
     expect(MockBridge.startAudioSession.mock.invocationCallOrder[0])
     .toBeLessThan(MockBridge.nativeRecordStart.mock.invocationCallOrder[0]);
 
-    fireEvent.click(screen.getByLabelText('Finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     expect(MockBridge.endAudioSession).toHaveBeenCalledTimes(1);
   });
 
@@ -792,7 +792,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     const utils = render(<EditorHost />);
     act(() => { vi.advanceTimersByTime(10); });
     act(() => { vi.advanceTimersByTime(1300); });
-    fireEvent.click(screen.getByLabelText('Finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await act(async () => {
       window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
       await vi.advanceTimersByTimeAsync(100);
@@ -833,7 +833,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     render(<EditorHost />);
     act(() => { vi.advanceTimersByTime(10); });
     act(() => { vi.advanceTimersByTime(1300); });
-    fireEvent.click(screen.getByLabelText('Finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await act(async () => {
       window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
       await vi.advanceTimersByTimeAsync(100);
@@ -858,7 +858,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     render(<EditorHost />);
     act(() => { vi.advanceTimersByTime(10); });
     act(() => { vi.advanceTimersByTime(1300); });
-    fireEvent.click(screen.getByLabelText('Finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await act(async () => {
       window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
       await vi.advanceTimersByTimeAsync(10000);
@@ -890,7 +890,7 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     render(<EditorHost />);
     act(() => { vi.advanceTimersByTime(10); });
     act(() => { vi.advanceTimersByTime(1300); });
-    fireEvent.click(screen.getByLabelText('Finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await act(async () => {
       window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
       await vi.advanceTimersByTimeAsync(10000);

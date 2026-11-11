@@ -62,20 +62,21 @@ export function RootGear({ onSettings }) {
    two are drawn and the rest dropped, loudly in development. */
 export const UTILITY_MAX_ACTIONS = 2;
 
-/** @param {{ title: string, onBack?: () => void, backLabel?: string, actions?: any[] }} props */
-export function utilityNav({ title, onBack, backLabel = 'Back', actions = [] }) {
+/** `lead` (a worded action such as the journal editor's Done) takes Back's place.
+ * @param {{ title: string, onBack?: () => void, backLabel?: string, actions?: any[], lead?: any }} props */
+export function utilityNav({ title, onBack, backLabel = 'Back', actions = [], lead = null }) {
   const list = (Array.isArray(actions) ? actions : [actions]).filter(Boolean);
   if (list.length > UTILITY_MAX_ACTIONS && typeof console !== 'undefined') {
     console.warn('[utility bar] ' + title + ': ' + list.length + ' actions, the bar holds ' + UTILITY_MAX_ACTIONS);
   }
   return (
     <>
-      {onBack ? (
+      {lead ? lead : onBack ? (
         <button type="button" className="nav-home nav-back-icon bar-back" onClick={onBack} title={backLabel} aria-label={backLabel}>
           <UiIcon name="back" />
         </button>
       ) : null}
-      <h1 className="bar-title">{title}</h1>
+      {title ? <h1 className="bar-title">{title}</h1> : <span className="bar-title" aria-hidden="true" />}
       {list.slice(0, UTILITY_MAX_ACTIONS).map((a, i) => <React.Fragment key={i}>{a}</React.Fragment>)}
     </>
   );

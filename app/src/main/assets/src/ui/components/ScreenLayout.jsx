@@ -44,7 +44,7 @@ function applySavedScrollToEl(el, saved) {
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
  *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
  *   className?: string, root?: boolean, navEnd?: any,
- *   utility?: { title: string, onBack?: () => void, backLabel?: string, actions?: any[], menu?: any } }} props
+ *   utility?: { title: string, onBack?: () => void, backLabel?: string, actions?: any[], menu?: any, lead?: any } }} props
  *   className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2).
  *   root: one of the three tab roots (Read, Listen, Library; the layout pass 2026-11-10): no resume dot and no ⋯ menu
  *   (its items live in the Library and Settings); `navEnd` is drawn after Tabs instead (the Settings gear, RootNav.jsx).

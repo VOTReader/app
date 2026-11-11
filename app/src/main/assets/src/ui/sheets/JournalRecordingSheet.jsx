@@ -878,16 +878,16 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         <div>
           <div className="jrn-rec-error">{error || 'Recording failed.'}</div>
           <div className="jrn-rec-actions">
-            <button className="jrn-rec-cancel" onClick={discard}>Close</button>
+            <button type="button" className="ui-btn jrn-rec-cancel" onClick={discard}>Close</button>
             {micDeniedRef.current && (
               <button
-                className="jrn-rec-confirm-btn"
+                className="ui-btn is-primary jrn-rec-confirm-btn"
                 onClick={function() { micDeniedRef.current = false; setError(''); setStage('requesting'); setAttempt(function(n) { return n + 1; }); }}
               >Try again</button>
             )}
             {!micDeniedRef.current && retryFetchRef.current && (
               <button
-                className="jrn-rec-confirm-btn"
+                className="ui-btn is-primary jrn-rec-confirm-btn"
                 onClick={function() { setError(''); setStage('retrieving'); retryFetchRef.current(); }}
               >Try again</button>
             )}
@@ -901,7 +901,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         <div className="jrn-rec-content">
           <div className="jrn-rec-requesting" role="status">Getting your recording…</div>
           <div className="jrn-rec-actions">
-            <button className="jrn-rec-cancel" onClick={discard}>Close</button>
+            <button type="button" className="ui-btn jrn-rec-cancel" onClick={discard}>Close</button>
           </div>
         </div>
       );
@@ -911,7 +911,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         <div className="jrn-rec-content">
           <div className="jrn-rec-requesting" role="status">Requesting microphone access…</div>
           <div className="jrn-rec-actions">
-            <button className="jrn-rec-cancel" onClick={discard}>Cancel</button>
+            <button type="button" className="ui-btn jrn-rec-cancel" onClick={discard}>Cancel</button>
           </div>
         </div>
       );
@@ -923,6 +923,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           <div className={"jrn-rec-status" + (isPaused ? ' is-paused' : '')} role="status" aria-live="polite">{isPaused ? 'Paused' : 'Recording'}</div>
           <div className="jrn-rec-time">{fmtTime(seconds)}</div>
           {renderRecordingWave(waveLive)}
+          <div className="jrn-rec-cap">{'Stops by itself at ' + Math.round(MAX_RECORDING_SECONDS / 60) + ' minutes'}</div>
           {confirmingDiscard ? (
             <ConfirmStrip
               className="jrn-rec-discard-confirm"
@@ -933,25 +934,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             />
           ) : (
           <div className="jrn-rec-actions">
-            <button className="jrn-rec-cancel" onClick={requestDiscard} aria-label="Cancel">Cancel</button>
+            {/* mock v2 l-jrec: three worded buttons, Finish the one gold fill */}
+            <button type="button" className="ui-btn jrn-rec-cancel" onClick={requestDiscard}>Cancel</button>
             {isPaused ? (
-              <button className="jrn-rec-pause-btn" onClick={resumeRecording} aria-label="Resume" title="Resume">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 3v18l16-9z" />
-                </svg>
-              </button>
+              <button type="button" className="ui-btn jrn-rec-pause-btn" onClick={resumeRecording}><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z" /></svg>Resume</button>
             ) : (
-              <button className="jrn-rec-pause-btn" onClick={pauseRecording} aria-label="Pause" title="Pause">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-                </svg>
-              </button>
+              <button type="button" className="ui-btn jrn-rec-pause-btn" onClick={pauseRecording}><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg>Pause</button>
             )}
-            <button className="jrn-rec-stop-btn" onClick={stopRecording} aria-label="Finish" title="Finish">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <rect x={6} y={6} width={12} height={12} rx={2} />
-              </svg>
-            </button>
+            <button type="button" className="ui-btn is-primary jrn-rec-stop-btn" onClick={stopRecording}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>Finish</button>
           </div>
           )}
         </div>
@@ -985,12 +975,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           />
         ) : (
         <div className="jrn-rec-actions jrn-rec-review-actions">
-          <button className="jrn-rec-discard-btn" onClick={requestDiscard} aria-label="Discard" title="Discard">×</button>
-          <button className="jrn-rec-confirm-btn" onClick={save} aria-label="Save" title="Save">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </button>
+          <button type="button" className="ui-btn jrn-rec-discard-btn" onClick={requestDiscard}>Discard</button>
+          <button type="button" className="ui-btn is-primary jrn-rec-confirm-btn" onClick={save}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>Save</button>
         </div>
         )}
         {previewUrlRef.current && (
@@ -1012,10 +998,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) requestDiscard(); }}>
       <div className="note-sheet jrn-rec-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-recording-title" onClick={function(e) { e.stopPropagation(); }}>
         <div className="note-sheet-header">
-          <span className="note-sheet-title" id="journal-recording-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
-          {stage !== 'preview' && (
-            <button className="note-sheet-menu-btn" onClick={requestDiscard} aria-label="Close" style={{ fontSize: 'var(--fsc-18)' }}>×</button>
-          )}
+          <span className="note-sheet-title" id="journal-recording-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review recording' : 'Voice recording'}</span>
         </div>
         {renderContent()}
       </div>

@@ -16,6 +16,10 @@
    failing (refuter r1). Until then a draft goes only when the quota leaves no room,
    oldest first, the entry on screen last. */
 import { pickupBuzz } from '../../utils/press-drag.js';
+import { BarTextAction, BarMenu } from '../components/RootNav.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { openJournalLinkPicker } from '../../utils/journal-link-picker.js';
 
 var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
 /** After 'Not saved', how often and how long the chip looks for the store's own retry (its schedule ends by ~2 min). */
@@ -216,6 +220,8 @@ export function JournalEditorScreen(props) {
 
   var _showInsert = useState(false);
   var showInsert = _showInsert[0]; var setShowInsert = _showInsert[1];
+  var _showEntryMenu = useState(false);   // the bar's ⋯ (mock v2 l-jedit)
+  var showEntryMenu = _showEntryMenu[0]; var setShowEntryMenu = _showEntryMenu[1];
 
   var _showRec = useState(false);
   var showRec = _showRec[0]; var setShowRec = _showRec[1];
@@ -1435,24 +1441,20 @@ export function JournalEditorScreen(props) {
   // drag's rect capture never reads a dead node. Ref callbacks repopulate.
   blockRefs.current.length = blocks.length;
 
-  // ─── Nav (back left; saved indicator + right cluster) ───────
-  // Standard app-wide Library nav. Editor specifics preserved: "Done"
-  // back label, commitSave() before every navigation, and the "Saved"
-  // status chip as a leftExtra (stays on the left, next to Home). The
-  // textareas also commit on blur, so the bare HomeBtn is data-safe.
-  var navChildren = LibraryNav({
-    onBack: function() { commitSave(); onBack && onBack(); },
-    backTitle: 'Done',
-    leftExtras: <span className="jrn-saved-ind">{savedLabel}</span>,
-    onSearch: props.onSearch ? function() { commitSave(); props.onSearch(); } : undefined,
-    onHistory: props.onHistory ? function() { commitSave(); props.onHistory(); } : undefined,
-    onSettings: props.onSettings ? function() { commitSave(); props.onSettings(); } : undefined,
-    theme: props.theme,
-    onThemeChange: props.onThemeChange
-  });
+  // ─── The bar (mock v2 l-jedit) ──────────────────────────────
+  // Done where Back sits (commitSave() first, as before), then the Saved chip, then the
+  // entry's own menu when the entry is stored (Pin to the top / Unpin). No gear, no app-wide
+  // menu (rule 11): Search, History and Settings left the bar with LibraryNav.
+  var storedEntry = entryId && typeof JournalStore !== 'undefined' ? JournalStore.get(entryId) : null;
+  var utility = {
+    title: '',
+    lead: <BarTextAction label="Done" onClick={function() { commitSave(); onBack && onBack(); }} />,
+    actions: [<span key="saved" className="jrn-saved-ind" role="status">{savedLabel}</span>],
+    menu: storedEntry ? <BarMenu label="Entry options" expanded={showEntryMenu} onClick={function() { setShowEntryMenu(true); }} /> : null
+  };
 
   return (
-    <ScreenLayout navChildren={navChildren}>
+    <ScreenLayout utility={utility}>
       <div className="jrn-editor">
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChosen} />
         <div className="jrn-editor-meta">
@@ -1479,18 +1481,19 @@ export function JournalEditorScreen(props) {
           {blocks.map(function(b, idx) { return renderEditableBlock(b, idx); })}
         </div>
       </div>
-      {/* Single + FAB. Voice recording is reached via + → Voice Recording
-          (the standalone mic FAB was removed per user direction). */}
+      {/* mock v2 l-jedit: Insert and the three quick picks along the bottom (the + FAB is gone). */}
       {!showRec && (
-        <button
-          className="jrn-fab jrn-fab-plus"
-          onClick={openInsertSheet}
-          title="Insert" aria-label="Insert"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
+        <div className="jrn-ebar" role="toolbar" aria-label="Add to the entry">
+          <button type="button" className="ui-btn is-primary is-small jrn-ebar-insert" onClick={openInsertSheet}><UiIcon name="plus" size="sm" />Insert</button>
+          <button type="button" className="ui-btn is-small" onClick={handleInsertImage}><UiIcon name="img" size="sm" />Photo</button>
+          <button type="button" className="ui-btn is-small" onClick={handleInsertAudio}><UiIcon name="mic" size="sm" />Voice</button>
+          <button type="button" className="ui-btn is-small" onClick={function() { openJournalLinkPicker('excerpt', handleBlockInsert); }}><UiIcon name="quote" size="sm" />Excerpt</button>
+        </div>
+      )}
+      {showEntryMenu && storedEntry && (
+        <ActionSheet open onClose={function() { setShowEntryMenu(false); }} title={title || 'Untitled'}
+          actions={[{ id: 'pin', icon: 'pin', label: storedEntry.pinned ? 'Unpin' : 'Pin to the top',
+            onSelect: function() { setShowEntryMenu(false); JournalStore.togglePin(entryId); } }]} />
       )}
       {showInsert && (
         <JournalInsertSheet

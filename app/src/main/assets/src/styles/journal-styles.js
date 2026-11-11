@@ -61,13 +61,8 @@
   // Editor screen — single body surface, title-only header, no inline + icons
   R('.jrn-editor { display: flex; flex-direction: column; flex: 1; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }');
   R('.jrn-editor-meta { padding: 18px 22px 4px 44px; }');
-  R('.jrn-editor-title { width: 100%; background: none; border: none; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-20); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; outline: none; padding: 0; }');
-  R('body.light .jrn-editor-title { color: #8b6f30; }');
-  R('.jrn-editor-title::placeholder { color: var(--gold-dim); opacity: 0.6; font-style: italic; text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
-  R('.jrn-saved-ind { font-style: italic; color: var(--gold-dim); font-family: var(--font-garamond); font-size: var(--fs-12); text-transform: none; letter-spacing: 0; padding: 0 8px; }');
   // Entry date under the editor title — same quiet eyebrow the viewer shows,
   // so the editor reads as the same document, not a different place.
-  R('.jrn-editor-date { font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }');
   R('.jrn-blocks { padding: 6px 18px 24px; display: flex; flex-direction: column; gap: 0; }');
   R('.jrn-body-surface { min-height: 65vh; cursor: text; }');
   R('.jrn-block { position: relative; padding: 0; }');
@@ -211,9 +206,6 @@
   // Viewer
   R('.jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }');
   R('.jrn-viewer-meta { padding: 22px 22px 12px; }');
-  R('.jrn-viewer-title { font-family: var(--font-cinzel); font-size: var(--fs-24); font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }');
-  R('.jrn-viewer-title.untitled { font-style: italic; color: var(--gold-dim); text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
-  R('.jrn-viewer-date { font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }');
   R('.jrn-viewer-blocks { padding: 8px 22px 100px; display: flex; flex-direction: column; gap: 12px; }');
   R('.jrn-viewer-blocks .jrn-p { font-family: var(--font-garamond); font-size: var(--fs-16); line-height: 1.7; color: var(--cream-dim); margin: 4px 0; }');
   R('body.light .jrn-viewer-blocks .jrn-p { color: #3a3528; }');
@@ -248,24 +240,7 @@
   // that LOOKS tappable but does nothing is the exact confusion the shared
   // SheetHandle module was built to kill; this sheet's real header already
   // carries ‹ back and × close buttons, so the fake bar just went away.)
-  R('.jrn-insert-section { padding: 12px 18px 4px; }');
-  R('.jrn-insert-section + .jrn-insert-section { border-top: 1px solid var(--gold-border); }');
-  R('.jrn-insert-section h4 { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); opacity: 0.72; margin: 0 0 8px; }');
   R('.jrn-insert-list { display: flex; flex-direction: column; gap: 1px; }');
-  R('.jrn-insert-item { display: flex; align-items: center; gap: 14px; padding: 11px 10px; border-radius: 10px; cursor: pointer; transition: background 0.12s; background: none; border: none; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover { background: var(--bg3); } body.light .jrn-insert-item:hover { background: #f3ecdc; } }');
-  R('.jrn-insert-item:active { background: var(--bg2); }');
-  R('body.light .jrn-insert-item:active { background: #ece2cc; }');
-  R('.jrn-insert-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--gold-faint); border: 1px solid var(--gold-border); display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0; font-family: var(--font-cinzel); font-size: var(--fs-13); transition: background 0.12s, border-color 0.12s, transform 0.1s; }');
-  R('.jrn-insert-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.75; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-icon { background: var(--gold-border); border-color: var(--gold); } }');
-  R('.jrn-insert-item:active .jrn-insert-icon { transform: scale(0.93); }');
-  R('.jrn-insert-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }');
-  R('.jrn-insert-label { font-family: var(--font-garamond); font-size: var(--fs-16); color: var(--cream); }');
-  R('body.light .jrn-insert-label { color: #2a2520; }');
-  R('.jrn-insert-desc { font-family: var(--font-garamond); font-style: italic; font-size: var(--fs-12); color: var(--cream-dim); }');
-  R('.jrn-insert-chevron { flex-shrink: 0; margin-left: 6px; color: var(--gold-dim); font-size: var(--fs-20); line-height: 1; font-family: var(--font-cinzel); transition: transform 0.12s, color 0.12s; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-chevron { color: var(--gold); transform: translateX(2px); } }');
 
   // Library / Note / Journal pickers (sheet shell + LinkPicker-style search)
   R('.jrn-picker-search-row { padding: 8px 14px 6px; }');
@@ -329,13 +304,8 @@
   // divider blocks (which have no inner embed border of their own) get the same
   // outline the card / image / audio blocks already carry, so the editor is
   // visually uniform — one gold-bordered box per block.
-  R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 8px 12px; transition: border-color 0.15s; }');
-  R('body.light .jrn-block-edit .jrn-grow-p, body.light .jrn-block-edit .jrn-grow-h2 { background: #f3ecdc; }');
-  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { border-color: var(--gold); }');
   R('.jrn-block-edit .jrn-block-quote { border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 8px; background: var(--bg3); padding: 10px 14px 10px 15px; }');
   R('body.light .jrn-block-edit .jrn-block-quote { background: #f3ecdc; }');
-  R('.jrn-block-edit .jrn-divider { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 12px 0; margin: 0; }');
-  R('body.light .jrn-block-edit .jrn-divider { background: #f3ecdc; }');
   // Drag-to-reorder grip — lives in a left gutter (the editor's .jrn-blocks
   // gets padding-left:44px below), the opposite corner from the delete x —
   // the same grab-left / destroy-right separation the tab cards use.
@@ -383,62 +353,34 @@
   // Recording sheet
   R('.jrn-rec-content { padding: 24px 24px 30px; text-align: center; }');
   R('.jrn-rec-requesting { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-14); padding: 20px 0; }');
-  R('.jrn-rec-status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.12em; color: #d05a4a; }');
-  R('.jrn-rec-status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #d05a4a; animation: jrnPulseRec 1s ease-in-out infinite; }');
   R('.jrn-rec-status.is-paused { color: var(--gold-dim); }');
   R('.jrn-rec-status.is-paused::before { background: var(--gold-dim); animation: none; }');
   R('@keyframes jrnPulseRec { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }');
-  R('.jrn-rec-time { font-family: var(--font-cinzel); font-size: var(--fs-36); font-weight: 500; color: var(--cream); letter-spacing: 0.05em; margin: 16px 0; }');
-  R('body.light .jrn-rec-time { color: #2a2520; }');
   R('.jrn-rec-time-total { color: var(--gold-dim); font-size: var(--fs-20); font-weight: 400; }');
-  R('.jrn-rec-waveform { display: flex; align-items: center; justify-content: center; height: 56px; gap: 3px; margin: 12px 0; }');
-  R('.jrn-rec-waveform .bar { width: 3px; background: var(--gold-dim); border-radius: 1px; transition: height 0.15s, background 0.1s; min-height: 4px; }');
   R('.jrn-rec-waveform .bar.is-played { background: var(--gold); }');
   R('.jrn-rec-waveform.is-scrubbable { cursor: pointer; padding: 0 6px; }');
-  R('.jrn-rec-error { font-family: var(--font-garamond); font-style: italic; color: #d05a4a; font-size: var(--fs-14); padding: 14px 24px; }');
   R('.jrn-rec-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; align-items: center; }');
-  // Review row holds ONLY the destructive × and the Save ✓ — give the pair a
-  // wider gutter than the generic action row so a Save tap can't graze Discard.
-  R('.jrn-rec-review-actions { gap: 34px; }');
   // Discard confirm — warm-red banner in place of the action row (same
   // ConfirmStrip skin the block-delete confirm uses).
   R('.jrn-rec-discard-confirm { margin-top: 24px; padding: 10px 12px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
   R('.jrn-rec-discard-confirm .ann-chip-confirm-q { color: #c75c4a; }');
-  // Pill-style legacy buttons (cancel + close + error close)
-  R('.jrn-rec-cancel { background: none; padding: 10px 24px; border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; border: 1px solid var(--gold-dim); color: var(--gold-dim); }');
-  R('.jrn-rec-cancel:hover { color: var(--gold); border-color: var(--gold); }');
-  // Pause / resume button (round, gold outline)
-  R('.jrn-rec-pause-btn { width: 56px; height: 56px; border-radius: 50%; background: none; border: 2px solid var(--gold); color: var(--gold); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-rec-pause-btn svg { width: 22px; height: 22px; fill: currentColor; }');
-  R('.jrn-rec-pause-btn:hover { background: var(--gold-faint); }');
-  // Stop / finish button (round, red square)
-  R('.jrn-rec-stop-btn { width: 56px; height: 56px; border-radius: 50%; background: #d05a4a; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 4px 14px rgba(208, 90, 74, 0.4); }');
-  R('.jrn-rec-stop-btn svg { width: 22px; height: 22px; }');
-  R('.jrn-rec-stop-btn:hover { background: #b84a3c; }');
   // Preview play / pause (round, gold-outlined)
   R('.jrn-rec-preview-actions { display: flex; justify-content: center; margin: 4px 0 6px; }');
   R('.jrn-rec-pp { width: 64px; height: 64px; border-radius: 50%; background: var(--gold); border: none; color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 6px 18px rgba(212, 183, 114, 0.35); }');
   R('.jrn-rec-pp svg { width: 26px; height: 26px; fill: currentColor; }');
   R('.jrn-rec-pp:hover { transform: scale(1.04); }');
   // Discard (red ×) + Confirm (green ✓) in preview
-  R('.jrn-rec-discard-btn { width: 52px; height: 52px; border-radius: 50%; background: none; border: 2px solid #c75c4a; color: #c75c4a; cursor: pointer; font-size: var(--fs-24); line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-rec-discard-btn:hover { background: rgba(199, 92, 74, 0.12); }');
-  R('.jrn-rec-confirm-btn { width: 52px; height: 52px; border-radius: 50%; background: #4caf50; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 4px 14px rgba(76, 175, 80, 0.4); }');
-  R('.jrn-rec-confirm-btn svg { width: 24px; height: 24px; }');
-  R('.jrn-rec-confirm-btn:hover { background: #3e9a42; }');
   R('.jrn-rec-preview .jrn-rec-status { color: var(--gold); }');
   R('.jrn-rec-preview .jrn-rec-status::before { background: var(--gold); animation: none; }');
 
   // Floating Action Buttons
   //   .jrn-fab            — base FAB (gold filled, bottom-right by default)
-  //   .jrn-fab-plus       — editor's + insert button (bottom-right)
   R('.jrn-fab { position: fixed; bottom: calc(16px + max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); right: calc(22px + env(safe-area-inset-right)); width: 56px; height: 56px; border-radius: 50%; background: var(--gold); color: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(212, 183, 114, 0.4); z-index: 35; transition: transform 0.15s, background 0.15s, box-shadow 0.15s; padding: 0; }');
   R('.jrn-fab:hover { transform: scale(1.05); }');
   R('.jrn-fab:active { transform: scale(0.96); }');
   R('.jrn-fab svg { width: 24px; height: 24px; display: block; }');
   // W3-01 (songs walk, 2026-09-25): the mini-player (z 150, ~70 px) covered the FAB. It rides the bottom dock
   // (app.css, cz1): --dock-player is the bar plus its pull tab while one is open, --dock-sys the gesture bar.
-  R('.jrn-fab-plus { right: calc(22px + env(safe-area-inset-right)); left: auto; }');
   // "New Entry" pill — the hub's primary create action. Wider than a round
   // FAB so the label reads clearly; the "+" insert FAB lives only in the
   // editor now.
@@ -446,6 +388,43 @@
   R('.jrn-fab-newentry { width: auto; min-width: 56px; height: var(--btn-h); border-radius: var(--r-pill); padding: 0 20px 0 16px; gap: 8px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 600; color: var(--accent-ink); }');
   R('.jrn-fab-newentry svg { width: 19px; height: 19px; }');
   R('.jrn-fab-newentry-label { white-space: nowrap; }');
+
+  // ── W2c (mock v2 l-jview, l-jedit, l-jins, l-jrec) ─────────────────────────────
+  // The entry's head: the title in the reader's face, the date as a plain meta line.
+  R('.jrn-viewer-title, .jrn-editor-title { font-family: var(--font-serif); font-size: var(--ts-display); line-height: 1.2; font-weight: 600; color: var(--text-1); margin: 0; }');
+  R('.jrn-viewer-title.untitled { font-style: italic; color: var(--text-2); font-weight: 400; }');
+  R('.jrn-editor-title { width: 100%; background: none; border: none; outline: none; padding: 0; }');
+  R('.jrn-editor-title::placeholder { color: var(--text-3); font-style: italic; font-weight: 400; }');
+  R('.jrn-viewer-date, .jrn-editor-date { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin-top: var(--sp-1); }');
+  R('.jrn-editor-meta { padding: 14px 22px 4px; }');
+  R('.jrn-saved-ind { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); padding: 0 var(--sp-1); margin-left: auto; }');
+  // Writing: no boxes; the block being written sits on surface-1 (mock .blk.on).
+  R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: none; border-radius: var(--r-field); background: none; padding: 8px 10px; transition: background var(--press); }');
+  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { background: var(--surface-1); }');
+  // The bottom bar: Insert (gold) + Photo, Voice, Excerpt, above the system bar and any player.
+  R('.jrn-ebar { position: fixed; left: 0; right: 0; bottom: calc(max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); z-index: 40; display: flex; gap: var(--sp-2); padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--hairline); overflow-x: auto; }');
+  R('.jrn-ebar .ui-btn { flex: 0 0 auto; gap: 6px; }');
+  // Insert: ten tiles in four groups, one view.
+  R('.jrn-ins-groups { padding: 0 var(--sp-1) var(--sp-5); overflow-y: auto; }');
+  R('.jrn-ins-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin: 14px 2px 8px; }');
+  R('.jrn-ins-label:first-child { margin-top: 0; }');
+  R('.jrn-ins-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }');
+  R('.jrn-ins-tile { min-height: 52px; border-radius: var(--r-field); background: var(--surface-2); border: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; color: var(--text-1); text-align: left; cursor: pointer; }');
+  R('.jrn-ins-tile:active { background: var(--surface-3); }');
+  R('.jrn-ins-tile .ui-i { color: var(--accent); flex: 0 0 auto; }');
+  R('.jrn-ins-close .ui-i { width: var(--icon); height: var(--icon); }');
+  // Voice recording: the status in red, the time large, the wave, the cap, three worded buttons.
+  R('.jrn-rec-status { display: block; font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; color: var(--tone-danger); }');
+  R('.jrn-rec-time { font-family: var(--font-serif); font-size: var(--ts-display); font-weight: 600; line-height: 1.1; color: var(--text-1); margin: 8px 0 0; transform: scale(1.45); transform-origin: center top; padding-bottom: 14px; }');
+  R('.jrn-rec-waveform { display: flex; align-items: center; justify-content: center; height: 64px; gap: 3px; margin: 6px 0 4px; }');
+  R('.jrn-rec-waveform .bar { width: 3px; background: var(--accent); border-radius: 2px; transition: height 0.15s, background 0.1s; min-height: 6px; }');
+  R('.jrn-rec-cap { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); margin-bottom: var(--sp-2); }');
+  R('.jrn-rec-actions .ui-btn { flex: 1 1 0; gap: 8px; }');
+  R('.jrn-rec-actions .ui-btn svg { width: var(--icon-sm); height: var(--icon-sm); }');
+  R('.jrn-rec-actions .jrn-rec-stop-btn, .jrn-rec-actions .jrn-rec-confirm-btn { flex-grow: 1.3; }');
+  R('.jrn-insert-sheet .note-sheet-title, .jrn-rec-sheet .note-sheet-title { font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-1); }');
+  R('.jrn-rec-error { font-family: var(--font-ui); font-size: var(--ts-value); line-height: var(--lh-meta); color: var(--tone-danger); padding: 14px 8px; }');
+  // ── end W2c ──────────────────────────────────────────────────────────────────
 
   var styleEl = document.createElement('style');
   styleEl.id = 'jrn-styles';

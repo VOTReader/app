@@ -45,7 +45,7 @@ beforeEach(() => {
   });
   globalThis.hideToast = vi.fn((id) => { const el = document.getElementById(id); if (el) el.remove(); });
   globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
-  globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
+  globalThis.ScreenLayout = ({ utility, children }) => React.createElement('div', null, utility && utility.lead, utility && utility.actions, utility && utility.menu, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = ({ onConfirm }) =>
     React.createElement('button', { 'data-testid': 'confirm-del', onClick: onConfirm }, 'confirm');
@@ -358,7 +358,7 @@ describe('JournalEditorScreen — the caret index follows a block delete (ds5 s2
     ta.setSelectionRange(2, 2);
     fireEvent.focus(ta);
     deleteFirstBlock();
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));
     fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
     fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
     const saved = JournalStore.get(entry.id).blocks;
