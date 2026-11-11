@@ -3538,6 +3538,11 @@
     .root-tile-eyebrow, .ui-tile-label { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
     .root-tile-title, .ui-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .root-tile-detail, .ui-tile-meta { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
+    /* Large text (the root class vot-large-text, 1.8 and up; POL2): the Read tab's tiles go one to a row, and the search
+       field and the Today card's titles wrap instead of cutting off. */
+    .vot-large-text .root-tiles { grid-template-columns: minmax(0, 1fr); }
+    .vot-large-text .root-search { height: auto; min-height: var(--field-h); padding-top: 8px; padding-bottom: 8px; }
+    .vot-large-text .root-search span, .vot-large-text .upnext-title { white-space: normal; }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
     :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
@@ -6932,7 +6937,7 @@
     .top-nav { gap: 1.92px; padding: 6px 6px 6px 4px; padding-top: calc(var(--inset-top, 0px) + 6px); min-height: calc(var(--inset-top, 0px) + var(--bar-h)); box-sizing: border-box; }
     .nav-home { font-size: var(--fsc-12); padding: 7.2px 8.8px; }
     .nav-back-icon { font-size: var(--fsc-36); padding: 0 5.6px; min-width: 44px; }
-    .nav-theme-btn, .nav-search-btn, .nav-more-btn { padding: 8px; }  /* the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
+    .nav-theme-btn, .nav-search-btn, .nav-more-btn, .settings-gear-btn { padding: 8px; }  /* the gear (POL2: its 0.5rem grew the volume bars at text 2) and the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
     .reading-dot-nav { width: 40px; height: 40px; }
     .tabs-nav-btn { font-size: var(--fsc-11); gap: 4px; }
     .top-nav .tabs-nav-btn-count { font-size: var(--fsc-12); }

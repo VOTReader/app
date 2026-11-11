@@ -79,7 +79,8 @@ try {
     await page.goto(BASE, { waitUntil: 'load' });
     await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
     await sleep(700);
-    const setScale = () => page.evaluate((s) => { document.documentElement.style.setProperty('--font-scale', String(s)); }, scale);
+    // The app sets the root class vot-large-text with the scale from 1.8 up (use-settings LARGE_TEXT_SCALE); so does the walk.
+    const setScale = () => page.evaluate((s) => { document.documentElement.style.setProperty('--font-scale', String(s)); document.documentElement.classList.toggle('vot-large-text', s >= 1.8); }, scale);
     await setScale();
     const click = async (l) => { await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim().replace(/\s+/g, ' ')).startsWith(l) && b.getBoundingClientRect().width > 0); if (b) b.click(); }, l); await sleep(600); await setScale(); await sleep(150); };
     // The three-tab layout (Read, Listen, Library; Settings is the gear): a tab by its label, else the reader's Home.
