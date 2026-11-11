@@ -471,7 +471,7 @@ describe('axe — AppShellOverlays', () => {
     overlayGlobals();
     render(<AppShellOverlays {...overlayProps} gardenWarningOpen />);
     expectModal(/Before you begin|No connection/);
-    expect(screen.getByRole('group', { name: 'Image Quality' })).toBeTruthy();
+    expect(screen.getByRole('radiogroup', { name: 'Image quality' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 });
