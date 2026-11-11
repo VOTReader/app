@@ -5623,7 +5623,7 @@
       -webkit-user-select: none; user-select: none;
     }
     body.light .rd-sheet { box-shadow: 0 -10px 30px rgba(0,0,0,0.14); }
-    .rd-sheet::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--surface-3); }
+    :is(.rd-sheet, .rd-form-sheet)::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--surface-3); }
     @keyframes rdSheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
     /* cp1 sweep: while the selection is being changed (a handle drag, Shift+arrows) the sheet steps aside
        and fades back where the selection settles (SelectionToolbar SETTLE_MS). */
@@ -6020,7 +6020,6 @@
       font-size: var(--fs-30); line-height: 1; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
-    .navpick-close-undo { color: var(--alert); }
     .navpick-confirm-green {
       background: none; border: none; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -7259,18 +7258,6 @@
        no gold edge, the title in the serif. The bookmark sheet's head reads Cancel | title | Save in words (rule 9). */
     .link-picker-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
     .navpick-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; letter-spacing: 0; }
-    .bkm-create-head { gap: var(--sp-2); padding: 10px 10px 8px; }
-    .bkm-create-head .navpick-title { text-align: center; }
-    .bkm-create-head .navpick-close, .bkm-create-head .navpick-confirm-green { flex: none; min-width: 64px; min-height: var(--tap); padding: 0 12px; border: 0; border-radius: var(--r-pill); background: none; font-family: var(--font-ui); font-size: var(--fsc-15); line-height: 1; cursor: pointer; }
-    .bkm-create-head .navpick-close { color: var(--text-2); font-weight: 500; }
-    .bkm-create-head .navpick-confirm-green { color: var(--accent); font-weight: 600; }
-    .bkm-create-head .navpick-confirm-green:disabled { color: var(--text-3); opacity: 1; cursor: default; }
-    .bkm-create-head :is(.navpick-close, .navpick-confirm-green):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .bkm-create-sheet :is(.bkm-create-source, .bkm-create-field-label) { color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); }
-    .bkm-create-sheet .bkm-create-source { color: var(--text-2); font-weight: 400; font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; }
-    .bkm-create-sheet .bkm-create-excerpt { border-left: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-2); }
-    .bkm-create-sheet .bkm-create-label-input { min-height: var(--field-h); padding: 0 14px; border: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); box-shadow: none; }
-    .bkm-create-sheet .bkm-create-label-input:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
 
     /* ── Bookmark inline icons ── */
     /* Small flag icon injected at the end of a bookmarked range in
@@ -7305,43 +7292,18 @@
       content: ''; position: absolute; inset: -8px -10px;
     }
     .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
-    /* Bookmark create sheet — pre-commit form, reuses link-picker overlay
-       chrome (navpick-sheet) for consistency with the new-link flow. */
-    .bkm-create-sheet { min-height: auto; }
-    .bkm-create-body { padding: 4px 20px 22px; overflow-y: auto; }
-    .bkm-create-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.2em; text-transform: uppercase;
-      color: var(--gold-dim); margin-bottom: 4px;
-    }
-    .bkm-create-excerpt {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted);
-      line-height: 1.45;
-      padding: 8px 12px; margin-bottom: 18px;
-      border-left: 2px solid var(--gold-border);
-      background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
-      max-height: 110px; overflow-y: auto;
-    }
-    .bkm-create-field-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold-dim); margin: 14px 0 6px;
-    }
-    .bkm-create-field-hint {
-      letter-spacing: 0.08em; color: var(--cream-muted);
-      font-size: var(--fs-10); text-transform: none;
-    }
-    .bkm-create-label-input {
-      width: 100%; box-sizing: border-box;
-      background: var(--bg2); color: var(--cream);
-      border: 1px solid var(--gold-border); border-radius: 8px;
-      padding: 10px 12px;
-      font-family: var(--font-body);
-      outline: none; transition: border-color 0.15s;
-    }
-    .bkm-create-label-input { font-size: var(--fs-16); }
-    .bkm-create-label-input:focus { border-color: var(--gold); }
+    /* ── W2e readers (mock v2 r-bm): the bookmark sheet. A grab, the title, where it is, the name field on
+       surface-2 with a clear, one line on where it is kept, then Cancel | Save at the foot. ── */
+    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6)); }
+    .rd-form-sheet .ui-sheet-head { margin: 0 2px 10px; }
+    .rd-field { background: var(--surface-2); cursor: text; }
+    .rd-field-clear { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin-right: -12px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+    .rd-note { margin: 12px 2px 16px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: 1.45; }
+    .bkm-create-body { overflow-y: auto; }
+    .rd-foot { margin-top: 4px; }
+    .rd-foot .ui-btn:not(.is-primary) { background: var(--surface-2); }
+    .rd-foot .ui-btn:disabled { opacity: 0.45; cursor: default; }
+    /* ── end W2e readers (r-bm) ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */

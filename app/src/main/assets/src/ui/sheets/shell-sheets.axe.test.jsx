@@ -157,8 +157,8 @@ describe('axe — BookmarkCreateSheet', () => {
   it('create mode: a labelled field', async () => {
     render(<BookmarkCreateSheet pending={{ hlKey: 'bible:john:3:16', defaultLabel: 'John 3:16', sourceLabel: 'John 3', excerpt: 'For God so loved the world' }}
       onConfirm={noop} onCancel={noop} />);
-    expectModal('New Bookmark');
-    expect(screen.getByRole('textbox', { name: 'Label' })).toBeTruthy();
+    expectModal('New bookmark');
+    expect(screen.getByRole('textbox', { name: 'Bookmark name' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 

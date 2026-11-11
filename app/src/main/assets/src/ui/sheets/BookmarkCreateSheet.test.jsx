@@ -33,7 +33,7 @@ describe('BookmarkCreateSheet — thought field removed', () => {
         onConfirm={() => {}} onCancel={() => {}}
       />
     );
-    const dialog = screen.getByRole('dialog', { name: 'New Bookmark' });
+    const dialog = screen.getByRole('dialog', { name: 'New bookmark' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
   });
 
