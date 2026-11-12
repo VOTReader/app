@@ -134,15 +134,15 @@ describe('Share as a card (O6)', () => {
     const measurer = (font) => { const px = parseInt(font.replace('italic ', ''), 10); return (s) => s.length * px * 0.5; };
     const short = answersCardLayout({ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }, measurer, 'serif');
     const long = answersCardLayout({ passage: Array(80).fill('righteousness').join(' '), cite: '“Title” · Volume 1', date: '' }, measurer, 'serif');
-    expect(short.size).toBe(60);
-    expect(long.size).toBeLessThan(60);
+    expect(short.size).toBe(48);
+    expect(long.size).toBeLessThan(48);
     for (const L of [short, long]) {
       expect(L.lines[L.lines.length - 1].y).toBeLessThan(L.rule);
-      expect(L.foot[L.foot.length - 1]).toMatchObject({ text: ANSWERS_CARD_SITE, gold: true });
+      expect(L.foot[L.foot.length - 1]).toMatchObject({ text: ANSWERS_CARD_SITE.toUpperCase(), gold: true });
       expect(L.foot.every((f) => f.y > L.rule && f.y <= L.H - L.pad)).toBe(true);
     }
-    expect(short.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', '1/2/03', ANSWERS_CARD_SITE]);
-    expect(long.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', ANSWERS_CARD_SITE]);
+    expect(short.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', '1/2/03', ANSWERS_CARD_SITE.toUpperCase()]);
+    expect(long.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', ANSWERS_CARD_SITE.toUpperCase()]);
   });
 
   it('three themes: Parchment, Ink, Night', () => {

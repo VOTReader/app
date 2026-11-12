@@ -220,22 +220,23 @@ export function answersCardLayout(card, measurer, family) {
   const cite = answersWrap(card.cite, width, measurer(footFont));
   const foot = [];
   let y = H - pad;
-  foot.unshift({ text: ANSWERS_CARD_SITE, y, font: '30px ' + family, gold: true });
+  // FA (a-card): the site in small gold capitals, the passage in italic at the mock's size (17 px on a 372 px card)
+  foot.unshift({ text: ANSWERS_CARD_SITE.toUpperCase(), y, font: '600 28px ' + family, gold: true, caps: true });
   y -= 56;
   if (card.date) { foot.unshift({ text: card.date, y, font: footFont, gold: false }); y -= 48; }
   for (let i = cite.length - 1; i >= 0; i--) { foot.unshift({ text: cite[i], y, font: footFont, gold: false }); y -= 48; }
   const rule = y - 16;
   const room = rule - 40 - pad;
-  let size = 60, lines = [], lh = 0;
+  let size = 48, lines = [], lh = 0;
   for (; size >= 24; size -= 2) {
     lh = Math.round(size * 1.45);
-    lines = answersWrap(card.passage, width, measurer(size + 'px ' + family));
+    lines = answersWrap(card.passage, width, measurer('italic ' + size + 'px ' + family));
     if (lines.length * lh <= room) break;
   }
   if (size < 24) size = 24;
   const top = pad + Math.max(0, (room - lines.length * lh) / 2);
   return {
-    W, H, pad, size, lh, font: size + 'px ' + family,
+    W, H, pad, size, lh, font: 'italic ' + size + 'px ' + family,
     lines: lines.map((text, i) => ({ text, y: top + (i + 1) * lh - Math.round(lh * 0.3) })),
     rule, foot,
   };

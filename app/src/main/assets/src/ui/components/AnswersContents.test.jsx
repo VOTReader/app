@@ -48,7 +48,7 @@ describe('AnswersContents — "On this page" (f10)', () => {
     expect(secs[0].querySelector('.ans-num').textContent).toBe('1');
     expect(NB(secs[0].querySelector('.ans-row-sub').textContent)).toBe('You are here · 7 passages');
     expect(secs[0].classList.contains('is-current')).toBe(true);
-    expect(NB(secs[8].querySelector('.ans-row-sub').textContent)).toBe('See: 2 links'); // never "0 passages"
+    expect(NB(secs[8].querySelector('.ans-row-sub').textContent)).toBe('2 links'); // never "0 passages"
     expect(NB(secs[12].querySelector('.ans-row-sub').textContent)).toBe('1 video · audio · PDF');
     // seven passages under the current section: three, then "Show 4 more"
     expect([...document.querySelectorAll('.ans-toc-ex')].map((e) => e.textContent)).toEqual(['“The Holy Days”', '“Embracing The Gift”', '“The Feasts of The Lord”']);

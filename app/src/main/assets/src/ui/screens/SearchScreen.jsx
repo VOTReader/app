@@ -8,6 +8,7 @@ import { pickTopic, topicTexts, withOwnPassage } from '../components/srch-topic.
 import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
 import { UiIcon } from '../components/UiIcon.jsx';
+import { SelectSheet } from '../components/SelectField.jsx';
 import { translationLabel } from '../../data/translations.js';
 import { cardHeads } from '../components/SrchCard.jsx';
 
@@ -24,6 +25,16 @@ const SRCH_CMD_UI = /** @type {Record<string, [string, string]>} */ ({
   'Show search help': ['help', 'Search help'],
   'Rebuild search index': ['reset', 'Rebuild search index'],
 });
+/* FA2 (s-slash): "/" alone lists the shortcuts in the mock's order; Clear current search (the field's x) and Rebuild
+   search index stay, found as they are typed. Display order only: what the engine offers is unchanged. */
+const SRCH_SLASH_ORDER = ['Random verse or letter', 'Go home', 'Go to scriptures', 'Go to volumes', 'Open settings',
+  'Show search help', 'Clear search history'];
+/** @param {any[]} list @param {string} q */
+export function slashListing(list, q) {
+  if (q !== '/' || !list.length || !list.every((x) => x.kind === 'command')) return list;
+  const at = (/** @type {any} */ x) => SRCH_SLASH_ORDER.indexOf(x.label);
+  return list.filter((x) => at(x) >= 0).sort((a, b) => at(a) - at(b));
+}
 const SRCH_SUG_ICON = /** @type {Record<string, string>} */ ({ book: 'book', passage: 'book', verse: 'book', chapter: 'book', letter: 'note', topic: 'quote', song: 'music' });
 /** @param {any} s */
 function sugLook(s) {
@@ -294,7 +305,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
        named passage's name opened its own entry over the passage card the search put at the top, whose
        "Named passage — open" strip sat half under the list. It is left out; the rest still open the list. */
     const own = q.toLowerCase().replace(/\s+/g, ' ');
-    const s = E.suggest(q, { max: 9 }).filter((x) => String(x.query || '').trim().toLowerCase().replace(/\s+/g, ' ') !== own).slice(0, 8);
+    const s = slashListing(E.suggest(q, { max: 9 }).filter((x) => String(x.query || '').trim().toLowerCase().replace(/\s+/g, ' ') !== own).slice(0, 8), q);
     setSuggestions(s);
     // open while a cold index builds too: they read the bundle's tables, no index (h8, search200 2026-11-04)
     setShowSuggest(s.length > 0 && dismissedFor !== query);
@@ -489,6 +500,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // changed nothing a reader could see (Corbin 2026-10-14, sr12). Book order now
   // drops Best Matches (relevance's row) and opens every collection in reading order.
   const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
+  const [sortOpen, setSortOpen] = React.useState(false);
   // The order holds while the query is refined (search200 audit 146: each key typed dropped Book order back to
   // Relevance mid-word) and starts over once the box is cleared.
   React.useEffect(() => { if (!(query || '').trim()) setSortMode('relevance'); }, [query]);
@@ -546,7 +558,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   /** One list of collections. `view` names the order and the list (each remembers its own open groups);
       `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
   const renderGroups = (/** @type {Array<{key: string, items: any[], more?: boolean}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
-    <div className="srch-groups">
+    <div className={'srch-groups' + (view === 'relevance' && groups.length > 1 ? ' is-where' : '')
+      + (groups.length === 1 && corpus === 'scriptures' ? ' is-lone' : '')}>
       {/* WA3 (s-sections): the collections under one label, each a row that opens in place. */}
       {view === 'relevance' && groups.length > 1 ? (
         <h2 className="srch-section-label srch-where">Where it appears <span>{groups.length} sections</span></h2>
@@ -848,6 +861,18 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     </>
   );
 
+  /* FA2 (s-none): nothing found offers a short list of picks, no Recent (the mock's) */
+  const nonePicks = (
+    <>
+      <h2 className="srch-section-label">Quick picks</h2>
+      <div className="srch-quick-row">
+        {SRCH_QUICK_PICKS.slice(0, 8).map((q) => (
+          <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
+        ))}
+      </div>
+    </>
+  );
+
   /* WA3 (s-empty "Go to"): the doors Search holds besides its words. Surprise me is the "/random" shortcut, named. */
   const goRows = (
     <>
@@ -1053,6 +1078,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       <div className="search-screen" ref={screenRef}>
         <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{liveText}</div>
 
+        {/* FA (s-empty, s-ref, s-none, s-slash): the tabs come with results, as the mock draws them; a tab other than All
+            stays so the reader can always get back to All. */}
+        {(qTrim && !qTrim.startsWith('/') && !(engineNav && directEntries.length > 0) && !(isDone && state.results.length === 0))
+          || (settings.searchCorpus || 'all') !== 'all' ? (
         <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
           {[
             { k: 'all', label: 'All' },
@@ -1071,6 +1100,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             );
           })}
         </div>
+        ) : null}
 
         {searchContext && (
           <button
@@ -1134,6 +1164,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 <span className="srch-suggest-label">{sugLook(s)[1]}</span>
                 {s.kind === 'command' ? <kbd className="srch-kbd">{s.query}</kbd>
                   : s.hint ? <span className="srch-suggest-hint">{s.hint}</span> : null}
+                {/* FA2 (s-results): a go-to row opens a place, so it ends in a chevron as the mock's */}
+                {s.kind === 'command' ? null : <UiIcon name="chev" size="sm" />}
               </button>
             ))}
           </div></div>
@@ -1266,11 +1298,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               </span>
               {/* [8] the order switch: both orders named, the one in use lit (one sort label, search200 audit 144). */}
               {sortToggleVisible ? (
-                <div className="srch-sort" role="group" aria-label="Order results">
-                  <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
-                    onClick={() => setSortMode('relevance')}>Relevance</button>
-                  <button type="button" className={'srch-sort-btn' + (bookOrder ? ' active' : '')} aria-pressed={bookOrder}
-                    onClick={() => setSortMode('canonical')}>Book order</button>
+                /* FA (s-results): one "Relevance ⌄" control, as the mock; it opens the two orders as a choice */
+                <div className="srch-sort">
+                  <button type="button" className="srch-sort-btn srch-sort-pick" aria-haspopup="dialog" aria-label={'Order: ' + (bookOrder ? 'Book order' : 'Relevance')}
+                    onClick={() => setSortOpen(true)}>{bookOrder ? 'Book order' : 'Relevance'}<UiIcon name="down" size="sm" /></button>
+                  <SelectSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Order results" value={sortMode}
+                    options={[{ id: 'relevance', label: 'Relevance' }, { id: 'canonical', label: 'Book order' }]} onChange={(v) => setSortMode(v)} />
                 </div>
               ) : null}
             </div>
@@ -1376,7 +1409,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 ))}
               </div>
             ) : null}
-            {state.stopWordsOnly ? null : pickRows}
+            {state.stopWordsOnly ? null : nonePicks}
             {/* WA3 (s-none, X-hidden 96): nothing found offers Answers as well as the picks. */}
             {state.stopWordsOnly || typeof onOpenAnswers !== 'function' ? null : (
               <>

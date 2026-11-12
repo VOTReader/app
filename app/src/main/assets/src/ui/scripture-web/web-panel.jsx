@@ -714,7 +714,11 @@ export function WebPanel(props) {
   const stopCount = trail ? trail.stops.length : 0;
   // the trail bar (use-journey.js: the navigation stream keeps the trail) once the reader has gone
   // somewhere from where they set out: pinned over the scroll, in every mode but My Web's
-  const trailShown = webMode !== 'personal' && !!here && stopCount >= 2;
+  // FA2 (w-near): In view's head is one row, as the mock: the list leaves the trail out while its one way back is to
+  // the whole web, which the Whole web button does; a longer trail keeps its bar (the arrows are then a way back)
+  const onlyWhole = mode === 'list' && stopCount === 2 && !!trail && trail.stops[0].label === WHOLE_WEB
+    && here === trail.stops[1];
+  const trailShown = webMode !== 'personal' && !!here && stopCount >= 2 && !onlyWhole;
   // the paths view, over whatever the panel shows; a new subject puts it away
   React.useEffect(() => { setPathsOpen(false); }, [key, setPathsOpen]);
   // and a closed panel leaves it put away for the next time it opens

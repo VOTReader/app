@@ -4173,14 +4173,16 @@
     .srch-loose-label, .srch-loose-more { border-top:2px solid var(--gold-border); margin-top:0.3rem; }
     /* ── WA3 search (v2 search.html, sheets v2-search-1..3): the box a pill, the tabs a segmented control, rows and
        cards on the surfaces, labels in sentence case but the 12px section label. Tokens carry the light theme. ── */
-    .srch-input-row { display:flex; align-items:center; flex:1; min-width:0; height:44px; margin-right:var(--gutter); background:var(--surface-1); border:1px solid transparent; border-radius:var(--r-pill); }
+    .srch-input-row { display:flex; align-items:center; flex:1; min-width:0; height:44px; margin-right:var(--gutter); position:relative; background:var(--surface-1); border:1px solid transparent; border-radius:var(--r-pill); }
     .srch-input-row:focus-within { border-color:var(--accent); }
     .srch-input-row:has(.search-input:focus-visible) { border-color:transparent; }
-    .srch-field-ic { display:inline-flex; flex:none; margin-left:14px; color:var(--text-2); }
-    .search-input { flex:1; min-width:0; height:100%; padding:0 4px 0 10px; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
+    /* FA2 (a-query, s-slash): the field is the whole pill, the magnifier and the clear laid over its ends, so the field's
+       own focus ring goes round all three as the mock draws it (the ring stays the input's, search200 audit 201) */
+    .srch-field-ic { position:absolute; z-index:1; left:14px; top:50%; transform:translateY(-50%); display:inline-flex; color:var(--text-2); pointer-events:none; }
+    .search-input { flex:1; min-width:0; height:100%; padding:0 48px 0 42px; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
     .search-input:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; border-radius:var(--r-pill); }
     .search-input::placeholder { color:var(--text-2); }
-    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; margin:-2px 0; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
+    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; position:absolute; z-index:1; right:0; top:50%; transform:translateY(-50%); width:48px; height:48px; margin:0; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
     .srch-corpus-row { display:flex; margin:2px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-field); }
     .srch-corpus-btn { flex:1; min-height:var(--tap); border:4px solid transparent; background:none; background-clip:padding-box; border-radius:var(--r-field); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-control); cursor:pointer; }
     .srch-corpus-btn.active { background-color:var(--surface-3); color:var(--text-1); }
@@ -4211,14 +4213,14 @@
     .srch-row-ic { flex:none; display:inline-flex; align-items:center; justify-content:center; width:var(--icon-chip); height:var(--icon-chip); border-radius:var(--r-chip); background:var(--surface-2); color:var(--accent); }
     .srch-row-t, .srch-suggest-label, .srch-songs-row-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-row-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:var(--fw-name); }
+    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; }
     .srch-row-m { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:var(--ts-meta); }
     .srch-row > svg:last-child, .srch-songs-row > svg:last-child { flex:none; color:var(--text-3); }
     .srch-kbd, .srch-suggest-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .srch-kbd { padding:5px 7px; border-radius:6px; background:var(--surface-2); line-height:1; }
     .srch-suggest-anchor { margin:12px var(--gutter) 0; }
     .srch-suggest-head { margin:6px 0 var(--label-below); }
-    .srch-suggest-item:not(:has(.srch-kbd)) .srch-suggest-label { font-family:var(--font-serif); font-size:var(--ts-body); font-weight:var(--fw-name); }
+    .srch-suggest-item:not(:has(.srch-kbd)) .srch-suggest-label { font-family:var(--font-serif); font-size:var(--ts-body); font-weight:600; }
     .srch-suggest { background:var(--surface-1); border-radius:var(--r-card); overflow:hidden; }
     .srch-songs-row { width:calc(100% - 2 * var(--gutter)); margin:8px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-card); }
     .srch-results-summary { margin:var(--label-above) var(--gutter) var(--label-below); }
@@ -4234,7 +4236,7 @@
     .srch-card { display:block; width:100%; padding:14px var(--card-pad) 12px; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
     .srch-card:active { background-color:var(--surface-2); }
     .srch-card-top { display:flex; align-items:baseline; gap:8px; }
-    .srch-card-ref { font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-weight:var(--fw-name); color:var(--text-1); }
+    .srch-card-ref { font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-weight:600; color:var(--text-1); }
     .srch-card-loc { margin-top:2px; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
     .srch-card-loc.is-inline { flex:1; min-width:0; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-card-snippet { margin-top:8px; font-family:var(--font-serif); font-size:var(--ts-body); line-height:1.5; color:var(--text-2); }
@@ -4244,10 +4246,7 @@
     .card-direct .srch-card-top { margin-top:5px; }
     .card-direct .srch-card-ref { font-size:var(--ts-title); line-height:1.25; font-weight:700; }
     .card-direct .srch-card-snippet { color:var(--text-1); font-size:var(--ts-headline); }
-    .srch-direct-acts { display:flex; gap:10px; margin-top:14px; }
-    .srch-direct-acts > .ui-btn { flex:1 1 0; }
-    .srch-direct-acts > .srch-direct-listen { background:var(--surface-2); }
-    .search-screen .srch-direct > .ui-label { background:none; border-radius:0; margin:6px 0 0; }
+    .srch-direct-open { margin-top:14px; }
     .srch-card-wrap > .srch-card { padding-bottom:8px; }
     .srch-places-toggle, .srch-also-toggle { width:calc(100% - 2 * var(--card-pad)); margin:0 var(--card-pad); border-top-color:var(--hairline); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
     .srch-also-item { font-family:var(--font-ui); letter-spacing:0; text-transform:none; }
@@ -4271,7 +4270,19 @@
     .srch-none-icon { display:flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0 auto 14px; border-radius:var(--r-card); background:var(--surface-1); color:var(--accent); }
     .srch-none-title { margin:0 0 6px; font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; color:var(--text-1); }
     .srch-no-results-tip, .srch-fewer { display:block; margin-top:4px; }
+    /* FA2 (s-results): a go-to suggestion's chevron, quiet as the rows' */
+    .srch-suggest-item > .ui-i:last-child { flex:none; margin-left:-6px; color:var(--text-3); }
+    /* FA2 (s-sections): under "Where it appears" a card's passage is two lines (SrchSnippet reads the box's height, so its
+       mark stays in them), cut with an ellipsis when the passage starts at its top */
+    .srch-groups.is-where .srch-group-items .srch-snippet-scroll { max-height:3em; }
+    .srch-groups.is-where .srch-group-items .srch-snippet-lines:not([style*="margin-top"]) { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+    /* FA2 (s-scriptures): the Scriptures tab's one collection goes straight to its verses (its head shows while closed) */
+    .srch-groups.is-lone > .srch-group:not(.collapsed) > .srch-group-h { display:none; }
     /* ── end WA3 search ── */
+    /* ── FA search: the order as one "Relevance ⌄" control (mock search.html s-results) ── */
+    .srch-sort-btn.srch-sort-pick { display:inline-flex; align-items:center; gap:4px; color:var(--text-1); font-weight:500; }
+    .srch-sort-pick svg { color:var(--text-2); }
+    /* ── end FA search ── */
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
@@ -7956,7 +7967,6 @@
        arm is what measures the geometry. Text guards the value, pixels guard
        the layout, and neither substitutes for the other.
        Portrait (.sw-narrow) keeps 42 %, which was measured clear. */
-    .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 200px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
          web beneath it — a real <button> inside an inert panel, and it works
@@ -8238,7 +8248,7 @@
       background: var(--sw-panel); border-left: 1px solid var(--sw-panel-edge); color: var(--sw-text);
       font-family: var(--font-ui); animation: sw-panel-in 220ms ease-out;
     }
-    .sw-filter-head { display: flex; align-items: center; gap: 8px; min-height: 52px; box-sizing: border-box; padding: calc(4px + var(--sw-safe-top)) calc(6px + var(--sw-safe-right)) 4px 18px; border-bottom: 1px solid var(--sw-hairline); }
+    .sw-filter-head { display: flex; align-items: center; gap: 8px; min-height: 44px; box-sizing: border-box; padding: calc(4px + var(--sw-safe-top)) calc(6px + var(--sw-safe-right)) 4px 18px; border-bottom: 1px solid var(--sw-hairline); }
     .sw-filter-head h2 { margin: 0; font-family: var(--sw-font); font-size: var(--fsc-20); font-weight: 700; line-height: 1; color: var(--sw-title); }
     .sw-filter-count { flex: 1 1 auto; min-width: 0; padding-left: 4px; color: var(--sw-text-meta); font-size: var(--fsc-13); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .sw-filter-clear { position: relative; min-height: 44px; padding: 0 10px; background: none; border: 0; color: var(--sw-gold); font: 600 var(--fsc-15) var(--font-ui); cursor: pointer; }
@@ -8246,11 +8256,11 @@
     .sw-filter-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; border-radius: 8px; }
     .sw-root .sw-filter-close { width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: var(--sw-text-meta); }
     .sw-filter-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 0 calc(16px + var(--sw-safe-right)) calc(14px + var(--sw-safe-bottom)) 16px; }
-    .sw-filter-name { display: block; margin: 12px 0 6px; font-size: var(--fsc-12); font-weight: 600; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sw-gold); }
+    .sw-filter-name { display: block; margin: 10px 0 5px; font-size: var(--fsc-12); font-weight: 600; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sw-gold); }
     /* the filters' rows and My Web's Yours | Timothy's notes: a tray with the chosen part lifted and ringed */
-    .sw-root :is(.sw-filter-seg, .sw-list-tabs) { display: flex; width: 100%; box-sizing: border-box; padding: 3px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+    .sw-root :is(.sw-filter-seg, .sw-list-tabs) { display: flex; width: 100%; box-sizing: border-box; padding: 2px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
     .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn {
-      flex: 1 1 0; min-width: 0; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      flex: 1 1 0; min-width: 0; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       padding: 0 6px; border: 0; border-radius: 8px; background: none; color: var(--sw-text-meta); font: 500 var(--fsc-14) var(--font-ui); white-space: nowrap;
     }
     .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn.is-on { background: rgba(255, 255, 255, 0.1); color: var(--sw-title); box-shadow: inset 0 0 0 1px rgba(214, 179, 95, 0.45); }
@@ -8259,11 +8269,11 @@
     .sw-filter-dot.is-middle { background: #e0a05a; }
     .sw-filter-dot.is-far { background: #a66fd0; }
     .sw-filter-toggles, .sw-filter-books { display: flex; align-items: center; gap: 8px; }
-    .sw-root .sw-filter-toggles .sw-toggle { flex: 1 1 0; min-width: 0; min-height: 40px; justify-content: center; gap: 8px; padding: 0 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
+    .sw-root .sw-filter-toggles .sw-toggle { flex: 1 1 0; min-width: 0; min-height: 38px; justify-content: center; gap: 8px; padding: 0 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
     .sw-root .sw-filter-toggles .sw-toggle.is-on { background: var(--sw-active-fill); color: var(--sw-gold); box-shadow: inset 0 0 0 1px var(--sw-active-border); }
     .sw-filter-and { flex: none; color: var(--sw-text-muted); font-size: var(--fsc-13); }
     .sw-filter-book { flex: 1 1 0; min-width: 0; }
-    .sw-filter-book .sw-select { width: 100%; min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background-color: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
+    .sw-filter-book .sw-select { width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 10px; background-color: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
     /* My Web with no links yet: a card with its link mark, the title, the two sentences and the gold Start reading; the
        x inside it at the right. Still inert but for its two buttons, so a drag across it moves the web */
     .sw-root .sw-empty { box-sizing: border-box; width: min(452px, calc(100% - 48px)); padding: 16px 16px 14px 18px; border-radius: 16px; background: rgba(19, 19, 18, 0.96); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); text-align: left; text-shadow: none; }
@@ -8289,6 +8299,31 @@
     /* My Web's list: "Links" and its line, Yours | Timothy's notes, then one card of rows */
     .sw-root .sw-list-tabs { margin-top: 12px; }
     .sw-list-tabs + .sw-choice-list { margin-top: 10px; }
+    /* FA (w-guide, w-goto): the web behind the guide card and the Go to sheet is dimmed, as the mock (a spread shadow:
+       no new element, and the drawing is untouched) */
+    .sw-guide { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5), 0 8px 32px rgba(0, 0, 0, 0.45); }
+    .sw-goto { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5), 0 12px 36px rgba(0, 0, 0, 0.55); }
+    /* FA2 (w-filters): open, Filters is a docked panel like List's, so the chrome steps left of it as it does for a
+       docked panel: the zoom and the more button stay in reach, the key keeps its credit (the bar's buttons as icons) */
+    .sw-root:has(> .sw-filter-sheet) .sw-controls { right: calc(var(--sw-panel-w, 40%) + 24px - 7px); max-width: calc(100% - var(--sw-panel-w, 40%) - 48px); }
+    .sw-root.sw-compact:has(> .sw-filter-sheet) .sw-controls { right: calc(var(--sw-panel-w, 42%) + 16px - 7px); }
+    .sw-root:has(> .sw-filter-sheet) .sw-wbot { right: calc(var(--sw-panel-w, 42%) + 12px); }
+    .sw-root:has(> .sw-filter-sheet) .sw-wbot :is(.sw-legend-line, .sw-legend-count) { display: none; }
+    .sw-root.sw-compact:has(> .sw-filter-sheet) .sw-wpills .sw-btn { width: 40px; padding: 0; gap: 0; justify-content: center; font-size: 0; }
+    .sw-root.sw-compact:has(> .sw-filter-sheet) .sw-wpills .sw-wpill-count { position: absolute; top: -4px; right: -4px; }
+    /* FA2 (w-pick, w-list): a row's quote and source stay inside the card, cut with an ellipsis, so the row's chevron
+       (.sw-choice-row::after) is on screen as the mock draws it */
+    .sw-choice-list > .sw-row { min-width: 0; }
+    .sw-choice-row .sw-row-text { overflow: hidden; text-overflow: ellipsis; }
+    /* FA2 (w-near): the chapter card's line wraps rather than cut ("to 40 chapters") */
+    .sw-inview-chapter .sw-row-text { white-space: normal; }
+    /* FA2 (w-goto): on the phone the box is centred under the top bar, no wider than the mock's (about 616 px), clear
+       of Back on the left and as far in on the right; the keyboard's side still pushes it in (its max) */
+    .sw-root .sw-goto.is-compact { max-width: 616px; margin: 0 auto; right: max(calc(68px + var(--sw-topbar-pad)), calc(16px + var(--sw-goto-inset, 0px))); }
+    .sw-root.sw-rotated > .sw-goto.is-compact { right: max(calc(68px + var(--sw-topbar-pad)), calc(16px + max(var(--sw-goto-inset, 0px), var(--keyboard-height, 0px), var(--inset-bottom, 0px)))); }
+    /* FA2 (w-mine0): My Web's empty card centred in the frame as the mock (was 58 %); the 200 px floor is the
+       measured one that keeps it off the strip on short frames, and 51 % still clears the 360 px case */
+    .sw-root:not(.sw-narrow) .sw-empty { top: max(51%, 200px); }
     /* ── end WA6 web ── */
 
       /* ══════════════════════════════════════════════════════════════════
@@ -9128,6 +9163,18 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-end-step{margin-top:10px}
 .ans-end-step .ans-tile-btn{border-radius:var(--r-pill)}
 .ans-end-step .ans-tile-btn:only-child{grid-column:1/-1}
+/* ── FA answers (FLAGS-answers-search: the bar title whole, the lead words lighter, the topic and commandment titles
+   at the mock's size, the field's magnifier, a shorter card sheet, Saved's second door; mock v2 answers.html) ── */
+.top-nav .ans-bar-title{margin:0 -6px 0 -2px}
+.ans-row-title .ans-lead,.ans-h2 .ans-lead{font-weight:400}
+.ans-hero .ans-display:not(.is-long){font-size:min(31px,8vw);line-height:1.13}
+.ans-ts2 .ans-hero .ans-display:not(.is-long){font-size:min(var(--fs-36),10vw);line-height:1.1}
+.ans-sheet .ans-cmd-t{text-wrap:wrap}
+.ans-bar-field .ans-search-lead{position:absolute;top:0;left:0;width:40px;height:var(--tap);display:grid;place-items:center;color:var(--text-2);pointer-events:none}
+.ans-bar-field .ans-search-lead+.ans-search-input{padding-left:40px}
+.ans-sheet .ans-card{max-width:min(100%,280px)}
+.ans-saved-surprise{margin:0 auto;font-family:var(--font-ui);font-size:var(--ts-control);font-weight:500;color:var(--text-1)}
+/* ── end FA answers ── */
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */
@@ -9200,7 +9247,7 @@ body.light .install-step-num { color: #fff; }
    ✕'s 60 px glyph left about three letters of the query in view. Held to phone px, and the box's own words to 36 px
    ("fear not" fits whole); the ✕ stays a 44 px target. */
 .vot-large-text .srch-input-row { gap: 4px; }
-.vot-large-text .search-input { padding-left: 10px; padding-right: 10px; font-size: min(var(--fs-16), 36px); }
+.vot-large-text .search-input { padding-left: 42px; padding-right: 48px; font-size: min(var(--fs-16), 36px); }
 .vot-large-text .srch-clear-btn { min-width: 44px; font-size: min(var(--fs-20), 28px); }
 
     /* ── THE LISTEN FAMILY (W3-listen, 2026-11-11; R/mock/v2/listen.html au-*). Built on the shared rows, sheets and

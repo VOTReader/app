@@ -27,7 +27,7 @@ import { h, Fragment } from '../jsx-h.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from './AnswersParts.jsx';
 import { FoldRow, TocRows, AnswersContentsSheet } from './AnswersContents.jsx';
 import { AnsSheet, ChartViewer, CommandmentSheet } from '../sheets/AnswersSheets.jsx';
-import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, answersBrowseShelves, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
+import { SEP, NBSP, pl, isDateHead, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, answersBrowseShelves, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
@@ -396,10 +396,14 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     if (!ps.length) return;
     const text = (/** @type {any[]} */ qs) => qs.map((q) => answersShownText(entry.paragraphs[q.index].text)).join('\n');
     const fits = (/** @type {string} */ w) => { const n = answersCardWords(w); return n > 0 && n <= ANSWERS_CARD_MAX_WORDS; };
+    // FA: the card starts at the passage's first real sentence, past its header lines ("Words To Live By / The Word
+    // of Truth", a dated head, an ornament): a line with no sentence end in it is a header
+    const real = (/** @type {any} */ q) => { const raw = entry.paragraphs[q.index].text; const t = answersShownText(raw).trim(); return !!t && t !== '✦' && !isDateHead(raw) && /[.!?…]/.test(t); };
+    const body = (/** @type {any[]} */ qs) => { const i = qs.findIndex(real); return i > 0 ? qs.slice(i) : qs; };
     let pick = null;
-    for (const p of ps) { if (fits(text(p.paras))) { pick = p.paras; break; } }
-    if (!pick) for (const p of ps) { const q = p.paras.find((x) => fits(text([x]))); if (q) { pick = [q]; break; } }
-    if (!pick) pick = ps[0].paras;
+    for (const p of ps) { const b = body(p.paras); if (fits(text(b))) { pick = b; break; } }
+    if (!pick) for (const p of ps) { const q = p.paras.find((x) => real(x) && fits(text([x]))); if (q) { pick = [q]; break; } }
+    if (!pick) pick = body(ps[0].paras);
     setSheet({ kind: 'card', card: answersCardFor(entry, item, pick[0].index, text(pick), meta && meta.sections) });
   };
   const cardMenu = React.useMemo(() => (inert || !ready ? null
@@ -761,10 +765,10 @@ const RELATED_SHOWN = 6;
 function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShelf, onLetter, tc }) {
   const [all, setAll] = React.useState(false);
   React.useEffect(() => { setAll(false); }, [entry.id]);
-  const topicSub = (id) => {
+  const topicSub = (id, about = false) => {
     const e = byId.get(id);
     if (!e) return null;
-    return <>{answersRowSub(e, metaAll && metaAll[id])}{pathOn && isRead(id) ? <>{SEP}<ReadMark /></> : null}</>;
+    return <>{answersRowSub(e, metaAll && metaAll[id], { about })}{pathOn && isRead(id) ? <>{SEP}<ReadMark /></> : null}</>;
   };
   const topicRow = (id, key) => {
     const e = byId.get(id);
@@ -834,7 +838,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       const step = [];
       if (sn && sn.next && byId.has(sn.next)) {
         const nx = byId.get(sn.next);
-        rows.push(<KRow key="n" kicker={'Next in ' + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next)} onClick={() => nav.go(sn.next)} />);
+        rows.push(<KRow key="n" kicker={'Next' + SEP + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next, true)} onClick={() => nav.go(sn.next)} />);
       }
       if (sn && sn.prev && byId.has(sn.prev)) {
         const pv = byId.get(sn.prev);

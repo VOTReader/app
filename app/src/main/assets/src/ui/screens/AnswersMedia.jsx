@@ -64,7 +64,7 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
   return (
     <ScreenLayout className={answersLayoutClass(fontScale, false)}
       navChildren={LibraryNav({ onBack, backLabel: 'Answers', showHome: false, onSettings, onHistory, onSearch, theme, onThemeChange,
-        leftExtras: <h1 className="ans-bar-title is-on">Charts &amp; videos</h1> })}>
+        leftExtras: <h1 className="ans-bar-title is-on">Charts and videos</h1> })}>
       <div className="ans-page ans-media-page">
         {idx ? (
           <>
@@ -116,7 +116,7 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
         ) : null}
       </div>
       {chart ? <ChartViewer chart={chart} onClose={closeChart} /> : null}
-      {about && site ? <AboutSheet site={site} onOpenTopic={(id) => { setAbout(false); onOpenTopic(id, null, 'Charts & videos'); }} onClose={closeAbout} /> : null}
+      {about && site ? <AboutSheet site={site} onOpenTopic={(id) => { setAbout(false); onOpenTopic(id, null, 'Charts and videos'); }} onClose={closeAbout} /> : null}
     </ScreenLayout>
   );
 }
