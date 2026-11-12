@@ -574,9 +574,18 @@ async function _run(it) {
   _wakeCheck();
   _emit({ type: 'progress', url: it.url, bytes: 0, total: -1 });
   // No bytes for STALL_MS: aborted and tried again (a connection that stops without an error held the queue for good).
+  // Only time the page was running counts: a tick that comes late (the page was frozen or throttled in the
+  // background, where no chunk could be read either) starts the wait again, or coming back aborted every download
+  // from byte 0. With every byte through, what is left is the write to storage, which is not a stalled connection.
+  const every = Math.max(10, Math.min(5000, Math.floor(_timing.stall / 3)));
+  let tick = Date.now();
   const watch = setInterval(() => {
-    if (Date.now() - job.last >= _timing.stall && !job.held && !ctl.signal.aborted) { job.stalled = true; _abortStalled(job); }
-  }, Math.max(10, Math.min(5000, Math.floor(_timing.stall / 3))));
+    const now = Date.now();
+    if (now - tick > Math.max(1000, every * 2)) job.last = now;
+    tick = now;
+    if (job.total > 0 && job.bytes >= job.total) return;
+    if (now - job.last >= _timing.stall && !job.held && !ctl.signal.aborted) { job.stalled = true; _abortStalled(job); }
+  }, every);
   let stored = false;
   try {
     if (_items.has(it.url)) throw new Failed('saved');

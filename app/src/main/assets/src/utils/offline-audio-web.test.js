@@ -671,6 +671,43 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
     expect(OfflineAudio.items()[0].bytes).toBe(5000);
   });
 
+  // PL-LISTEN 3 (REVIEW-offline 2): the stall check read the wall clock, so time the page spent frozen in the
+  // background counted as "no bytes" and every running download was aborted on the way back, from byte 0.
+  it('time the page spent frozen is not a stall: the download goes on where it was', async () => {
+    await ready();
+    WebOfflineAudio._setTiming({ stall: 60, retry: [5] });
+    let feed;
+    fetchMock.mockImplementationOnce(async () => new Response(new ReadableStream({
+      start(c) { c.enqueue(new Uint8Array(100)); feed = c; },
+    }), { headers: { 'Content-Length': '5000' } }));
+    OfflineAudio.download([{ url: URL_OF('fz'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect((OfflineAudio.progressOf(URL_OF('fz')) || {}).bytes).toBe(100));
+    const realNow = Date.now;
+    try {
+      Date.now = () => realNow() + 3600000;   // an hour in the background: no timer ran, no chunk was read
+      await new Promise((r) => setTimeout(r, 50));   // the first tick back
+      feed.enqueue(new Uint8Array(4900));
+      feed.close();
+      await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('fz'))).toBe(true));
+    } finally { Date.now = realNow; }
+    expect(gets()).toHaveLength(1);
+  });
+
+  it('a slow write of the last bytes is not a stall: the finished file stays', async () => {
+    await ready();
+    WebOfflineAudio._setTiming({ stall: 60, retry: [5] });
+    const realOpen = caches.open;
+    caches.open = async (name) => {
+      const b = await realOpen(name);
+      return { ...b, put: async (r, res) => { await b.put(r, res); await new Promise((ok) => setTimeout(ok, 250)); } };
+    };
+    try {
+      OfflineAudio.download([{ url: URL_OF('sw'), key: 'k', title: 't' }]);
+      await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('sw'))).toBe(true), { timeout: 3000 });
+    } finally { caches.open = realOpen; }
+    expect(gets()).toHaveLength(1);
+  });
+
   // dl-rework D (defect 11): the first one that did not fit held the whole queue.
   it('one that does not fit is stepped over; the queue holds only when nothing left fits, and says the real shortfall', async () => {
     await ready();
