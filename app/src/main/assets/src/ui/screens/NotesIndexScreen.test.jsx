@@ -17,6 +17,7 @@ import * as ReactDOM from 'react-dom';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
 import { noteSourceSegments } from '../../utils/note-source.js';
+import { _resetToasts } from '../../utils/toast.js';
 
 const SRC = {
   'bible:genesis:1:1': 'Genesis 1:1',
@@ -309,7 +310,7 @@ describe('NotesIndexScreen — a note’s menu', () => {
     localStorage.setItem('vot-notes-tab', 'all-notes');
     const remove = vi.fn(), removeGroup = vi.fn();
     window.NoteStore.remove = remove;
-    window.AnnotationStore = { removeGroup };
+    window.AnnotationStore = { removeGroup, getByGroup: () => [] };
     const { getAllByRole, getByRole } = render(<NotesIndexScreen {...props} />);
     fireEvent.click(getAllByRole('button', { name: 'Note options' })[0]);
     fireEvent.click(rowNamed(document.body, 'Delete note'));
@@ -317,6 +318,36 @@ describe('NotesIndexScreen — a note’s menu', () => {
     fireEvent.click(getByRole('button', { name: 'Delete' }));
     expect(removeGroup).toHaveBeenCalledWith('g1');
     expect(remove).toHaveBeenCalledWith('g1');
+  });
+
+  /* PL-SEARCH 5: the reader's own Remove offers Undo (AnnotationActionChip); this delete lost the note and its
+     mark for good on one mistaken confirm. Undo puts back the very records the stores held. */
+  it('Delete note offers Undo, which puts the mark and the note back as they were', () => {
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    // a highlight segment and its note record, shaped as main writes them
+    const seg = { key: 'bible:genesis:1:1', ann: { kind: 'highlight', color: 'yellow', groupId: 'g1', start: 0, end: 14, text: 'my anchor text', created: 1 } };
+    const rec = { body: 'The covenant of peace', created: 1, updated: 6, notebookIds: ['nb1'] };
+    const marks = new Map([['g1', [seg]]]);
+    const notes = new Map([['g1', rec]]);
+    const add = vi.fn(), set = vi.fn();
+    window.AnnotationStore = { getByGroup: (g) => marks.get(g) || [], removeGroup: (g) => marks.delete(g), add };
+    window.NoteStore.get = (g) => notes.get(g) || null;
+    window.NoteStore.remove = (g) => notes.delete(g);
+    window.NoteStore.set = set;
+    try {
+      const { getAllByRole, getByRole } = render(<NotesIndexScreen {...props} />);
+      fireEvent.click(getAllByRole('button', { name: 'Note options' })[0]);
+      fireEvent.click(rowNamed(document.body, 'Delete note'));
+      fireEvent.click(getByRole('button', { name: 'Delete' }));
+      expect(marks.has('g1')).toBe(false);
+      expect(notes.has('g1')).toBe(false);
+      const toast = document.getElementById('vot-toast-mark-removed');
+      expect(toast.textContent).toMatch(/^Note deleted/);
+      fireEvent.click(toast.querySelector('.vot-undo-btn'));
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(add).toHaveBeenCalledWith('bible:genesis:1:1', seg.ann);
+      expect(set).toHaveBeenCalledWith('g1', rec);
+    } finally { _resetToasts(); }
   });
 });
 
