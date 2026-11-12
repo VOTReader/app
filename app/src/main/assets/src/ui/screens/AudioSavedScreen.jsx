@@ -109,7 +109,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
       <ScreenLayout utility={utility}>
         <div className="root-screen listen-saved">
           <EmptyState icon="star" title="Nothing saved yet"
-            text="Tap the star beside any recording or song to keep it here. What you save travels with your VOTReader backup."
+            text="Tap the star beside any recording or song to keep it here."
             action={onOpenVolumes ? { label: 'Browse The Volumes of Truth', onClick: onOpenVolumes } : undefined} />
         </div>
       </ScreenLayout>

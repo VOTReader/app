@@ -215,7 +215,7 @@ export function HighlightsScreen(props) {
       <div className="hlx-screen lib-screen">
         {marks.length === 0 ? (
           <EmptyState icon="pen" title="No highlights yet"
-            text="Select some words while you read and tap a colour to mark them. Every mark you make collects here."
+            text="Select some words while you read and tap a colour; every mark you make collects here."
             action={props.onStartReading ? { label: 'Start reading', onClick: props.onStartReading } : null} />
         ) : (
           <>
