@@ -457,7 +457,7 @@ jobs:
   browser:
     name: browser (smoke render walk + end-to-end)
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h
+    timeout-minutes: 45   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h; 45 since e2e:contrast (LIGHT2)
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name != github.repository
@@ -577,6 +577,16 @@ jobs:
         # the real corpus still answers them. Each case names the report or audit it
         # came from; a run that checks nothing FAILS (NOTHING-CHECKED).
         run: npm run e2e:search
+
+      - name: Both themes readable (contrast walk)
+        # tools/e2e-contrast.mjs (LIGHT1-LIGHT2, 2026-11-11): the built app walked at 412x915 in the dark and the
+        # light theme through ~110 stops (a seeded profile: notes, every highlight colour and mark style, a journal
+        # with a photo and a voice memo, a started plan, songs, Downloads, Answers' sheets, every Settings page, the
+        # tour, the Scripture Web drawn by SwiftShader). Every text run, icon, placeholder and mark line is measured
+        # against what is painted under it (4.5:1, large text and control graphics 3:1); literal dark-theme colours
+        # in light, an unreached stop or a wrong theme-color meta fail. Excepted sites are listed at the top of the
+        # file with their reasons. ~TIMING.
+        run: npm run e2e:contrast
 
   search-bench:
     name: Search benchmark (500 remembered queries + the fresh 100)

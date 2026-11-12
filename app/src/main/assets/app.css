@@ -752,9 +752,10 @@
          grey over cream); --scrim is the warm one the reader menu already uses. */
       body.light :is(.sh-modal-backdrop, .audio-manager-backdrop, .fn-sheet-backdrop, .select-sheet-backdrop, .disable-tabs-overlay,
         .link-picker-overlay, .note-sheet-overlay, .nb-picker-overlay, .multinote-overlay, .install-steps-backdrop) { background: var(--scrim); }
-      body.light :is(.home-eyebrow, .vol-index-eyebrow, .coverage-badge-no-recording) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
+      body.light :is(.home-eyebrow, .vol-index-eyebrow, .coverage-badge-no-recording, .idx-min-chip) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
       /* words drawn in the tertiary ink: --text-3 (#8a8070) is the chevrons' 3:1 ink, 3.5:1 on parchment; text takes --text-2 */
-      body.light :is(.dl-unit-num, .plan-ribbon-why, .prg-days-axis, .link-half-word, .ws3-about-build, .tour-never) { color: var(--text-2); }
+      body.light :is(.plan-ribbon-why, .ws3-about-build, .tour-never) { color: var(--text-2); }
+      body.light .song-lyrics-follow.is-on { color: var(--text-1); }
       body.light .audio-bar-mark { background: radial-gradient(circle at 30% 25%, var(--surface-1), var(--surface-3) 72%); }
             /* ── Right-cluster alignment ──────────────────────────────────────────
          Back + Home stay on the LEFT; every other nav control hugs the RIGHT,
@@ -1790,7 +1791,7 @@
       .dl-auto .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-control); font-weight:500; }
       .dl-unit .dl-row { min-height:46px; padding-left:var(--sp-1); }
       .dl-unit .dl-row-main { justify-content:space-between; padding:var(--sp-2) 0; }
-      .dl-unit-num { flex:0 0 auto; min-width:1.2em; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-meta); font-variant-numeric:tabular-nums; }
+      .dl-unit-num { flex:0 0 auto; min-width:1.2em; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-variant-numeric:tabular-nums; }
       .dl-unit-title { flex:1 1 auto; min-width:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .dl-unit-meta { flex:0 0 auto; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-variant-numeric:tabular-nums; }
       .dl-link { min-height:var(--tap); padding:var(--sp-1) 0; border:0; background:none; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-value); cursor:pointer; text-align:left; }
@@ -2601,6 +2602,7 @@
     .fn-ref { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; min-width:1.8em; height:1.8em; padding:0 0.25em; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:0.9em; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
     /* The marker is DRAWN 18 px (standard text size) but a finger needs 24 (WCAG 2.2 2.5.8): a transparent ring grows the
        HIT area to 30 px and changes nothing the eye sees. tools/smoke-ci.js probes what a finger lands on at 360x800 (2026-09-22). */
+    .hl-mark .fn-ref { color:inherit; border-color:currentColor; }
     .fn-ref::after { content:''; position:absolute; inset:-6px; border-radius:50%; }
     .fn-ref.active { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); }
     @media (hover: hover) { .fn-ref:hover { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); } }
@@ -5548,7 +5550,7 @@
     .prg-days-bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; margin-top: 14px; }
     .prg-days-bar { flex: 1; min-width: 0; height: 4px; border-radius: 3px; background: var(--surface-3); }
     .prg-days-bar.is-on { background: var(--accent); }
-    .prg-days-axis { display: flex; justify-content: space-between; margin-top: var(--sp-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-3); }
+    .prg-days-axis { display: flex; justify-content: space-between; margin-top: var(--sp-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-2); }
     .prg-row { position: relative; display: flex; flex-direction: column; padding: 12px var(--card-pad) 13px; }
     .prg-row + .prg-row::before, .prg-row + .ui-row::before { content: ""; position: absolute; top: 0; left: var(--card-pad); right: 0; height: 1px; background: var(--hairline); }
     .prg-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
@@ -5660,7 +5662,7 @@
     .link-row { border-radius: var(--r-card); background: var(--surface-1); overflow: hidden; }
     .link-half { display: flex; flex-direction: column; width: 100%; padding: 14px var(--card-pad) 15px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--press) ease; }
     .link-half:active { background: var(--surface-2); }
-    .link-half-word { margin-bottom: 3px; color: var(--text-3); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 500; }
+    .link-half-word { margin-bottom: 3px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 500; }
     .link-half-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); }
     .link-half-cat { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
     .link-half-quote { margin-top: var(--sp-2); padding-left: 12px; border-left: 2px solid var(--surface-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -5679,7 +5681,6 @@
       color: var(--cream-muted);
     }
     /* n116: the how-to on the Notebooks tab sits above the notebook rows, so it is shorter. */
-    .notes-empty-inline { padding: 1.2rem 1rem 1.4rem; }
     /* n118: the one primary button an empty list screen carries (Bookmarks, Links, History). */
     .empty-cta {
       display: inline-block; min-height: 44px; margin-top: 1.2rem; padding: 0.6rem 1.6rem;
@@ -6460,14 +6461,6 @@
     }
     /* Inline thought-edit mode inside the popover. */
     .bkm-popover-thought-edit { padding: 6px 0 8px; }
-    /* Inline thought-edit inside the action sheet (long-press flow). */
-    .bkm-action-thought-edit { padding: 12px 14px 8px; }
-    .bkm-action-thought-actions {
-      display: flex; gap: 0.5rem; margin-top: 4px;
-    }
-    .bkm-action-thought-actions .link-action-btn {
-      flex: 1; justify-content: center;
-    }
 
     /* Invisible word-joiner injected at mark boundaries that fall MID-WORD
        so the browser cannot break a word across the mark/text seam. The

@@ -44,13 +44,14 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const EXCEPTIONS = [
   [/^web/, /^(canvas|div\.sw-(stage|canvas))/, 'Scripture Web draws its scene on a black canvas in both themes by design (sw-chrome-light)'],
   [/^web/, /sw-/, 'Scripture Web chrome floats over the black canvas and keeps the dark ink in both themes (sw-chrome-light.test.js)'],
+  [/^web-guide/, /^span > b$/, 'the How-to-read card is Scripture Web chrome over the black canvas: light ink in both themes, like the sw- chrome above', ['light ink']],
   [/^garden-page/, /./, 'the Garden viewer is a dark room in both themes (photographs on black); its own tokens are set dark (.garden-fullscreen)', ['light ink', 'dark fill']],
 ];
 const excepted = (stop, sel, kind) => EXCEPTIONS.find(([s, e, , k]) => s.test(stop) && e.test(sel) && (!k || k.includes(kind)));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { server, url: BASE } = await serveOwnTree();
-const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-gpu', '--renderer-process-limit=2'] });
+const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--renderer-process-limit=2', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 
 /* ── in-page measurement ── */
 function measureInPage(isLight) {
@@ -285,6 +286,18 @@ async function runTheme(theme) {
     await ev(() => { const s = document.querySelector('.screen-scroll'); if (s) s.scrollTop = s.scrollHeight; }); await sleep(600);
     await stop('tour-offer');
     await tap('^show me around'); await sleep(1200); await stop('tour');
+    // the stops after the first card (LIGHT2): the primary button walks on; a stop that waits on its target is pressed for it
+    const primary = () => ev(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); if (!b) return null; const t = b.textContent.trim(); b.click(); return t; });
+    for (let k = 2; k <= 16; k++) {
+      const before = await ev(() => { const e = document.querySelector('.tour-card'); return e ? e.textContent.slice(0, 80) : null; });
+      if (!before) break;
+      const pressed = await primary(); await sleep(1200);
+      let after = await ev(() => { const e = document.querySelector('.tour-card'); return e ? e.textContent.slice(0, 80) : null; });
+      if (after && after === before) { await ev(() => { try { window.TourController && window.TourController.targetPressed(); } catch (_e) { /* */ } }); await sleep(1200); after = await ev(() => { const e = document.querySelector('.tour-card'); return e ? e.textContent.slice(0, 80) : null; }); }
+      if (!after) break;
+      await stop(`tour-${k}`);
+      if (pressed && /^(done|finish|end)/i.test(pressed)) break;
+    }
     await esc(2); await ev(() => { const b = [...document.querySelectorAll('button')].find((x) => /^(end|stop|close|skip|done)/i.test((x.getAttribute('aria-label') || x.textContent).trim())); if (b) b.click(); });
   });
   await declineTourOffer(page); await sleep(300);
@@ -341,7 +354,19 @@ async function runTheme(theme) {
     await tab('Read'); await ev(() => window.__openScriptureWeb({ book: 'genesis' })); await sleep(3000); await stop('web-guide');
     await ev(() => { const e = [...document.querySelectorAll('.sw-guide-close')].find((b) => /^got it$/i.test(b.textContent.trim())); if (e) e.click(); }); await sleep(800);
     await ev(() => { const e = [...document.querySelectorAll('.sw-whole')].find((b) => /^whole web$/i.test(b.textContent.trim())); if (e) e.click(); }); await sleep(1500); await stop('web-main');
-    await ev(() => { const e = document.querySelector('.sw-goto-btn'); if (e) e.click(); }); await sleep(800); await stop('web-goto'); await esc(2);
+    await ev(() => { const e = document.querySelector('.sw-goto-btn'); if (e) e.click(); }); await sleep(800); await stop('web-goto');
+    // LIGHT2: with SwiftShader WebGL the web draws, so its sheets and cards open too (geometry: the web lies a quarter turn clockwise at 412x915)
+    const swClick = (re) => ev((re) => { const b = [...document.querySelectorAll('button, [role="button"]')].find((x) => x.getBoundingClientRect().width > 0 && new RegExp(re, 'i').test((x.getAttribute('aria-label') || x.textContent).replace(/\s+/g, ' ').trim())); if (b) b.click(); return !!b; }, re);
+    if (await ev(() => { const i = [...document.querySelectorAll('input')].find((x) => x.getBoundingClientRect().width > 0); if (i) i.focus(); return !!i; })) {
+      await page.keyboard.type('John 3', { delay: 20 }); await page.keyboard.press('Enter'); await sleep(1500); await page.keyboard.press('Escape'); await sleep(900); await stop('web-focus');
+      await page.mouse.click(170, 330); await sleep(1200); await stop('web-chooser');
+      if (await ev(() => { const r = document.querySelector('.sw-choice-list button, .sw-choice-list [role="button"], .sw-choice-list > *'); if (r) r.click(); return !!r; })) { await sleep(1200); await stop('web-card'); }
+    }
+    await esc(2);
+    if (await swClick('^filter')) { await sleep(900); await stop('web-filters'); await esc(); }
+    if (await swClick('^list')) { await sleep(900); await stop('web-list'); await esc(); }
+    if (await swClick('^(more|menu|options|web menu|⋮)')) { await sleep(900); await stop('web-menu'); await esc(); }
+    await esc(2);
     await ev(() => window.__screenBack && window.__screenBack()); await sleep(800);
   });
   await step('plans', async () => { await tab('Library'); await tap('^reading plans'); await sleep(800); await stop('plans'); });
@@ -372,6 +397,169 @@ async function runTheme(theme) {
     await ev(() => { const b = document.querySelector('.audio-bar-summary'); if (b) b.click(); }); await sleep(1500); await stop('player');
     await ev(() => { const b = [...document.querySelectorAll('.np-tool')].find((x) => /speed/i.test(x.textContent)); if (b) b.click(); }); await sleep(900); await stop('player-speed');
     await esc(3);
+  });
+
+  /* ── LIGHT2: real data in the profile, then the screens that only show with it ── */
+  const click = (sel, t, nth = 0) => ev((sel, t, nth) => {
+    const els = [...document.querySelectorAll(sel)].filter((x) => x.getBoundingClientRect().width > 0 && (!t || new RegExp(t, 'i').test((x.getAttribute('aria-label') || x.textContent).replace(/\s+/g, ' ').trim())));
+    const b = els[nth]; if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true;
+  }, sel, t, nth);
+  const must = async (p, what) => { if (!(await p)) throw new Error('no ' + what); await sleep(900); };
+  const scrollTo = (y) => ev((y) => { const s = [...document.querySelectorAll('.screen-scroll')].filter((e) => e.getBoundingClientRect().width > 0).pop(); if (s) s.scrollTop = y === 'end' ? s.scrollHeight : y; }, y);
+  const select = (i, k, n) => ev((i, k, n) => {
+    const p = [...document.querySelectorAll('p.letter-para')].filter((q) => q.offsetParent && q.textContent.trim().length > 80)[i]; if (!p) return false;
+    const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT); let tn = w.nextNode(); let seen = 0;
+    while (tn) { if (tn.textContent.trim().length >= 20) { if (seen === k) break; seen++; } tn = w.nextNode(); }
+    if (!tn) return false;
+    const r = document.createRange(); const lead = tn.textContent.length - tn.textContent.trimStart().length; r.setStart(tn, lead); r.setEnd(tn, Math.min(lead + n, tn.length));
+    (tn.parentElement || p).scrollIntoView({ block: 'center' }); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange'));
+    const b = r.getBoundingClientRect(); const o = { bubbles: true, cancelable: true, clientX: b.x + 20, clientY: b.y + 8 };
+    p.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', isPrimary: true, ...o })); p.dispatchEvent(new MouseEvent('mouseup', o)); return true;
+  }, i, k, n);
+  const soft = async (what, fn) => { try { await fn(); } catch (e) { console.log(`${theme.padEnd(5)} seed: ${what} skipped (${String(e.message || e).slice(0, 160)})`); await esc(2); } };
+
+  if (want('lib-notes', 'lib-highlights', 'lib-bookmarks', 'lib-links', 'lib-journal', 'lib-notebooks', 'lib-history', 'lib-progress', 'journal-view', 'journal-edit')) await step('seed', async () => {
+    await tab('Read'); await tap('volumes of truth'); await tap('^volume two'); await tap('the seventh day'); await sleep(1500); await top();
+    await soft('highlight', async () => { await must(select(0, 0, 34), 'selection'); await sleep(1200); await tap('^yellow highlight'); await sleep(900); });
+    await soft('note', async () => {
+      await must(select(0, 1, 72), 'selection'); await sleep(1200); await tap('^note$'); await sleep(900);
+      await typeIn('textarea', 'Be steadfast. He strengthens the weak.'); await tap('^save$'); await sleep(900);
+    });
+    await soft('link', async () => {
+      await must(select(1, 0, 40), 'selection'); await sleep(1200); await tap('^link$'); await sleep(900); await tap('^browse$'); await tap('^search$');
+      await typeIn('input[type="search"], input', 'John 15'); await sleep(2000); await tap('john 15new testament'); await sleep(1500);
+      await tap('^select verse 5$'); await tap('^link to john 15'); await sleep(900); await tap('^done$');
+    });
+    await soft('bookmark', async () => { await ev(() => { if (window.__hideSelectionToolbar) window.__hideSelectionToolbar(); getSelection().removeAllRanges(); }); await tap('^bookmark this chapter'); await sleep(900); await tap('^save bookmark$'); });
+    // every colour in every mark style, as rows the Highlights list draws (copies of the real highlight's place)
+    await ev(() => {
+      const AS = window.AnnotationStore; if (!AS) return;
+      const all = AS.all(); const key = Object.keys(all).find((k) => (all[k] || []).some((a) => a.kind === 'highlight')) || Object.keys(all)[0]; if (!key) return;
+      const cols = ['yellow', 'green', 'pink', 'red', 'orange', 'blue', 'purple', 'teal', 'brown', 'gray'];
+      ['highlight', 'underline', 'squiggle'].forEach((kind, ki) => cols.forEach((color, ci) => {
+        if (kind === 'highlight' && color === 'yellow') return;
+        const id = `ctx-${kind}-${color}`; const s = 40 + (ki * 10 + ci) * 3;
+        AS.add(key, { id, groupId: id, kind, color, start: s, end: s + 2, text: `${color} ${kind}` });
+      }));
+    });
+    // a notebook, a journal entry with a photo and a voice memo
+    await ev(async () => {
+      try { if (window.NotebookStore) window.NotebookStore.add('Steadfast'); } catch (_e) { /* */ }
+      const blocks = [{ type: 'p', text: 'Grace and peace to you from the Lord.' }];
+      try {
+        const JM = window.JournalMediaStore;
+        const cv = document.createElement('canvas'); cv.width = 320; cv.height = 200; const g = cv.getContext('2d');
+        const gr = g.createLinearGradient(0, 0, 320, 200); gr.addColorStop(0, '#6a8caf'); gr.addColorStop(1, '#e8d8b0'); g.fillStyle = gr; g.fillRect(0, 0, 320, 200);
+        const img = await new Promise((r) => cv.toBlob(r, 'image/png'));
+        const pid = await JM.put({ type: 'image', blob: img, mime: 'image/png', width: 320, height: 200 });
+        blocks.push({ type: 'image', mediaId: pid });
+        const aid = await JM.put({ type: 'audio', blob: new Blob([new Uint8Array(2048)], { type: 'audio/webm' }), mime: 'audio/webm', duration: 12 });
+        blocks.push({ type: 'audio', mediaId: aid, duration: 12, samples: null });
+      } catch (_e) { blocks.push({ type: 'divider' }); }
+      blocks.push({ type: 'quote', text: 'Be steadfast.' });
+      if (window.JournalStore) window.JournalStore.add({ title: 'Morning reading', blocks });
+    });
+    await sleep(800);
+  });
+
+  // the Library's lists and each list's row sheet
+  const LISTS = [['notes', '^notes'], ['highlights', '^highlights'], ['bookmarks', '^bookmarks'], ['links', '^links'], ['journal', '^journal'], ['history', '^(history|see all)'], ['progress', '^progress']];
+  for (const [id, re] of LISTS) {
+    if (!want(`lib-${id}`, `lib-${id}-menu`)) continue;
+    await step(`lib-${id}`, async () => {
+      await tab('Library'); await tap(re); await sleep(900); await top(); await stop(`lib-${id}`);
+      if (id === 'progress') { await scrollTo('end'); await stop('lib-progress-2'); return; }
+      if (await click('.screen-scroll .ui-row-menu, .screen-scroll [aria-label$="options"], .screen-scroll [aria-label^="More"]')) { await sleep(900); await stop(`lib-${id}-menu`); await esc(); }
+      if (id === 'highlights' && await click('[aria-label="Colour"]')) { await sleep(900); await stop('lib-highlights-colour'); await esc(); }
+      if (id === 'notes') {   // with a notebook, Notes opens on Notebooks: a notebook, then All notes
+        if (await click('.screen-scroll .ui-row-press, .screen-scroll .ui-row-main, .screen-scroll .ui-row', 'steadfast')) { await sleep(900); await top(); await stop('lib-notebook'); await esc(); await sleep(400); }
+        if (await click('button, [role="tab"]', '^all notes')) { await sleep(900); await top(); await stop('lib-notes-all'); }
+        if (await click('.screen-scroll .ui-row-menu, .screen-scroll [aria-label*="option" i], .screen-scroll [aria-label^="More" i]')) { await sleep(900); await stop('lib-notes-all-menu'); await esc(); }
+      }
+    });
+  }
+  // the note editor and the journal: viewer, editor, insert sheet
+  await step('editors', async () => {
+    await tab('Library'); await tap('^notes'); await sleep(600); await click('button, [role="tab"]', '^all notes'); await sleep(900);
+    await must(click('.screen-scroll .ui-row-menu, .screen-scroll [aria-label*="option" i], .screen-scroll [aria-label^="More" i]'), 'a note menu'); await sleep(900);
+    await tap('^edit note'); await sleep(1200); await stop('note-edit'); await esc(2);
+    await tab('Library'); await tap('^journal'); await tap('^morning reading'); await sleep(1200); await stop('journal-view');
+    await tap('^edit$'); await sleep(1200); await stop('journal-edit');
+    await tap('^insert$'); await sleep(900); await stop('journal-insert'); await esc();
+    await tap('^done$'); await esc(2);
+  });
+
+  // a reading plan: preview, started, its schedule, a finished day
+  await step('plan', async () => {
+    await tab('Library'); await tap('^reading plans'); await tap('^bible in a year'); await sleep(900); await top(); await stop('plan-preview');
+    await tap('^(start|begin)'); await sleep(1200); await top(); await stop('plan-page');
+    await scrollTo('end'); await stop('plan-page-2'); await top();
+    await tap('^whole schedule$'); await sleep(900); await top(); await stop('plan-schedule'); await esc();
+    await tap('^(continue|start) reading'); await sleep(1800); await stop('plan-session');
+    for (let i = 0; i < 5 && !(await ev(() => [...document.querySelectorAll('button')].some((b) => /^finish day/i.test(b.textContent.trim())))); i++) { await tap('^next'); await sleep(1500); }
+    await ev(() => { const e = document.querySelector('.plan-end'); if (e) e.scrollIntoView({ block: 'start' }); }); await sleep(800);
+    await tap('^finish day'); await sleep(1200); await stop('plan-daydone'); await tap('^done$');
+  });
+
+  // songs, a song page, the song player and its lyrics; Downloads and its pickers
+  await step('songs', async () => {
+    await tab('Listen'); await tap('^songs of the letters');
+    await page.waitForFunction(() => !!document.querySelector('.songs-chips'), { timeout: 30000 }); await sleep(2000); await top(); await stop('songs');
+    await must(click('.ui-chip', '^worship'), 'Worship chip'); await sleep(1200); await top();
+    await must(click('.songs-row .ui-row-menu', null, 2), 'song menu'); await stop('song-menu');
+    await click('.ui-sheet-action', '^(save|keep)'); await sleep(700);
+    await must(click('.songs-row .ui-row-menu', null, 2), 'song menu'); await must(click('.ui-sheet-action', '^song page'), 'song page action'); await sleep(1200); await top(); await stop('song-page');
+    await ev(() => { const b = document.querySelector('.bar-back, [aria-label^="Back to"]'); if (b) b.click(); }); await sleep(900);
+    await must(click('.songs-row .ui-row-main', null, 2), 'song row'); await sleep(2500);
+    await tab('Read'); await must(click('.audio-bar-summary'), 'audio bar'); await sleep(1500); await stop('song-player');
+    await must(click('.np-tool', '^lyrics'), 'lyrics tool'); await sleep(1500); await stop('song-lyrics'); await esc(3);
+  });
+  await step('downloads', async () => {
+    await tab('Listen'); await tap('^downloads'); await sleep(900); await stop('downloads');
+    await must(click('.dl-tab', '^choose'), 'Choose tab'); await sleep(900); await top(); await stop('dl-choose');
+    await click('.dl-row-main', '^volume two'); await sleep(500); await click('.dl-box', 'volume two'); await sleep(600); await stop('dl-pick');
+    await tap('^voice to download'); await sleep(700); await stop('dl-voice'); await esc();
+  });
+
+  // Answers' sheets: share card, more, a command tablet, media, saved, a topic, its share card, on this page
+  await step('answers-sheets', async () => {
+    await tab('Read'); await tap('^topics & doctrines'); await sleep(1500);
+    await must(click('[aria-label="Share as a card"]'), 'share card'); await stop('ans-share'); await esc();
+    await must(click('.ans-chip.is-more'), 'more chip'); await stop('ans-more'); await esc();
+    if (await click('.ans-tablet', null, 3)) { await stop('ans-cmd'); await esc(); }
+    if (await click('.ans-tile-btn', 'chart')) { await sleep(900); await stop('ans-media'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
+    if (await click('.ans-tile-btn', 'saved')) { await sleep(900); await stop('ans-saved'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
+    await ev(() => { const h = document.querySelector('.ans-hero-c'); if (h) h.closest('.screen-scroll').scrollTop = 0; });
+    await tap('the sabbath.$'); await sleep(1200); await stop('ans-topic');
+    if (await click('[aria-label="Share as a card"], [aria-label^="Share"]')) { await sleep(900); await stop('ans-topic-card'); await esc(); }
+    await ev(() => { const h = document.querySelector('.ans-hero'); if (h) h.closest('.screen-scroll').scrollTop = 1800; }); await sleep(600);
+    await must(click('.ans-runhead'), 'running head'); await stop('ans-onpage'); await esc(2);
+  });
+
+  // every Settings page and its sheets
+  await step('settings-all', async () => {
+    const back = async () => { await tap('^back to settings'); await top(); };
+    await tab('Read'); await tap('^settings$');
+    await ev(() => { const i = document.getElementById('settings-find-input'); if (!i) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'keep'); i.dispatchEvent(new Event('input', { bubbles: true })); }); await sleep(1000); await stop('st-find');
+    await ev(() => { const i = document.getElementById('settings-find-input'); if (!i) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); }); await sleep(600);
+    await tap('^reading'); await stop('st-reading'); await scrollTo('end'); await stop('st-reading-2'); await top();
+    await tap('^more$'); await stop('st-restored'); await esc();
+    await tap('^previous and next arrows'); await stop('st-arrows'); await esc();
+    await tap('^auto-scroll'); await stop('st-auto'); await tap('^back to reading'); await back();
+    await tap('^a return to the garden'); await stop('st-garden-quality'); await esc();
+    await tap('^listening'); await stop('st-listening'); await back();
+    await tap('^buttons and tools'); await stop('st-tools'); await back();
+    await tap('^sharing'); await stop('st-sharing'); await back();
+    await tap('^your data'); await scrollTo('end'); await stop('st-data-2'); await back();
+    await scrollTo('end'); await tap('^about votreader'); await sleep(900);
+    await tap('^what.s new'); await sleep(900); await stop('about-new'); await esc();
+    await tap('^credits and privacy'); await stop('about-credits');
+  });
+
+  // Search with results by section, the Tabs sheet with tabs open
+  await step('search-more', async () => {
+    await tab('Read'); await tap('^search'); await typeIn('input', 'steadfast'); await page.keyboard.press('Enter'); await sleep(1500); await stop('search-results-2');
+    await scrollTo(900); await stop('search-results-3');
   });
 
   if (errors.length) results.push({ stop: 'page-errors', theme, unreached: errors.slice(0, 3).join(' | ') });
