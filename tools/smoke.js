@@ -273,11 +273,18 @@
     if (tab) { tab.click(); return true; }
     return false;
   }
-  /** The Settings gear (a root's own, or the bar's): matched by name, as it has no text. */
-  function openSettings() {
-    var g = document.querySelector('.root-gear-btn, .settings-gear-btn');
-    if (g) { g.click(); return true; }
-    return false;
+  /** Settings: the gear (a root's own, or the bar's) opens Quick settings, whose last row is Settings (GEAR1). */
+  async function openSettings() {
+    var g = document.querySelector('.root-gear-btn:not(.plan-gear), .settings-gear-btn');
+    if (!g) return false;
+    g.click();
+    await sleep(120);
+    var row = [].slice.call(document.querySelectorAll('.quick-settings-sheet [role="menuitem"]')).find(function (b) {
+      return (b.textContent || '').trim() === 'Settings';
+    });
+    if (!row) return false;
+    row.click();
+    return true;
   }
   function onHome() {
     // Home shows the main nav tiles. Detect via button TEXTCONTENT, not
@@ -642,7 +649,7 @@
       return /Most (Annotated|marked)/i.test(document.body.textContent || '');   // W2b: the section is Most marked (mock v2 l-prog2)
     });
     await step('Settings', async function () {
-      openSettings(); await sleep(360);
+      await openSettings(); await sleep(360);
       return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Your data/.test(document.body.textContent || '');
     });
     await goHome();

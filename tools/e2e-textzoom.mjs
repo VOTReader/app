@@ -155,7 +155,7 @@ try {
     await stop('notes-index');
     await click('Back'); await libTile('journal');
     await stop('journal');
-    await tab('Read'); await click('Settings'); await sleep(300);
+    await tab('Read'); await click('Quick settings'); await click('Settings'); await sleep(300);   // GEAR1: the gear opens Quick settings
     await page.evaluate(() => { for (const h of document.querySelectorAll('.settings-group-head')) if (/Appearance|Your Data/.test(h.textContent)) h.click(); }); await sleep(500); await setScale();
     await stop('settings');
     await click('Search'); await stop('search');

@@ -568,9 +568,12 @@ async function main() {
     try {
       // TABS5: Mark as read off the way a reader does it (Settings -> Progress), since the state lives in IndexedDB
       // and the running app writes its own over a hand edit (TABS4's localStorage write never reached the app)
-      await page.evaluate(() => { if (!document.querySelector('[aria-label="Settings"]') && window.__goHome) window.__goHome(); });
-      await page.waitForSelector('[aria-label="Settings"]', { timeout: 10000 });
-      await page.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('[aria-label="Settings"]')).click());
+      // GEAR1: the gear opens Quick settings; Settings is its last row.
+      await page.evaluate(() => { if (!document.querySelector('[aria-label="Quick settings"]') && window.__goHome) window.__goHome(); });
+      await page.waitForSelector('[aria-label="Quick settings"]', { timeout: 10000 });
+      await page.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('[aria-label="Quick settings"]')).click());
+      await page.waitForSelector('.quick-settings-sheet [role="menuitem"]', { timeout: 5000 });
+      await page.evaluate(() => /** @type {HTMLElement} */ ([...document.querySelectorAll('.quick-settings-sheet [role="menuitem"]')].find((b) => b.textContent.trim() === 'Settings')).click());
       const grp = 'section[data-settings-group="progress"]';
       await page.waitForSelector(`${grp} .settings-group-head`, { timeout: 10000 });
       if (!(await page.$eval(`${grp} .settings-group-head`, (b) => b.getAttribute('aria-expanded') === 'true'))) await page.click(`${grp} .settings-group-head`);
