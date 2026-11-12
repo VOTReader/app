@@ -55,7 +55,9 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(texts('.ans-sechead .ans-h2', panel)).toEqual(['The Ten Commandments', 'Other Topics', 'Thus Says The Lord...', 'Index of False Doctrines Within the Churches of Men']);
     expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics', '16 topics', '85 topics']);
     expect(texts('.ans-tablet .ans-num')).toEqual(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']);
-    expect(panel.querySelector('.ans-row .ans-row-title').textContent).toBe('Main Page');
+    // ANS1: the Main Page is the Start here card, not a Contents row: the list starts at The Ten Commandments
+    expect(panel.querySelector('.ans-sechead .ans-h2').textContent).toBe('The Ten Commandments');
+    expect(texts('.ans-row .ans-row-title', panel)).not.toContain('Main Page');
     // WA1 (a-az): group numbers dropped; the twelve groups are the rows that count topics
     const groups = [...panel.querySelectorAll('.ans-row')].filter((r) => /^\d+ topics?/.test(NB((r.querySelector('.ans-row-sub') || { textContent: '' }).textContent)));
     expect(groups.map((r) => r.querySelector('.ans-row-title').textContent)).toEqual(['Signs of this generation', 'Prophets, witnesses & gifts',
@@ -70,8 +72,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
   it('subs come from the shared words: size, minutes, media, "✓ Read" in words', () => {
     render(<AnswersHome {...base} />);
     const row = (t) => [...document.querySelectorAll('.ans-row')].find((r) => r.querySelector('.ans-row-title').textContent === t);
-    expect(NB(row('Main Page').querySelector('.ans-row-sub').textContent)).toBe('12 passages · ~12 min · video · downloads');
-    expect(NB(row('The Volumes of Truth').querySelector('.ans-row-sub').textContent)).toBe('39 passages · ~38 min · video · audio · Read');
+    expect(NB(row('The Volumes of Truth').querySelector('.ans-row-sub').textContent)).toBe('39 passages · 38 min · video · audio · Read');
     expect(NB(row('False Doctrines Within the Churches (Index)').querySelector('.ans-row-sub').textContent)).toBe('46 categories, each answered by The Truth');
     expect(NB(screen.getByRole('button', { name: /^Charts and videos/ }).getAttribute('aria-label'))).toBe('Charts and videos, 2 charts, 4 videos, 11 playlists and more');
     expect(document.body.textContent).not.toMatch(/\b0 passages/);
@@ -100,24 +101,103 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     const second = render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
     expect(path().querySelector('.ans-k').textContent).toBe('Start here');
     expect(path().querySelector('.ans-row-title').textContent).toBe('Main Page');
-    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · about 12 min');
+    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · 12 min');
     second.unmount();
     render(<AnswersHome {...base} pathOn={false} />);
     expect(path().querySelector('.ans-k').textContent).toBe('Start here');
     expect(document.querySelector('.ans-read')).toBeNull();
   });
 
-  it('the Answer of the day is one whole excerpt by the date, and Read in context opens it', () => {
+  // ANS1: the Answer of the day is gone; its Surprise me is a chip at the end of the question chips
+  it('Surprise me ends the chips and opens a quote paragraph on its own words', () => {
     const onOpenTopic = vi.fn();
-    render(<AnswersHome {...base} onOpenTopic={onOpenTopic} now={new Date(2026, 4, 17, 12)} />);
-    const daily = document.querySelector('.ans-daily');
-        expect(daily.querySelector('.ans-quote').textContent).toMatch(/^"For I am a Great King!.*God Eternal!"$/);
-    // WA1 (a-land): the source line carries the head's date; the label keeps the site's wording
-    expect(daily.querySelector('.ans-src a').getAttribute('aria-label')).toMatch(/^Excerpt from “The Alarm of War”, /);
-    expect(NB(daily.querySelector('.ans-src a').textContent)).toMatch(/^“The Alarm of War” · .+ · 7\/5\/10$/);
-    fireEvent.click(within(daily).getByText('Read in context'));
-    expect(onOpenTopic.mock.calls[0][0]).toBe('there-is-no-other');
-    expect(onOpenTopic.mock.calls[0][1]).toMatch(/^"For I am a Great King!/);
+    render(<AnswersHome {...base} onOpenTopic={onOpenTopic} />);
+    expect(document.querySelector('.ans-daily')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Answer of the day|Read in context/);
+    const chips = [...document.querySelectorAll('.ans-ask .ans-chip')];
+    expect(chips.slice(-2).map((c) => c.textContent)).toEqual(['More questions', 'Surprise me']);
+    const s = chips[chips.length - 1];
+    expect(s.classList.contains('is-more')).toBe(false);
+    expect(s.querySelector('.ans-ico')).toBeTruthy();
+    fireEvent.click(s);
+    expect(onOpenTopic).toHaveBeenCalledTimes(1);
+    const [id, para, from] = onOpenTopic.mock.calls[0];
+    const e = ANSWERS.find((x) => x.id === id);
+    expect(e.paragraphs.some((p) => p.text === para && p.align === 'justify')).toBe(true);
+    expect(from).toBe('Answers');
+  });
+
+  // ANS1: "Main Page" is offered once on the landing, by the Start here card
+  it('Main Page once: the Start here card, not the jump strip or the Contents list', () => {
+    render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
+    expect(texts('.ans-jump-strip .ans-az-key')[0]).toBe('Ten Commandments');
+    expect(texts('.ans-jump-strip .ans-az-key')).not.toContain('Main Page');
+    const landing = document.querySelector('.ans-landing');
+    const offers = [...landing.querySelectorAll('button')].filter((b) => /^Main Page$/.test((b.querySelector('.ans-row-title') || b).textContent.trim()));
+    expect(offers).toHaveLength(1);
+    expect(offers[0].classList.contains('ans-start')).toBe(true);
+  });
+
+  // ANS1: the chips finish "What does The Lord say about…"; when the field falls back, the words stand above them
+  it('the lead-in line shows exactly when the field falls back to "Search Answers…"', () => {
+    const proto = HTMLCanvasElement.prototype;
+    const had = proto.getContext;
+    const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    const run = (room) => {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return room; } });
+      const r = render(<AnswersHome {...base} />);
+      const out = { ph: field().getAttribute('placeholder'), lead: document.querySelector('.ans-ask-lead') };
+      const next = out.lead ? out.lead.nextElementSibling : null;
+      out.beforeChips = !!(next && next.classList.contains('ans-chips'));
+      out.text = out.lead ? out.lead.textContent : null;
+      r.unmount();
+      return out;
+    };
+    try {
+      proto.getContext = function getContext() { return { font: '', measureText: (t) => ({ width: t.length * 8 }) }; };
+      const narrow = run(150);
+      expect(narrow.ph).toBe('Search Answers…');
+      expect(narrow.text).toBe('What does The Lord say about…');
+      expect(narrow.beforeChips).toBe(true);
+      const wide = run(600);
+      expect(wide.ph).toBe('What does The Lord say about…');
+      expect(wide.lead).toBeNull();
+    } finally {
+      proto.getContext = had;
+      if (cw) Object.defineProperty(HTMLElement.prototype, 'clientWidth', cw); else delete HTMLElement.prototype.clientWidth;
+    }
+  });
+
+  // ANS1: the scrolled-in bar title is never cut: whole when it fits at 15 px or more, else "Answers"
+  it('the bar title is the whole name, made smaller to fit, or "Answers"; never an ellipsis', () => {
+    const proto = HTMLCanvasElement.prototype;
+    const had = proto.getContext;
+    const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    const title = (room) => {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return room; } });
+      const r = render(<AnswersHome {...base} />);
+      const inner = navProps.leftExtras && document.querySelector('.ans-bar-title > span');
+      const out = { text: inner.textContent, size: inner.style.fontSize };
+      r.unmount();
+      return out;
+    };
+    try {
+      // the title measures 250 px at the bar's 18 px (a stub canvas; jsdom has no font size, so the bar's is given)
+      proto.getContext = function getContext() { const c = { font: '', measureText: (t) => ({ width: t.length * 10 }) }; return c; };
+      const gcs = window.getComputedStyle;
+      window.getComputedStyle = (el) => { const cs = gcs(el); return new Proxy(cs, { get: (o, k) => (k === 'fontSize' ? '18px' : (typeof o[k] === 'function' ? o[k].bind(o) : o[k])) }); };
+      try {
+        expect(title(400)).toEqual({ text: 'Answers Only God Can Give', size: '' });
+        const small = title(230);
+        expect(small.text).toBe('Answers Only God Can Give');
+        expect(parseFloat(small.size)).toBeGreaterThanOrEqual(15);
+        expect(title(150)).toEqual({ text: 'Answers', size: '' });
+      } finally { window.getComputedStyle = gcs; }
+    } finally {
+      proto.getContext = had;
+      if (cw) Object.defineProperty(HTMLElement.prototype, 'clientWidth', cw); else delete HTMLElement.prototype.clientWidth;
+    }
+    expect(document.body.textContent).not.toMatch(/Answers Only God Can …/);
   });
 
   it('while answers.js loads, the head, title, tagline, chips and tablets paint; the path and the day wait', () => {
@@ -125,10 +205,10 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     render(<AnswersHome {...base} entries={null} site={null} />);
     expect(document.querySelector('h1').textContent).toBe('Answers Only God Can Give');
     expect(document.querySelector('.ans-lede').textContent).toBe(SITE.tagline);
-    expect(document.querySelectorAll('.ans-chip').length).toBe(6);
+    expect(document.querySelectorAll('.ans-chip').length).toBe(7);
+    expect(document.querySelector('.ans-chip.is-surprise').disabled).toBe(true);
     expect(document.querySelectorAll('.ans-tablet').length).toBe(10);
     expect(document.querySelector('.ans-start')).toBeNull();
-    expect(document.querySelector('.ans-daily')).toBeNull();
   });
 
   it('a chip, a group and Charts & videos open where they say', () => {
@@ -228,7 +308,12 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     // WA2 (a-about): the site's own row first, then the Sister Sites, in one card under their head
     const sister = [...d.querySelectorAll('h3')].find((h) => h.textContent === 'Sister Sites');
     const rows = [...sister.parentNode.nextElementSibling.querySelectorAll('a .ans-row-title')].map((n) => n.textContent).slice(1);
-    expect(rows).toEqual(SITE.sisterSites.map((s) => s.label));
+    // ANS1 (mock a-about): the official pages by short names, the address under each; the site's full name stays the label
+    expect(rows.slice(0, 4)).toEqual(['TheVolumesofTruth.com', 'YouTube channel', 'Facebook page', 'X page']);
+    expect(rows.slice(4)).toEqual(SITE.sisterSites.slice(4).map((s) => s.label));
+    const yt = [...sister.parentNode.nextElementSibling.querySelectorAll('a')].find((a) => a.textContent.startsWith('YouTube channel'));
+    expect(yt.querySelector('.ans-row-sub').textContent).toBe('youtube.com/AnswersOnlyGodCanGive');
+    expect(yt.getAttribute('aria-label')).toBe('Answers Only God Can Give - Official YouTube Channel, youtube.com/AnswersOnlyGodCanGive');
     expect(d.textContent).toContain('Copyright © 2004-2024 ~ All Rights Reserved.');
     expect(d.textContent).toContain('2026-10-19');
     expect(d.textContent).toContain('The words, headings and order are the site’s.');

@@ -2,8 +2,8 @@
    AnswersCardSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
    Share as a card (AOGCG final design O6), from the long-press menu on an
-   Answers topic (SelectionToolbar) and the Answer of the day's share
-   button (AnswersHome): a theme control (Parchment · Ink · Night), the
+   Answers topic (SelectionToolbar) and a topic's own share (AnswersTopic):
+   a theme control (Parchment · Ink · Night), the
    card itself as a 4:5 preview in the app serif (the passage verbatim,
    then its citation, its date and answersonlygodcangive.com), and Share.
 

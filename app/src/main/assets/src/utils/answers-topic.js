@@ -17,7 +17,7 @@
    text (tools/fetch-answers.py).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { pl, SEP, NBSP, answersMinutes, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead } from './answers-browse.js';
+import { pl, SEP, NBSP, answersMinWords, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead } from './answers-browse.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle, isAttribution, isTrumpetSection } from './answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteShelfOf } from './answers-site.js';
 import { answersSource } from './answers-contents.js';
@@ -86,7 +86,7 @@ function pageMedia(meta) {
 }
 
 /**
- * The hero's meta line: "26 passages · ~31 min · 15 sections · 2 playlists · 1 video · audio · PDF · 2 charts";
+ * The hero's meta line: "26 passages · 31 min · 15 sections · 2 playlists · 1 video · audio · PDF · 2 charts";
  * "6 links" for a page of links (never "0 passages"). '' before the sidecar lands.
  * @param {any} entry
  * @param {any} meta
@@ -97,7 +97,7 @@ export function answersHeroMeta(entry, meta) {
   const top = answersTopSections(meta).length;
   const size = fd ? pl(top, 'category') : answersSizeWords(entry, meta, { minutes: false });
   const parts = [size];
-  if (!/link$|links$/.test(size) && !size.startsWith('~')) parts.push('about' + NBSP + answersMinutes(meta) + NBSP + 'min');
+  if (!/link$|links$/.test(size) && !/min$/.test(size)) parts.push(answersMinWords(meta));
   if (!fd && top === 2) parts.push(pl(top, 'section')); // WA1 (a-topic): 3 or more are counted by the sections strip
   const pos = (m) => (m.at === 'end' ? 1e9 : m.at);
   return parts.concat(mediaWords(pageMedia(meta).slice().sort((a, b) => pos(a) - pos(b)))).filter(Boolean).join(SEP);

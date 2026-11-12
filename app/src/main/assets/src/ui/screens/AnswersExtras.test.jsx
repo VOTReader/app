@@ -1,6 +1,6 @@
 // @ts-nocheck — free-var globals installed on window, same shape as AnswersHome.test.jsx
 /* The AOGCG Extras on the real corpus: Saved answers (O5: the screen and the landing's Tools row) and
-   Share as a card (O6: the Answer of the day's share button, the sheet, the 80-word rule). */
+   Share as a card (O6: the sheet, the 80-word rule). */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, act, within } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
@@ -101,11 +101,8 @@ describe('Saved answers (O5)', () => {
 });
 
 describe('Share as a card (O6)', () => {
-  it('the Answer of the day\'s share button opens the card: Parchment · Ink · Night, the preview, Share', () => {
-    stores({});
-    render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} now={new Date(2026, 4, 17, 12)} />);
-    const daily = document.querySelector('.ans-daily');
-    fireEvent.click(within(daily).getByLabelText('Share as a card'));
+  it('the card sheet: Parchment · Ink · Night, the preview, Share', () => {
+    render(<AnswersCardSheet card={{ passage: '"For I am a Great King! I AM God Eternal!"', cite: '“The Alarm of War” · Volume Six', date: '7/5/10' }} onClose={noop} />);
     const sheet = screen.getByRole('dialog', { name: 'Share as a card' });
     // One choice of three that repaints the card: a radio group (a tablist would want panels to show).
     const group = within(sheet).getByRole('radiogroup', { name: 'Card theme' });

@@ -8603,15 +8603,7 @@
 .ans-tablet .ans-row-title{display:flex;align-items:center;gap:6px}
 @media (max-width:380px){.ans-tablets{column-gap:16px}}
 
-/* Answer of the day */
-.ans-daily{margin-top:32px}
-.ans-daily .ans-metarow{margin-top:8px}
 .ans-quote{margin:8px 0 0;font-size:var(--fs-18);line-height:1.6;color:var(--cream)}
-.ans-daily .ans-src{margin:4px 0 0;text-align:right}
-.ans-actions{display:flex;flex-wrap:wrap;gap:0 24px;margin-top:4px}
-/* the source chip's 14px band overlaps the buttons beside it (Share above it at Text Size 2+, the text buttons under it):
-   a tap on a button's edge is that button's, not the chip's (acceptance U10) */
-.ans-daily .ans-textbtn{position:relative;z-index:1}
 
 /* Tabs and landing sections */
 .ans-tabs{display:flex;margin-top:32px;border-bottom:1px solid var(--border)}
@@ -9017,19 +9009,17 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-landing .ans-chips{gap:var(--sp-2);margin-top:10px}
 .ans-landing .ans-chip{min-height:var(--chip-h);padding:0 12px;border:0;border-radius:var(--r-chip);background:var(--surface-1);color:var(--text-1);font-size:var(--ts-value)}
 .ans-landing .ans-chip.is-more{background:var(--accent-soft);color:var(--accent)}
-.ans-start,.ans-landing .ans-daily,.ans-box{border-radius:var(--r-card);background:var(--surface-1)}
+/* ANS1: the sentence the chips finish when the field cannot hold it; Surprise me ends the chips, outlined like them */
+.ans-ask-lead{margin:12px 0 0;font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);color:var(--text-2)}
+.ans-ask-lead+.ans-chips{margin-top:6px}
+.ans-landing .ans-chip.is-surprise{display:inline-flex;align-items:center;gap:6px}
+.ans-chip.is-surprise .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
+.ans-landing .ans-chip.is-surprise:disabled{opacity:.55}
+.ans-start,.ans-box{border-radius:var(--r-card);background:var(--surface-1)}
 .ans-start{display:flex;align-items:center;gap:12px;width:100%;margin-top:var(--sp-4);padding:14px 12px 14px 16px;color:var(--text-1)}
 .ans-start .ans-row-title{margin-top:2px;font-size:var(--ts-headline)}
-.ans-landing .ans-row-sub,.ans-landing .ans-daily .ans-src{font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);font-style:normal;color:var(--text-2)}
+.ans-landing .ans-row-sub{font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);font-style:normal;color:var(--text-2)}
 .ans-landing .ans-chev{color:var(--text-3)}
-.ans-landing .ans-daily{margin-top:12px;padding:14px 16px 4px}
-.ans-landing .ans-quote{display:-webkit-box;margin-top:var(--sp-2);overflow:hidden;font-size:var(--ts-headline);line-height:1.45;font-style:italic;font-weight:600;-webkit-line-clamp:4;-webkit-box-orient:vertical}
-.ans-landing .ans-daily .ans-src{margin:var(--sp-2) 0 0;text-align:left}
-.ans-landing .ans-actions{flex-wrap:nowrap;align-items:center;gap:4px;margin:10px -8px 0;padding:2px 0;border-top:1px solid var(--hairline)}
-.ans-landing .ans-actions .ans-textbtn{min-height:var(--tap);padding:0 8px;gap:6px;font-family:var(--font-ui);font-size:var(--ts-value);color:var(--text-1)}
-.ans-landing .ans-actions .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
-.ans-landing .ans-actions .ans-gold{color:var(--accent)}
-.ans-sp{flex:1}
 .ans-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 .ans-tile-btn{display:flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:var(--btn-h);border-radius:var(--r-card);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-value)}
 .ans-tile-btn svg{color:var(--accent)}
@@ -9083,13 +9073,19 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-hero .ans-label{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);color:var(--accent)}
 .ans-hero .ans-display{font-weight:600}
 .ans-hero .ans-meta{font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
-.ans-runhead{top:calc(var(--dock-nav-bottom) - var(--bar-h) + var(--offline-strip-h,0px));left:52px;right:184px;width:auto;height:var(--bar-h);padding:0 4px;border:0;background:var(--bg);font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);transition:opacity var(--press),visibility var(--press)}
+.ans-runhead{top:calc(var(--dock-nav-bottom) - var(--bar-h) + var(--offline-strip-h,0px));left:var(--rh-left,52px);right:var(--rh-right,184px);width:auto;gap:4px;height:var(--bar-h);padding:0 4px;border:0;background:var(--bg);font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);transition:opacity var(--press),visibility var(--press)}
 .ans-runhead.is-hidden{transform:none;opacity:0}
 .ans-runhead :is(.ans-runhead-num,.ans-runhead-t){display:none}
 .ans-runhead .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
 .ans-runhead .ans-runhead-text{flex:0 1 auto}
 .ans-sec-strip .ans-az-key.ans-contents-line{flex:none;width:auto;margin:0}
-.ans-runhead:not(.is-hidden){z-index:1000}
+/* ANS1: one above the bar (100), under every sheet, menu, the tour and the Tabs screen; its sides come from the bar's own
+   buttons (AnswersTopic measures them into --rh-left / --rh-right). The section name is cut by letters on one line, so
+   its chevron follows the words; the bar titles keep the bar's capped 18 px at every text size, as bar titles do. */
+.ans-runhead:not(.is-hidden){z-index:101}
+.ans-runhead{font-size:var(--fsc-18)}
+.ans-runhead .ans-runhead-s{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ans-bar-title{font-size:var(--fsc-18);text-overflow:clip}
 /* ── WA2 answers (AnswersSheets.jsx, AnswersContents.jsx: a-onpage, a-cmd, a-more, a-card, a-about; mock v2 answers.html, WA2-answers 2026-11-11) ──
    Every Answers sheet: grab bar, then × | title | count on one row; rows in one inset card. */
 .ans-sheet .ans-sheet-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 -10px 4px;padding:0;border:0;background:inherit}

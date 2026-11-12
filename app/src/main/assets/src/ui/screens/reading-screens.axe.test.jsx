@@ -44,6 +44,7 @@ import { AnswersHome, resetAnswersLanding } from './AnswersHome.jsx';
 import { AnswersShelf } from './AnswersShelf.jsx';
 import { AnswersSaved } from './AnswersSaved.jsx';
 import { AnswersMedia } from './AnswersMedia.jsx';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -499,8 +500,8 @@ describe('axe — Answers browse screens', () => {
   });
 
   it('the Share as a card sheet', async () => {
-    render(<AnswersHome {...base} />);
-    act(() => { fireEvent.click(document.querySelector('.ans-daily button[aria-label="Share as a card"]')); });
+    // ANS1: the landing's Answer of the day is gone; the sheet opens from a topic's ⋯ menu and a selection
+    render(<AnswersCardSheet card={{ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }} onClose={() => {}} />);
     expectModal('Share as a card');
     await clean();
   });

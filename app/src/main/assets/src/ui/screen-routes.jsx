@@ -1076,7 +1076,6 @@ export function buildScreenRoutes({
       /* Search switched off hides every door into Search (Settings: "Off hides the search button everywhere"),
          the find boxes' "Search the whole library" rows too; Answers' own topic finder stays. */
       onSearchLibrary={settings.searchEnabled !== false ? (q) => { setSearchQuery(q); goSearch(); } : undefined}
-      onOpenLetter={(target) => openInAppLetter(target, { sourceLetterTitle: 'Answers', sourceVolumeLabel: null })}
       onGoToRef={(ref) => {
         const m = /^Exodus 20:(\d+)$/.exec(ref);
         if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
