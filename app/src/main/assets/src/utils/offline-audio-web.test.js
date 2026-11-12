@@ -710,7 +710,9 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
   // background counted as "no bytes" and every running download was aborted on the way back, from byte 0.
   it('time the page spent frozen is not a stall: the download goes on where it was', async () => {
     await ready();
-    WebOfflineAudio._setTiming({ stall: 60, retry: [5] });
+    // The wait and the pause are far apart on purpose: at stall 60 and a 50 ms pause a timer that ran 10 ms late on a
+    // busy machine was a real stall, and the test failed on and off (gates 2026-11-12). The check runs every 200 ms.
+    WebOfflineAudio._setTiming({ stall: 600, retry: [5] });
     let feed;
     fetchMock.mockImplementationOnce(async () => new Response(new ReadableStream({
       start(c) { c.enqueue(new Uint8Array(100)); feed = c; },
@@ -720,7 +722,7 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
     const realNow = Date.now;
     try {
       Date.now = () => realNow() + 3600000;   // an hour in the background: no timer ran, no chunk was read
-      await new Promise((r) => setTimeout(r, 50));   // the first tick back
+      await new Promise((r) => setTimeout(r, 250));   // the first tick back
       feed.enqueue(new Uint8Array(4900));
       feed.close();
       await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('fz'))).toBe(true));
