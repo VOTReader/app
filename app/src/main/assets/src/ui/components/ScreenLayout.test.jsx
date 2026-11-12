@@ -216,6 +216,23 @@ describe('ScreenLayout pager wiring', () => {
     expect(container.querySelector('.pager-peek-prev')).toBeTruthy();
     expect(container.querySelector('.pager-peek-next')).toBeTruthy();
   });
+
+  it('a touch after a plain re-render does not redraw neighbours that are already there (android 5)', async () => {
+    // Every reader hands a fresh pager object on each render; the neighbours it describes are the same ones.
+    let drawn = 0;
+    const Peek = () => { drawn++; return <span className="screen-scroll">peek</span>; };
+    const mk = () => ({ peek: () => ({ kind: 'screen', el: <Peek /> }), onPrev: () => {}, onNext: () => {} });
+    const ui = (p) => <SL hideTabsBtn navChildren={null} pager={p} placeKey="v:c">x</SL>;
+    const { container, rerender } = render(ui(mk()));
+    await waitFor(() => expect(container.querySelector('.pager-peek-next')).toBeTruthy());
+    rerender(ui(mk()));
+    const before = drawn;
+    const sc = container.querySelector('.screen-scroll');
+    const ev = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(ev, 'touches', { value: [{ identifier: 1, clientX: 300, clientY: 400 }] });
+    act(() => { sc.dispatchEvent(ev); });
+    expect(drawn).toBe(before);
+  });
 });
 
 /* The three tab roots (the layout pass, 2026-11-10): no resume dot and no ⋯ menu; navEnd (the gear) after Tabs. */
