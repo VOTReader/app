@@ -64,6 +64,18 @@ describe('snapLiveTab', () => {
     expect(p.getAttribute('data-snap-key')).toBe('gen-1-5');
   });
 
+  // FIXC (REVIEW-readers 8): a snapshot 1 s after a scroll could land in a slow sideways drag and keep its offset.
+  it('a snapshot taken mid-swipe shows the page at rest, not slid part-way off its side', () => {
+    page();
+    const track = /** @type {HTMLElement} */ (document.querySelector('.pager-track'));
+    track.style.transform = 'translate3d(-140px, 0, 0)';
+    track.style.transition = 'none';
+    track.style.willChange = 'transform';
+    const s = /** @type {any} */ (snapLiveTab());
+    expect(s.html).not.toMatch(/translate|will-change|transition/);
+    expect(track.style.transform).toBe('translate3d(-140px, 0, 0)');   // the live page is left alone
+  });
+
   it('copies nothing from the Tabs screen, a peek or an inert copy', () => {
     document.body.innerHTML = '<div class="tabs-overview-layer"><div class="screen-layout"><div class="screen-scroll">x</div></div></div>';
     expect(snapLiveTab()).toBeNull();
