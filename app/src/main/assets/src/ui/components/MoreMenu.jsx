@@ -47,6 +47,10 @@ import { translationName, translationSheetOptions } from '../../data/translation
 import { pageMenu } from '../../utils/page-menu.js';
 import { AnnotationHintItem } from './AnnotationHint.jsx';
 import { UiIcon } from './UiIcon.jsx';
+import { QuickSettingsRows, QuickSettingsLive, stepFontScale } from './QuickSettings.jsx';
+
+// The text-size step moved to QuickSettings.jsx with the block it serves (GEAR1); kept importable from here.
+export { stepFontScale };
 
 /**
  * @typedef {Object} NavMenuValue
@@ -64,29 +68,11 @@ import { UiIcon } from './UiIcon.jsx';
  * @property {(v: string) => void} [onTranslation]
  * @property {boolean} [autoScroll]      settings.autoScroll (r-menu's Auto-scroll row says On / Off)
  * @property {(on: boolean) => void} [onAutoScroll]
+ * @property {string} [screen]          the screen on show: a door back to it is left out (QuickSettings.jsx)
  */
 
 /** The ⋯ menu's actions and state (a NavMenuValue, or null outside the provider). */
 export const NavMenuContext = React.createContext(/** @type {NavMenuValue | null} */ (null));
-
-/** The Settings slider's range and the menu's step (SettingsScreen's TextSizeSliderRow: 0.8-3). */
-const MENU_SCALE_MIN = 0.8;
-const MENU_SCALE_MAX = 3;
-const MENU_SCALE_STEP = 0.1;
-
-/**
- * The next text scale one step up or down, clamped to the slider's range and
- * rounded to two places so repeated steps never drift (1.1 + 0.1 = 1.2).
- * @param {string | number | undefined} current
- * @param {1 | -1} dir
- * @returns {string}
- */
-export function stepFontScale(current, dir) {
-  const v = parseFloat(String(current));
-  const base = Number.isFinite(v) ? v : 1;
-  const next = Math.min(MENU_SCALE_MAX, Math.max(MENU_SCALE_MIN, base + dir * MENU_SCALE_STEP));
-  return String(Math.round(next * 100) / 100);
-}
 
 const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemradio"]';
 
@@ -212,9 +198,6 @@ export function MoreMenuBtn() {
       else setFallback(here.link);
     });
   };
-  const pct = Math.round(parseFloat(String(ctx.fontScale || '1')) * 100) || 100;
-  const atMin = pct <= MENU_SCALE_MIN * 100, atMax = pct >= MENU_SCALE_MAX * 100;
-  const theme = ctx.theme === 'light' ? 'light' : 'dark';
   // A Bible chapter's translation, picked from here as from Settings > Reading (mw17 A02.1).
   const canPickTranslation = !!ctx.translationHere && typeof ctx.onTranslation === 'function'
     && typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) && TRANSLATION_OPTIONS.length > 1;
@@ -280,56 +263,20 @@ export function MoreMenuBtn() {
               <span>Full screen</span>
             </button>
           </div>
-          <div className="rd-menu-group" role="group" aria-label="Look">
-            {canPickTranslation ? (
-              <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
-                <UiIcon name="book" />
-                <span className="more-menu-item-text">
-                  <span>Bible translation</span>
-                  <span className="more-menu-item-sub">{translationName(ctx.translation)}</span>
-                </span>
-              </button>
-            ) : null}
-            <div className="more-menu-row" role="group" aria-label="Text size">
-              <span className="more-menu-row-label">Text size</span>
-              <span className="more-menu-step">
-                <button type="button" role="menuitem" aria-label="Smaller text" aria-disabled={atMin}
-                  onClick={() => { if (!atMin) ctx.onFontScale(stepFontScale(ctx.fontScale, -1)); }}>A−</button>
-                <span className="more-menu-step-value">{pct === 100 ? 'Standard' : pct + '%'}</span>
-                <button type="button" role="menuitem" aria-label="Larger text" aria-disabled={atMax}
-                  onClick={() => { if (!atMax) ctx.onFontScale(stepFontScale(ctx.fontScale, 1)); }}>A+</button>
+          {/* The look and the doors out: the same block the gear's Quick settings sheet draws (QuickSettings.jsx, GEAR1). */}
+          <QuickSettingsRows ctx={ctx} go={go} lookLead={canPickTranslation ? (
+            <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
+              <UiIcon name="book" />
+              <span className="more-menu-item-text">
+                <span>Bible translation</span>
+                <span className="more-menu-item-sub">{translationName(ctx.translation)}</span>
               </span>
-            </div>
-            <div className="more-menu-row" role="group" aria-label="Theme">
-              <span className="more-menu-row-label">Theme</span>
-              <span className="more-menu-seg">
-                <button type="button" role="menuitemradio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'on' : ''}
-                  onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); }}>Dark</button>
-                <button type="button" role="menuitemradio" aria-checked={theme === 'light'} className={theme === 'light' ? 'on' : ''}
-                  onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); }}>Light</button>
-              </span>
-            </div>
-          </div>
-          <div className="rd-menu-group" role="group" aria-label="More places">
-            {ctx.historyEnabled ? (
-              <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onHistory)}>
-                <UiIcon name="clock" /><span>History</span><UiIcon name="chev" size="sm" />
-              </button>
-            ) : null}
-            {ctx.onPlans ? (
-              <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onPlans)}>
-                <UiIcon name="cal" /><span>Reading plans</span><UiIcon name="chev" size="sm" />
-              </button>
-            ) : null}
-            <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onSettings)}>
-              <UiIcon name="gear" /><span>Settings</span><UiIcon name="chev" size="sm" />
             </button>
-          </div>
+          ) : null} />
         </div>
-        {/* The text size's announcement: a role=menu may own only its items, so
-            the live region sits beside the menu, visually hidden (axe
-            aria-required-children); the readout above is what the eye sees. */}
-        <span className="more-menu-live sr-only" aria-live="polite">{'Text size ' + (pct === 100 ? 'Standard' : pct + '%')}</span>
+        {/* The text size's announcement: a role=menu may own only its items, so the live region sits beside the menu,
+            visually hidden (axe aria-required-children); the readout in the block is what the eye sees. */}
+        <QuickSettingsLive fontScale={ctx.fontScale} />
         </>,
         document.body,
       ) : null}

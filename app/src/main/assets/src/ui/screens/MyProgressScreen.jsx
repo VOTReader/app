@@ -26,6 +26,7 @@
 
 import { countMarks } from '../../utils/mark-kinds.js';
 import { BarAction } from '../components/RootNav.jsx';
+import { GearMenuBtn } from '../components/GearMenu.jsx';
 import { SectionLabel, ListRow, EmptyState } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { readKind, readWords } from '../../utils/read-kind.js';
@@ -407,7 +408,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
     <ScreenLayout utility={{ title: 'Progress', onBack, backLabel: 'Back to Library',
       actions: onSearch ? [<BarAction key="s" icon="search" label="Search" onClick={onSearch} />] : [],
       // the gear after Tabs, as on every root and utility bar (mock v2 l-prog)
-      menu: onSettings ? <BarAction icon="gear" label="Settings" onClick={onSettings} /> : null }}>
+      menu: onSettings ? <GearMenuBtn className="bar-action" onSettings={onSettings} /> : null }}>
       <div className="prg-screen lib-screen">
         {isEmpty ? (
           <>

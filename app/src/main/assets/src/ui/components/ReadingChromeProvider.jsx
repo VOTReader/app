@@ -49,6 +49,7 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
   usePlanReminders(() => { if (screen !== 'reading-plans' && n.onPlans) n.onPlans(); });
   const menuValue = {
     enabled: true,   // the compact bar is the only bar since the three tabs (2026-11-10)
+    screen,          // GEAR1: the Quick settings block leaves out a door back to this screen
     historyEnabled: s.historyEnabled !== false,
     theme: n.theme || 'dark',
     onThemeChange: n.onThemeChange || (() => {}),

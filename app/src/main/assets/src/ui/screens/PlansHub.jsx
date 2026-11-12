@@ -4,9 +4,10 @@
    One app screen holding a small stack of views (utils/plan-nav.js): the
    list, a plan's preview, the plan's own page, its whole schedule, a
    finished plan, the builder. Back pops a view; at the list it leaves.
-   The top bar is back, the view's title and at most the plan's gear (U
-   rule 11): the app-wide Settings gear, History and theme stay off here so
-   a plan page never shows two gears. Each view gets a fresh scroll (the
+   The top bar is back, the view's title and one gear (U rule 11): on a
+   plan's own page the plan's gear (its settings sheet), on every other view
+   the app's gear (Quick settings, GEAR1), so a page never shows two gears.
+   History and theme stay off here. Each view gets a fresh scroll (the
    layout is keyed by the view), so nothing here writes scrollTop.
    The reading session itself (the reader's strip and end panel) is started
    through `onStartSession`, which screen-routes owns.
@@ -185,7 +186,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     <ScreenLayout key={v.v + ':' + stack.length} navChildren={LibraryNav({
       onBack: v.v === 'build' && buildStep === 2 ? () => setBuildStep(1) : back, backLabel: stack.length > 1 ? 'Reading plans' : backLabel, showHome: false,
       leftExtras: <PlanBarTitle title={title} />,
-      onSearch, hide: stack.length > 1 || !onSearch ? ['settings', 'history', 'theme', 'search'] : ['settings', 'history', 'theme'],
+      onSearch, hide: ['history', 'theme'].concat(gear ? ['settings'] : [], stack.length > 1 || !onSearch ? ['search'] : []),
       rightExtras: gear ? <button type="button" className="root-gear-btn plan-gear" title="Plan settings" aria-label="Plan settings" onClick={() => setSettings(true)}>{GEAR}</button> : null,
     })}>
       {body}
