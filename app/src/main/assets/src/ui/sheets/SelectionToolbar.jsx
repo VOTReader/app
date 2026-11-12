@@ -15,7 +15,7 @@ import { passageCopy, passageLabel, translationTag, quotedPassage } from '../../
 import { readingBlocksIn, readingRange } from '../../utils/reading-range.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // A dragged selection stays in the reading column and scrolls it gently at the edges (rs1); the bottom dock's top.
-import { startSelectionDrag, selectionDragging } from './selection-drag.js';
+import { startSelectionDrag, selectionDragging, liveColumnOf } from './selection-drag.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
@@ -123,6 +123,21 @@ function hlDisplayText(container, tcText, start, end) {
 function sameRange(a, b) {
   return !!a && !!b && a.startContainer === b.startContainer && a.startOffset === b.startOffset
     && a.endContainer === b.endContainer && a.endOffset === b.endOffset;
+}
+
+/** FIXC: how far the reading column must scroll so the selected words, and the end handle Android hangs under
+    their last line, show above the docked sheet (r-sel docks it at the foot, about 320 px tall at 412x915, so a
+    long-press in the lower part of the screen raised it over the very words it acts on). `pad` is the part of
+    that scroll the column cannot make (the chapter's last lines): extra room at its foot while the sheet is up.
+    Nothing moves when the words already clear the sheet, or when their end is off the screen (a select-all):
+    the page moves only to show what the finger just chose.
+    @param {{ selTop: number, selBottom: number, sheetTop: number, viewportH: number, lineH: number, maxScrollDown: number }} a
+    @returns {{ scroll: number, pad: number }} */
+export function selectionClearance({ selTop, selBottom, sheetTop, viewportH, lineH, maxScrollDown }) {
+  const gap = Math.min(Math.max(lineH, 32), 80);   // the end handle hangs about a line under the words
+  const need = Math.ceil(selBottom + gap - sheetTop);
+  if (need <= 0 || selBottom > viewportH || selBottom < selTop) return { scroll: 0, pad: 0 };
+  return { scroll: need, pad: Math.max(0, need - Math.max(0, Math.floor(maxScrollDown))) };
 }
 
 /** A raised toolbar steps aside while its selection is being changed (a
@@ -353,6 +368,51 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     };
     return () => { window.__hideSelectionToolbar = null; };
   }, []);
+
+  // FIXC: the docked sheet keeps the selected words in sight. Before the raised sheet paints (and again after each
+  // settled handle drag, which hands it a new selInfo), the reading column scrolls the words and their end handle
+  // clear of its top; at a chapter's foot the column first gets the room it lacks, given back when the sheet goes.
+  // One write, at the raise, after the finger has lifted (the toolbar raises only then), so it fights no other
+  // scrollTop writer; the old placement pass wrote the same way (its near-top assist).
+  const padRef = React.useRef(/** @type {{ col: HTMLElement, was: string, base: number, extra: number } | null} */ (null));
+  const unpad = React.useCallback(() => {
+    const p = padRef.current;
+    if (p) { p.col.style.paddingBottom = p.was; padRef.current = null; }
+  }, []);
+  React.useLayoutEffect(() => {
+    if (!visible || !selInfo) { unpad(); return; }
+    const el = /** @type {HTMLElement | null} */ (toolbarRef.current);
+    const h = el ? el.offsetHeight : 0;
+    if (!h) return;
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const col = /** @type {HTMLElement | null} */ (liveColumnOf(range.endContainer));
+      if (!col) return;
+      const rect = range.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)) return;
+      const vh = window.innerHeight;
+      const block = findHlContainer(range.endContainer);
+      const lh = block ? parseFloat(getComputedStyle(block).lineHeight) : NaN;
+      const { scroll, pad } = selectionClearance({
+        selTop: rect.top, selBottom: rect.bottom, sheetTop: vh - h, viewportH: vh,
+        lineH: lh > 0 && isFinite(lh) ? lh : 28, maxScrollDown: col.scrollHeight - col.clientHeight - col.scrollTop,
+      });
+      if (!scroll) return;
+      if (pad) {
+        if (!padRef.current || padRef.current.col !== col) {
+          unpad();
+          padRef.current = { col, was: col.style.paddingBottom, base: parseFloat(getComputedStyle(col).paddingBottom) || 0, extra: 0 };
+        }
+        const p = padRef.current;
+        p.extra += pad;
+        col.style.paddingBottom = (p.base + p.extra) + 'px';
+      }
+      col.scrollTop += scroll;
+    } catch (_e) { /* the selection went mid-frame: nothing to clear */ }
+  }, [visible, selInfo, findHlContainer, unpad]);
+  React.useEffect(() => unpad, [unpad]);
 
 
   // EDGE AUTO-SCROLL and the drag guard (rs1, 2026-10-22): selection-drag.js keeps a dragged end in the
@@ -1295,8 +1355,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     return HighlightStore.get(c.dataset.hlKey).length > 0;
   });
 
-  // r-sel (the UI pass, mock v2 readers): one bottom sheet docked at the foot of the screen, so it never
-  // has to be placed against the words or move the page to make room. Style switch, ten colours in a row,
+  // r-sel (the UI pass, mock v2 readers): one bottom sheet docked at the foot of the screen; the page scrolls the
+  // words clear of it as it rises (selectionClearance, FIXC). Style switch, ten colours in a row,
   // six worded tiles, then Listen from here and the Scriptures door side by side.
   const styleBtn = (id, label, word) => (
     <button

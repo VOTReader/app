@@ -32,7 +32,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
-import { SelectionToolbar } from './SelectionToolbar.jsx';
+import { SelectionToolbar, selectionClearance } from './SelectionToolbar.jsx';
 import { dockTop } from './selection-drag.js';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 import { showToast as realShowToast, hideToast as realHideToast, _resetToasts } from '../../utils/toast.js';
@@ -576,6 +576,113 @@ describe('SelectionToolbar — verse-number crossing (Android menu + copy)', () 
     expect(writtenTexts[0]).toMatch(/5/);
     // Copy text also includes the reading content
     expect(writtenTexts[0]).toMatch(/God called the li/);
+  });
+});
+
+/* FIXC (REVIEW-readers 1, REVIEW-android 3, REVIEW-tests 1): the docked sheet must never sit over the words it acts
+   on. In the spirit of main's "near-top selection never sits under the toolbar" and "keeps the toolbar off the
+   player", deleted when the bar became a sheet docked at the foot: the page now scrolls the words clear instead. */
+describe('selectionClearance: how far the page moves the selected words clear of the docked sheet', () => {
+  // A 915 px screen with a 320 px sheet: its top at 595. lineH 28 → the end handle's gap is 32 (sane-bounded 32..80).
+  const base = { sheetTop: 595, viewportH: 915, lineH: 28, maxScrollDown: 5000 };
+
+  it('words above the sheet (and their end handle): the page does not move', () => {
+    expect(selectionClearance({ ...base, selTop: 400, selBottom: 420 })).toEqual({ scroll: 0, pad: 0 });
+    expect(selectionClearance({ ...base, selTop: 540, selBottom: 563 })).toEqual({ scroll: 0, pad: 0 });   // 563 + 32 = 595
+  });
+
+  it('words under the sheet: the page scrolls them up just past its top, with the handle\'s gap', () => {
+    expect(selectionClearance({ ...base, selTop: 710, selBottom: 763 })).toEqual({ scroll: 200, pad: 0 });   // 763 + 32 − 595
+  });
+
+  it('at the chapter\'s foot the page gets the room it lacks, and only that', () => {
+    expect(selectionClearance({ ...base, selTop: 638, selBottom: 658, maxScrollDown: 0 })).toEqual({ scroll: 95, pad: 95 });
+    expect(selectionClearance({ ...base, selTop: 638, selBottom: 658, maxScrollDown: 40 })).toEqual({ scroll: 95, pad: 55 });
+  });
+
+  it('an end off the screen (a select-all) moves nothing: the page moves only to show what the finger chose', () => {
+    expect(selectionClearance({ ...base, selTop: -1900, selBottom: 1400 })).toEqual({ scroll: 0, pad: 0 });
+  });
+
+  it('the handle\'s gap tracks the line height, sane-bounded', () => {
+    expect(selectionClearance({ ...base, lineH: 48, selTop: 600, selBottom: 620 }).scroll).toBe(73);    // 620 + 48 − 595
+    expect(selectionClearance({ ...base, lineH: 500, selTop: 600, selBottom: 620 }).scroll).toBe(105);  // gap capped at 80
+    expect(selectionClearance({ ...base, lineH: 10, selTop: 600, selBottom: 620 }).scroll).toBe(57);    // at least 32
+  });
+});
+
+describe('SelectionToolbar — the raised sheet never sits on the selected words (layout effect)', () => {
+  /* jsdom has no layout: only the .sel-toolbar reports a size (412 x 320), the window is 915 tall, so the sheet's top
+     is at 595. The reading column is a .screen-scroll with a controllable scrollTop. */
+  let restore;
+  beforeEach(() => {
+    const oh = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    const ih = window.innerHeight;
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get() { return this.classList && this.classList.contains('sel-toolbar') ? 320 : 0; },
+    });
+    window.innerHeight = 915;
+    restore = () => { Object.defineProperty(HTMLElement.prototype, 'offsetHeight', oh); window.innerHeight = ih; };
+  });
+  afterEach(() => { restore(); });
+
+  function column(scrollTop, scrollHeight = 6000) {
+    const s = document.createElement('div');
+    s.className = 'screen-scroll';
+    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 800 });
+    let st = scrollTop;
+    Object.defineProperty(s, 'scrollTop', { configurable: true, get: () => st, set: (v) => { st = Math.max(0, v); } });
+    document.body.appendChild(s);
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'bible:matthew:5:5');
+    p.textContent = 'Blessed are the meek, For they shall inherit the earth.';
+    s.appendChild(p);
+    return { col: s, block: p };
+  }
+  function selectAt(block, top, bottom) {
+    const r = rangeOver(block, 30, 54);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 40, top, right: 300, bottom, width: 260, height: bottom - top });
+    stubSelection(r);
+    act(() => { fire(block, 'contextmenu', { clientX: 60, clientY: top + 4 }); });
+    return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+  }
+
+  it('a long-press low on the screen: the page scrolls the words up clear of the sheet (RED before FIXC: it covered them)', () => {
+    const { col, block } = column(1000);
+    mount();
+    expect(selectAt(block, 710, 763)).not.toBeNull();
+    expect(col.scrollTop).toBe(1200);        // 763 + 32 − 595: the words and their end handle sit above the sheet
+    expect(col.style.paddingBottom).toBe('');
+  });
+
+  it('a long-press already above the sheet: the page does not move', () => {
+    const { col, block } = column(1000);
+    mount();
+    selectAt(block, 300, 320);
+    expect(col.scrollTop).toBe(1000);
+  });
+
+  it('the chapter\'s last lines: the column gets the room it lacks while the sheet is up, and gives it back', () => {
+    const { col, block } = column(5200, 6000);   // 5200 + 800 = 6000: nothing left to scroll
+    mount();
+    selectAt(block, 638, 658);
+    expect(col.style.paddingBottom).toBe('95px');
+    expect(col.scrollTop).toBe(5295);
+    act(() => { window.__hideSelectionToolbar && window.__hideSelectionToolbar(); });
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+    expect(col.style.paddingBottom).toBe('');
+  });
+
+  it('keeps the words off the player too: the sheet covers the bar, and the words clear the sheet', () => {
+    // main's "keeps the toolbar off the player": the docked sheet sits over the mini player (z-index), so clearing
+    // the sheet's top clears the dock as well; the words never end up between the two.
+    const bar = document.createElement('div'); bar.className = 'audio-bar'; document.body.appendChild(bar);
+    const { col, block } = column(0);
+    mount();
+    selectAt(block, 600, 640);
+    expect(col.scrollTop).toBe(77);          // 640 + 32 − 595
   });
 });
 
