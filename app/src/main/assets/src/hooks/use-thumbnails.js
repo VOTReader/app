@@ -197,21 +197,42 @@ export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabs
   React.useEffect(() => {
     if (!tabsEnabled) return undefined;
     let t = /** @type {any} */ (null);
-    const later = (ms) => { clearTimeout(t); t = setTimeout(() => captureActiveTabThumbnail(), ms); };
+    let cancelIdle = /** @type {null | (() => void)} */ (null);
+    // The copy walks the reading column on the main thread (a few ms on a desktop, several times that on a phone), so
+    // it never lands in a touch: with a finger down it waits for the lift, and then it takes an idle moment.
+    let down = false; let owed = false;
+    const drop = () => { clearTimeout(t); if (cancelIdle) cancelIdle(); cancelIdle = null; };
+    const take = () => {
+      if (down) { owed = true; return; }
+      cancelIdle = onIdle(() => { cancelIdle = null; if (down) owed = true; else captureActiveTabThumbnail(); }, { timeout: 1500, fallbackDelay: 0 });
+    };
+    const later = (ms) => { drop(); t = setTimeout(take, ms); };
     const onScroll = (/** @type {Event} */ e) => {
       const el = /** @type {any} */ (e.target);
       if (el && el.classList && el.classList.contains('screen-scroll')) later(SNAP_AFTER_SCROLL_MS);
     };
+    const onDown = () => { down = true; };
+    const onUp = (/** @type {any} */ e) => {
+      if (e.touches && e.touches.length) return;
+      down = false;
+      if (owed) { owed = false; later(SNAP_AFTER_SCROLL_MS); }
+    };
     const onResize = () => later(SNAP_AFTER_NAV_MS);
-    const onHide = () => { clearTimeout(t); captureActiveTabThumbnail(); flushPersist(); };
+    const onHide = () => { drop(); captureActiveTabThumbnail(); flushPersist(); };
     const onVis = () => { if (pageHidden()) onHide(); };
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    document.addEventListener('touchstart', onDown, { capture: true, passive: true });
+    document.addEventListener('touchend', onUp, { capture: true, passive: true });
+    document.addEventListener('touchcancel', onUp, { capture: true, passive: true });
     window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pagehide', onHide);
     return () => {
-      clearTimeout(t);
+      drop();
       document.removeEventListener('scroll', onScroll, true);
+      document.removeEventListener('touchstart', onDown, true);
+      document.removeEventListener('touchend', onUp, true);
+      document.removeEventListener('touchcancel', onUp, true);
       window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('pagehide', onHide);
