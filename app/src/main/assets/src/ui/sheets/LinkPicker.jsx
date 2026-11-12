@@ -35,6 +35,9 @@
 import { UiIcon } from '../components/UiIcon.jsx';
 import { navItemPreview } from '../../utils/nav-index.js';
 
+/** A result row's tile (mock v2 r-link1): the book for a Bible or study chapter; a letter keeps its collection's badge. */
+const isBookKind = (/** @type {string} */ kind) => /^(bible|study)/.test(kind || '');
+
 /**
  * The three corpus scopes, in SearchScreen's order + vocabulary
  * (.srch-corpus-row). `id` is the engine's own `corpus` option value, so the
@@ -283,10 +286,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       onClick={() => createLinkTo(item)}
     >
       <div className={"navpick-row-icon navpick-row-icon-" + item.kind}>
-        {item.kind === 'bible-chapter' ? (item.category === 'Old Testament' ? 'OT' : 'NT') :
-          item.kind === 'study-chapter' ? 'SB' :
-          item.kind === 'study-letter-chapter' ? 'LS' :
-          (COL_NAV_ICON.get(item.collection) || '?')}
+        {isBookKind(item.kind) ? <UiIcon name="book" /> : (COL_NAV_ICON.get(item.collection) || '?')}
       </div>
       <div className="navpick-row-text">
         <div className="navpick-row-label">{item.label}</div>

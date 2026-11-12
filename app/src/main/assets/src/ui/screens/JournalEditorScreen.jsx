@@ -1499,7 +1499,7 @@ export function JournalEditorScreen(props) {
         </div>
       )}
       {showEntryMenu && storedEntry && (
-        <ActionSheet open onClose={function() { setShowEntryMenu(false); }} title={title || 'Untitled'}
+        <ActionSheet open onClose={function() { setShowEntryMenu(false); }} title={title || 'Untitled'} className="ui-row-sheet"
           actions={[{ id: 'pin', icon: 'pin', label: storedEntry.pinned ? 'Unpin' : 'Pin to the top',
             onSelect: function() { setShowEntryMenu(false); JournalStore.togglePin(entryId); } }]} />
       )}

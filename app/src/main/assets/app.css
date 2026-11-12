@@ -530,6 +530,9 @@
         --hl-teal:     #00bcd4;
         --hl-brown:    #8d6e63;
         --hl-gray:     #9e9e9e;
+        /* a notebook's dot: the highlight name, muted (mock v2 l-nb-new) */
+        --nb-red: #e2776b; --nb-orange: #e79a52; --nb-yellow: #f2d024; --nb-green: #7fbf86;
+        --nb-teal: #5fb6c9; --nb-blue: #7d93e0; --nb-purple: #b487d6;
         /* ── Semantic accent tokens ── */
         --danger:           #ef9a9a;   /* destructive action text/icon color */
         --ok:               #4caf50;   /* n181: confirm / success green (nav picker); light override below */
@@ -3535,9 +3538,6 @@
     body.light .build-input { color-scheme:light; }
     .build-goal input[type="number"] { width:6.5rem; }
     .build-name { width:100%; box-sizing:border-box; }
-    .build-days { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; padding-top:0.3rem; }
-    .build-days button { min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    .build-days button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
     .plan-start .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
     .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
@@ -3610,7 +3610,8 @@
     .plan-day-when { flex: none; display: flex; flex-direction: column; width: 6.6rem; }
     .plan-day-n { color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; }
     .plan-day-date { color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
-    .plan-day-portion { flex: 1; min-width: 0; color: var(--cream); font-size: var(--fs-18); line-height: 1.3; overflow-wrap: anywhere; }
+    .plan-day-portion { flex: 1; min-width: 0; color: var(--cream); font-size: var(--fs-18); line-height: 1.3; overflow-wrap: anywhere;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
     .plan-day-min { flex: none; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-14); }
     .plan-note-mark { flex: none; color: var(--gold-dim); font-size: var(--fs-14); }
     .plan-sched-item.is-today > .plan-day-row { background: var(--gold-faint); }
@@ -5170,23 +5171,10 @@
       transition: background 0.12s;
     }
     .navpick-row:active { background: var(--gold-faint); }
-    .navpick-row-icon {
-      width: 36px; height: 50px; border-radius: 4px;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(180,150,90,0.35);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.05em; color: var(--gold-dim);
-      flex-shrink: 0;
-    }
-    body.light .navpick-row-icon { background: rgba(0,0,0,0.05); }
-    .navpick-row-icon-bible-chapter   { color: var(--hl-brown); }
-    .navpick-row-icon-letter          { color: #d4a960; }
-    .navpick-row-icon-wtlb-entry      { color: #b39ddb; }
-    .navpick-row-icon-blessed-entry   { color: var(--accent-pink); }
-    .navpick-row-icon-holy-days-entry { color: #4dd0e1; }
-    .navpick-row-icon-study-chapter   { color: var(--ok-soft); }
-    .navpick-row-icon-study-letter-chapter { color: #aed581; }
+    /* POL6 (mock r-link1 .card.in .ic): a 38 px tile, the icon in gold */
+    .navpick-row-icon { display: grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; background: var(--surface-3); color: var(--accent); }
+    .navpick-row-icon svg { width: 20px; height: 20px; }
+    .navpick-row-icon { font-family: var(--font-ui); font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.02em; }
     .navpick-row-text {
       flex: 1; min-width: 0;
     }
@@ -5575,7 +5563,7 @@
     .prg-row + .prg-row::before, .prg-row + .ui-row::before { content: ""; position: absolute; top: 0; left: var(--card-pad); right: 0; height: 1px; background: var(--hairline); }
     .prg-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
     .prg-row-label { min-width: 0; font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); }
-    .prg-row .ui-progress { margin-top: var(--sp-2); }
+    .prg-row .ui-progress { margin-top: var(--sp-2); background: var(--surface-3); }
     .prg-fact .ui-row-title, .prg-history-row.is-one .ui-row-title { font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; }
     .prg-src-row .ui-row-title { white-space: normal; }
     .prg-row .ui-row-meta { margin-top: 6px; }
@@ -5873,12 +5861,18 @@
     .sheet-handle-back { position: absolute; top: calc(100% - 26px); right: -10px; margin: 0; color: var(--text-2); }
     .link-action-sheet .sheet-handle-back { right: calc(var(--gutter) - 10px); }
     /* what follows the grabber (the title, or a head with its own words at the right) leaves the x its room */
-    .sheet-handle-row + :not(:is(.plan-sheet, .ui-sheet:has(> .ui-sheet-foot), .jrn-insert-sheet, .fn-sheet, .audio-manager-sheet, .ans-sheet) *) { padding-right: 34px; }
+    .sheet-handle-row + :not(:is(.plan-sheet, .ui-sheet:has(> .ui-sheet-foot), .jrn-insert-sheet, .fn-sheet, .audio-manager-sheet, .ans-sheet, .ui-row-sheet) *) { padding-right: 34px; }
     .sheet-handle-back:active { color: var(--text-1); }
     .sheet-handle-bar { width: 36px; height: 4px; background: var(--surface-3); }
     /* POL1 (rule 13): a sheet with worded actions (Cancel | Save, Done) closes by its words, so it draws no x.
        The grabber stays; the words are the screen-reader and keyboard close. */
     .plan-sheet .sheet-handle-back, .ui-sheet:has(> .ui-sheet-foot) .sheet-handle-back, .jrn-insert-sheet .sheet-handle-back { display: none; }
+    /* POL6 (mock library .sheet .who): a row's actions sheet (a bookmark, a note, a link, a journal entry) is led by
+       the row itself - its title at the row's size (serif 600 18/23), the muted line under it, no x (the grabber, the
+       scrim and Back close it). Opt in with className="ui-row-sheet"; a titled menu keeps the sheet title and x. */
+    .ui-row-sheet .sheet-handle-back { display: none; }
+    .ui-row-sheet .ui-sheet-head { margin: 0 0 12px; padding-top: 8px; }
+    .ui-row-sheet .ui-sheet-title { font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); }
     /* the full player's put-away chevron and the Answers sheets keep theirs at the left (mock listen p-full, answers) */
     .audio-manager-sheet .sheet-handle-row, .ans-sheet .sheet-handle-row { position: static; margin: -0.25rem 0 var(--sp-1); }
     .audio-manager-sheet .sheet-handle-grab, .ans-sheet .sheet-handle-grab { align-items: center; padding-top: 0; }
@@ -6019,6 +6013,7 @@
     .note-sheet-color-hit { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -13px; padding: 0; border: 0; background: none; cursor: pointer; }
     .note-sheet-color-dot.sel-color-btn { display: block; width: 12px; height: 12px; padding: 0; border: 0; border-radius: 50%; pointer-events: none; }
     .note-sheet-color-dot[data-color="blank"] { box-shadow: inset 0 0 0 1.5px var(--text-3); }
+    .note-sheet-color-dot[data-color="blank"]::after { content: none; }
     .rd-note-sheet .rd-note-head + .rd-colors { margin-top: 0; }
     .note-sheet-body { margin: 0 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
     .note-sheet-empty-btn { justify-content: flex-start; min-height: var(--tap); padding: 0 2px; color: var(--accent); }
@@ -6138,6 +6133,7 @@
     .rd-menu-sheet .more-menu-item:active { background: var(--surface-3); }
     .rd-menu-sheet .more-menu-item-text { flex: 1; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
     .rd-menu-sheet .more-menu-item-sub { font-size: var(--ts-meta); text-align: right; }
+    .rd-menu-sheet .more-menu-item > svg:first-child { box-sizing: content-box; flex: none; width: 20px; height: 20px; padding: 9px; border-radius: 10px; background: var(--surface-3); }
     .rd-menu-sheet .more-menu-item > svg:last-child:not(:first-child) { width: 18px; height: 18px; margin-left: auto; color: var(--text-3); }
     .rd-menu-sheet .more-menu-seg { padding: 2px; border-radius: var(--r-field); background: var(--surface-1); }
     .rd-menu-sheet .more-menu-seg button, .rd-menu-sheet .more-menu-step button { border-radius: var(--r-chip); background: var(--surface-1); }

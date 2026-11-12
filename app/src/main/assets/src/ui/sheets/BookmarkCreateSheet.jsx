@@ -3,6 +3,15 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { UiIcon } from '../components/UiIcon.jsx';
+import { _bookmarkSourcePlace, _bookmarkSourceNumber } from '../../utils/bookmark-source.js';
+
+/* r-bm (mock v2 readers): a letter's sheet says where it is, "Volume One · Letter 1"; anything without a letter
+   number (a chapter, a study, a Holy Days entry) keeps its own name there. */
+function whereLine(pending) {
+  var num = pending.hlKey ? _bookmarkSourceNumber(pending.hlKey) : '';
+  var place = num ? _bookmarkSourcePlace(pending.hlKey) : '';
+  return place ? place + ' \u00b7 ' + num : (pending.sourceLabel || '');
+}
 
 /**
  * @param {{ pending: any, onConfirm: any, onCancel: any, onDelete?: any, onOpen?: any }} props
@@ -133,7 +142,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
             kept, then Cancel | Save in words at the foot. */}
         <div className="ui-sheet-head">
           <h2 className="ui-sheet-title" id="bookmark-create-title">{title}</h2>
-          {pending.sourceLabel && <div className="ui-sheet-sub bkm-create-source">{pending.sourceLabel}</div>}
+          {whereLine(pending) && <div className="ui-sheet-sub bkm-create-source">{whereLine(pending)}</div>}
         </div>
         <div className="bkm-create-body">
           <div className="ui-field is-square rd-field">

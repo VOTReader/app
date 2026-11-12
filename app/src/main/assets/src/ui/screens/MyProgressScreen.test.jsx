@@ -211,10 +211,10 @@ describe('_fmtWords — compact hero count', () => {
 });
 
 describe('MyProgressScreen — reading measurement rows', () => {
-  it('shows Words read compactly and hides Reading pace while measuredWpm is null', () => {
+  it('draws no Words read row (mock v2 l-prog: the tile and each bar carry the words) and hides Reading pace while measuredWpm is null', () => {
     setupGlobals({ stats: { words: 12440, wpm: null } });
     const { container } = renderScreen();
-    expect(fact(container, 'Words read')).toBe('12.4k');
+    expect(fact(container, 'Words read')).toBeNull();
     expect(fact(container, 'Reading pace')).toBeNull();
   });
 

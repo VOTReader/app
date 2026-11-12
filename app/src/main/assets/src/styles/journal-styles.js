@@ -351,7 +351,7 @@
   R('.jrn-tripledel-final:hover:not(:disabled) { background: #b04d3d; }');
 
   // Recording sheet
-  R('.jrn-rec-content { padding: 24px 24px 30px; text-align: center; }');
+  R('.jrn-rec-content { padding: 0 0 4px; text-align: center; }');
   R('.jrn-rec-requesting { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-14); padding: 20px 0; }');
   R('.jrn-rec-status.is-paused { color: var(--gold-dim); }');
   R('.jrn-rec-status.is-paused::before { background: var(--gold-dim); animation: none; }');
@@ -359,7 +359,7 @@
   R('.jrn-rec-time-total { color: var(--gold-dim); font-size: var(--fs-20); font-weight: 400; }');
   R('.jrn-rec-waveform .bar.is-played { background: var(--gold); }');
   R('.jrn-rec-waveform.is-scrubbable { cursor: pointer; padding: 0 6px; }');
-  R('.jrn-rec-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; align-items: center; }');
+  R('.jrn-rec-actions { display: flex; justify-content: center; gap: 10px; margin-top: 16px; align-items: center; }');
   // Discard confirm — warm-red banner in place of the action row (same
   // ConfirmStrip skin the block-delete confirm uses).
   R('.jrn-rec-discard-confirm { margin-top: 24px; padding: 10px 12px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
@@ -408,6 +408,10 @@
   R('.jrn-ins-groups { padding: 0 0 var(--sp-5); overflow-y: auto; }');
   // POL1: the mock's sheet: grabber on top, the gutter at the sides, tiles the sheet's full width.
   R('.note-sheet.jrn-insert-sheet { padding: 8px var(--gutter) 24px; }');
+  R('.note-sheet.jrn-rec-sheet { padding: 8px var(--gutter) 24px; background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }');
+  R('.jrn-rec-sheet::before { content: ""; display: block; width: 36px; height: 4px; margin: 0 auto 4px; border-radius: 2px; background: var(--surface-3); }');
+  R('.jrn-rec-sheet .note-sheet-header { display: flex; align-items: center; min-height: 48px; margin: 0 0 4px; padding: 0 2px; }');
+  R('.jrn-rec-waveform .bar.is-rest { width: 3px; height: 3px; min-height: 3px; border-radius: 50%; background: var(--surface-3); }');
   R('.jrn-insert-sheet .sheet-handle-row { margin: 0 0 var(--sp-1); }');
   R('.jrn-ins-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin: 14px 2px 8px; }');
   R('.jrn-ins-label:first-child { margin-top: 0; }');
@@ -423,6 +427,7 @@
   R('.jrn-rec-waveform .bar { width: 3px; background: var(--accent); border-radius: 2px; transition: height 0.15s, background 0.1s; min-height: 6px; }');
   R('.jrn-rec-cap { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); margin-bottom: var(--sp-2); }');
   R('.jrn-rec-actions .ui-btn { flex: 1 1 0; gap: 8px; }');
+  R('.jrn-rec-actions .ui-btn:not(.is-primary) { background: var(--surface-2); }');
   R('.jrn-rec-actions .ui-btn svg { width: var(--icon-sm); height: var(--icon-sm); }');
   R('.jrn-rec-actions .jrn-rec-stop-btn, .jrn-rec-actions .jrn-rec-confirm-btn { flex-grow: 1.3; }');
   R('.jrn-insert-sheet .note-sheet-title, .jrn-rec-sheet .note-sheet-title { font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-1); }');

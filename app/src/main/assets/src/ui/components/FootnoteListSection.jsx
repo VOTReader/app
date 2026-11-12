@@ -101,7 +101,7 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, o
                   const link = page ? (inAppLinkForTitle(page.title, page.answers) || (page.answers ? { letterTitle: page.title } : null)) : null;
                   return page && link ? <InAppLinkButton compact={true} link={link} onActivate={() => openInAppPage(page, fn.url, onInAppLink)} /> : null;
                 })()}
-                {fn.url && <span className={(fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text"}><a href={fn.url} target="_blank" rel="noopener noreferrer" className="fn-link" onClick={(e) => e.stopPropagation()}>{(fn.link || fn.text) ? "Open external link" : fn.url}</a></span>}
+                {fn.url && !(fn.link && inAppTitleForUrl(fn.url)) && <span className={(fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text"}><a href={fn.url} target="_blank" rel="noopener noreferrer" className="fn-link" onClick={(e) => e.stopPropagation()}>{(fn.link || fn.text) ? "Open external link" : fn.url}</a></span>}
                 {!fn.text && !fn.link && !fn.url && <span className="footnote-list-missing">(no content attached)</span>}
               </>
             )}

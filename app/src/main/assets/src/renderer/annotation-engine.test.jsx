@@ -876,7 +876,7 @@ describe('noteNotebookColor + icon tinting [11b]', () => {
     const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
     const svg = /** @type {SVGElement} */ (container.querySelector('.hl-note-icon svg'));
     expect(svg).not.toBeNull();
-    expect(svg.style.stroke).toBe('var(--hl-teal)');
+    expect(svg.style.stroke).toBe('var(--nb-teal, var(--hl-teal))');
   });
 });
 

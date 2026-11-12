@@ -300,7 +300,6 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   /* Mock v2 l-prog: the streak and the read count are tiles now, so the Reading card holds the bars and the facts
      the tiles do not carry. */
   const readingFacts = [
-    ...(readingStats ? [{ label: 'Words read', value: _fmtWords(readingStats.totalWordsRead || 0) }] : []),
     ...(measuredWpm ? [{ label: 'Reading pace', value: measuredWpm + ' words a minute' }] : []),
     // Lifetime reading time — the ledger's visibility-honest activeMs sum.
     ...(readingStats && readingStats.totalActiveMs > 60000
@@ -406,10 +405,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
 
   return (
     <ScreenLayout utility={{ title: 'Progress', onBack, backLabel: 'Back to Library',
-      actions: [
-        onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null,
-        onSettings ? <BarAction key="g" icon="gear" label="Settings" onClick={onSettings} /> : null,
-      ].filter(Boolean) }}>
+      actions: onSearch ? [<BarAction key="s" icon="search" label="Search" onClick={onSearch} />] : [],
+      // the gear after Tabs, as on every root and utility bar (mock v2 l-prog)
+      menu: onSettings ? <BarAction icon="gear" label="Settings" onClick={onSettings} /> : null }}>
       <div className="prg-screen lib-screen">
         {isEmpty ? (
           <>
@@ -468,7 +466,8 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
               const w = wordStats && wordStats[grp.id];
               // Bar fill weighs WORDS once computed; item fraction until then.
               const frac = (w && w.wordsTotal > 0) ? w.wordsRead / w.wordsTotal : t.read / t.total;
-              const pct = Math.min(100, Math.round(frac * 100));
+              // anything read shows a sliver (mock v2 l-prog: 1 of 727 draws 2%)
+              const pct = frac > 0 ? Math.min(100, Math.max(2, Math.round(frac * 100))) : 0;
               return barRow(grp.id, grp.label, t.read.toLocaleString('en-US') + ' of ' + t.total.toLocaleString('en-US'), pct,
                 w && w.wordsTotal > 0 ? _fmtWords(w.wordsRead) + ' of ' + _fmtWords(w.wordsTotal) + ' words' : '');
             })

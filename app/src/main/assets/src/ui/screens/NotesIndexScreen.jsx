@@ -28,15 +28,21 @@ export function openWords(nav) {
 }
 
 /** The notebook colours: gold (no tag) then the highlight colours. @param {{ value: string | null, onPick: (c: string | null) => void }} props */
+/* POL6 (mock v2 l-nb-new): gold and seven muted colours, one row. A notebook keeps an older pick (pink, brown,
+   gray): it is shown while chosen. The stored name is the highlight colour's; --nb-<name> is its muted dot. */
+const NB_COLOURS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'];
+/** @param {string} c */
+export const nbDotColour = (c) => 'var(--nb-' + c + ', var(--hl-' + c + '))';
+
 function ColourDots({ value, onPick }) {
-  const colours = typeof HL_COLORS !== 'undefined' ? HL_COLORS : [];
+  const colours = value && NB_COLOURS.indexOf(value) < 0 ? NB_COLOURS.concat([value]) : NB_COLOURS;
   return (
     <div className="lib-colours" role="radiogroup" aria-label="Notebook colour">
       <button type="button" role="radio" aria-checked={!value} aria-label="Gold" className="lib-colour"
         style={{ background: 'var(--gold)' }} onClick={() => onPick(null)} />
       {colours.map((/** @type {string} */ c) => (
         <button key={c} type="button" role="radio" aria-checked={value === c} aria-label={colourName(c)} className="lib-colour"
-          style={{ background: 'var(--hl-' + c + ')' }} onClick={() => onPick(c)} />
+          style={{ background: nbDotColour(c) }} onClick={() => onPick(c)} />
       ))}
     </div>
   );
@@ -365,7 +371,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
               <ListRow one icon="note" title={NOT_IN_A_NOTEBOOK} value={countOf(counts.__uncategorized, 'note')} onClick={() => setDrilledNbId('uncategorized')} />
               {notebooks.map((nb) => (
                 <ListRow key={nb.id} one title={nb.name} value={countOf(counts[nb.id] || 0, 'note')} onClick={() => setDrilledNbId(nb.id)}
-                  lead={<span className="ui-row-lead" aria-hidden="true"><span className="lib-nb-dot" style={{ background: nb.color ? 'var(--hl-' + nb.color + ')' : 'var(--gold)' }} /></span>} />
+                  lead={<span className="ui-row-lead" aria-hidden="true"><span className="lib-nb-dot" style={{ background: nb.color ? nbDotColour(nb.color) : 'var(--gold)' }} /></span>} />
               ))}
             </ListGroup>
             <UiButton wide icon="plus" className="lib-new" onClick={openNewNotebook}>New notebook</UiButton>
@@ -385,7 +391,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
       <ActionSheet open={barMenu} onClose={closeBarMenu} title={drilledNbId ? drilledTitle : 'Notes'} actions={barActions} portal />
       <ActionSheet open={!!noteMenu} onClose={closeNoteMenu} title={noteMenu ? noteHead(noteMenu) : ''}
         sub={noteMenu ? [noteSourceLabel(noteMenu), relativeDate(noteMenu.updated || noteMenu.created)].filter(Boolean).join(' · ') : ''}
-        actions={noteMenu ? noteActions(noteMenu) : []} portal />
+        actions={noteMenu ? noteActions(noteMenu) : []} portal className="ui-row-sheet" />
       <ActionSheet open={!!noteToDelete} onClose={closeDelete} title="Delete this note?"
         confirm={{ label: 'Delete', danger: true, onConfirm: () => deleteNote(noteToDelete) }} portal>
         The note and the mark it sits on are removed from this phone.

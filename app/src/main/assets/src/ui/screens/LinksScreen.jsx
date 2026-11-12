@@ -156,7 +156,7 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
   if (onMyWeb) actions.push({ id: 'web', icon: 'web', label: 'See in My Web', onSelect: function() { onMyWeb(lnk); } });
   actions.push({ id: 'delete', icon: 'trash', label: 'Delete link', danger: true, onSelect: function() { onDelete(lnk); } });
   return (
-    <ActionSheet open={!!lnk} onClose={onClose} portal
+    <ActionSheet open={!!lnk} onClose={onClose} portal className="ui-row-sheet"
       title={<>{from} <span className="link-arrow" aria-label="to">→</span> {to}</>}
       sub={when ? 'Linked ' + when.charAt(0).toLowerCase() + when.slice(1) : undefined}
       actions={actions} />
