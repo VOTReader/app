@@ -1,44 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
    BibleStudyIndex — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
-   scrollBehavior is a bundle-d global, read at call time rather than
-   imported, as the other Cluster G screens do.
-
-   The study's contents in the index-row language Volume One uses (studies
-   pass, 2026-11-12): a part is a flat row like the sections under it, not a
-   boxed card. Its number column stays empty so part titles, the Preface and
-   the section titles share one left edge; a gold label line says "Part 1 ·
-   12 sections"; a chevron (the UI pass's) turns when the part is open. */
+   The study's contents in the UI pass's parts (second studies pass,
+   2026-11-12; the first only re-dressed the old index rows, and the page
+   still read as the old look): a centred hero as Answers has, a card that
+   says where to go next, and one grouped list as The Scriptures of Truth
+   has. A part is a row that opens its sections under it. */
 
 import { UiIcon } from '../components/UiIcon.jsx';
-import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { ListGroup, ListRow, UiButton } from '../components/UiParts.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
-
-/**
- * The title's size step: a long study title at Volume One's size filled a
- * third of the screen (108 characters, five bold lines).
- * @param {string} title
- * @returns {string} the extra class for .vol-index-title ('' up to 40 characters)
- */
-export function studyTitleSizeClass(title) {
-  const n = String(title || '').length;
-  if (n > 70) return ' is-long';
-  if (n > 40) return ' is-longish';
-  return '';
-}
-
-/**
- * A part row's gold label: "Part 1 · 12 sections", or just "Part 4" for a part of one section.
- * @param {{ num: any }} part
- * @param {number} sections
- * @returns {string}
- */
-export function partRowLabel(part, sections) {
-  return sections > 1 ? `Part ${part.num} · ${sections} sections` : `Part ${part.num}`;
-}
+import { countOf } from '../../utils/download-tree.js';
+import { studyTitleParts, chapterTitleParts, studyNextStep } from '../../utils/study-titles.js';
 
 export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack, onListen = null }) {
-  const currentRef = React.useRef(null);
   const [expandedPart, setExpandedPart] = React.useState(null);
 
   // Auto-expand the part containing the current reading position
@@ -50,68 +25,100 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one-shot auto-expand at study load. study + currentChapter together identify the load; a different study or chapter routes through the parent's setStudyId/setStudyChapterId, which remounts this index via the parent's key=. The []-deps captures the values for THIS instance's lifetime.
   }, []);
 
-  // Scroll current chapter into view after expand
-  React.useEffect(() => {
-    if (!currentRef.current) return undefined;
-    const timer = setTimeout(() => {
-      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
-    }, 180);
-    return () => clearTimeout(timer);
-  }, [expandedPart]);
-
   // A study's recordings ride AUDIO_MANIFEST in the lazy letter corpus: warm it as
-  // the chapter page does, so the Listen pill can appear (the route re-renders when it lands).
+  // the chapter page does, so the Listen button can appear (the route re-renders when it lands).
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, []);
 
-  const resolveChapter = (cid) => (study.chapters || []).find((c) => c.id === cid);
+  const chapters = study.chapters || [];
+  const resolveChapter = (cid) => chapters.find((c) => c.id === cid);
+  const { head, tail, extensive } = studyTitleParts(study.title, study.subtitle);
 
-  // "~N min" at the row's end, as Volume One's rows show it (the one shared chip).
-  // Not on a chapter holding prophecy cards: the counter leaves the cards out by
-  // rule (ProphecyCard's reading contract), so Section One, most of it cards,
-  // read "~1 min". No number beats a wrong one.
+  // The study in reading order: the preface, then each part's sections; a study without parts is its list.
+  const order = study.parts
+    ? [study.prefaceId ? resolveChapter(study.prefaceId) : null, ...study.parts.flatMap((p) => p.chapterIds.map(resolveChapter))].filter(Boolean)
+    : chapters;
+  const read = (ch) => !!(markAsReadEnabled && ch && isRead(ch.id));
+  const readN = order.filter(read).length;
+  const next = studyNextStep(order, currentChapter, read);
+
+  // "~N min" in a row's meta line (the one shared chip). Not on a chapter holding
+  // prophecy cards: the counter leaves the cards out by rule (ProphecyCard's
+  // reading contract), so Section One, most of it cards, read "~1 min". No
+  // number beats a wrong one.
   const _wpm = readingChipWpm();
   const hasCards = (ch) => Array.isArray(ch.blocks) && ch.blocks.some((b) => b && b.type === 'prophecy-group');
   const minChip = (ch) => hasCards(ch) ? null : readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.id) : null, _wpm);
 
-  const readTick = (ch) => (markAsReadEnabled && ch && isRead(ch.id))
-    ? <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>
-    : null;
+  const names = (ch) => (ch.title ? chapterTitleParts(ch.title, head) : { over: '', name: 'Part ' + ch.num });
 
-  const renderChapterCard = (ch) => {
+  /** A read chapter's one mark: the round tick, or the tick and "×2" once it has been read again.
+   * @returns {any} (the counted mark's label is a node: its words for a screen reader, "×2" for the eye) */
+  const readMark = (ch) => {
+    if (!read(ch)) return null;
+    const n = readCount ? readCount(ch.id) : 1;
+    return n > 1
+      ? { icon: 'check', label: <><span className="sr-only">{'Read ' + n + ' times'}</span><span aria-hidden="true">{'×' + n}</span></> }
+      : { tick: true, label: 'Read' };
+  };
+
+  const chapterRow = (ch) => {
     if (!ch) return null;
-    const isCurrent = ch.id === currentChapter;
+    const t = names(ch);
     return (
-      <button
-        key={ch.id}
-        ref={isCurrent ? currentRef : null}
-        className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
-        aria-current={isCurrent ? 'true' : undefined}
-        onClick={() => onSelect(ch.id)}
-      >
-        <span className="chapter-card-num">{ch.num}</span>
-        <div className="chapter-card-divider" />
-        <div className="chapter-card-info">
-          {ch.title
-            ? <div className="chapter-card-title">{ch.title}</div>
-            : <div className="chapter-card-title untitled">Part {ch.num}</div>
-          }
-        </div>
-        {minChip(ch)}
-        {readTick(ch)}
-      </button>
+      <ListRow key={ch.id} noLead className="sty-row" over={t.over || null} title={t.name} meta={minChip(ch)} mark={readMark(ch)}
+        current={ch.id === currentChapter} onClick={() => onSelect(ch.id)} />
     );
   };
 
-  /** The text column of a part row: label line, title, subtitle. */
-  const partInfo = (part, sections) => (
-    <div className="chapter-card-info">
-      <div className="chapter-card-label">{partRowLabel(part, sections)}</div>
-      <div className="chapter-card-title">{part.title}</div>
-      {part.subtitle && <div className="part-row-sub">{part.subtitle}</div>}
-    </div>
-  );
+  const partLabel = (part) => <span className="root-eyebrow">{'Part ' + part.num}</span>;
+
+  const partRows = (part) => {
+    const partChapters = part.chapterIds.map(resolveChapter).filter(Boolean);
+    if (partChapters.length === 1) {
+      /* A part of one section: the row goes straight to it */
+      const ch = partChapters[0];
+      const chip = minChip(ch);
+      return (
+        <ListRow key={'p' + part.num} noLead className="sty-row" over={partLabel(part)} title={part.title}
+          meta={part.subtitle || chip ? <>{part.subtitle}{part.subtitle && chip ? ' · ' : null}{chip}</> : null}
+          mark={readMark(ch)} current={ch.id === currentChapter} onClick={() => onSelect(ch.id)} />
+      );
+    }
+    const isOpen = expandedPart === part.num;
+    const done = partChapters.filter(read).length;
+    const facts = [part.subtitle, countOf(partChapters.length, 'section'), done ? done + ' read' : ''].filter(Boolean).join(' · ');
+    return (
+      <React.Fragment key={'p' + part.num}>
+        <ListRow noLead className="sty-row sty-part" over={partLabel(part)} title={part.title} meta={facts}
+          expanded={isOpen} onClick={() => setExpandedPart(isOpen ? null : part.num)} />
+        {isOpen ? <div className="root-sublist">{partChapters.map(chapterRow)}</div> : null}
+      </React.Fragment>
+    );
+  };
+
+  /** The card under the hero: where to go next, and how far through the study the reader is. */
+  const nextCard = () => {
+    if (!next) return null;
+    const t = names(next.ch);
+    const part = study.parts ? study.parts.find((p) => p.chapterIds.includes(next.ch.id)) : null;
+    const where = [part ? 'Part ' + part.num : '', t.over].filter(Boolean).join(' · ');
+    const chip = minChip(next.ch);
+    return (
+      <button type="button" className="ui-card ui-row-press sty-next" onClick={() => onSelect(next.ch.id)}>
+        <span className="sty-next-main">
+          <span className="ui-row-text">
+            <span className="root-eyebrow">{next.k}</span>
+            <span className="ui-row-title">{t.name}</span>
+            {where || chip ? <span className="ui-row-meta">{where}{where && chip ? ' · ' : null}{chip}</span> : null}
+          </span>
+          <UiIcon name="chev" className="ui-row-chev" />
+        </span>
+        {readN > 0 ? <span className="ui-progress" aria-hidden="true"><span style={{ width: Math.round((100 * readN) / order.length) + '%' }} /></span> : null}
+      </button>
+    );
+  };
 
   const navBar = LibraryNav({
     onBack, backLabel: 'Studies',
@@ -131,76 +138,24 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
           </button>
         </div>
       )}
-      <div className="vol-index">
-        <div className="vol-index-header">
-          <div className="vol-index-eyebrow">Bible/Letter Study</div>
-          <h1 className={'vol-index-title' + studyTitleSizeClass(study.title)}>{study.title}</h1>
-          {study.subtitle && <div className="vol-index-subtitle">{study.subtitle}</div>}
-          <div className="vol-index-ornament">
-            <div className="vol-index-ornament-line" />
-            <div className="vol-index-ornament-diamond" />
-            <div className="vol-index-ornament-line r" />
-          </div>
-          {/* A study with a recording: Volume One's pill, opening what Listen > Studies > this study opens. */}
-          {onListen && (
-            <div className="vol-index-play-row">
-              <AudioPlayButton variant="playall" label="Listen" onClick={onListen} />
-            </div>
-          )}
-        </div>
-        <div className="chapter-cards">
+      <div className="sty">
+        <header className="sty-hero">
+          <div className="root-eyebrow">{extensive ? 'Extensive Bible/Letter Study' : 'Bible/Letter Study'}</div>
+          <h1>{head}</h1>
+          {tail ? <p>{tail}</p> : null}
+        </header>
+        {nextCard()}
+        {/* A study with a recording: what Listen > Studies > this study opens. */}
+        {onListen ? <UiButton wide icon="head" onClick={onListen}>Listen</UiButton> : null}
+        <ListGroup label="Contents"
+          aside={readN > 0 ? readN + ' of ' + order.length + ' read' : countOf(study.parts ? study.parts.length : order.length, 'part')}>
           {study.parts ? (
             <>
-              {study.prefaceId && renderChapterCard(resolveChapter(study.prefaceId))}
-              {study.parts.map((part) => {
-                const partChapters = part.chapterIds.map(resolveChapter).filter(Boolean);
-                const sectionCount = partChapters.length;
-                const isSingleSection = sectionCount === 1;
-                const isOpen = expandedPart === part.num;
-
-                if (isSingleSection) {
-                  /* Single-section part: direct tap goes straight to chapter */
-                  const ch = partChapters[0];
-                  const isCurrent = ch && ch.id === currentChapter;
-                  return (
-                    <button
-                      key={part.num}
-                      ref={isCurrent ? currentRef : null}
-                      className={`chapter-card-btn part-row${isCurrent ? " is-current" : ""}`}
-                      aria-current={isCurrent ? 'true' : undefined}
-                      onClick={() => ch && onSelect(ch.id)}
-                    >
-                      <span className="chapter-card-num" />
-                      {partInfo(part, sectionCount)}
-                      {ch && minChip(ch)}
-                      {readTick(ch)}
-                    </button>
-                  );
-                }
-
-                /* Multi-section part: accordion; its sections follow it as plain rows */
-                const holdsCurrent = !!currentChapter && part.chapterIds.includes(currentChapter);
-                return (
-                  <React.Fragment key={part.num}>
-                    <button
-                      className={`chapter-card-btn part-row${isOpen || holdsCurrent ? " is-open" : ""}`}
-                      onClick={() => setExpandedPart(isOpen ? null : part.num)}
-                      aria-expanded={isOpen}
-                    >
-                      <span className="chapter-card-num" />
-                      {partInfo(part, sectionCount)}
-                      <UiIcon name="chev" className="ui-row-chev" />
-                    </button>
-                    {isOpen && partChapters.map((ch) => renderChapterCard(ch))}
-                  </React.Fragment>
-                );
-              })}
+              {study.prefaceId ? chapterRow(resolveChapter(study.prefaceId)) : null}
+              {study.parts.map(partRows)}
             </>
-          ) : (
-            /* Flat chapter list fallback for studies without parts */
-            (study.chapters || []).map((ch) => renderChapterCard(ch))
-          )}
-        </div>
+          ) : chapters.map(chapterRow)}
+        </ListGroup>
       </div>
     </ScreenLayout>
   );

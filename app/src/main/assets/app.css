@@ -1246,9 +1246,6 @@
         font-family: 'Cinzel Decorative', serif; font-size: var(--fs-36);
         color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2; text-wrap: balance;
       }
-      /* A long study title steps down (studies pass): 108 characters at this size filled a third of the screen. */
-      .vol-index-title.is-longish { font-size: var(--fs-24); }
-      .vol-index-title.is-long { font-size: var(--fs-20); }
       .vol-index-subtitle {
         font-size: var(--fs-16); color: var(--cream-muted); font-style: italic; margin-bottom: 1.5rem;
       }
@@ -4393,14 +4390,24 @@
       margin-top:0.7rem; font-family:var(--font-body); font-style:italic; font-size:var(--fs-13);
       color:var(--cream-muted); text-align:center;
     }
-    /* ── A study's parts (studies pass 2026-11-12): rows in the index-row language,
-       the label line and title the rows' own; an open part keeps the current row's gold. ── */
-    .chapter-cards:not(.two-col) .chapter-card-btn.part-row.is-open { background:var(--gold-faint); }
-    .part-row-sub { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-muted); line-height:1.35; margin-top:0.15rem; }
-    .part-row .ui-row-chev { margin-left:auto; color:var(--gold-dim); }
-    /* a part's label and title are short: they wrap rather than cut (at Text Size 2 they read 'Part 1 · 12 S…', 'The Fulfillme…') */
-    .part-row .chapter-card-label { white-space:normal; }
-    .chapter-cards:not(.two-col) .part-row .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; hyphens:auto; }
+    /* ── The study pages (Studies, a study's contents; second studies pass 2026-11-12) in the UI pass's parts:
+       a centred hero as Answers has, a card that says where to go next, one grouped list. A study's long title is
+       set in three levels (label, name, the rest under it), so rows and names wrap instead of cutting off. ── */
+    .sty { width: 100%; max-width: 560px; margin: 0 auto; padding: 0 var(--gutter) var(--sp-8); box-sizing: border-box; }
+    .sty-hero { padding: var(--sp-3) 0 var(--sp-1); text-align: center; }
+    .sty-hero h1 { margin: var(--sp-2) 0 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-display); font-weight: 600; line-height: 1.15; text-wrap: balance; overflow-wrap: break-word; }
+    .sty-hero p { margin: var(--sp-2) 0 0; color: var(--text-2); font-family: var(--font-serif); font-size: var(--fs-15); font-style: italic; line-height: 1.45; text-wrap: balance; }
+    .sty-next { display: block; width: 100%; margin-top: var(--sp-5); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .sty-next-main { display: flex; align-items: center; gap: var(--sp-3); }
+    .sty-next .ui-row-title { margin-top: 2px; }
+    .sty > .ui-btn { margin-top: var(--sp-3); }
+    .sty .ui-row-title, .sty .ui-row-meta { white-space: normal; overflow-wrap: break-word; }
+    .sty-sub { display: block; margin-top: 1px; color: var(--text-2); font-size: var(--fs-15); font-weight: 400; font-style: italic; }
+    .sty-row[aria-current=true] { box-shadow: inset 3px 0 0 var(--accent); }
+    .sty-note { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); padding: var(--sp-6) 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-control); text-align: center; }
+    .root-sublist .ui-row { padding-left: 26px; }
+    .root-sublist .ui-row + .ui-row::before { left: 26px; }
+    .root-sublist .ui-row-title { font-size: var(--fs-16); }
     /* Resume-reading dot — lives IN the top nav (right cluster, left of the
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav
@@ -4416,7 +4423,7 @@
     .reading-dot-nav .rdg-glyph { display:block; width:16px; height:16px; color:var(--gold); filter:drop-shadow(0 0 5px var(--gold-glow)); animation: ribbon-pulse 2.8s ease-in-out infinite; will-change:opacity; }
     @keyframes ribbon-pulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
     /* W2b (mock v2 l-hist): a history row is a ListRow; its reading chip reads as plain meta text. */
-    .history-entry-card .idx-min-chip { margin:0; padding:0; border:0; background:none; font:inherit; color:inherit; letter-spacing:0; }
+    .history-entry-card .idx-min-chip, .sty .idx-min-chip { margin:0; padding:0; border:0; background:none; font:inherit; color:inherit; letter-spacing:0; opacity:1; }
     /* A broad search draws the newest 100 matches; this draws the rest (sweep W69). The tally's
        voice (Cinzel caps, dim gold) on a full-width hairline button, 44 px tall for a thumb. */
     .history-show-all {

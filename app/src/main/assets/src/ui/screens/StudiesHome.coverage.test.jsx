@@ -6,8 +6,8 @@
    nothing about it: a listener had to open a study, press Listen and find out.
    The badge answers before the tap, and the count is read from AUDIO_MANIFEST,
    never typed here. */
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { render, cleanup, screen, fireEvent } from '@testing-library/react';
 import { StudiesHome } from './StudiesHome.jsx';
 // StudiesHome rides bundle-g and reads these as bundle-d globals; the real ones, so the badge is the shipped badge.
 import { studyCoverage, studyCoverageDetail } from '../../utils/audio-coverage.js';
@@ -44,10 +44,14 @@ const noop = () => {};
 function renderHome() {
   return render(<StudiesHome studies={STUDIES} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
 }
-/** The badge inside the row whose title is `title`. */
+/** The row whose title is `title`. */
+function rowOf(title) {
+  return [...document.querySelectorAll('.sty-row')].find((b) => b.textContent.includes(title)) || null;
+}
+/** The recording word in that row's facts line (second studies pass: words in the meta line, not a boxed badge). */
 function badgeOf(title) {
-  const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes(title));
-  return card ? card.querySelector('.coverage-badge') : null;
+  const card = rowOf(title);
+  return card ? card.querySelector('.ui-row-meta .sty-cov') : null;
 }
 
 describe('StudiesHome -- the read-along badge', () => {
@@ -56,18 +60,15 @@ describe('StudiesHome -- the read-along badge', () => {
     const badge = badgeOf('Purity');
     expect(badge).toBeTruthy();
     expect(badge.textContent).toBe('Read-along');
-    expect(badge.className).toContain('coverage-badge-read-along');
-    expect(badge.parentElement.textContent).not.toMatch(/of 2 parts/);
+    expect(badge.parentElement.textContent).toBe('2 parts \u00b7 Read-along');
   });
 
   it('marks a partly recorded study read-along AND says how much of it is recorded', () => {
     renderHome();
-    const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Lamb of God'));
-    expect(card.querySelector('.coverage-badge').textContent).toBe('Read-along');
+    const card = rowOf('Lamb of God');
     // n6-12: a study in parts counts its recorded CHAPTERS - the row already
-    // says "1 Part", and "1 of 2 parts" beside it contradicted it
-    expect(card.textContent).toContain('1 Part');
-    expect(card.textContent).toContain('1 of 2 chapters');
+    // says "1 part", and "1 of 2 parts" beside it contradicted it
+    expect(card.querySelector('.ui-row-meta').textContent).toBe('1 part \u00b7 Read-along for 1 of 2 chapters');
   });
 
   it('(n6-12) a study with no parts keeps "parts", which agrees with its row', () => {
@@ -75,23 +76,21 @@ describe('StudiesHome -- the read-along badge', () => {
     const two = [{ id: 'grace', slug: 'grace', title: 'Grace', chapters: [{ id: 'grace-ch1' }, { id: 'grace-ch2' }] }];
     window.AUDIO_MANIFEST['study:grace-ch1'] = [['g', 'V']];
     render(<StudiesHome studies={two} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
-    const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Grace'));
-    expect(card.textContent).toContain('2 Parts');
-    expect(card.textContent).toContain('1 of 2 parts');
+    const card = rowOf('Grace');
+    expect(card.querySelector('.ui-row-meta').textContent).toBe('2 parts \u00b7 Read-along for 1 of 2 parts');
   });
 
   it('marks a study with no recording, so a listener knows before tapping', () => {
     renderHome();
     const badge = badgeOf('The Trinity');
     expect(badge.textContent).toBe('No recording');
-    expect(badge.className).toContain('coverage-badge-no-recording');
   });
 
   it('gives the badge a sentence a screen reader can reach, not colour alone', () => {
     renderHome();
     const badge = badgeOf('Purity');
     expect(badge.getAttribute('title')).toMatch(/light/i);
-    expect(screen.getAllByText('Read-along').length).toBe(2);
+    expect(screen.getAllByText(/^Read-along/).length).toBe(2);
   });
 
   it('marks the Matthew Study Bible read-along -- its recording is a Bible edition', () => {
@@ -105,6 +104,27 @@ describe('StudiesHome -- the read-along badge', () => {
     delete window.AUDIO_MANIFEST;
     renderHome();
     expect(badgeOf('Purity').textContent).toBe('No recording');
+  });
+});
+
+describe('StudiesHome -- the row (second studies pass, 2026-11-12)', () => {
+  it('sets the name as the row title and the rest of the title under it; a locked study opens nothing', () => {
+    const onSelectStudy = vi.fn();
+    const studies = [
+      { id: 'a', slug: 'a', title: 'Odds Chart - YahuShua Fulfills Over 200 Messianic Prophecies', singlePage: true, chapters: [{ id: 'a-1' }] },
+      { id: 'b', slug: 'b', title: 'Soon', locked: true, chapters: [] },
+    ];
+    render(<StudiesHome studies={studies} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={onSelectStudy} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
+    const row = rowOf('Odds Chart');
+    expect(row.querySelector('.ui-row-title').firstChild.textContent).toBe('Odds Chart');
+    expect(row.querySelector('.sty-sub').textContent).toBe('YahuShua Fulfills Over 200 Messianic Prophecies');
+    expect(row.querySelector('.ui-row-meta').textContent).toBe('Reference \u00b7 No recording');
+    fireEvent.click(row);
+    expect(onSelectStudy).toHaveBeenCalledWith('a');
+    const locked = rowOf('Soon');
+    expect(locked.tagName).toBe('DIV');
+    expect(locked.querySelector('.ui-row-meta').textContent).toBe('Coming soon');
+    expect(document.querySelector('.ui-label-aside').textContent).toBe('2');
   });
 });
 

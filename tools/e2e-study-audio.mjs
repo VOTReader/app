@@ -137,12 +137,14 @@ try {
   };
   const openStudyChapter = async () => {
     await click('Studies', { contains: true, settle: 800 });
-    // StudiesHome lists the studies as chapter cards; the corpus is lazy, so wait for the card.
-    await page.waitForFunction((s) => [...document.querySelectorAll('.chapter-card-btn')].some((b) => b.textContent.includes(s)), { timeout: 30000 }, STUDY);
-    await page.evaluate((s) => { [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes(s)).click(); }, STUDY);
+    // StudiesHome lists the studies as rows (.sty-row); the corpus is lazy, so wait for the row.
+    await page.waitForFunction((s) => [...document.querySelectorAll('.sty-row')].some((b) => b.textContent.includes(s)), { timeout: 30000 }, STUDY);
+    await page.evaluate((s) => { [...document.querySelectorAll('.sty-row')].find((b) => b.textContent.includes(s)).click(); }, STUDY);
     await sleep(600);
-    await page.waitForSelector('.chapter-card-btn', { timeout: 15000 });
-    await page.evaluate(() => { document.querySelector('.chapter-card-btn').click(); });
+    // the study's contents: the card that says where to go next is not a row; the first row is the first chapter
+    await page.waitForSelector('.sty-hero h1', { timeout: 15000 });
+    await page.waitForSelector('.ui-group .sty-row', { timeout: 15000 });
+    await page.evaluate(() => { document.querySelector('.ui-group .sty-row').click(); });
     await page.waitForFunction(() => { const s = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll'); return !!(s && s.querySelector('.hero-title')); }, { timeout: 15000 });
     await sleep(700);
   };

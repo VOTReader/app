@@ -41,12 +41,15 @@ describe('app.css — the study screens', () => {
     }
   });
 
-  it('a study title steps down past 40 and 70 characters', () => {
-    expect(blocks('.vol-index-title.is-longish').join(';')).toMatch(/var\(--fs-24\)/);
-    expect(blocks('.vol-index-title.is-long').join(';')).toMatch(/var\(--fs-20\)/);
+  it('the study pages wear the UI pass: a serif display heading, and names that wrap instead of cutting off', () => {
+    const h1 = blocks('.sty-hero h1').join(';');
+    expect(h1).toMatch(/var\(--font-serif\)/);
+    expect(h1).toMatch(/var\(--ts-display\)/);
+    expect(blocks('.sty .ui-row-title').join(';')).toMatch(/white-space:\s*normal/);
+    expect(blocks('.sty-next').join(';')).not.toMatch(/border:\s*1px/);
   });
 
-  it('the old boxed part cards are gone', () => {
-    expect(CSS).not.toMatch(/\.part-group-card|\.part-chevron|\.part-chapters/);
+  it('the old boxed part cards, the first pass\u2019s flat part rows and its title steps are gone', () => {
+    expect(CSS).not.toMatch(/\.part-group-card|\.part-chevron|\.part-chapters|\.part-row|\.vol-index-title\.is-long/);
   });
 });

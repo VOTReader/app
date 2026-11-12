@@ -412,7 +412,7 @@ describe('axe — BibleStudyIndex', () => {
 
   it('the part accordion says whether it is open; its chevron is not read', async () => {
     renderStudy({ currentChapter: null });
-    const part = [...document.querySelectorAll('.part-row')].find((b) => b.hasAttribute('aria-expanded'));
+    const part = [...document.querySelectorAll('.sty-part')].find((b) => b.hasAttribute('aria-expanded'));
     expect(part.getAttribute('aria-expanded')).toBe('false');
     expect(part.querySelector('.ui-row-chev').getAttribute('aria-hidden')).toBe('true');
     fireEvent.click(part);
