@@ -8315,7 +8315,9 @@
     /* A short landscape screen (a phone on its side, 360 px tall): the card took 0.79 of the web's rows
        (e2e-myweb R3, limit 0.45). There it is one band: no mark, the first sentence only, Start reading at its right. */
     @media (orientation: landscape) and (max-height: 480px) {
-      .sw-root:not(.sw-narrow) .sw-empty { display: flex; align-items: center; gap: 14px; width: min(640px, calc(100% - 48px)); padding: 10px 44px 10px 16px; }
+      /* centred in the web's gap, not on the 200 px floor (WEB2: at 800x360 its foot sat on the lower rule, at
+         568x320 38 px past it): the rails stand at 80 and H - 120, so the gap's middle is 50% - 20px */
+      .sw-root:not(.sw-narrow) .sw-empty { top: calc(50% - 20px); display: flex; align-items: center; gap: 14px; width: min(640px, calc(100% - 48px)); padding: 10px 44px 10px 16px; }
       .sw-root:not(.sw-narrow) .sw-empty-in { flex: 1 1 auto; min-width: 0; }
       .sw-root:not(.sw-narrow) .sw-empty-mark, .sw-root:not(.sw-narrow) .sw-empty-more { display: none; }
       .sw-root:not(.sw-narrow) .sw-empty-title { margin: 0 0 2px; font-size: var(--fsc-16); }
