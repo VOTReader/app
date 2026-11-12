@@ -1588,7 +1588,9 @@
       .np-sheet {
         position: fixed; z-index: 261; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); transform: translateX(-50%);
         width: min(620px, 100%); max-height: calc(88vh - var(--inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
-        padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + var(--dock-sys)); background: var(--surface-1); color: var(--text-1);
+        /* FIXC: the lift (bottom) already clears --inset-bottom, the APK's nav bar; the padding adds only what a
+           browser's own safe area asks beyond it (it added the whole inset again, a nav bar's blank band). */
+        padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + max(0px, env(safe-area-inset-bottom, 0px) - var(--inset-bottom, 0px))); background: var(--surface-1); color: var(--text-1);
         border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: var(--shadow-float, 0 -18px 42px rgba(0, 0, 0, 0.45));
         animation: np-sheet-rise 0.2s cubic-bezier(0.22, 0.8, 0.28, 1);
       }
@@ -5996,7 +5998,10 @@
     .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
     /* ── W2e readers (mock v2 r-bm): the bookmark sheet. A grab, the title, where it is, the name field on
        surface-2 with a clear, one line on where it is kept, then Cancel | Save at the foot. ── */
-    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6)); }
+    /* FIXC: no --inset-bottom here. Every form sheet sits in an overlay that already pads its foot by
+       max(--keyboard-height, --inset-bottom), and the APK writes the keyboard into --inset-bottom: added again here,
+       a keyboard's height of blank surface pushed Save and Cancel below the visible part. */
+    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) var(--sp-6); }
     .rd-form-sheet .ui-sheet-head { margin: 0 2px 10px; }
     .rd-field { background: var(--surface-2); cursor: text; }
     .rd-field-clear { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin-right: -12px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
@@ -6215,6 +6220,9 @@
     .ws2-step-value { min-width:3.2em; text-align:center; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
     .ws1-settings .settings-step-btn { width:36px; height:36px; border:0; background:var(--surface-2); color:var(--text-1); }
     .ws1-settings .settings-step-btn:disabled { opacity:.4; }
+    /* FIXC: drawn at 36 (st mocks), tapped at 44: a − and a + a thumb can tell apart (REVIEW-css 2). */
+    .ws1-settings .settings-step-btn { position:relative; }
+    .ws1-settings .settings-step-btn::after { content:''; position:absolute; inset:-4px; }
     .ws2-speed .txtsize-controls { gap:var(--sp-3); padding:0 var(--card-pad) var(--sp-3); }
     .ws2-speed .txtsize-reset { min-height:var(--tap); border:0; background:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws2-radio { display:flex; flex-direction:row; align-items:center; gap:var(--sp-3); width:100%; min-height:var(--row-h); padding:var(--sp-3) var(--card-pad); border:0; border-bottom:1px solid var(--hairline); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
@@ -6264,7 +6272,9 @@
     .ws3-meter-used.is-text { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:400; }
     .ws3-meter-of { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws3-meter .settings-row-desc { display:block; margin-top:var(--sp-3); }
-    .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter); }
+    /* FIXC: centred, but over the keyboard (the APK writes it into --inset-bottom): the flat padding dropped the
+       overlay's lift and left "Type DELETE" and Delete behind it. */
+    .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter) var(--gutter) max(var(--gutter), var(--keyboard-height, 0px), var(--inset-bottom, 0px)); }
     .note-sheet.ws3-dialog { width:100%; max-width:420px; border-radius:var(--r-sheet); padding:var(--sp-6) var(--gutter) var(--gutter); background:var(--surface-1); }
     .ws3-dialog-title { margin:0 0 var(--sp-3); color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; }
     .ws3-dialog-text, .ws3-sheet-text { margin:0 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
@@ -6286,6 +6296,9 @@
     .ws3-prog .ws3-clear.settings-clear-btn { flex:none; min-height:36px; padding:0 var(--sp-3); border:0; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
     .ws3-prog .ws3-clear.is-text { background:none; color:var(--text-2); }
     .ws3-prog .ws3-clear:disabled { opacity:.45; }
+    /* FIXC: the Clear pill is drawn 36 tall and tapped 44 (REVIEW-css 3). */
+    .ws3-prog .ws3-clear.settings-clear-btn { position:relative; }
+    .ws3-prog .ws3-clear.settings-clear-btn::after { content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px; }
     .ws3-prog-books { margin:0 var(--sp-3) var(--sp-2); border-radius:var(--r-chip); background:var(--surface-2); }
     .ws3-prog-genre { padding:var(--sp-3) var(--sp-3) var(--sp-1); }
     .ws3-prog .progress-row.is-sub { padding:var(--sp-1) var(--sp-3); border-bottom:0; }

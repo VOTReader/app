@@ -19,6 +19,9 @@ import { recordingTranslationFor, textForRecording } from '../../utils/audio-tex
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
+/** FIXC: the loaded recording (book:edition) over which the reader picked his own translation here; '' for none. */
+let pickedOver = '';
+
 export function BibleChapterView(props) {
   const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null, bibleAudioFor = null } = props;
   const bodyRef = React.useRef(null);
@@ -27,7 +30,24 @@ export function BibleChapterView(props) {
   // (utils/audio-text-edition.js). The snapshot is a string, so the clock's
   // ticks do not re-render the chapter; only a change of recording does.
   const recording = React.useSyncExternalStore(AudioPlayer.subscribe, () => recordingTranslationFor(AudioPlayer, book.id));
-  const recordingEdition = textForRecording(readerTranslation, recording);
+  // FIXC: a translation the reader picks here (the pill, or the ⋯ menu's "Bible translation", which says so with
+  // vot:translation-pick) is shown at once, though this book's recording is loaded or a search showed the KJV: the
+  // pick did nothing while either held the page. It holds while that recording stays loaded, from chapter to chapter.
+  const [visit, setVisit] = React.useState(/** @type {{ key: string, ed: string, verse: number } | null} */ (null));
+  const recId = recording ? book.id + ':' + recording : '';
+  const [, setPicked] = React.useState(0);
+  const ownPick = !!recId && pickedOver === recId;
+  const pickOwn = React.useCallback(() => {
+    pickedOver = recId;
+    setVisit(null);
+    setPicked((n) => n + 1);
+  }, [recId]);
+  React.useEffect(() => {
+    if (inert) return undefined;
+    document.addEventListener('vot:translation-pick', pickOwn);
+    return () => document.removeEventListener('vot:translation-pick', pickOwn);
+  }, [inert, pickOwn]);
+  const recordingEdition = ownPick ? (readerTranslation || 'nkjv') : textForRecording(readerTranslation, recording);
   const matchingRecording = recordingEdition !== (readerTranslation || 'nkjv');
   /* THE KJV FOR THIS VISIT (search200 idea A, 2026-10-22, PICKS.md A). A verse its KJV wording found opens in the
      KJV (the search anchor's `edition`) under one row beneath "‹ Back to results": "Shown in KJV, as you searched"
@@ -37,7 +57,6 @@ export function BibleChapterView(props) {
   const chapterKey = book.id + ':' + chapter.num;
   const chapterKeyRef = React.useRef(chapterKey);
   chapterKeyRef.current = chapterKey;
-  const [visit, setVisit] = React.useState(/** @type {{ key: string, ed: string, verse: number } | null} */ (null));
   const visitEdition = !inert && !matchingRecording && visit && visit.key === chapterKey && visit.ed !== (readerTranslation || 'nkjv') ? visit.ed : null;
   const translation = visitEdition || recordingEdition;
   const altShown = translation !== (readerTranslation || 'nkjv');
@@ -317,7 +336,7 @@ export function BibleChapterView(props) {
                 {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
                   <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
                 )}
-                <TranslationPill translation={shownTranslation} short onTranslation={typeof onTranslation === 'function' ? onTranslation : null} />
+                <TranslationPill translation={shownTranslation} short onTranslation={typeof onTranslation === 'function' ? (v) => { pickOwn(); onTranslation(v); } : null} />
               </div>
               {/* A02.2: plain Matthew and the Matthew Study Bible did not know about each other. The plain chapter
                   opens the same chapter with its study notes (a peek keeps the line, inert, as it keeps Listen). */}

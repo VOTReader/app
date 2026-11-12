@@ -61,6 +61,12 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
     onClose();
   };
 
+  // FIXC: Copy and Share report through the selection's copy toast. The app's showToast takes an options object and
+  // drops a bare string (with a console warning), so "Copied", "Could not copy" and "Could not share" never showed.
+  const showToast = (/** @type {string} */ m) => {
+    const show = /** @type {any} */ (globalThis).showToast;
+    if (typeof show === 'function') show({ id: 'vot-toast-copy', className: 'vot-toast', text: m });
+  };
   const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
   const copy = () => { onClose(); copyToClipboard(words).then((r) => toast(r === 'copied' ? 'Copied' : 'Could not copy')); };
   const share = () => { onClose(); shareText(words).then((r) => { if (r === 'copied-instead') toast('Copied'); else if (r === 'failed') toast('Could not share'); }); };

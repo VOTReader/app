@@ -164,6 +164,14 @@ export function snapLiveTab() {
 
   const shell = (/** @type {Element} */ el) => { const c = /** @type {Element} */ (el.cloneNode(false)); scrubEl(c); return c; };
   const page = copy(track || scroller, 0, false);
+  // FIXC: a snapshot taken mid-swipe (a scroll's pause, then a slow sideways drag) copied the pager's drag offset, the
+  // track's and the peeks' inline transform, and the card showed the page slid part-way off its side. A card is the
+  // page at rest.
+  if (track) {
+    for (const el of /** @type {HTMLElement[]} */ ([page, ...page.querySelectorAll('.pager-peek')])) {
+      if (el.style) { el.style.transform = ''; el.style.transition = ''; el.style.willChange = ''; }
+    }
+  }
   let root = page;
   if (track) { const sc = shell(scroller); sc.appendChild(page); root = sc; }
   if (viewport) { const vp = shell(viewport); vp.appendChild(root); root = vp; }

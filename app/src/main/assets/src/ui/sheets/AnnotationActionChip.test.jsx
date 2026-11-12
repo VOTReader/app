@@ -146,3 +146,38 @@ describe('AnnotationActionChip style switcher', () => {
     expect(screen.getByText('Remove this highlight?')).toBeTruthy();
   });
 });
+
+// FIXC (REVIEW-readers 2): the chip called the app's showToast with a bare string, which it drops with a warning,
+// so a tapped mark's Copy never said "Copied" and a failed copy or share said nothing.
+describe('AnnotationActionChip: Copy and Share say how it went', () => {
+  afterEach(() => { delete /** @type {any} */ (globalThis).showToast; delete /** @type {any} */ (navigator).clipboard; delete /** @type {any} */ (navigator).share; });
+
+  /** @param {string} label @param {{ clipboard?: any, share?: any }} [o] */
+  async function tap(label, { clipboard, share } = {}) {
+    setupStores({ id: 'a1', groupId: 'g1', kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'Jesus wept' });
+    const show = vi.fn();
+    /** @type {any} */ (globalThis).showToast = show;
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: clipboard });
+    if (share) Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    return show;
+  }
+
+  it('Copy that worked: a "Copied" toast, as an options object the toast shows', async () => {
+    const show = await tap('Copy', { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
+    expect(show).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String), text: 'Copied' }));
+  });
+
+  it('Copy refused: "Could not copy"', async () => {
+    const show = await tap('Copy', { clipboard: { writeText: vi.fn(() => Promise.reject(new Error('denied'))) } });
+    expect(show).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String), text: 'Could not copy' }));
+  });
+
+  it('Share with no share sheet copies instead and says "Copied"', async () => {
+    const show = await tap('Share', { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
+    expect(show).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String), text: 'Copied' }));
+  });
+});

@@ -63,7 +63,8 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
     // r-menu: Auto-scroll starts (and stops) from the reader menu; the pill shows while it is on.
     autoScroll: !!s.autoScroll,
     onAutoScroll: (on) => { if (updateSetting) updateSetting('autoScroll', !!on); },
-    onTranslation: (v) => { if (updateSetting) updateSetting('translation', v); },
+    // FIXC: the chapter on screen shows the pick even over a loaded recording or a KJV search visit.
+    onTranslation: (v) => { if (updateSetting) updateSetting('translation', v); document.dispatchEvent(new CustomEvent('vot:translation-pick')); },
   };
 
   return (
