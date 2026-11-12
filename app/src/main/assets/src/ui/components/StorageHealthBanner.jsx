@@ -26,6 +26,7 @@
 
 import { OfflineLibraryBanner, useTopStrip } from './OfflineLibraryBanner.jsx';
 import { showToast } from '../../utils/toast.js';
+import { openYourData } from '../../utils/your-data-link.js';
 import { Notice } from './UiParts.jsx';
 
 /** ds5 s16.1: a banner action that failed says so; the banner itself stays. Runs fn now (a throw is a rejection). */
@@ -234,7 +235,9 @@ export function StorageHealthBanner({ onNavigateSettings }) {
     return parts.length ? parts.join(', ') : 'nothing saved';
   }
 
+  // "Back up now" lands on Your data, where the backup button is the first thing (PL-SETTINGS 2).
   function _goExport() {
+    openYourData();
     if (onNavigateSettings) onNavigateSettings();
   }
 }
