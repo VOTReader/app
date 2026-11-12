@@ -185,10 +185,13 @@ export function placeTourCard({ vh, ring, top0, docked: dockIn, afterPressed, ba
     below = fitsBelow || (!fitsAbove && ring.top < vh / 2);
     cardTop = below ? ring.top + ring.height + CARD_GAP : ring.top - CARD_GAP - h;
     cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
+  } else {
+    // FSET (tr-welcome): a card with nothing to point at floats mid-screen, the tab bar left in view.
+    cardTop = Math.max(CARD_EDGE, Math.round((vh - h) / 2));
   }
   const clear = !docked && ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
   const cardStyle = docked ? { bottom: Math.round(dockBottom) + 'px', maxHeight: Math.round(cap) + 'px' }
-    : ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
+    : { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' };
   return { docked, dockBottom, cap, h, below, cardTop, clear, dockPad, cardStyle };
 }
 
@@ -404,10 +407,16 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   React.useEffect(() => {
     const s = active && dockPadRef.current > 0 ? scrollerRef.current : null;
     const prev = padOnRef.current;
-    if (prev && prev !== s) { prev.style.scrollPaddingBottom = ''; padOnRef.current = null; }
-    if (s) { const v = Math.round(dockPadRef.current) + 'px'; if (s.style.scrollPaddingBottom !== v) s.style.scrollPaddingBottom = v; padOnRef.current = s; }
+    if (prev && prev !== s) { prev.style.scrollPaddingBottom = ''; prev.style.paddingBottom = ''; padOnRef.current = null; }
+    /* FSET (tr-stop): the scroller also gets the card's height as bottom room, so the page's last lines can be
+       scrolled up above the card instead of ending under it. */
+    if (s) {
+      const v = Math.round(dockPadRef.current) + 'px'; if (s.style.scrollPaddingBottom !== v) s.style.scrollPaddingBottom = v;
+      const pb = 'calc(' + v + ' + 16px)'; if (s.style.paddingBottom !== pb) s.style.paddingBottom = pb;
+      padOnRef.current = s;
+    }
   });
-  React.useEffect(() => () => { const p = padOnRef.current; if (p) { p.style.scrollPaddingBottom = ''; padOnRef.current = null; } }, []);
+  React.useEffect(() => () => { const p = padOnRef.current; if (p) { p.style.scrollPaddingBottom = ''; p.style.paddingBottom = ''; padOnRef.current = null; } }, []);
 
   if (!active) return null;
   if (!st.ready) return <div className="tour-wait" role="status">One moment…</div>;
@@ -472,7 +481,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
             {Array.from({ length: Number(of[2]) }, (_, k) => <span key={k} className={k < Number(of[1]) ? 'is-on' : ''} />)}
           </div>
         ) : null}
-        <h2 className="tour-title" id="tour-title">{step.title}</h2>
+        <h2 className="tour-title" id="tour-title">{st.pressed && step.afterTitle ? step.afterTitle : step.title}</h2>
         <div aria-live="polite">
           <p className="tour-text" id={descId}>{text}</p>
           {hint && <p className="tour-tip">{hint}</p>}

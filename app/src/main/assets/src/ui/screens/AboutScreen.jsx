@@ -104,6 +104,7 @@ function AboutHome({ onBack, onYourData }) {
   const [buildInfo, refresh] = useBuildInfo();
   const v = versionWords(buildInfo);
   const tour = typeof TourController !== 'undefined' ? TourController : null;
+  const tourMins = tour && typeof tour.minutesWord === 'function' ? minutesOf(tour.minutesWord()) : -1;
   const title = page === 'credits' ? 'Credits and privacy' : page === 'features' ? 'What you can do' : 'About VOTReader';
   const back = page === 'about' ? onBack : () => setPage('about');
   useInnerBack(page === 'about' ? null : back);
@@ -112,7 +113,7 @@ function AboutHome({ onBack, onYourData }) {
   );
   const makers = songMakers();
   return (
-    <ScreenLayout utility={{ title, onBack: back, backLabel: page === 'about' ? 'Back' : 'Back to About VOTReader' }}>
+    <ScreenLayout hideTabsBtn utility={{ title, onBack: back, backLabel: page === 'about' ? 'Back' : 'Back to About VOTReader' }}>
       <div className="ws3-about" key={page}>
         {page === 'about' ? (
           <>
@@ -135,7 +136,9 @@ function AboutHome({ onBack, onYourData }) {
               </div>
               <ListRow noLead title="What’s new" onClick={() => { void openWhatsNew(); }} />
               <ListRow noLead title="What you can do" onClick={() => setPage('features')} />
-              {tour ? <ListRow noLead title="Show me around" meta={tourMeta()} onClick={() => tour.start('settings')} /> : null}
+              {/* FSET (ab-about): the length at the right, "3 min", as the mock draws it. */}
+              {tour ? <ListRow noLead title="Show me around" ariaLabel={'Show me around. ' + tourMeta()}
+                value={tourMins > 0 ? tourMins + ' min' : null} onClick={() => tour.start('settings')} /> : null}
               <ListRow noLead title="Credits and privacy" onClick={() => setPage('credits')} />
             </div>
             {v.build ? <p className="ws3-about-build">{v.build}</p> : null}

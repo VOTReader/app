@@ -7,7 +7,8 @@ import { letterVoiceOptions } from './AudioLibraryScreen.jsx';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell, networkType } from '../../utils/download-gate.js';
-import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
+import { OfflineLibraryStatus, OfflineLibraryReady } from '../components/OfflineLibraryBanner.jsx';
+import { useBuildInfo, versionWords } from '../components/about-parts.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
@@ -146,7 +147,7 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
             <span className="settings-row-label">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
           </span>
           {!confirming && (
-            <button type="button" className="ui-btn is-small ws2-text-btn" disabled={historyCount === 0}
+            <button type="button" className="ui-btn is-small is-danger ws2-text-btn" disabled={historyCount === 0}
               onClick={(e) => { e.stopPropagation(); setConfirming(true); }}>Clear history</button>
           )}
         </div>
@@ -419,6 +420,17 @@ function DownloadsStorageRow() {
 }
 
 /* WS3 settings (st-data, st-data2): one Your data row: the name, one plain line, then a value, a pill or a button. */
+/* FSET (st-root): the About row says the facts, "Version 1.0.2 · up to date · What's new". Its own component, so the
+   build check runs only while the root is showing. @param {{ onAbout: () => void }} props */
+function AboutRootRow({ onAbout }) {
+  const [buildInfo] = useBuildInfo();
+  const v = versionWords(buildInfo);
+  const verdict = buildInfo.state !== 'ok' || !buildInfo.server ? null
+    : buildInfo.server.cacheVersion === (buildInfo.running && buildInfo.running.cacheVersion) ? 'up to date' : 'update ready';
+  const meta = [v.title !== 'Version' ? v.title : 'Version', verdict, 'What’s new'].filter(Boolean).join(' · ');
+  return <ListRow icon="info" title="About VOTReader" meta={meta} onClick={onAbout} />;
+}
+
 function DataRow({ label, desc = null, value = null, pill = false, children = null, className = '', find = '' }) {
   const f = useSettingsFind(label + ' ' + (typeof desc === 'string' ? desc : '') + ' ' + find);
   if (!f.show) return null;
@@ -1065,6 +1077,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
 
   const textScalePercent = Math.round(clampFontScale(settings.fontScale || '1') * 100);
+  const bibleAudioEd = settings.bibleAudio === 'off' ? null
+    : (/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {})[settings.bibleAudio || 'brm-kjv'];
+  const bibleAudioShown = settings.bibleAudio === 'off' ? 'Off' : (bibleAudioEd && bibleAudioEd.label) || null;
   const selectedFont = typeof readingFontById === 'function'
     ? readingFontById(settings.fontStyle || 'classic')
     : null;
@@ -1087,10 +1102,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     id: t.id, label: t.label + ' · about ' + String(t.size).replace(/^~\s*/, ''), desc: t.res + ' · ' + t.desc }));
   const gardenSub = (/** @type {any} */ (globalThis).GARDEN_TOTAL || 209) + ' photographs. Pages load from the internet as you read and are kept on this phone.';
   const gardenDoor = typeof onOpenGarden === 'function'
-    ? <UiButton wide icon="img" onClick={() => { setGardenPick(false); onOpenGarden(); }}>Open A Return to The Garden</UiButton> : null;
+    ? <UiButton wide icon="img" className="ws2-garden-door" onClick={() => { setGardenPick(false); onOpenGarden(); }}>Open A Return to The Garden</UiButton> : null;
 
   return (
     <ScreenLayout
+      hideTabsBtn
       utility={{
         title: screenTitle, onBack: goUp,
         backLabel: mode === 'screen' ? (openGroups.has('autoscroll') && openGroups.size === 1 ? 'Back to Reading' : 'Back to Settings') : backLabel,
@@ -1117,7 +1133,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           {/* WS1 settings (st-look): Theme is Dark | Light (X-hidden 1 "theme"), then text size, then the font. */}
           <Findable text="theme dark light mode night day look colour color">
             <SectionLabel>Theme</SectionLabel>
-            <Segmented label="Theme" className="ws1-theme" options={[{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }]}
+            <Segmented label="Theme" className="ws1-theme" options={[{ id: 'dark', label: <><UiIcon name="moon" size="sm" />Dark</> }, { id: 'light', label: <><UiIcon name="sun" size="sm" />Light</> }]}
               value={theme === 'light' ? 'light' : 'dark'} onChange={(v) => { if (v !== theme) onThemeChange(v); }} />
           </Findable>
           {/* [10] True Black toggle REMOVED 2026-08-03 (owner: "just make
@@ -1311,8 +1327,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               eyebrow="Listening"
               title="Bible audio"
               label="Bible audio"
-              desc="The recorded voice for Listen on Bible chapters. Off hides the button."
-              find="voice reader recording"
+              /* FSET (st-listen): the chosen edition is the line under the name, as the mock draws it. */
+              desc={bibleAudioShown || 'The recorded voice for Listen on Bible chapters'}
+              valueStyle={bibleAudioShown ? { display: 'none' } : null}
+              find="voice reader recording the recorded voice for listen on bible chapters off hides the button"
               value={settings.bibleAudio || "brm-kjv"}
               options={[
                 /* Registry source of truth: utils/audio-track.js
@@ -1653,7 +1671,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             <DataRow label="Your data" desc={userDataLine} value={userData ? formatBytes(userData.total) : 'Calculating…'} find="size bytes" />
             {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
             {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
-              ? <DataRow label="Offline library" desc={<OfflineLibraryStatus />} find="offline books cache every book without a connection" /> : null}
+              ? <DataRow label="Offline library" desc={<OfflineLibraryStatus />} find="offline books cache every book without a connection ready"><OfflineLibraryReady /></DataRow> : null}
             {dataSamples.length > 0 ? (
               <DataRow label="Growth" desc={growthLine(dataSamples)} value={formatBytes(dataSamples[dataSamples.length - 1].b)} find="trend size grows" />
             ) : null}
@@ -1687,7 +1705,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             <div className="note-sheet ws3-dialog" ref={wipeTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-wipe-title" aria-describedby="settings-wipe-text" onClick={(e) => e.stopPropagation()}>
               <h2 className="ws3-dialog-title" id="settings-wipe-title">Delete all your data?</h2>
               <p className="ws3-dialog-text" id="settings-wipe-text">
-                This removes every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record and saved tab, the search cache and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}. Settings go back to their defaults. <strong>This cannot be undone.</strong>
+                This removes every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record and saved tab, the search cache and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}. Settings go back to their defaults. This cannot be undone.
               </p>
               {/* WS3 settings (st-wipe): Back up first, inside the dialog; the dialog stays open while it runs. */}
               <UiButton wide icon="dl" className="ws3-dialog-backup" disabled={backupBusy} onClick={() => { _runLockedBackupOperation(exportPersonalData); }}>Back up first</UiButton>
@@ -1803,7 +1821,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               <ListRow icon="help" title="Show me around" onClick={startTour}
                 meta={'A short tour: ' + (_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes')} />
               {typeof onAbout === 'function' ? (
-                <ListRow icon="info" title="About VOTReader" meta="Version, updates, What’s new and credits" onClick={onAbout} />
+                <AboutRootRow onAbout={onAbout} />
               ) : null}
             </div>
             <p className="ws1-foot">Changes save on this phone.</p>

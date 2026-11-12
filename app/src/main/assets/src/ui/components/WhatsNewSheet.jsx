@@ -11,7 +11,7 @@
 import { inertAttr } from '../../utils/inert-attr.js';
 import { OPEN_EVENT, byDay } from '../../utils/whats-new.js';
 import { EmptyState, ListRow } from './UiParts.jsx';
-import { LinkRow, tourMeta } from './about-parts.jsx';
+import { LinkRow, tourLength, VersionKicker } from './about-parts.jsx';
 
 export function WhatsNewSheet() {
   const [items, setItems] = React.useState(/** @type {{ t: number, text: string }[] | null} */ (null));
@@ -34,14 +34,14 @@ export function WhatsNewSheet() {
       <div className={`fn-sheet whats-new-sheet${isOpen ? ' open' : ''}${rail ? ' rail' : ''}`} ref={trapRef} role="dialog"
         aria-modal={!rail && isOpen ? 'true' : undefined} aria-hidden={!isOpen} {...inertAttr(!isOpen)} aria-label="What's new">
         <SheetHandle onClose={close} />
-        <div className="ui-sheet-head ws3-new-head"><h2 className="ui-sheet-title">What&rsquo;s new</h2></div>
+        <div className="ui-sheet-head ws3-new-head"><div className="ws3-new-heading"><VersionKicker /><h2 className="ui-sheet-title">What&rsquo;s new</h2></div></div>
         {/* WS3 settings (ab-new): an empty list still leads somewhere. */}
         {!days.length && (
           <div className="ws3-new-empty">
             <EmptyState icon="spark" title="Nothing new to tell yet." text="When an update changes something you will notice, it is listed here, newest first." />
             <div className="ui-group is-inset">
               {typeof TourController !== 'undefined' ? (
-                <ListRow icon="help" title="Show me around" meta={tourMeta()} onClick={() => { close(); TourController.start('settings'); }} />
+                <ListRow icon="help" title="Show me around" meta={tourLength()} onClick={() => { close(); TourController.start('settings'); }} />
               ) : null}
               <LinkRow href="https://www.thevolumesoftruth.com" icon="out" title="thevolumesoftruth.com" meta="The canonical text, audio, video and PDFs" />
             </div>
