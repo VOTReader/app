@@ -57,7 +57,8 @@ export const WORDS_PER_MIN = 200;
  *   seen?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
  *   credited: how many reads from before the start were counted (plans2; their ticks carry no date)
- *   seen: a finished run's finish page was opened or its Home row dismissed (plans2)
+ *   seen: a finished run's finish page was opened or its Home row dismissed (plans2); false is written at the finish
+ *   (FIXB), and a run with no seen (finished before plans2) counts as seen
  */
 
 // ── dates ────────────────────────────────────────────────────────────────
@@ -725,11 +726,21 @@ export function markOn(run, dateKey, now) {
   return finishIfDone({ ...run, ticks, updated: now.getTime() }, todayKey(now));
 }
 
-/** A run whose every day is read is finished on `dateKey`. */
+/** A run whose every day is read is finished on `dateKey`; `seen: false` until its finish page is opened (FIXB). */
 function finishIfDone(run, dateKey) {
   if (run.status === 'finished' || run.status === 'stopped') return run;
   for (let d = 0; d < totalDays(run); d++) if (!dayDone(run, d)) return run;
-  return { ...run, status: 'finished', finished: dateKey };
+  return { ...run, status: 'finished', finished: dateKey, seen: false };
+}
+
+/**
+ * Whether a finished run still waits to be seen (the Read tab's "You finished" row). Only a finish this build made
+ * says so (`seen: false`): a run finished before plans2 has no `seen` at all and counts as seen, so the update never
+ * brings back plans finished long ago, and nothing stored is rewritten to say so (FIXB).
+ * @param {any} run
+ */
+export function finishUnseen(run) {
+  return !!run && run.status === 'finished' && run.seen === false;
 }
 
 // ── start where I am (n354b, hub call 2026-10-23) ────────────────────────
