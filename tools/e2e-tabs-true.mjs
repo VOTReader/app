@@ -315,7 +315,7 @@ async function main() {
     }
     return out;
   }, rc);
-  const swipe = async (label, dir, throttle, bars = false, pre = null) => {
+  const swipe = async (label, dir, throttle, bars = false, pre = null, atRel = null) => {
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     const rect = await scrollerRect();
     const ov0 = await overlays(rect);
@@ -342,6 +342,7 @@ async function main() {
     for (let i = 1; i <= 24; i++) { const d = Math.round(dx * i / 24); await touch('touchMove', x0 + d); log.push({ t: wall(), dx: d }); await sleep(16); }
     await sleep(250);   // hold still: the last frames before release show the finished drag
     const peekSig = await pageSig(`.screen-layout > .pager-viewport > .pager-peek-${dir} > .screen-scroll`);
+    if (atRel) await atRel();   // TABS5: a look at the drawn neighbour with the finger still down
     const tRel = wall();
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
@@ -503,7 +504,7 @@ async function main() {
         if (ch.length >= 3) studies.push(ch[0].id, ch[1].id);
       }
       const study = studies;
-      return { v7a: v7.length > 1 ? v7[v7.length - 2].id : null, v1: arr('LETTERS_V1').length > 3 ? arr('LETTERS_V1')[3] : null,
+      return { v7a: v7.length > 1 ? v7[v7.length - 2].id : null, v7p: v7.length > 2 ? v7[v7.length - 3].id : null, v1: arr('LETTERS_V1').length > 3 ? arr('LETTERS_V1')[3] : null,
         w1: w1[1] && w1[1].id, w1last: w1.length ? w1[w1.length - 1].id : null, bl: arr('THE_BLESSED')[1] && arr('THE_BLESSED')[1].id,
         hd: hdAt >= 0 ? hd[hdAt].id : null, study };
     });
@@ -561,33 +562,51 @@ async function main() {
       } catch (e) { fails.push(`walk: ${label}: ${(e && e.message) || e}`); }
     }
 
-    // P1 (TABS4): a reading-plan chapter. With Mark as read off, a chapter a running plan holds keeps its Mark as read
-    // (plans2); Genesis 6, which no plan holds, has none, and the neighbour drawn for it must not carry Genesis 5's.
+    // P1 (TABS4, on a letter since TABS5: a Bible chapter draws no Mark as read row). With Mark as read off, a letter a
+    // running plan holds keeps its row (plans2); the next letter, which no plan holds, has none, and the neighbour
+    // drawn for it must not carry the plan letter's row, before release or after.
     try {
-      // the setting goes in before the app boots (the running app saves its own state as the page unloads)
-      await page.evaluateOnNewDocument(() => {
-        try {
-          const s = JSON.parse(localStorage.getItem('vot-state') || 'null');
-          if (s && s.settings && s.settings.markAsRead !== false) { s.settings.markAsRead = false; localStorage.setItem('vot-state', JSON.stringify(s)); }
-        } catch (_e) { /* the case reports itself unarmed */ }
-      });
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0 && typeof ReadingPlanStore !== 'undefined'; });
-      const held = await page.evaluate(() => {
-        ReadingPlanStore.put({ id: 'e2e-tabs4', plan: 'e2e', start: '2026-11-11', status: 'running', segs: [], tracks: [{ items: [{ k: 'genesis:5' }] }] });
-        return ReadingPlanStore.holds('genesis', 5) && !ReadingPlanStore.holds('genesis', 6);
-      });
+      // TABS5: Mark as read off the way a reader does it (Settings -> Progress), since the state lives in IndexedDB
+      // and the running app writes its own over a hand edit (TABS4's localStorage write never reached the app)
+      await page.evaluate(() => { if (!document.querySelector('[aria-label="Settings"]') && window.__goHome) window.__goHome(); });
+      await page.waitForSelector('[aria-label="Settings"]', { timeout: 10000 });
+      await page.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('[aria-label="Settings"]')).click());
+      const grp = 'section[data-settings-group="progress"]';
+      await page.waitForSelector(`${grp} .settings-group-head`, { timeout: 10000 });
+      if (!(await page.$eval(`${grp} .settings-group-head`, (b) => b.getAttribute('aria-expanded') === 'true'))) await page.click(`${grp} .settings-group-head`);
+      await page.waitForSelector(`${grp} .settings-group-body`, { timeout: 5000 });
+      const marOff = await page.evaluate((g) => {
+        const row = [...document.querySelectorAll(`${g} .settings-row`)].find((r) => (r.querySelector('.settings-row-label') || {}).textContent === 'Mark as read');
+        const inp = row && row.querySelector('.settings-toggle input');
+        if (!inp) return null;
+        if (inp.checked) /** @type {HTMLElement} */ (inp).click();
+        return !inp.checked;
+      }, grp);
+      await sleep(400);
+      if (!marOff) throw new Error(`Mark as read could not be switched off in Settings (${marOff})`);
+      if (!ids.v7p || !ids.v7a) throw new Error('no Volume Seven letters to hold');
+      const held = await page.evaluate((a, b) => {
+        ReadingPlanStore.put({ id: 'e2e-tabs5', plan: 'e2e', start: '2026-11-11', status: 'running', segs: [], tracks: [{ items: [{ k: 'volume-seven:' + a }] }] });
+        return ReadingPlanStore.holds('volume-seven', a) && !ReadingPlanStore.holds('volume-seven', b);
+      }, ids.v7p, ids.v7a);
       if (!held) throw new Error('the plan run was not stored');
-      await viaDesk('bible', ['genesis', 5], false);
-      const mar = () => page.evaluate(() => { const el = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track'); return el ? /Mark as read/i.test(el.textContent || '') : null; });
-      const armed = await mar();
-      out.more.plan = { markAsReadOnPlanPage: armed };
-      need(armed === true, `P1 the plan chapter (Genesis 5) shows no Mark as read with the setting off (${armed}): the case is not armed`);
-      await swipe('plan-chapter-next', 'next', 1);
-      out.more.plan.markAsReadOnNext = await mar();
-      need(out.more.plan.markAsReadOnNext === false, 'P1 Genesis 6 (no plan holds it) shows Mark as read');
-      await swipe('plan-chapter-back', 'prev', 1);
-    } catch (e) { fails.push(`walk: plan chapter: ${(e && e.message) || e}`); }
+      await viaDesk('letter', ['seven', ids.v7p, 'LETTERS_V7'], false);
+      // the row: in the live page, and in the drawn neighbour (where = live | next | prev)
+      const mar = (where) => page.evaluate((w) => {
+        const el = document.querySelector(w === 'live' ? '.screen-layout > .pager-viewport > .screen-scroll > .pager-track' : `.screen-layout > .pager-viewport > .pager-peek-${w}`);
+        return el ? !!el.querySelector('.mark-read-row') : null;
+      }, where);
+      const armed = await mar('live');
+      out.more.plan = { letter: ids.v7p, markAsReadOnPlanPage: armed };
+      need(armed === true, `P1 the plan letter (${ids.v7p}) shows no Mark as read with the setting off (${armed}): the case is not armed`);
+      await swipe('plan-letter-next', 'next', 1, false, null, async () => { out.more.plan.rowOnNextPeek = await mar('next'); });
+      need(out.more.plan.rowOnNextPeek === false, `P1 the neighbour drawn for ${ids.v7a} (no plan holds it) carries a Mark as read row before release (${out.more.plan.rowOnNextPeek})`);
+      out.more.plan.rowOnNext = await mar('live');
+      need(out.more.plan.rowOnNext === false, `P1 ${ids.v7a} (no plan holds it) shows Mark as read`);
+      await swipe('plan-letter-back', 'prev', 1, false, null, async () => { out.more.plan.rowOnPrevPeek = await mar('prev'); });
+      need(out.more.plan.rowOnPrevPeek === true, `P1 the plan letter's neighbour lost its Mark as read row before release (${out.more.plan.rowOnPrevPeek})`);
+      need(await mar('live') === true, 'P1 the plan letter lost its Mark as read row after the swipe back');
+    } catch (e) { fails.push(`walk: plan letter: ${(e && e.message) || e}`); }
 
     // a search landing: the "Back to results" pill and the look's mark-as-read are that page's, not its neighbour's
     try {
@@ -646,7 +665,7 @@ async function main() {
           litOnScreen: !!(box && sb && box.height > 0 && box.bottom > sb.top && box.top < sb.bottom) };
       });
       const a0 = await aud();
-      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0, plays: 0 }; for (const m of (window.__medias || [])) { m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); m.addEventListener('play', () => window.__a1.plays++); } });
+      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0, plays: 0 }; for (const m of (window.__medias || [])) { m.__tabsL = 1; m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); m.addEventListener('play', () => window.__a1.plays++); } });
       await swipe('audio-next', 'next', 1, true);
       const a1 = await aud();
       await swipe('audio-back', 'prev', 1, true);
@@ -659,6 +678,59 @@ async function main() {
         `A1 the sound did not run on through the swipes (${a0.time}/${a0.media}, ${a1.time}/${a1.media}, ${a2.time}/${a2.media})`);
       need(ev.pauses === 0 && ev.seeks === 0 && ev.plays === 0, `A1 the audio paused, seeked or restarted during the swipes (${JSON.stringify(ev)})`);
       need(a0.lit && a0.litLive && a2.litLive && a2.litOnScreen, `A1 read-along's line is not on the playing page after the swipes (${JSON.stringify({ a0: [a0.lit, a0.litLive], a2: [a2.lit, a2.litLive, a2.litOnScreen] })})`);
+      await page.evaluate(() => AudioPlayer.stop());
+      await sleep(800);
+
+      // A2 (TABS5): the same for a letter. A Volume Seven letter plays; swipe to the next letter and back. With the
+      // finger down on the way back, the playing letter's neighbour already carries the wash (its clause, in the peek);
+      // the sound runs on, and the wash is on the playing page after.
+      if (!ids.v7p) throw new Error('A2: no Volume Seven letter');
+      await viaDesk('letter', ['seven', ids.v7p, 'LETTERS_V7'], true);
+      await page.waitForFunction("AudioPlayer.getState().status === 'playing' && AudioPlayer.getState().time > 1", { timeout: 25000 });
+      // a letter's first timed clause comes after its spoken title (26.5 s on this one): go to its first minute
+      await page.evaluate(() => AudioPlayer.seek(60));
+      await page.waitForFunction("AudioPlayer.getState().status === 'playing' && AudioPlayer.getState().time > 60", { timeout: 15000 });
+      await page.waitForFunction(() => { const h = window.CSS && CSS.highlights && CSS.highlights.get('vot-reading'); return !!(h && h.size); }, { timeout: 15000 });
+      await sleep(1500);
+      const peekLit = () => page.evaluate(() => {
+        const hl = CSS.highlights.get('vot-reading'); const r = hl ? [...hl][0] : null;
+        const n = r && r.startContainer; const el = n && (n.nodeType === 1 ? n : n.parentElement);
+        const pk = el && el.closest('.pager-peek'); const k = el && el.closest('[data-hl-key]');
+        return { inPeek: pk ? [...pk.classList].filter((c) => /pager-peek-/.test(c)).join(' ') : null, key: k ? k.getAttribute('data-hl-key') : null, len: r ? String(r).length : 0 };
+      });
+      const l0 = await aud();
+      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0, plays: 0 }; for (const m of (window.__medias || [])) { if (m.__tabsL) continue; m.__tabsL = 1; m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); m.addEventListener('play', () => window.__a1.plays++); } });
+      await swipe('audio-letter-next', 'next', 1, true);
+      const l1 = await aud();
+      // A letter's clauses run 2-4 s, so in the 1.6 s from release to the settled frame the voice can move on to the
+      // next clause: a true change, not the swipe's. The way back starts at a long clause (6 s or more, within the next
+      // 30 s, so it is on the page), the walk's own seek, made before the counters start again.
+      const longAt = await page.evaluate(() => {
+        const s = AudioPlayer.getState(); const t = s.queue[s.qi];
+        const rows = (window.AUDIO_SYNC && t && window.AUDIO_SYNC[t.key]) || [];
+        for (let i = 0; i + 1 < rows.length; i++) if (rows[i][0] > s.time + 1 && rows[i][0] < s.time + 30 && rows[i + 1][0] - rows[i][0] >= 6) return rows[i][0];
+        return null;
+      });
+      if (longAt != null) {
+        await page.evaluate((t) => AudioPlayer.seek(t + 0.3), longAt);
+        await page.waitForFunction((t) => AudioPlayer.getState().time >= t + 0.3, { timeout: 10000 }, longAt);
+        await sleep(300);
+        await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0, plays: 0 }; });
+      }
+      const l1b = longAt != null ? await aud() : l1;
+      let atRel = null;
+      await swipe('audio-letter-back', 'prev', 1, true, null, async () => { atRel = await peekLit(); });
+      const l2 = await aud();
+      const ev2 = await page.evaluate(() => window.__a1);
+      out.more.audioLetter = { letter: ids.v7p, l0, l1, longAt, l1b, l2, atRelease: atRel, events: ev2 };
+      need(l0.status === 'playing' && l0.lit && l0.litLive, `A2 the letter's recording is not playing with read-along on it (${JSON.stringify(l0)})`);
+      need(l1.key === l0.key && l2.key === l0.key, `A2 the track changed during a swipe (${l0.key} -> ${l1.key} -> ${l2.key})`);
+      need(l1.status === 'playing' && l2.status === 'playing' && l1.time > l0.time && l2.time > l1b.time && l1.media > l0.media && l2.media > l1b.media,
+        `A2 the sound did not run on through the swipes (${l0.time}/${l0.media}, ${l1.time}/${l1.media}, ${l1b.time}/${l1b.media}, ${l2.time}/${l2.media})`);
+      need(ev2.pauses === 0 && ev2.seeks === 0 && ev2.plays === 0, `A2 the audio paused, seeked or restarted during the swipes (${JSON.stringify(ev2)})`);
+      need(atRel && atRel.inPeek === 'pager-peek-prev' && atRel.len > 0 && String(atRel.key).startsWith('letter:' + ids.v7p + ':'),
+        `A2 the playing letter's neighbour has no wash before release (${JSON.stringify(atRel)})`);
+      need(l2.litLive && l2.litOnScreen, `A2 read-along's line is not on the playing letter after the swipes (${JSON.stringify(l2)})`);
       await page.evaluate(() => AudioPlayer.stop());
     } catch (e) { fails.push(`walk: audio: ${(e && e.message) || e}`); } finally {
       page.off('request', onReq);
