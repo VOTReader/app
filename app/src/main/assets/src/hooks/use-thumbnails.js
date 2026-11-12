@@ -1,563 +1,116 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useThumbnails — tab-card thumbnail capture, IDB persistence, and GC
+   useThumbnails — the Tabs screen's card pictures: snapshot, IDB, GC
    ═══════════════════════════════════════════════════════════════════════
    Global-scope module. Bundled into dist/bundle-b.js.
 
+   TABS1 (2026-11-11). A card's picture is a SNAPSHOT of the tab's own page
+   (utils/tab-snap.js): the live reading area's markup, trimmed to one screen,
+   which the card lays out again with the app's own stylesheet and scales down.
+   It replaced the html2canvas JPEGs (two per tab, one per theme, 150-400 KB
+   each, a 0.5-2 s main-thread render apiece on a phone, and text that came
+   out squeezed and in the wrong faces). Consequences that shaped this file:
+     - taking one costs a few ms, so it is taken synchronously, right where it
+       is needed: goTabs (app.jsx) takes the active tab's just before the Tabs
+       screen mounts, so that card is in the screen's first frame; the calm
+       gate, boot window, render queue and retries the JPEGs needed are gone;
+     - a snapshot has no theme of its own (colours are the theme's CSS
+       variables), so a theme switch needs nothing: every card follows it;
+     - the active tab is snapshotted again when it settles: 600 ms after a
+       screen or tab change, 1 s after its scroll stops, and when the page is
+       hidden, so a tab left any other way (a link that opens a new tab) has a
+       picture from its last still moment;
+     - each entry is a few KB of HTML in IndexedDB under the tab's content key
+       (tabContentKey, unchanged), written when the main thread is idle and at
+       once when the page is hidden, so a restart shows every card at once.
+
    OWNS:
-     - tabThumbnails state (content-keyed DUAL-THEME variant maps:
-       { dark?: jpegDataUrl, light?: jpegDataUrl, unknown?: jpegDataUrl } —
-       the current theme is photographed as before; the OTHER theme is
-       rendered ~900ms later from an html2canvas clone with the opposite
-       theme class forced, so the Tabs overview always has the right-theme
-       card and a theme switch never mixes dark+light walls)
+     - tabThumbnails state: { [contentKey]: { snap } } (older rows keep their
+       { dark?, light?, unknown? } JPEGs until the tab is next seen; the
+       overview draws those only where no snapshot exists yet)
      - setTabThumbnails   (returned so App's closeAllTabs can clear it)
-     - IDB load-on-mount  (idbReadAll — gated on tabsEnabled; reads ONLY the
-                           live tabs' keys and deletes nothing; re-runs when
-                           the set of open tabs changes — boot-performance-5
-                           and its follow-up)
-     - GC effect          (debounced; sweeps the STORE's keys, not React
-                           state, and only once StateStore reports 'loaded')
-     - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled;
-                                   failed captures retry up to 3× @2.5s;
-                                   takes { urgent } — non-urgent calls defer
-                                   through the interaction CALM GATE below)
-     - the interaction calm gate  (module tracker + listener effect: renders
-                                   wait until no finger is down and nothing
-                                   was touched for CAPTURE_CALM_MS, so a
-                                   capture task never lands where the next
-                                   tap/scroll queues behind it)
-     - aspect-ratio CSS var effect (sets --card-ar on resize; a settled
-                                   resize also RECAPTURES the active tab —
-                                   stored thumbs would be the wrong aspect)
-     - capture-after-nav effect   (fires 350 ms after screen/tab change,
-                                   then waits out the calm gate)
-     - the boot quiet window      (web and Android: no non-urgent capture
-                                   until BOOT_CAPTURE_FLOOR_MS after the first
-                                   render AND an idle moment — keeps
-                                   html2canvas out of page load)
-     - the restore quiet window   (re-armed when the page comes back from
-                                   hidden / the bfcache, and when vot-state
-                                   finishes hydrating: no non-urgent capture
-                                   for RESTORE_CAPTURE_FLOOR_MS + an idle
-                                   moment — the S22 reopen freeze, 10-18)
-     - the render queue           (module-wide: ONE html2canvas/PixelCopy
-                                   render at a time, primary and other-theme
-                                   alike, across every hook instance)
-     - idle placement             (every non-urgent render starts from
-                                   onIdle — requestIdleCallback, or a timer
-                                   where it is missing)
-     - hidden-page skip           (no capture while document.visibilityState
-                                   is 'hidden'; one is re-requested on return)
-     - one-shot cache reuse       (only the FIRST capture after a startup
-                                   or restore reuses a content key that
-                                   already holds both theme variants; every
-                                   later capture redraws, so no card goes
-                                   stale; resize, theme flips and the
-                                   overview heal always redraw)
-     - overview-open heal effect  (opening the overview captures the active
-                                   content tab URGENTLY — safe: clone renders
-                                   exclude the overlay; heals blank/stale
-                                   cards; goTabs in app.jsx is the other
-                                   urgent caller)
+     - IDB load           (idbReadAll(liveKeys), tabsEnabled-gated, re-run when
+                           the set of open tabs changes; it deletes nothing)
+     - GC effect          (debounced; sweeps the STORE's keys, only once
+                           StateStore reports 'loaded')
+     - captureActiveTabThumbnail(opts?)  synchronous; stable on [tabsEnabled]
 
-   DOES NOT OWN:
-     - tabContentKey / idbReadAll / idbPut / idbDelete — global helpers
-       in Cluster A (bundle-a.js); accessed as bare names via window.
-     - tabsOverviewOpenRef — callers pass tabsOverviewOpen as a param;
-       an internal ref mirror provides the synchronous read inside the
-       capture callback.
-
-   PARAMS:
-     tabs              — full tabs array (useTabs). For the mount-read's
-                         live-key filter, the GC live-key set, and tabsRef.
-     activeTabIdx      — active tab index (useTabs). For activeTabIdxRef.
-     activeTab         — active tab object (useTabs); screen/bookId/etc.
-                         used as effect deps for the after-nav trigger.
-     tabsEnabled       — settings.tabsEnabled (useSettings); gates capture
-                         everywhere.
-     tabsOverviewOpen  — boolean (App()-local state); suppresses capture
-                         while the Tabs Overview overlay is up.
+   DOES NOT OWN: tabContentKey / idbReadAll / idbPut / idbDelete / idbAllKeys
+   (globals from the thumb store, reached as bare names via window).
 
    RETURNS: { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail }
-
-   STORAGE:
-     IndexedDB — written via idbPut(key, dataUrl); read via
-     idbReadAll(liveKeys), gated on tabsEnabled and re-run when tabsEnabled
-     flips true OR the set of open tabs changes — a tabs-off session reads
-     nothing, and only the currently-open tabs' rows are read.
-     idbReadAll DELETES NOTHING: its key set derives from `tabs`, which can be
-     synthetic boot defaults on a degraded vot-state hydration, so a delete
-     there wiped the whole store (boot-performance-5 and its follow-up).
-     Dead rows die in the GC effect, which sweeps idbAllKeys() and runs only
-     once StateStore says 'loaded'. Keys are content-signature strings produced
-     by tabContentKey(tab) — survive tab-index shifts (close/reorder).
-
-   WINDOW: none — no window.__* handler bridges wired. Content-tab captures
-     go through PlatformBridge.takeThemedScreenshot(curTheme) — an html2canvas
-     DOM-clone render on BOTH platforms (chrome-free + blink-free: the live
-     page is never photographed). Garden tabs go through takeScreenshot()
-     (native PixelCopy on Android, html2canvas on web) for true pixels.
-
-   ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
-   │ captureActiveTabThumbnail MUST be the direct return value of          │
-   │ React.useCallback with dependency array [tabsEnabled]. The after-nav, │
-   │ heal, and resize effects list it in their dep arrays and re-run when  │
-   │ its identity changes — stability is load-bearing.                     │
-   └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
-import { PlatformBridge, captureTargetEl } from '../utils/platform-bridge.js';
 import { StateStore } from '../stores/state-store.js';
 import { onIdle } from '../utils/on-idle.js';
+import { snapLiveTab, readSnap } from '../utils/tab-snap.js';
 
-/**
- * Publish the tab-card aspect ratio (--card-ar) from the APP COLUMN
- * (.screen-layout — what the screenshots capture; max-width 760px centered
- * on desktop, full-width on phones). Falls back to the window when no
- * column is mounted (corpus-loading placeholder, garden). Called from the
- * mount/resize effect AND at capture time — at boot the first measurement
- * can land while a lazy corpus still shows the placeholder (no column yet),
- * so the capture path re-measures once real screens exist.
- */
-function updateCardAr() {
-  // Same target selection as the capture itself (captureTargetEl) so the
-  // card box and the pixels that fill it always agree — the naive
-  // first-.screen-layout read could measure the overview overlay's own
-  // layout or a transient zero-sized node.
-  const layout = captureTargetEl();
-  const colW = (layout && layout.classList && layout.classList.contains('screen-layout'))
-    ? layout.getBoundingClientRect().width : 0;
-  const w = colW || window.innerWidth || 1;
-  const h = window.innerHeight || 1;
-  document.documentElement.style.setProperty('--card-ar', Math.round(w) + ' / ' + h);
-}
+/** After a screen or tab change, the snapshot waits this long (scroll restore lands first). */
+export const SNAP_AFTER_NAV_MS = 600;
+/** After the reading area's scroll stops, the snapshot waits this long. */
+export const SNAP_AFTER_SCROLL_MS = 1000;
 
-/* ── Interaction calm gate ──────────────────────────────────────────────
-   A capture is an html2canvas full-DOM clone render (plus a second one for
-   the other theme) — a 150ms main-thread task on a desktop and up to ~1s on
-   a phone. The OLD cadence (300ms after scroll-stop, 350ms after nav) put
-   those renders EXACTLY where the next interaction lands: the finger lifts,
-   the render starts, and the follow-up tap or scroll queues behind it — the
-   owner's "taps and scroll take a second to respond" (worst around the
-   auto-scroll pill, whose every pause is a scroll-stop). The renders are
-   unavoidable; their PLACEMENT is not. Every non-urgent capture now waits
-   until the user has been calm — no finger down, nothing touched for
-   CAPTURE_CALM_MS — and defers itself in CALM_RECHECK_MS steps otherwise.
-   Urgent captures (the Tabs-overview open + its heal, where the user is
-   about to LOOK at the card) bypass the gate — that is today's behavior.
-
-   Tracking is module state fed by document-level capture+passive listeners
-   (installed by the hook, tabsEnabled-gated): touch events are the truth on
-   touch devices; pointer events cover the mouse (pointerType-filtered so a
-   touch never double-drives both flags). pointermove is deliberately NOT
-   stamped — desktop hover motion would starve captures forever; touchmove
-   IS stamped, so a live drag (selection handles, press-drag reorder) stays
-   busy however long it runs. A held-down flag older than DOWN_STALE_MS
-   stops counting as busy: a swallowed touchend (the documented WebView
-   non-bubbling failure) must not disable captures for the session, and
-   capturing under a genuinely parked-motionless-for-10s finger is fine —
-   the screen is static. */
-export const CAPTURE_CALM_MS = 1000;
-export const CALM_RECHECK_MS = 700;
-const DOWN_STALE_MS = 10000;
-let _touchDown = false;
-let _mouseDown = false;
-let _lastInteractTs = -Infinity;
-
-/**
- * Feed the calm tracker. Exported for the listener wiring below and for
- * tests (jsdom TouchEvents don't carry real touches lists reliably).
- * @param {'touch-down'|'touch-up'|'mouse-down'|'mouse-up'|'pulse'} kind
- * @param {number} now   performance.now()-domain timestamp
- * @param {number} [remainingTouches]  touches still down after a touch-up
- */
-export function noteCaptureInteraction(kind, now, remainingTouches) {
-  if (kind === 'touch-down') _touchDown = true;
-  else if (kind === 'touch-up') _touchDown = (remainingTouches || 0) > 0;
-  else if (kind === 'mouse-down') _mouseDown = true;
-  else if (kind === 'mouse-up') _mouseDown = false;
-  _lastInteractTs = now;
-}
-
-/**
- * True when a thumbnail render can start without landing on an interaction:
- * no finger/button down (self-healing after DOWN_STALE_MS of event silence)
- * and nothing touched for CAPTURE_CALM_MS. Vacuously calm before any
- * interaction, so non-interactive hosts (tests, cold boot) capture freely.
- * @param {number} now
- * @returns {boolean}
- */
-export function captureIsCalm(now) {
-  const down = (_touchDown || _mouseDown) && (now - _lastInteractTs) <= DOWN_STALE_MS;
-  return !down && (now - _lastInteractTs) >= CAPTURE_CALM_MS;
-}
-
-/* ── Boot quiet window ──────────────────────────────────────────────────
-   Lighthouse mobile (docs/perf/lighthouse-2026-09.md, item 1): the after-nav
-   capture fired 350 ms after the FIRST screen, so the html2canvas load and
-   its clone renders (plus the other-theme render) landed in the middle of
-   page load — 4.5 to 8.2 s of 4x-throttled main-thread time on the reading
-   pages, the top bootup-time entry on every page. Nobody sees a card during
-   load: the Tabs overview is the only place cards appear, and opening it
-   captures URGENTLY (the heal effect below, and goTabs in app.jsx).
-   So every non-urgent capture waits until the page has been up
-   for BOOT_CAPTURE_FLOOR_MS (measured from the hook's first mount, i.e.
-   the first render) AND the main thread has an idle moment; navigations in
-   that window collapse into ONE capture of whatever tab is active when it
-   lifts. The window lifts once per page load and never re-arms.
-   ANDROID too (pf1, 2026-10-22; it was exempt until then): on the S22,
-   reopening the APK with a reader tab restored ran a 2.0-2.3 s and a
-   1.1-1.3 s html2canvas task in every load (about 3.3 s of a CPU profile)
-   and held the search index back to 4-9 s; from Home there was no freeze
-   over 70 ms and the index was ready in 0.65 s. */
-export const BOOT_CAPTURE_FLOOR_MS = 10000;
-/* RESTORE re-arms the same window, shorter: the page coming back from hidden
-   (the APK reopened from recents, a PWA tab refocused), a bfcache pageshow,
-   and vot-state's late hydration (the restored tabs replace the boot
-   defaults, which re-fires the after-nav capture) are all moments the app is
-   busy repainting a restored route — exactly where the 10-18 S22 reopen
-   freeze sat. Re-arming only ever EXTENDS the window, never shortens it. */
-export const RESTORE_CAPTURE_FLOOR_MS = 5000;
-/* Bound on every idle wait (a permanently busy thread must not starve the
-   capture forever). */
-export const CAPTURE_IDLE_TIMEOUT_MS = 2000;
-const WEB_BOOT_IDLE_TIMEOUT_MS = 5000;
-let _bootFloorAt = /** @type {number | null} */ (null);
-let _bootSettled = false;
-/** @type {Array<() => void>} */
-let _bootWaiters = [];
-let _bootTimer = /** @type {any} */ (null);
-let _bootIdleCancel = /** @type {null | (() => void)} */ (null);
-
-/** Start the floor clock at the first render (first call wins). */
-function noteCaptureBootStart(now) {
-  if (_bootFloorAt == null) _bootFloorAt = now + BOOT_CAPTURE_FLOOR_MS;
-}
-
-/**
- * A restore happened (page back from hidden / bfcache, state hydrated):
- * close the window again until `now + RESTORE_CAPTURE_FLOOR_MS` and an idle
- * moment. Extends a window still open from boot; never shortens one.
- * @param {number} now  performance.now()-domain
- */
-/* CACHE REUSE IS ONE-SHOT. A stored card is reused (not redrawn) only by
-   the FIRST capture after a startup or a restore: that is the capture that
-   froze the reopen, and the card it reuses is the one the reader saw when
-   they left. Every later capture redraws, so a page whose content changes
-   under the same content key (a highlight, a note, an edited entry) never
-   keeps a stale card. Module state like the boot window: page load arms it,
-   noteCaptureRestore re-arms it, and the first capture to reach the cache
-   check consumes it, whatever it then does. */
-let _reuseArmed = true;
-
-export function noteCaptureRestore(now) {
-  const until = now + RESTORE_CAPTURE_FLOOR_MS;
-  // A settled window's floor is spent: the restore sets its own. An open one
-  // (boot still running) only ever grows.
-  if (_bootSettled || _bootFloorAt == null || until > _bootFloorAt) _bootFloorAt = until;
-  _bootSettled = false;
-  _reuseArmed = true;
-  // A wait already armed re-checks the floor when its timer or idle callback
-  // fires (pumpCaptureBootWindow), so nothing else to do here.
-}
-
-function pumpCaptureBootWindow() {
-  const now = performance.now();
-  const wait = Math.max(0, /** @type {number} */ (_bootFloorAt) - now);
-  _bootTimer = setTimeout(() => {
-    _bootTimer = null;
-    // Re-armed by a restore while this timer slept: sleep the remainder.
-    if (performance.now() < /** @type {number} */ (_bootFloorAt)) { pumpCaptureBootWindow(); return; }
-    _bootIdleCancel = onIdle(() => {
-      _bootIdleCancel = null;
-      if (performance.now() < /** @type {number} */ (_bootFloorAt)) { pumpCaptureBootWindow(); return; }
-      _bootSettled = true;
-      const waiters = _bootWaiters;
-      _bootWaiters = [];
-      waiters.forEach((w) => w());
-    }, { timeout: WEB_BOOT_IDLE_TIMEOUT_MS });
-  }, wait);
-}
-
-/**
- * Run `fn` once the boot window has lifted (floor passed + an idle moment);
- * runs it synchronously when it already has.
- * @param {() => void} fn
- * @returns {() => void} cancel
- */
-function whenCaptureBootSettled(fn) {
-  if (_bootSettled) { fn(); return () => {}; }
-  _bootWaiters.push(fn);
-  if (!_bootTimer && !_bootIdleCancel) {
-    noteCaptureBootStart(performance.now());
-    pumpCaptureBootWindow();
-  }
-  return () => { _bootWaiters = _bootWaiters.filter((w) => w !== fn); };
-}
-
-/**
- * Tests only: reset the boot window. `settled` true opens it (the state every
- * pre-existing capture test assumes); false re-arms it with a fresh floor.
- * @param {boolean} settled
- */
-export function _resetCaptureBootGateForTests(settled) {
-  if (_bootTimer) clearTimeout(_bootTimer);
-  if (_bootIdleCancel) _bootIdleCancel();
-  _bootTimer = null;
-  _bootIdleCancel = null;
-  _bootWaiters = [];
-  _bootFloorAt = null;
-  _bootSettled = settled;
-  _renderQueue = [];
-  _renderBusy = false;
-  _reuseArmed = true;
-}
-
-/* ── The render queue ───────────────────────────────────────────────────
-   Every html2canvas clone render (and Garden's native shot) goes through
-   here, so at most ONE runs at a time in the whole page: the primary, the
-   other-theme render ~900ms later, a retry, and a second hook instance can
-   otherwise overlap (the per-hook in-flight flag covered only the primary),
-   and two overlapping clone renders on a phone are one multi-second freeze.
-   A task starts synchronously when the queue is empty. Each task re-checks
-   its own preconditions when it actually starts (hidden page, superseded
-   capture, page changed) — the wait in the queue can outlive them. */
-/** @type {Array<{ task: () => any, resolve: (v: any) => void, reject: (e: any) => void }>} */
-let _renderQueue = [];
-let _renderBusy = false;
-
-/**
- * @template T
- * @param {() => T | Promise<T>} task
- * @returns {Promise<T>}
- */
-export function runCaptureRender(task) {
-  return new Promise((resolve, reject) => {
-    _renderQueue.push({ task, resolve, reject });
-    if (!_renderBusy) drainCaptureRenders();
-  });
-}
-
-async function drainCaptureRenders() {
-  _renderBusy = true;
-  while (_renderQueue.length) {
-    const job = /** @type {any} */ (_renderQueue.shift());
-    try { job.resolve(await job.task()); } catch (e) { job.reject(e); }
-  }
-  _renderBusy = false;
-}
-
-/** True while the page is hidden — nobody can see a card, and a capture
- *  then only steals the CPU the reopen will need. */
+/** True while the page is hidden. */
 function pageHidden() {
   return typeof document !== 'undefined' && document.visibilityState === 'hidden';
 }
 
-/** Sentinels a queued render returns instead of a data URL. */
-const SKIP_HIDDEN = 'skip:hidden';
-const SKIP_STALE = 'skip:stale';
-
 /**
- * Classify which theme a legacy (pre-metadata) thumbnail was captured under
- * by its average luminance: the dark theme's background (#07070e, luma ~8)
- * and the light theme's (#f7f2e8, luma ~242) dominate any capture, so a
- * mid-scale threshold is unambiguous. Resolves 'dark' | 'light', or null
- * when the image can't be decoded/drawn (jsdom, corrupt row) — callers
- * leave the row as `unknown` and render it as-is.
- *
- * @param {string} dataUrl
- * @returns {Promise<'dark'|'light'|null>}
- */
-function classifyThumbTheme(dataUrl) {
-  return new Promise((resolve) => {
-    try {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const c = document.createElement('canvas');
-          c.width = 8; c.height = 8;
-          const ctx = c.getContext('2d');
-          if (!ctx) { resolve(null); return; }
-          ctx.drawImage(img, 0, 0, 8, 8);
-          const d = ctx.getImageData(0, 0, 8, 8).data;
-          let luma = 0;
-          for (let i = 0; i < d.length; i += 4) {
-            luma += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-          }
-          luma /= (d.length / 4);
-          resolve(luma >= 128 ? 'light' : 'dark');
-        } catch (_e) { resolve(null); }
-      };
-      img.onerror = () => resolve(null);
-      img.src = dataUrl;
-    } catch (_e) { resolve(null); }
-  });
-}
-
-/**
- * Per-tab thumbnail capture + IDB persistence.
- * Owns the tabThumbnails state, the captureActiveTabThumbnail callback,
- * the IDB load-on-mount effect, and the after-nav / heal / resize triggers.
- *
- * @param {{
- *   tabs: any[],
- *   activeTabIdx: number,
- *   activeTab: any,
- *   tabsEnabled: boolean,
- *   tabsOverviewOpen: boolean,
- *   theme: string
- * }} args
+ * Card pictures for the Tabs screen.
+ * @param {{ tabs: any[], activeTabIdx: number, activeTab: any, tabsEnabled: boolean, tabsOverviewOpen: boolean, theme?: string }} args
  * @returns {{
- *   tabThumbnails: Record<string, { dark?: string, light?: string, unknown?: string }>,
+ *   tabThumbnails: Record<string, { snap?: any, dark?: string, light?: string, unknown?: string }>,
  *   setTabThumbnails: (val: any) => void,
  *   captureActiveTabThumbnail: (opts?: { urgent?: boolean, force?: boolean }) => void
  * }}
  */
-export function useThumbnails({
-  tabs,
-  activeTabIdx,
-  activeTab,
-  tabsEnabled,
-  tabsOverviewOpen,
-  theme,
-}) {
-  // ── State ──────────────────────────────────────────────────────────────
+export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabsOverviewOpen }) {
   const [tabThumbnails, setTabThumbnails] = React.useState({});
-  // Call-time mirror of tabThumbnails — mergeVariant and the probe upgrades
-  // read it to build entries without stale-closure state.
-  const thumbnailsRef = React.useRef({});
-  // The live-tabs IDB read while it is in flight (null once it settles): the
-  // cache-reuse check waits for it, so a reopen never redraws a card that is
-  // sitting in IndexedDB merely because the read had not landed yet.
-  const thumbsLoadRef = React.useRef(/** @type {null | Promise<void>} */ (null));
+  const thumbnailsRef = React.useRef(/** @type {Record<string, any>} */ ({}));
 
-  // ── Load previously-saved thumbnails on mount ──────────────────────────
-  // Entries are DUAL-THEME variant maps: { dark?: url, light?: url,
-  // unknown?: url }. The overview picks the variant matching the current
-  // theme, so a theme switch never shows a mixed dark/light wall and never
-  // needs a recapture. Older shapes migrate in place:
-  //   - { url, theme }  (the one-day interim format) → { [theme]: url }
-  //   - bare string / theme:null (pre-metadata rows)  → { unknown: url },
-  //     then classifyThumbTheme probes the JPEG's average luminance and
-  //     upgrades the row to its real theme slot (so even never-revisited
-  //     tabs participate in theme matching — the owner's Library card).
-  // The load also SCRUBS degenerate variants: before the capture-side floor
-  // existed, a zero-sized-canvas capture stored "data:," and painted that tab
-  // blank forever (background tabs never recapture). Any variant under the
-  // floor is dropped; an entry left empty is deleted → placeholder until the
-  // next good capture.
-  // The open tabs' content keys as one primitive, so the read effect below can
-  // depend on the SET of tabs without depending on the `tabs` array identity
-  // (which changes on every render). Newline-joined because a content key can
-  // contain most punctuation but never a newline.
+  // ── Load the open tabs' rows ─────────────────────────────────────────────
+  // Only the live keys are read (boot-performance-5) and NOTHING is deleted here:
+  // `tabs` can be synthetic boot defaults on a degraded vot-state hydration, and a
+  // delete keyed off them wiped the store once. Dead rows go in the GC below.
   const liveKeySig = tabs.map((t) => tabContentKey(t)).join('\n');
-
   React.useEffect(() => {
-    // boot-performance-5: tabs off ⇒ nothing to show, so read nothing. Re-runs
-    // (and then actually reads) the moment tabsEnabled flips true.
     if (!tabsEnabled) return undefined;
     let cancelled = false;
-    const ok = (u) => typeof u === 'string' && u.length >= 1000;
-    // Only the currently-open tabs' rows reach React state — idbReadAll skips
-    // the rest (boot-performance-5). It does NOT delete them, and must not:
-    // `tabs` comes from the persisted vot-state, which can mount on boot
-    // DEFAULTS (storage-backup-3 — a 3 s hydration timeout drops it to
-    // 'degraded' and one synthetic tab renders), so a delete keyed off this
-    // list would wipe every real thumbnail before the true state arrived.
-    // Dead rows are the debounced GC effect's job below: it depends on
-    // [tabs, tabThumbnails], so it re-runs once the real tabs hydrate.
+    const ok = (/** @type {any} */ u) => typeof u === 'string' && u.length >= 1000;
     const liveKeys = liveKeySig ? liveKeySig.split('\n') : [];
-    const load = idbReadAll(liveKeys).then((thumbs) => {
+    idbReadAll(liveKeys).then((rows) => {
       if (cancelled) return;
       const norm = {};
-      /** @type {Array<[string, string]>} */
-      const probes = [];
-      for (const k of Object.keys(thumbs || {})) {
-        const v = thumbs[k];
+      for (const k of Object.keys(rows || {})) {
+        const v = rows[k];
         let entry = null;
-        let rewrite = false;
-        if (typeof v === 'string') {
+        if (v && typeof v === 'object' && v.snap) {
+          const snap = readSnap(v.snap);
+          if (snap) entry = { snap };
+        } else if (typeof v === 'string') {
           if (ok(v)) entry = { unknown: v };
-        } else if (v && typeof v.url === 'string') {
-          // interim { url, theme } rows
-          rewrite = true;
-          if (ok(v.url)) {
-            entry = (v.theme === 'dark' || v.theme === 'light')
-              ? { [v.theme]: v.url }
-              : { unknown: v.url };
-          }
         } else if (v && typeof v === 'object') {
-          entry = {};
-          for (const f of ['dark', 'light', 'unknown']) {
-            if (ok(v[f])) entry[f] = v[f];
-            else if (v[f] != null) rewrite = true; // blank variant scrubbed
-          }
-          if (Object.keys(entry).length === 0) entry = null;
+          // older JPEG rows ({ dark?, light?, unknown? } or the interim { url, theme })
+          const e = {};
+          if (typeof v.url === 'string' && ok(v.url)) e[v.theme === 'dark' || v.theme === 'light' ? v.theme : 'unknown'] = v.url;
+          for (const f of ['dark', 'light', 'unknown']) if (ok(v[f])) e[f] = v[f];
+          if (Object.keys(e).length) entry = e;
         }
-        if (entry) {
-          norm[k] = entry;
-          if (entry.unknown) probes.push([k, entry.unknown]);
-          if (rewrite) idbPut(k, entry);
-        } else {
-          idbDelete(k); // blank/empty row — placeholder until recaptured
-        }
+        if (entry) norm[k] = entry; else idbDelete(k);
       }
-      thumbnailsRef.current = norm;
-      setTabThumbnails(norm);
-      // Luminance-probe the unknowns in the background; each resolution
-      // upgrades its row (state + IDB) unless a real capture got there first.
-      probes.forEach(([k, url]) => {
-        classifyThumbTheme(url).then((cls) => {
-          if (cancelled || !cls) return;
-          const cur = thumbnailsRef.current[k];
-          if (!cur || cur.unknown !== url) return; // superseded by a real capture
-          const entry = { [cls]: url };
-          thumbnailsRef.current[k] = entry;
-          setTabThumbnails((prev) => ({ ...prev, [k]: entry }));
-          idbPut(k, entry);
-        });
-      });
-    });
-    thumbsLoadRef.current = load;
-    load.then(() => { if (thumbsLoadRef.current === load) thumbsLoadRef.current = null; }, () => {
-      if (thumbsLoadRef.current === load) thumbsLoadRef.current = null;
-    });
+      // A snapshot taken this session (goTabs before the read landed) outranks the stored row.
+      const merged = { ...norm };
+      for (const k of Object.keys(thumbnailsRef.current)) if (thumbnailsRef.current[k] && thumbnailsRef.current[k].snap) merged[k] = thumbnailsRef.current[k];
+      thumbnailsRef.current = merged;
+      setTabThumbnails(merged);
+    }, () => {});
     return () => { cancelled = true; };
-    // tabsEnabled gates AND re-triggers this read; liveKeySig re-triggers it
-    // when the SET of open tabs changes. The comment that used to sit here said
-    // `tabs` must not retrigger the normalize/probe pipeline on every tab edit
-    // — that was written when this read was a full dump of every stored row. It
-    // reads only the live rows now, so the cost is a handful of keys, and NOT
-    // re-reading was itself the defect: on a degraded vot-state hydration the
-    // mount read runs against one synthetic tab, and with deps [tabsEnabled]
-    // alone the real tabs' thumbnails were never loaded for the rest of the
-    // session (Verifier, boot-performance-5 follow-up). Depending on the
-    // signature string rather than `tabs` is what keeps it from firing on every
-    // render — the array identity changes constantly, the key set does not.
   }, [tabsEnabled, liveKeySig]);
 
-  // ── Garbage-collect stale thumbnails ───────────────────────────────────
-  // Debounced so we don't thrash during rapid tab edits.
-  //
-  // The sweep reads the STORE's keys, not React state. It used to derive
-  // deadKeys from Object.keys(tabThumbnails), which worked only while the
-  // mount read was a full dump: after boot-performance-5 scoped that read to
-  // live keys, a row whose tab closed in a PREVIOUS session never enters state
-  // and a state-derived sweep can never see it. `closeAllTabs` is the concrete
-  // path — it does setTabThumbnails({}), state only, so on the next boot those
-  // rows were neither loaded nor collected and the JPEGs stayed forever
-  // (Verifier, boot-performance-5 follow-up).
-  //
-  // THE INVARIANT, and it is the whole reason this is written the way it is:
-  // NO DELETE KEYED OFF `tabs` MAY RUN BEFORE `tabs` IS KNOWN TO BE REAL.
-  // `tabs` comes from the persisted vot-state, which mounts on synthetic boot
-  // defaults when hydration times out (storage-backup-3). Sweeping then would
-  // delete every real thumbnail — which is exactly what the first version of
-  // boot-performance-5 did, inline in the read. So the sweep asks StateStore
-  // whether it has actually loaded. No state store at all (LS-only mode, a
-  // test harness) counts as loaded: there is no deferred hydration to wait for.
-  const thumbGcTimerRef = React.useRef(null);
+  // ── Garbage-collect closed tabs' rows ────────────────────────────────────
+  // Sweeps the STORE's keys (a row whose tab closed in an earlier session never
+  // enters state), and only once StateStore says the tabs are the real ones.
+  const thumbGcTimerRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => {
     clearTimeout(thumbGcTimerRef.current);
     thumbGcTimerRef.current = setTimeout(() => {
@@ -566,16 +119,11 @@ export function useThumbnails({
         || StateStore.getState() === 'loaded';
       if (!stateReal) return;
       const liveKeys = new Set(tabs.map((t) => tabContentKey(t)));
-      // typeof guard for the same reason every other cross-bundle call in this
-      // file has one: idbAllKeys is a bundle-d global, and a harness that only
-      // stubs the reads should not crash on the sweep.
       if (typeof idbAllKeys === 'function') {
         idbAllKeys().then((keys) => {
-          const deadKeys = keys.filter((k) => !liveKeys.has(k));
-          if (deadKeys.length) deadKeys.forEach((k) => idbDelete(k));
+          keys.filter((k) => !liveKeys.has(k)).forEach((k) => idbDelete(k));
         });
       }
-      // State still prunes independently — it can hold a key the store lost.
       setTabThumbnails((prev) => {
         const out = {};
         let changed = false;
@@ -583,520 +131,91 @@ export function useThumbnails({
           if (liveKeys.has(k)) out[k] = prev[k];
           else changed = true;
         }
+        if (changed) thumbnailsRef.current = out;
         return changed ? out : prev;
       });
     }, 2000);
     return () => clearTimeout(thumbGcTimerRef.current);
   }, [tabs, tabThumbnails]);
 
-  // ── Refs ───────────────────────────────────────────────────────────────
+  // ── Persistence: idle writes, flushed at once when the page hides ────────
+  const pendingRef = React.useRef(/** @type {Map<string, any>} */ (new Map()));
+  const persistIdleRef = React.useRef(/** @type {null | (() => void)} */ (null));
+  const flushPersist = React.useCallback(() => {
+    if (persistIdleRef.current) { persistIdleRef.current(); persistIdleRef.current = null; }
+    const pending = pendingRef.current;
+    pendingRef.current = new Map();
+    if (typeof idbPut !== 'function') return;   // a harness without the thumb store (and a late unmount)
+    pending.forEach((entry, key) => { idbPut(key, entry); });
+  }, []);
+  const schedulePersist = React.useCallback(() => {
+    if (persistIdleRef.current) return;
+    persistIdleRef.current = onIdle(() => { persistIdleRef.current = null; flushPersist(); }, { timeout: 3000 });
+  }, [flushPersist]);
+
+  // ── Snapshot the active tab ──────────────────────────────────────────────
   const activeTabIdxRef = useRefMirror(activeTabIdx);
   const tabsRef = useRefMirror(tabs);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
-  // Theme rides a ref so the capture reads it call-time fresh without
-  // breaking the captureActiveTabThumbnail [tabsEnabled] identity invariant.
-  const themeRef = useRefMirror(theme);
-  const captureInFlightRef = React.useRef(false);
-  // A capture asked for while one is in flight ({ urgent }), run once that one
-  // ends if the reader has moved to another page or theme meanwhile (sweep mw13:
-  // the bare in-flight return lost a quickly picked tab's capture).
-  const pendingCaptureRef = React.useRef(/** @type {null | { urgent: boolean, force: boolean }} */ (null));
-  // Capture sequence + the pending other-theme capture timer. Each primary
-  // capture bumps the sequence; the deferred themed capture aborts if a newer
-  // primary superseded it (fresh scroll position or content).
-  const captureSeqRef = React.useRef(0);
-  const variantTimerRef = React.useRef(/** @type {any} */ (null));
-  // The other-theme render's idle wait (its cancel), once its timer fired.
-  const variantIdleRef = React.useRef(/** @type {null | (() => void)} */ (null));
-  // Bounded failed-capture retry (see the tail of captureActiveTabThumbnail).
-  const captureRetryCountRef = React.useRef(0);
-  const captureRetryTimerRef = React.useRef(/** @type {any} */ (null));
-
-  // Pending calm-gate deferral (see the gate at the top of the callback).
-  const calmDeferTimerRef = React.useRef(/** @type {any} */ (null));
-  // Pending web boot-window wait (its cancel), at most one per hook.
-  const bootWaitCancelRef = React.useRef(/** @type {null | (() => void)} */ (null));
-  // Pending idle wait before a non-urgent render (its cancel), at most one.
-  const idleCancelRef = React.useRef(/** @type {null | (() => void)} */ (null));
-  // A capture dropped because the page was hidden — re-requested on return.
-  const hiddenSkippedRef = React.useRef(false);
-
-  // The boot window's floor counts from the first render.
-  React.useEffect(() => { noteCaptureBootStart(performance.now()); }, []);
-  // False once the hook has unmounted: a capture still awaiting its render then arms
-  // nothing more (no other-theme timer, no retry, no re-run), since the unmount
-  // cleanup below has already run (leak hunt 2026-11-01).
-  const aliveRef = React.useRef(true);
-
-  // ── Capture callback ───────────────────────────────────────────────────
-  // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
-  // Single async-await path: clone render (takeThemedScreenshot) for content
-  // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
-  // capture comment below.
-  const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean, force?: boolean, idle?: boolean }} [opts] */ async (opts) => {
-    if (!tabsEnabled || !aliveRef.current) return;
-    const urgent = !!(opts && opts.urgent);
-    const force = !!(opts && opts.force);
-    // HIDDEN PAGE: nothing to look at and nothing to gain — a capture then only
-    // competes with the reopen. Remember it; the visibility listener asks again
-    // (through the restore window) when the page comes back.
-    if (pageHidden()) { hiddenSkippedRef.current = true; return; }
-    if (captureInFlightRef.current) {
-      const was = pendingCaptureRef.current;
-      pendingCaptureRef.current = {
-        urgent: !!(urgent || (was && was.urgent)),
-        force: !!(force || (was && was.force)),
-      };
-      return;
-    }
-    // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
-    // ~900ms-deferred second render for the other theme — main-thread work that
-    // competes directly with a main-thread scroll. The after-nav capture fires
-    // on every auto-advance, which on short entries would mean two full-page
-    // renders per page. Suppress every path at this one choke point; the
-    // overview-open heal covers anything still stale.
-    if (typeof document !== 'undefined' && document.body
-      && document.body.classList.contains('autoscroll-running')) return;
-    // BOOT QUIET WINDOW (see the module header). Non-urgent captures wait
-    // for it on both platforms; one pending wait per hook, so boot-time
-    // navigations collapse into one capture.
-    if (!urgent && !_bootSettled) {
-      if (!bootWaitCancelRef.current) {
-        bootWaitCancelRef.current = whenCaptureBootSettled(() => {
-          bootWaitCancelRef.current = null;
-          captureActiveTabThumbnail(force ? { force: true } : undefined);
-        });
-      } else if (force) {
-        // A forced request (resize, theme flip) folds into the pending wait.
-        bootWaitCancelRef.current();
-        bootWaitCancelRef.current = whenCaptureBootSettled(() => {
-          bootWaitCancelRef.current = null;
-          captureActiveTabThumbnail({ force: true });
-        });
-      }
-      return;
-    }
-    // CALM GATE (see the module header). A render that starts within a beat
-    // of a touch is a render the NEXT tap or scroll queues behind — the felt
-    // "input takes a second" defect. Non-urgent captures wait for calm and
-    // re-check on a short timer (each check is trivial; the one capture runs
-    // when the user actually rests). Urgent captures — the overview open/heal,
-    // where the user is about to look at the card — run regardless.
-    if (calmDeferTimerRef.current) { clearTimeout(calmDeferTimerRef.current); calmDeferTimerRef.current = null; }
-    if (!urgent && !captureIsCalm(performance.now())) {
-      calmDeferTimerRef.current = setTimeout(() => {
-        calmDeferTimerRef.current = null;
-        captureActiveTabThumbnail(force ? { force: true } : undefined);
-      }, CALM_RECHECK_MS);
-      return;
-    }
-    // IDLE PLACEMENT. A calm user is not an idle main thread: a non-urgent
-    // render starts from an idle callback (requestIdleCallback, a timer where
-    // it is missing), bounded by CAPTURE_IDLE_TIMEOUT_MS. Requests collapse
-    // into the one pending idle wait; the capture then reads the live tab.
-    if (!urgent && !(opts && opts.idle)) {
-      if (idleCancelRef.current) {
-        if (!force) return;
-        idleCancelRef.current();
-      }
-      idleCancelRef.current = onIdle(() => {
-        idleCancelRef.current = null;
-        captureActiveTabThumbnail({ idle: true, force });
-      }, { timeout: CAPTURE_IDLE_TIMEOUT_MS });
-      return;
-    }
-    const tab = tabsRef.current[activeTabIdxRef.current];
-    if (!tab) return;
-    // Garden pages are photographs — theme-neutral content where a themed
-    // re-render buys nothing (and html2canvas re-rasterizing large images is
-    // the priciest case). One capture fills BOTH variant slots.
-    const isGarden = tab.screen === 'garden-view';
-    // While the overview overlay is up only the GARDEN capture is suppressed:
-    // its native shot photographs the real screen (overlay included). Content
-    // tabs are clone renders that exclude the overlay via
-    // SCREENSHOT_IGNORE_CLASSES ('tabs-overview-layer'), so capturing under
-    // it is safe — and the overview-open heal below depends on it.
-    if (tabsOverviewOpenRef.current && isGarden) return;
-    // The Scripture Web is a full-screen WebGL canvas with no .screen-layout: the clone capture
-    // fell back to a zero-height #root, failed "degenerate canvas", and retried three times a
-    // visit, each try cloning the page and stalling on readPixels (sw1 B5, 2026-10-05). Its card
-    // keeps the plain placeholder instead.
-    if (tab.screen === 'scripture-web') return;
-    const key = tabContentKey(tab);
-    // Re-measure the card aspect now that a real screen is up — the mount
-    // effect can fire while a lazy-corpus placeholder (no .screen-layout)
-    // still covers the route.
-    updateCardAr();
-
-    // Measure nav height (in CSS px) so the native side can crop it — only
-    // the Garden true-pixel shot uses it (web ignores topCropDp; content-tab
-    // captures are clone renders where the nav + floating chrome are excluded
-    // via the bridge's SCREENSHOT_IGNORE_CLASSES ignoreElements list).
-    const navEl = document.querySelector('.top-nav');
-    const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
-
-    const curTheme = themeRef.current === 'light' ? 'light' : 'dark';
-    const otherTheme = curTheme === 'light' ? 'dark' : 'light';
-    const seq = ++captureSeqRef.current;
-    if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
-    if (variantIdleRef.current) { variantIdleRef.current(); variantIdleRef.current = null; }
-
-    // Merge one theme's pixels into the tab's variant entry ({ dark?, light?,
-    // unknown? }). Any real capture supersedes a legacy `unknown` snapshot.
-    // The length floor rejects degenerate captures ("data:," from a zero-sized
-    // canvas) — storing one painted a permanently blank tab card.
-    const mergeVariant = (variantTheme, dataUrl) => {
-      if (!dataUrl || dataUrl.length < 1000) return;
-      const cur = thumbnailsRef.current[key];
-      const base = (cur && typeof cur === 'object') ? cur : {};
-      const entry = { ...base, [variantTheme]: dataUrl };
-      delete entry.unknown;
-      delete entry.url; delete entry.theme; // scrub interim-format fields
-      thumbnailsRef.current[key] = entry;
-      setTabThumbnails((prev) => ({ ...prev, [key]: entry }));
-      idbPut(key, entry); // write-through to IndexedDB — survives app restart
-    };
-
-    const applyThumb = (dataUrl) => {
-      if (!dataUrl) return;
-      mergeVariant(curTheme, dataUrl);
-      if (isGarden) mergeVariant(otherTheme, dataUrl);
-    };
-
-    // The OTHER theme rides the same clone-render path with the opposite
-    // theme class forced on the clone, so both variants exist without the
-    // user ever seeing a theme flash. Deferred ~900ms so the two html2canvas
-    // renders never contend with each other or the visible nav/scroll settle,
-    // and dropped if a newer capture supersedes it meanwhile.
-    // NOTE: no live-body class, no on-screen hiding — html2canvas draws from
-    // a DOM clone and drops the chrome via SCREENSHOT_IGNORE_CLASSES, so the
-    // visible page is never touched. (The old `capturing-thumb` body class
-    // hid the floating chrome ON SCREEN for the full render — the owner's
-    // "dice/dot/arrows blink out for a split second" glitch. Never re-add it.)
-    // When it fires it must still be on the page it belongs to (sweep mw13): a
-    // tab picked or a page turned since (a capture gated off by auto-scroll or
-    // the in-flight check never bumps the sequence) would put that page's
-    // picture under THIS key, and an auto-scroll run that started since is the
-    // main-thread scroll every capture path stays out of. Either way it drops;
-    // the overview falls back to the flip filter, and its open heals the card.
-    // The live check is enough: the clone is taken synchronously right after
-    // the call (html2canvas is loaded by the primary), so the page cannot
-    // change under the render.
-    const onOwnPage = () => {
-      const live = tabsRef.current[activeTabIdxRef.current];
-      return !!live && tabContentKey(live) === key
-        && !(document.body && document.body.classList.contains('autoscroll-running'));
-    };
-    const scheduleOtherTheme = (delayMs) => {
-      if (isGarden || !aliveRef.current) return;
-      variantTimerRef.current = setTimeout(async () => {
-        variantTimerRef.current = null;
-        if (captureSeqRef.current !== seq) return;        // superseded
-        if (!onOwnPage()) return;
-        // Same calm gate as the primary: this render is just as heavy, and
-        // 900ms after a capture is prime follow-up-tap territory. Re-defer
-        // (seq-guarded) rather than land on an interaction. Urgency does not
-        // carry over — the overview only ever shows the CURRENT theme's
-        // variant right away; the other-theme render can always wait.
-        if (!captureIsCalm(performance.now())) { scheduleOtherTheme(CALM_RECHECK_MS); return; }
-        // Hidden: drop it; the return asks for a capture again.
-        if (pageHidden()) { hiddenSkippedRef.current = true; return; }
-        // Same idle placement and the same one-at-a-time queue as the primary.
-        variantIdleRef.current = onIdle(async () => {
-          variantIdleRef.current = null;
-          try {
-            const dataUrl = await runCaptureRender(() => {
-              if (pageHidden()) { hiddenSkippedRef.current = true; return SKIP_HIDDEN; }
-              if (captureSeqRef.current !== seq || !onOwnPage()) return SKIP_STALE;
-              return PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
-            });
-            if (dataUrl === SKIP_HIDDEN || dataUrl === SKIP_STALE) return;
-            if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
-          } catch (_e) {
-            // best-effort — the overview falls back to the flip filter
-          }
-        }, { timeout: CAPTURE_IDLE_TIMEOUT_MS });
-      }, delayMs == null ? 900 : delayMs);
-    };
-
-    // Primary capture — CONTENT tabs render from a DOM clone in the CURRENT
-    // theme (takeThemedScreenshot(curTheme): html2canvas on both platforms,
-    // chrome-free via SCREENSHOT_IGNORE_CLASSES, and blink-free by
-    // construction — the live page is never photographed, so nothing ever
-    // needs hiding on screen). On web this is the same html2canvas path the
-    // primary always used; on Android it replaces the native PixelCopy shot,
-    // which could only stay chrome-free by visibility-hiding the floating
-    // chrome on the REAL screen (the owner's split-second blink glitch).
-    // GARDEN keeps the native true-pixel shot (photo pages are html2canvas's
-    // priciest case, are theme-neutral, and carry no floating chrome — so
-    // the native path is both cheaper and blink-free there).
-    captureInFlightRef.current = true;
-    let gotUrl = false;
-    // Set when the capture did not render on purpose (cached, hidden, stale):
-    // no retry, and a stale one asks again for the page now on screen.
-    let skipped = false;
-    let rerun = false;
-    try {
-      // CACHE REUSE (one-shot, see _reuseArmed). The FIRST capture after a
-      // startup or restore does not redraw a content key that already holds
-      // both theme variants (Garden: one shot fills both) — the reopen reuses
-      // the stored JPEGs. Every later capture redraws, so no card goes stale.
-      // Any first capture consumes the arm; resize and theme flips (`force`:
-      // the stored pixels are wrong for them) and the urgent overview heal
-      // consume it without reusing. The live-tabs IDB read is awaited first,
-      // so a row that is in IndexedDB but not yet in state still counts.
-      const reuse = _reuseArmed;
-      _reuseArmed = false;
-      if (reuse && !urgent && !force) {
-        if (thumbsLoadRef.current) { try { await thumbsLoadRef.current; } catch (_e) { /* read failed: nothing cached */ } }
-        const cached = thumbnailsRef.current[key];
-        if (cached && cached[curTheme] && cached[otherTheme]) skipped = true;
-      }
-      if (!skipped) {
-        const dataUrl = await runCaptureRender(() => {
-          if (pageHidden()) return SKIP_HIDDEN;
-          if (!onOwnPage() || (themeRef.current === 'light' ? 'light' : 'dark') !== curTheme) return SKIP_STALE;
-          // The overview opened while this waited: Garden's native shot would
-          // photograph the overlay. The rerun stops at the overview check, and
-          // closing the overview re-fires the after-nav capture.
-          if (isGarden && tabsOverviewOpenRef.current) return SKIP_STALE;
-          return isGarden
-            ? PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
-            : PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
-        });
-        if (dataUrl === SKIP_HIDDEN) { skipped = true; hiddenSkippedRef.current = true; }
-        else if (dataUrl === SKIP_STALE) { skipped = true; rerun = true; }
-        else {
-          gotUrl = !!dataUrl;
-          applyThumb(dataUrl);
-          if (dataUrl) scheduleOtherTheme();
-        }
-      }
-    } catch (_e) {
-      // Best-effort capture — failures are silent (thumbnails are visual
-      // sugar; missing one isn't an error worth surfacing to the user).
-    } finally {
-      captureInFlightRef.current = false;
-    }
-    if (!aliveRef.current) return;   // unmounted while the render ran: arm nothing more
-    // BOUNDED RETRY: a failed capture used to wait for the next nav —
-    // on a tab the user just opens the overview from, that's never,
-    // and the card stays a blank ✦ forever (owner's PC). Retry up to 3
-    // consecutive times, 2.5s apart, seq-guarded so a real capture (or a
-    // newer failure chain) supersedes the pending retry. Success resets the
-    // budget; a permanently-broken environment stops after 3 traces.
-    if (gotUrl) {
-      captureRetryCountRef.current = 0;
-    } else if (skipped) {
-      // nothing failed — no retry
-    } else if (captureRetryCountRef.current < 3) {
-      captureRetryCountRef.current += 1;
-      if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
-      captureRetryTimerRef.current = setTimeout(() => {
-        captureRetryTimerRef.current = null;
-        if (captureSeqRef.current !== seq) return; // superseded by a newer capture
-        captureActiveTabThumbnail();
-      }, 2500);
-    }
-    // A request that met the in-flight gate: this capture already covered it
-    // unless the reader moved to another page (or theme) meanwhile. The re-run
-    // bumps the sequence, which also retires any retry armed just above.
-    const pending = pendingCaptureRef.current;
-    pendingCaptureRef.current = null;
-    if (pending) {
-      const live = tabsRef.current[activeTabIdxRef.current];
-      const liveTheme = themeRef.current === 'light' ? 'light' : 'dark';
-      if (live && (rerun || skipped || tabContentKey(live) !== key || liveTheme !== curTheme)) {
-        captureActiveTabThumbnail({ urgent: pending.urgent, force: pending.force });
-      }
-    } else if (rerun) {
-      captureActiveTabThumbnail(force ? { force: true } : undefined);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
-  }, [tabsEnabled]);
-
-  // ── Pending other-theme capture + failed-capture retry — clear on unmount ─
-  React.useEffect(() => {
-    aliveRef.current = true;
-    return () => {
-      aliveRef.current = false;
-      if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
-      if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
-      if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
-      if (variantIdleRef.current) variantIdleRef.current();
-    };
-  }, []);
-
-  // ── Pending boot-window wait — drop on unmount or a tabsEnabled flip ────
-  // The wait holds THIS callback identity; when it changes (tabs toggled) or
-  // the hook unmounts, the stale wait must not capture. The after-nav effect
-  // re-requests under the new identity.
-  // The calm re-check, the other-theme render and the failed-capture retry also call
-  // the old identity (tabsEnabled baked in): a flip to tabs-off drops them too, or
-  // they capture for tabs that are gone (leak hunt 2026-11-01).
-  React.useEffect(() => () => {
-    if (bootWaitCancelRef.current) { bootWaitCancelRef.current(); bootWaitCancelRef.current = null; }
-    if (idleCancelRef.current) { idleCancelRef.current(); idleCancelRef.current = null; }
-    if (calmDeferTimerRef.current) { clearTimeout(calmDeferTimerRef.current); calmDeferTimerRef.current = null; }
-    if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
-    if (variantIdleRef.current) { variantIdleRef.current(); variantIdleRef.current = null; }
-    if (captureRetryTimerRef.current) { clearTimeout(captureRetryTimerRef.current); captureRetryTimerRef.current = null; }
-  }, [captureActiveTabThumbnail]);
-
-  // ── Restore: page back from hidden / bfcache, vot-state hydrated ───────
-  // Each re-arms the quiet window (noteCaptureRestore), so the reopen's
-  // repaint, scroll restore and search-index warm-up get the main thread to
-  // themselves. A capture skipped while hidden is asked for again — it waits
-  // out that window like any non-urgent capture.
-  React.useEffect(() => {
-    if (!tabsEnabled) return undefined;
-    const onRestore = () => {
-      noteCaptureRestore(performance.now());
-      if (hiddenSkippedRef.current) {
-        hiddenSkippedRef.current = false;
-        captureActiveTabThumbnail();
-      }
-    };
-    const onVis = () => { if (!pageHidden()) onRestore(); };
-    const onPageShow = (e) => { if (e && e.persisted) onRestore(); };
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('pageshow', onPageShow);
-    // vot-state hydrating late swaps the boot-default tabs for the restored
-    // ones (after-nav re-fires): that is a restore too. Only the TRANSITION
-    // into 'loaded' counts; typeof-guarded like the GC's StateStore read.
-    let unsub = /** @type {null | (() => void)} */ (null);
-    if (typeof StateStore !== 'undefined' && StateStore
-      && typeof StateStore.subscribe === 'function' && typeof StateStore.getState === 'function') {
-      let last = StateStore.getState();
-      unsub = StateStore.subscribe(() => {
-        const now = StateStore.getState();
-        if (now === 'loaded' && last !== 'loaded') noteCaptureRestore(performance.now());
-        last = now;
-      });
-    }
-    return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('pageshow', onPageShow);
-      if (unsub) unsub();
-    };
-  }, [tabsEnabled, captureActiveTabThumbnail]);
-
-  // ── Calm-tracker listeners ─────────────────────────────────────────────
-  // Feed the module-level interaction tracker the calm gate reads. Document
-  // CAPTURE phase (nothing can starve it — the tab-drag lesson) + passive
-  // (never blocks scrolling). tabsEnabled-gated: with tabs off there are
-  // no captures to place, so no listeners either.
-  React.useEffect(() => {
-    if (!tabsEnabled) return undefined;
-    const now = () => performance.now();
-    const onTouchStart = () => noteCaptureInteraction('touch-down', now());
-    const onTouchEnd = (e) => noteCaptureInteraction('touch-up', now(), e.touches ? e.touches.length : 0);
-    const onTouchMove = () => noteCaptureInteraction('pulse', now());
-    const onPointerDown = (e) => { if (e.pointerType === 'mouse') noteCaptureInteraction('mouse-down', now()); };
-    const onPointerUp = (e) => { if (e.pointerType === 'mouse') noteCaptureInteraction('mouse-up', now()); };
-    const onWheel = () => noteCaptureInteraction('pulse', now());
-    const opts = { capture: true, passive: true };
-    document.addEventListener('touchstart', onTouchStart, opts);
-    document.addEventListener('touchend', onTouchEnd, opts);
-    document.addEventListener('touchcancel', onTouchEnd, opts);
-    document.addEventListener('touchmove', onTouchMove, opts);
-    document.addEventListener('pointerdown', onPointerDown, opts);
-    document.addEventListener('pointerup', onPointerUp, opts);
-    document.addEventListener('pointercancel', onPointerUp, opts);
-    document.addEventListener('wheel', onWheel, opts);
-    return () => {
-      document.removeEventListener('touchstart', onTouchStart, true);
-      document.removeEventListener('touchend', onTouchEnd, true);
-      document.removeEventListener('touchcancel', onTouchEnd, true);
-      document.removeEventListener('touchmove', onTouchMove, true);
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('pointerup', onPointerUp, true);
-      document.removeEventListener('pointercancel', onPointerUp, true);
-      document.removeEventListener('wheel', onWheel, true);
-    };
-  }, [tabsEnabled]);
-
-  // ── Overview-open heal ─────────────────────────────────────────────────
-  // The moment the overview opens is the one guaranteed chance to refresh
-  // the ACTIVE card the user is about to look at — and the only trigger
-  // available while it's open (the page under the overlay neither scrolls
-  // nor navigates). Clone renders exclude the overlay via
-  // SCREENSHOT_IGNORE_CLASSES, so this is safe for content tabs; the
-  // callback itself suppresses Garden (native shot would photograph the
-  // overlay). Heals both the blank-✦ card (all captures failed while the
-  // tab was live) and a stale-geometry thumb after a window resize.
-  React.useEffect(() => {
-    if (!tabsEnabled || !tabsOverviewOpen) return undefined;
-    // URGENT: the user is looking at this card right now — the calm gate
-    // must not defer the heal behind the tap that opened the overview.
-    const timer = setTimeout(() => captureActiveTabThumbnail({ urgent: true }), 60);
-    return () => clearTimeout(timer);
-  }, [tabsOverviewOpen, tabsEnabled, captureActiveTabThumbnail]);
-
-  // ── (RETIRED 2026-07-28) Scroll-stop capture effect ────────────────────
-  // The scroll-stop path (capture after 1.2s of scroll silence) is GONE.
-  // On-device CDP profiling with the owner reading showed it was the app's
-  // dominant main-thread load: every reading pause fired an html2canvas
-  // clone render (+ the other-theme render ~900ms later) — ~450-550ms
-  // long tasks each on a Pixel 9 Pro, ~13% of the main thread blocked over
-  // a 2-minute reading window, worst first-touch-after-pause input delay
-  // 381ms. Its only product was a scroll-position-fresh card picture that
-  // nobody sees: the after-nav capture keeps every card CONTENT-fresh, and
-  // the overview-open heal urgently recaptures the active card the moment
-  // cards actually become visible. Do not re-add a scroll-driven capture;
-  // if a future need arises, it must be at-most-once-per-minutes throttled.
-  // (Removing it also removed this hook's 400ms __scrollEl re-attach poll.)
-
-  // ── Aspect-ratio CSS var effect ────────────────────────────────────────
-  // Keep tab-card aspect ratio in sync with the APP COLUMN (.screen-layout —
-  // what the screenshots now capture), not the raw window: on a wide desktop
-  // window the column is a centered 760px strip, so window-aspect cards drew
-  // landscape boxes around portrait captures. Column aspect ⇒ every card is
-  // a mini of the app viewport on every platform. On phones the column
-  // equals the window, so mobile card geometry is unchanged. (updateCardAr
-  // also runs at capture time — see the callback above — covering the boot
-  // race where this effect fires while a lazy corpus placeholder is up.)
-  React.useEffect(() => {
-    updateCardAr();
-    let recaptureTimer = /** @type {any} */ (null);
-    const onResize = () => {
-      updateCardAr();
-      // A resize changes the column geometry the cards mirror — every stored
-      // thumb is now the WRONG aspect for the new --card-ar (cover-cropping
-      // them is the PC "giant text / cropped garbage" glitch). Recapture the
-      // active tab once the resize settles; background tabs heal when
-      // visited (and render letterboxed meanwhile — TabsOverview's aspect
-      // guard).
-      clearTimeout(recaptureTimer);
-      // force: the stored thumbs are the wrong aspect now — no cache reuse.
-      recaptureTimer = setTimeout(() => captureActiveTabThumbnail({ force: true }), 600);
-    };
-    window.addEventListener('resize', onResize);
-    return () => {
-      clearTimeout(recaptureTimer);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [captureActiveTabThumbnail]);
-
-  // ── Capture-after-nav effect ───────────────────────────────────────────
-  // Capture shortly after any screen/tab change — and after a THEME change
-  // (the active tab re-renders in the new theme; recapturing swaps its
-  // filtered overview card for true pixels).
-  // A THEME change forces the redraw (even the one-shot cache reuse would
-  // keep the old pixels).
-  const lastNavThemeRef = React.useRef(theme);
-  React.useEffect(() => {
+  // HARD INVARIANT: a React.useCallback on [tabsEnabled] - the effects below list it.
+  const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean, force?: boolean }} [opts] */ (opts) => {
     if (!tabsEnabled) return;
-    if (tabsOverviewOpen) return;
-    const force = lastNavThemeRef.current !== theme;
-    lastNavThemeRef.current = theme;
-    const timer = setTimeout(() => captureActiveTabThumbnail(force ? { force: true } : undefined), 350);
+    const urgent = !!(opts && opts.urgent);
+    // Under the Tabs screen the page neither scrolls nor navigates: goTabs already took it.
+    if (!urgent && tabsOverviewOpenRef.current) return;
+    const tab = tabsRef.current[activeTabIdxRef.current];
+    if (!tab || tab.screen === 'scripture-web') return;   // a WebGL canvas: the card keeps its sigil
+    let snap = null;
+    try { snap = snapLiveTab(); } catch (e) { try { console.warn('[thumb] snapshot failed', e); } catch (_e) { /* ignore */ } }
+    if (!snap) return;
+    const key = tabContentKey(tab);
+    const cur = thumbnailsRef.current[key];
+    const was = cur && cur.snap;
+    if (was && was.html === snap.html && was.top === snap.top && was.st === snap.st && was.w === snap.w && was.h === snap.h) return;
+    const entry = { snap };
+    thumbnailsRef.current = { ...thumbnailsRef.current, [key]: entry };
+    setTabThumbnails((prev) => ({ ...prev, [key]: entry }));
+    pendingRef.current.set(key, entry);
+    if (pageHidden()) flushPersist(); else schedulePersist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs read via .current; flushPersist/schedulePersist are stable callbacks
+  }, [tabsEnabled]);
+
+  // After a screen or tab change (scroll restore first).
+  React.useEffect(() => {
+    if (!tabsEnabled || tabsOverviewOpen) return undefined;
+    const timer = setTimeout(() => captureActiveTabThumbnail(), SNAP_AFTER_NAV_MS);
     return () => clearTimeout(timer);
   }, [activeTab.screen, activeTab.bookId, activeTab.chapterNum, activeTab.letterId,
-  activeTab.studyId, activeTab.studyChapterId, activeTab.genreId,
-  activeTab.gardenPage, activeTabIdx, tabsEnabled, tabsOverviewOpen, theme,
-  captureActiveTabThumbnail]);
+    activeTab.studyId, activeTab.studyChapterId, activeTab.genreId, activeTab.journalEntryId,
+    activeTab.gardenPage, activeTabIdx, tabsEnabled, tabsOverviewOpen, captureActiveTabThumbnail]);
 
-  // ── Return ─────────────────────────────────────────────────────────────
+  // When the reading area's scroll stops, when the window settles after a resize, and when the page hides.
+  React.useEffect(() => {
+    if (!tabsEnabled) return undefined;
+    let t = /** @type {any} */ (null);
+    const later = (ms) => { clearTimeout(t); t = setTimeout(() => captureActiveTabThumbnail(), ms); };
+    const onScroll = (/** @type {Event} */ e) => {
+      const el = /** @type {any} */ (e.target);
+      if (el && el.classList && el.classList.contains('screen-scroll')) later(SNAP_AFTER_SCROLL_MS);
+    };
+    const onResize = () => later(SNAP_AFTER_NAV_MS);
+    const onHide = () => { clearTimeout(t); captureActiveTabThumbnail(); flushPersist(); };
+    const onVis = () => { if (pageHidden()) onHide(); };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onResize);
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onResize);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', onHide);
+    };
+  }, [tabsEnabled, captureActiveTabThumbnail, flushPersist]);
+
+  // Unmount: write what is pending.
+  React.useEffect(() => () => flushPersist(), [flushPersist]);
+
   return { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail };
 }

@@ -54,6 +54,8 @@
        DiagnosticLog) so a failing device names itself.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { snapLiveTab, rememberPageSnap } from '../utils/tab-snap.js';
+
 // Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
 const SLOP = 8;
 // Settle animation: a decelerate curve ≈ Android FastOutSlowInInterpolator.
@@ -511,12 +513,14 @@ export function createPagerGesture(io) {
  * } | null | undefined} pager
  * @returns {{ trackRef: {current:any}, peekPrevRef: {current:any}, peekNextRef: {current:any} }}
  */
-export function usePagerGesture(scrollRef, pager) {
+export function usePagerGesture(scrollRef, pager, placeKey = '') {
   const trackRef = React.useRef(null);
   const peekPrevRef = React.useRef(null);
   const peekNextRef = React.useRef(null);
   const pagerRef = React.useRef(pager);
   pagerRef.current = pager;
+  const placeKeyRef = React.useRef(placeKey);
+  placeKeyRef.current = placeKey;
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -533,6 +537,8 @@ export function usePagerGesture(scrollRef, pager) {
         const go = () => {
           if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
         };
+        // TABS1: the page being left, as it stands, is the neighbour a swipe back slides in (pager-preview).
+        try { if (placeKeyRef.current) rememberPageSnap(placeKeyRef.current, snapLiveTab()); } catch (_e) { /* a picture is never worth a failed turn */ }
         // ATOMIC REVEAL — the controller parks the covering peek the moment
         // this returns, so the destination must be committed AND painted with
         // its annotation layers before then. See commitReadingNav.

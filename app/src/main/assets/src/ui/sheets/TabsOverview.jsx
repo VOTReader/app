@@ -37,6 +37,7 @@
  */
 import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { UiIcon } from '../components/UiIcon.jsx';
+import { SnapBox } from '../components/SnapBox.jsx';
 
 export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
   if (!naturalW || !naturalH || !boxW || !boxH) return false;
@@ -319,6 +320,8 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           // approximation; `unknown` legacy rows (awaiting the luminance
           // probe) render as-is. Garden tabs never flip (photographs).
           const thumbEntry = thumbnails ? thumbnails[tabContentKey(t)] : null;
+          // TABS1: a snapshot of the tab's own page (useThumbnails) - always in the current theme.
+          const snap = thumbEntry && typeof thumbEntry === 'object' && thumbEntry.snap ? thumbEntry.snap : null;
           let thumb = null;
           let thumbFlip = false;
           if (typeof thumbEntry === 'string') {
@@ -342,7 +345,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
             <div
               key={i}
               ref={setCardRef(i)}
-              className={`tab-card${isActive ? ' active' : ''}${thumb ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
+              className={`tab-card${isActive ? ' active' : ''}${thumb || snap ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
               onClick={(e) => { if (dragRef.current.suppressed()) { e.preventDefault(); e.stopPropagation(); return; } onSelect(i); }}
               onPointerDown={(e) => {
                 if (e.isPrimary === false) return; // a second finger never owns a gesture
@@ -369,7 +372,9 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                     IMAGE otherwise starts the browser's native image drag,
                     which cancels the touch stream and killed the reorder
                     gesture (desktop mouse drags too). */}
-                {thumb
+                {snap
+                  ? <SnapBox snap={snap} lazy={i >= 6} />
+                  : thumb
                   ? <img
                       className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`}
                       src={thumb} alt="" draggable={false}

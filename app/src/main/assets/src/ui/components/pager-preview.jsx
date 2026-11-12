@@ -35,6 +35,9 @@
    wiring (ScreenLayout.jsx).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { pageSnapFor } from '../../utils/tab-snap.js';
+import { SnapBox } from './SnapBox.jsx';
+
 // ── Neighbor resolution (Letter / WTLB) ─────────────────────────────────────
 // Bible/Matthew screens already hold full neighbor chapter objects; only the
 // VOT letter / WTLB screens need to resolve {id} → full entry from the
@@ -52,6 +55,25 @@
  */
 export function holyDaysLetter(entry) {
   return entry ? { ...entry, prevLetter: entry.prevEntry || null, nextLetter: entry.nextEntry || null } : entry;
+}
+
+/**
+ * The placeKey the neighbour's live ScreenLayout will carry (the screens' own formulas: LetterView and WtlbEntryView
+ * `volKey:id`, BibleChapterView `book-ch-translation[-r]`, ChapterView `book-ch`), read off the inert element's
+ * props. A key that does not match finds no snapshot and the inert render is used, so a mismatch is safe.
+ * @param {any} el
+ * @returns {string}
+ */
+export function peekPlaceKey(el) {
+  const p = el && el.props;
+  if (!p) return '';
+  if (p.letter) return (p.volKey || '') + ':' + p.letter.id;
+  if (p.entry) return (p.volKey || '') + ':' + p.entry.id;
+  if (p.book && p.chapter) {
+    const base = p.book.id + '-' + p.chapter.num;
+    return 'translation' in p ? base + '-' + (p.translation || 'nkjv') + (p.restoredNames ? '-r' : '') : base;
+  }
+  return '';
 }
 
 export function resolveNeighborLetter(volKey, neighborId) {
@@ -119,6 +141,16 @@ export function PagerPeek({ side, desc, peekRef }) {
             <div className="bottom-nav-title">{desc.title}</div>
           </div>
         </div>
+      </div>
+    );
+  }
+  // A neighbour this reader swiped away from keeps its snapshot (TABS1): that page as it really stood, which is
+  // exactly what the commit lands on (its scroll place, sticky header, end cards, annotation icons).
+  const snap = pageSnapFor(peekPlaceKey(desc.el));
+  if (snap) {
+    return (
+      <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={attach}>
+        <SnapBox snap={snap} className="tab-snap tab-snap-peek" />
       </div>
     );
   }

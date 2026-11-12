@@ -74,7 +74,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   // present, both neighbor peeks are pre-mounted and parked at their CSS ±100%
   // defaults; usePagerGesture hands their refs to the controller which drives
   // them imperatively — no React state fires during the swipe.
-  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, activePager);
+  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, activePager, placeKey);
   // Compute neighbor peek descriptors at render time. Pre-mounted peeks update
   // on each screen render (e.g. after navigation) with zero swipe-path cost.
   // Never computed when inert — a clone must not build grand-neighbor peeks.
