@@ -229,6 +229,9 @@ export function useGoTo(web) {
   const [isOpen, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [sel, setSel] = React.useState(0);
+  // WEB3 (w-goto): the first row is Enter's pick from the start, but it is filled only once the
+  // arrows or the pointer have chosen (the mock's rows are plain while the reader types)
+  const [moved, setMoved] = React.useState(false);
   const [chip, setChip] = React.useState(/** @type {null | { lo: number, hi: number, label: string, count: number, litKey: string, ids: Int32Array }} */ (null));
   const [edges, setEdges] = React.useState(/** @type {{ left: any, right: any }} */ ({ left: null, right: null }));
   const inputRef = React.useRef(null);
@@ -311,6 +314,7 @@ export function useGoTo(web) {
     }
     setQuery(typeof q === 'string' ? q : '');
     setSel(0);
+    setMoved(false);
     setOpen(true);
   }, [live, mode, isOpen, rootRef]);
 
@@ -447,7 +451,7 @@ export function useGoTo(web) {
   const onInputKey = React.useCallback((e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      if (rows.length) setSel((selAt + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
+      if (rows.length) { setSel((selAt + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length); setMoved(true); }
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (selAt >= 0) choose(rows[selAt]);
@@ -667,7 +671,7 @@ export function useGoTo(web) {
           role="combobox" aria-expanded={rows.length > 0} aria-controls="sw-goto-list" aria-autocomplete="list"
           aria-activedescendant={selAt >= 0 ? optId(selAt) : undefined}
           autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go"
-          onChange={(e) => { setQuery(e.target.value); setSel(0); }} onKeyDown={onInputKey} />
+          onChange={(e) => { setQuery(e.target.value); setSel(0); setMoved(false); }} onKeyDown={onInputKey} />
         {/* WA5 (w-goto): the field's clear, as the app's other search fields have */}
         {query ? (
           <button type="button" className="sw-goto-clear" aria-label="Clear" onMouseDown={(e) => e.preventDefault()}
@@ -676,15 +680,18 @@ export function useGoTo(web) {
           </button>
         ) : null}
       </div>
+      {/* WEB3 (w-goto): the rows and the hint scroll as one, so the phone shows the hint under the rows
+          when there is room and a keyboard scrolls it away rather than taking a row */}
+      <div className="sw-goto-scroll">
       {rows.length ? (
-        <ul id="sw-goto-list" className="sw-goto-list" role="listbox" aria-label="Places">
+        <ul id="sw-goto-list" className={'sw-goto-list' + (moved ? ' is-moved' : '')} role="listbox" aria-label="Places">
           {rows.map((row, k) => (
             // WA5 (w-goto): two lines, a book mark on a whole chapter or book, the verse's words in
             // italics under its reference, a chevron; the option's name keeps the words apart
             <li key={row.key} id={optId(k)} role="option" aria-selected={k === selAt}
               aria-label={row.label + (row.sub ? ', ' + row.sub : '') + (row.text ? ', ' + row.text : '')}
               className={'sw-goto-row' + (k === selAt ? ' is-sel' : '') + (row.sub ? ' is-whole' : '')}
-              onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setSel(k)} onClick={() => choose(row)}>
+              onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => { setSel(k); setMoved(true); }} onClick={() => choose(row)}>
               <span className="sw-goto-mark" aria-hidden="true">{row.sub ? BOOK_ICON : null}</span>
               <span className="sw-goto-lines">
                 <span className="sw-goto-ref">{row.label}</span>
@@ -697,9 +704,8 @@ export function useGoTo(web) {
           ))}
         </ul>
       ) : null}
-      {/* the phone's keyboard leaves room for the rows or the hint: it says what to type until
-          there is something to choose (w4) */}
-      {compact && rows.length ? null : <div className="sw-goto-hint">{GOTO_HINT}</div>}
+      <div className="sw-goto-hint">{GOTO_HINT}</div>
+      </div>
     </div>
   ) : null;
 

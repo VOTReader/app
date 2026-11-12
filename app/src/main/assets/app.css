@@ -6923,7 +6923,7 @@
       --sw-control-fill: rgba(28, 37, 39, 0.88); --sw-control-border: #3A4547;
       --sw-control-border-hover: #4A5658; --sw-active-fill: #242D2F;
       --sw-active-border: rgba(196, 164, 105, 0.7);
-      --sw-panel: #1C2527; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
+      --sw-panel: #131312; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
       --sw-cite-rule: rgba(196, 164, 105, 0.6);
       --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(239, 209, 138, 0.9);
       --sw-font: 'SW Garamond', 'EB Garamond', Georgia, serif;
@@ -7216,10 +7216,9 @@
     .sw-goto:focus-within { border-color: rgba(196, 164, 105, 0.55); }
     .sw-goto.is-compact .sw-goto-input { font-size: var(--fsc-18); }
     .sw-goto-list { list-style: none; margin: 0; padding: 4px 10px 0; }
-    /* compact: the rows end the box when they show (the hint waits for no rows, goto.jsx) */
-    .sw-goto.is-compact .sw-goto-list {
-      flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 4px;
-    }
+    /* compact: the rows and the hint scroll as one under the field (WEB3: a keyboard scrolls the hint away) */
+    .sw-goto.is-compact .sw-goto-scroll { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+    .sw-goto.is-compact .sw-goto-list { padding: 2px 10px 4px; }
     .sw-goto.is-compact .sw-goto-hint { margin: 4px 18px 0; padding: 8px 0 10px; font-size: var(--fsc-14); }
     .sw-goto-list + .sw-goto-hint { margin-top: 6px; }
     .sw-goto-chip, .sw-goto-edge {
@@ -8171,8 +8170,8 @@
       border-radius: 10px; cursor: pointer; color: var(--sw-text);
     }
     .sw-goto-row + .sw-goto-row { border-top: 1px solid rgba(255, 255, 255, 0.07); }
-    .sw-goto-row.is-sel { background: var(--sw-active-fill); border-top-color: transparent; }
-    .sw-goto-row.is-sel + .sw-goto-row { border-top-color: transparent; }
+    .is-moved > .sw-goto-row.is-sel { background: var(--sw-active-fill); border-top-color: transparent; }
+    .is-moved > .sw-goto-row.is-sel + .sw-goto-row { border-top-color: transparent; }
     .sw-goto.is-compact .sw-goto-row { min-height: 50px; padding: 4px 6px 4px 8px; }
     .sw-goto-mark { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--sw-gold); }
     .sw-goto-row.is-whole .sw-goto-mark { background: rgba(255, 255, 255, 0.07); }
@@ -8183,7 +8182,7 @@
     .sw-goto.is-compact .sw-goto-ref { font-size: var(--fsc-16); }
     .sw-goto.is-compact .sw-goto-text { font-size: var(--fsc-14); }
     .sw-goto-chev { flex: none; color: var(--sw-text-muted); }
-    .sw-goto-row.is-sel .sw-goto-chev { color: var(--sw-gold); }
+    .is-moved > .sw-goto-row.is-sel .sw-goto-chev { color: var(--sw-gold); }
     .sw-goto-hint { margin: 6px 24px 0; padding: 12px 0 14px; font-family: var(--font-ui); font-size: var(--fsc-13); color: var(--sw-text-muted); }
     /* every card's overline: the 12 px gold section label */
     .sw-panel .sw-panel-over { font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0.12em; color: var(--sw-gold); }
@@ -8199,13 +8198,14 @@
     .sw-act-icon { flex: none; }
     /* CONNECTIONS BY BOOK, "Strongest first" at its right; each book a card of rows */
     .sw-sec.sw-sec-books { border-top: 0; }
+    .sw-root.sw-compact .sw-sec.sw-sec-books { margin-top: 4px; padding-top: 0; }
     .sw-sec-books .sw-sec-title { flex: 1 1 auto; font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0.12em; color: var(--sw-gold); }
     .sw-sec-split { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
     .sw-sec-note { font-size: var(--fsc-13); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--sw-text-meta); }
     .sw-groups { display: grid; gap: 8px; }
     .sw-group { border-radius: 12px; background: rgba(255, 255, 255, 0.045); overflow: hidden; }
     .sw-group-head {
-      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px 0 14px; background: none; border: 0;
+      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px 0 14px; background: none; border: 0;
       text-align: left; font-family: var(--sw-font); font-size: calc(var(--fsc-18) * var(--sw-ts)); color: var(--sw-title); cursor: pointer;
     }
     .sw-group .sw-group-head:focus-visible { outline-offset: -2px; border-radius: 12px; }
@@ -8249,7 +8249,7 @@
     /* List (was Nearby): In view, the chapter at the centre as a card, its strongest threads as one card of rows */
     .sw-inview-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; }
     .sw-inview-head .sw-panel-title { margin: 0; font-size: calc(var(--fsc-20) * var(--sw-ts)); }
-    .sw-inview-head .sw-panel-meta { margin: 0; font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-root .sw-inview-head .sw-panel-meta { margin: 0; font-family: var(--font-ui); font-size: calc(var(--fsc-13) * var(--sw-ts)); }
     .sw-inview-chapter {
       display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; margin-top: 12px; padding: 8px 12px;
       box-sizing: border-box; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.045); color: inherit;
@@ -8259,7 +8259,7 @@
     .sw-inview-mark { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, 0.07); color: var(--sw-gold); }
     .sw-inview-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .sw-inview-chapter .sw-row-ref { color: var(--sw-title); }
-    .sw-inview-chapter .sw-row-text { font-family: var(--font-ui); font-size: var(--fsc-13); }
+    .sw-root .sw-inview-chapter .sw-row-text { font-family: var(--font-ui); font-size: calc(var(--fsc-12) * var(--sw-ts)); }
     .sw-list .sw-sec .sw-choice-list { margin-top: 0; }
     .sw-list .sw-choice-list .sw-row { border-radius: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
     .sw-list .sw-choice-list .sw-row:first-child { box-shadow: none; }
@@ -8329,8 +8329,8 @@
     .sw-list-tabs + .sw-choice-list { margin-top: 10px; }
     /* FA (w-guide, w-goto): the web behind the guide card and the Go to sheet is dimmed, as the mock (a spread shadow:
        no new element, and the drawing is untouched) */
-    .sw-guide { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5), 0 8px 32px rgba(0, 0, 0, 0.45); }
-    .sw-goto { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5), 0 12px 36px rgba(0, 0, 0, 0.55); }
+    .sw-guide { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6), 0 8px 32px rgba(0, 0, 0, 0.45); }
+    .sw-goto { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6), 0 12px 36px rgba(0, 0, 0, 0.55); }
     /* FA2 (w-filters): open, Filters is a docked panel like List's, so the chrome steps left of it as it does for a
        docked panel: the zoom and the more button stay in reach, the key keeps its credit (the bar's buttons as icons) */
     .sw-root:has(> .sw-filter-sheet) .sw-controls { right: calc(var(--sw-panel-w, 40%) + 24px - 7px); max-width: calc(100% - var(--sw-panel-w, 40%) - 48px); }

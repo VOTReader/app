@@ -94,7 +94,8 @@ describe('the compact box takes the header row and keeps above the keyboard', ()
     expect(d()).toMatch(/flex-direction:\s*column/);
     expect(d()).toMatch(/max-height:\s*calc\(100% - var\(--sw-chrome-top\) - 8px - max\(var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)\)/);
     expect(declsFor('.sw-goto.is-compact .sw-goto-field')).toMatch(/flex:\s*none/);
-    const list = declsFor('.sw-goto.is-compact .sw-goto-list');
+    // WEB3: the rows and the hint scroll as one
+    const list = declsFor('.sw-goto.is-compact .sw-goto-scroll');
     expect(list).toMatch(/overflow-y:\s*auto/);
     expect(list).toMatch(/min-height:\s*0/);
     expect(list).toMatch(/overscroll-behavior:\s*contain/);

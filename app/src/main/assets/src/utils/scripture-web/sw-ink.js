@@ -135,7 +135,7 @@ const TABLE = {
   scrim: { hex: '#000000', alpha: 0.65 },                        // the top scrim's dark end (#000000A6), to transparent
   gotoFill: { hex: '#242D2F', alpha: 0.96 },
   gotoRow: { hex: '#2C3537', alpha: 1 },                         // the keyboard-selected suggestion
-  panel: { hex: '#1C2527', alpha: 1 },                           // opaque, pinned under .sw-root: never cream (#18)
+  panel: { hex: '#131312', alpha: 1 },                           // opaque, pinned under .sw-root: never cream (#18); WEB3: the app's sheet fill (--surface-1 dark), as the other families' sheets
   panelEdge: { hex: '#3A4547', alpha: 1, width: 1 },
   hairline: { hex: '#2C3537', alpha: 1, width: 1 },              // section rules in the panel
   citeRule: { hex: '#C4A469', alpha: 0.60, width: 2 },           // CITED IN THE VOLUMES left rule
