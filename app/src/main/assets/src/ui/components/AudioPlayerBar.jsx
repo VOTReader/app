@@ -34,6 +34,7 @@ import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { useStillLoading } from './AudioPlayButton.jsx';
 import { formatClock as fmt } from './AudioSeekSlider.jsx';
+import { onFullPlayerRequest, playerFailLine } from './player-open.js';
 
 /**
  * Offline, the player plays a unit of the queue when some reading of it is on the phone (playableNow, the rule its
@@ -334,6 +335,8 @@ export function AudioPlayerBar({ hidden = false } = {}) {
   React.useEffect(() => {
     if (!open) setManagerOpen(false);
   }, [open]);
+  // The Listen root's Continue card opens the full player through here: the bar is hidden there, its sheet is not.
+  React.useEffect(() => onFullPlayerRequest(() => { if (AudioPlayer.getState().status !== 'idle') setManagerOpen(true); }), []);
 
   // U10.2 (UX sweep 2026-10-22): a recording that has not started yet (no length, the clock still at its start)
   // says Loading… on line 2, and Still loading past STILL_LOADING_MS (8 s, brief 3g) with Cancel beside it: on a
@@ -343,7 +346,7 @@ export function AudioPlayerBar({ hidden = false } = {}) {
   const starting = st.status === 'loading' && !(st.duration > 0) && !((Number(st.time) || 0) >= 1);
   const lateStart = useStillLoading(starting, (head && head.url) || '');
 
-  if (hidden) return null;
+  if (hidden) return open ? <AudioManagerSheet open={managerOpen} state={st} onClose={() => setManagerOpen(false)} /> : null;
   if (!open) return fin ? <FinishedBar fin={fin} barRef={barRef} /> : null;
 
   const queue = st.queue || [];
@@ -387,8 +390,7 @@ export function AudioPlayerBar({ hidden = false } = {}) {
   // Why the last start failed (brief 3g), while the bar sits paused on it. Offline (player brief 3g): nothing ahead of
   // it is on the phone either, or it was the last one.
   const failed = st.status === 'paused' ? st.failed : null;
-  const failLine = failed === 'offline' ? (st.qi < queue.length - 1 ? 'Nothing ahead is on this phone' : 'Not on this phone')
-    : failed === 'signal' ? 'No signal. Your place is kept.' : failed ? 'Couldn’t load' : null;
+  const failLine = playerFailLine(st);
   const left = dur && !starting ? timeLeft(st.time, dur) : null;
   // Sleep and speed chips (brief 3a: a small moon "15m" when sleep is set, "1.5×" when speed isn't 1×).
   const sleepSec = st.sleepEndsAt ? AudioPlayer.getSleepRemainingSeconds() : 0;

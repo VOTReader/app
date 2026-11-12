@@ -28,6 +28,7 @@ import * as AudioTrack from '../../utils/audio-track.js';
 import * as AudioCoverage from '../../utils/audio-coverage.js';
 import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
+import { onFullPlayerRequest } from '../components/player-open.js';
 
 const savedTrack = {
   key: 'one:wide-path', title: 'The Wide Path', sub: 'Volume One', partLabel: 'Part 1',
@@ -163,13 +164,36 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     const openTrack = vi.fn();
     renderScreen({ onOpenTrack: openTrack });
     expect(screen.getByText('Continue listening'), 'au-root: always Continue listening').toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'The Wide Path · Part 1' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open the player: The Wide Path · Part 1' })).toBeTruthy();
     expect(screen.getByText('Volume One · 1 min left')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Playback position' }).getAttribute('aria-valuenow')).toBe('40');
     fireEvent.click(screen.getByRole('button', { name: 'Pause current recording' }));
     expect(player.toggle).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Open the text of The Wide Path' }));
     expect(openTrack).toHaveBeenCalledWith(savedTrack);
+  });
+
+  // FIXA (REVIEW-listen 1): the mini bar hides on this root, so the card is the way to the full player, and a failed
+  // start says why here as the bar's line 2 would.
+  it('while something is in the player, the card opens the full player and says why a start failed', () => {
+    setPlayerState({ queue: [savedTrack], qi: 0, status: 'playing', time: 48, duration: 120 });
+    const asked = vi.fn();
+    const off = onFullPlayerRequest(asked);
+    try {
+      renderScreen();
+      fireEvent.click(screen.getByRole('button', { name: 'Open the player: The Wide Path · Part 1' }));
+      expect(asked).toHaveBeenCalledTimes(1);
+      cleanup();
+      setPlayerState({ queue: [savedTrack], qi: 0, status: 'paused', failed: 'signal', time: 48, duration: 120 });
+      renderScreen();
+      expect(screen.getByText('Volume One · No signal. Your place is kept.')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Open the player: The Wide Path · Part 1. No signal. Your place is kept' })).toBeTruthy();
+    } finally { off(); }
+  });
+
+  it('with nothing in the player, the card has nothing to open: its play continues the newest recording', () => {
+    renderScreen();
+    expect(screen.queryByRole('button', { name: /^Open the player/ })).toBeNull();
   });
 
   it('Letter voice states the current choice and opens the voice picker in place; a pick sets it', () => {

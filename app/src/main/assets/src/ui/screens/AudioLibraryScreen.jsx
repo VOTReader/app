@@ -27,6 +27,7 @@ import { SelectSheet } from '../components/SelectField.jsx';
 import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { remainingLabel, relativePlayedAt } from '../components/AudioShelf.jsx';
+import { requestFullPlayer, playerFailLine } from '../components/player-open.js';
 
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
@@ -265,6 +266,7 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
   // Continue listening: what is in the player, else the newest recording played.
   const resume = current || recent[0] || null;
   const left = current ? minutesLeft(state) : '';
+  const failLine = current ? playerFailLine(state) : null;
 
   return (
     <ScreenLayout root navChildren={rootNavStart({ title: 'Listen', onSearch })} navEnd={<RootGear onSettings={onSettings} />}>
@@ -276,11 +278,22 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
             <div className="listen-continue-main">
               <button type="button" className="listen-art" disabled={!hasTextDestination(resume)} onClick={() => onOpenTrack(resume)}
                 aria-label={'Open the text of ' + trackName(resume)} title="Open text">{HEADPHONES_ICON}</button>
-              <div className="listen-continue-text">
-                <span className="root-eyebrow">Continue listening</span>
-                <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>
-                <span className="listen-continue-meta">{[resume.sub || trackMeta(resume), left].filter(Boolean).join(' · ')}</span>
-              </div>
+              {/* The card is the player on this root (no mini bar here): while something is in the player, its words
+                  open the full player, as the bar's do everywhere else; a failed start says why, as the bar's line 2. */}
+              {current ? (
+                <button type="button" className="listen-continue-text" onClick={() => requestFullPlayer()}
+                  aria-label={'Open the player: ' + continueTitle(resume) + (failLine ? '. ' + failLine.replace(/\.$/, '') : '')}>
+                  <span className="root-eyebrow">Continue listening</span>
+                  <span id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</span>
+                  <span className={'listen-continue-meta' + (failLine ? ' is-failed' : '')}>{[resume.sub || trackMeta(resume), failLine || left].filter(Boolean).join(' · ')}</span>
+                </button>
+              ) : (
+                <div className="listen-continue-text">
+                  <span className="root-eyebrow">Continue listening</span>
+                  <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>
+                  <span className="listen-continue-meta">{[resume.sub || trackMeta(resume), left].filter(Boolean).join(' · ')}</span>
+                </div>
+              )}
               <button type="button" className="listen-play" aria-busy={isLoading}
                 aria-label={current ? (active ? 'Pause current recording' : 'Resume current recording') : 'Continue listening: ' + trackName(resume)}
                 onClick={() => (current ? AudioPlayer.toggle() : AudioPlayer.playTrack(resume))}>
