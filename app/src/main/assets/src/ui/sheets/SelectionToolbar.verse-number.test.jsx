@@ -133,7 +133,7 @@ describe('rs1 - a selection that takes in a verse number keeps the whole menu', 
     selectAndPress(numText(16), 0, numText(16), 2);
     const copy = [...document.querySelectorAll('.sel-action-btn')].find((b) => b.textContent === 'Copy');
     act(() => { /** @type {any} */ (copy).dispatchEvent(new MouseEvent('click', { bubbles: true })); });
-    expect(written).toEqual([`"${V[16]}"\n\nJohn 3:16 (NKJV)`]);
+    expect(written).toEqual([`"${V[16]}"\n\nJohn 3:16`]);
   });
 
   it('both ends on numbers (16\'s to 18\'s): the toolbar over 16-17, not the browser\'s menu', () => {
@@ -169,7 +169,7 @@ describe('rs1 - a selection that takes in a verse number keeps the whole menu', 
     const ev = new Event('copy', { bubbles: true, cancelable: true });
     Object.defineProperty(ev, 'clipboardData', { value: { setData: (/** @type {string} */ t, /** @type {string} */ v) => { data[t] = v; } } });
     numText(16).parentElement?.dispatchEvent(ev);
-    expect(data['text/plain']).toBe(`"${V[16]}"\n\nJohn 3:16 (NKJV)`);
+    expect(data['text/plain']).toBe(`"${V[16]}"\n\nJohn 3:16`);
     expect(ev.defaultPrevented).toBe(true);
   });
 });

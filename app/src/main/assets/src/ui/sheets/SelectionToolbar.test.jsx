@@ -842,7 +842,8 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
     expect(document.querySelector('.sel-toolbar')).not.toBeNull();
   }
-  it('Share sends the quote, its reference and a link that opens the passage (A8)', async () => {
+  // SHARE1 (Corbin 2026-11-12): a Bible passage's Share adds its reference by default; the link is a setting.
+  it('Share sends the quote, then its reference (SHARE1 default for Scripture)', async () => {
     const sent = /** @type {any[]} */ ([]);
     setShare((d) => { sent.push(d); return Promise.resolve(); });
     raiseToolbarOn('bible:john:3:16');
@@ -850,8 +851,7 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     await settle();
     expect(sent.length).toBe(1);
     expect(sent[0].text.startsWith('"' + QUOTE + '"')).toBe(true);
-    expect(sent[0].text).not.toContain('John 3:16');   // 2026-11-11: the link alone under the quote
-    expect(sent[0].text.endsWith('"\n\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16')).toBe(true);
+    expect(sent[0].text.endsWith('"\n\nJohn 3:16')).toBe(true);
   });
 
   /* n6-10 (sweep 2): a quote across three verses was labelled with its
@@ -871,16 +871,15 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     await settle();
     expect(sent.length).toBe(1);
     // ASCII hyphen: Permanent Rule 1 (verse ranges never take an en dash, labels included; cp1).
-    expect(sent[0].text).toMatch(/"\n\nhttps:\/\/votreader\.github\.io\/app\/\?p=bible%3Ajohn%3A3%3A16$/);   // the link alone (2026-11-11)
+    expect(sent[0].text).toMatch(/"\n\nJohn 3:16-18$/);   // SHARE1 default: the reference with its range
     expect(sent[0].text).not.toMatch(/[–—]/);
-    expect(sent[0].text.endsWith('?p=bible%3Ajohn%3A3%3A16')).toBe(true);
   });
 
   /* n6-10, the rest: the quote is in the reader's translation while the link opens in the recipient's, so the
      label names it ("John 3:16 (KJV)"): two readers comparing the words know why they differ. */
   it('(n6-10) a Bible quote names the reader\'s translation', async () => {
     const g = /** @type {any} */ (globalThis);
-    g.StateStore = { get: () => ({ settings: { translation: 'kjv' } }) };
+    g.StateStore = { get: () => ({ settings: { translation: 'kjv', shareScripture: 'translation' } }) };   // SHARE1: the tier that names it
     g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version' }, { id: 'kjv', label: 'KJV', desc: 'King James Version' }];
     try {
       const sent = /** @type {any[]} */ ([]);
@@ -895,7 +894,7 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
       act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
       tapAction('Share');
       await settle();
-      expect(sent[0].text).toMatch(/"\n\nhttps:\/\/votreader\.github\.io\/app\/\?p=bible/);   // the link alone (2026-11-11); Copy names KJV
+      expect(sent[0].text).toMatch(/"\n\nJohn 3:16 \(KJV\)$/);
     } finally { delete g.StateStore; delete g.TRANSLATION_OPTIONS; }
   });
 
@@ -1127,7 +1126,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
   const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
   const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
   const V39 = 'But this He spoke concerning the Spirit, whom those believing in Him would receive; for the Holy Spirit was not yet given, because YahuShua was not yet glorified.';
-  const WANT = `"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV)`;
+  const WANT = `"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39`;   // SHARE1: Copy's default, no translation
   const g = /** @type {any} */ (globalThis);
   /** @type {PropertyDescriptor | undefined} */ let origClipboard;
 
@@ -1220,7 +1219,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
       await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
-      expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
+      expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39`);   // SHARE1 default for Scripture
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
@@ -1555,7 +1554,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     expect(document.querySelector('.sel-link-choice')).toBeNull();
     act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual(['"For God so loved the world"\n\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
+    expect(sent.map((d) => d.text)).toEqual(['"For God so loved the world"\n\nJohn 3:16']);   // SHARE1 default
   });
   /* FEAT1 (st-share, "Use the other link"): a plain tap shares at once with the Sharing setting's link, then a
      note names that link and offers the other for this one share; the text stays the words, a blank line, the link. */

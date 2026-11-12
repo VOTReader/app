@@ -314,27 +314,63 @@ describe('Copy & Share group', () => {
     expect(onSetting).toHaveBeenCalledWith('shareLink', 'app');
   });
 
-  // share-link (Corbin 2026-11-11, "Append only the link itself"): the preview is what Share sends - the quoted
-  // words, then the link alone; no title line.
-  it('previews a shared passage as the quoted words and the link alone, for each link setting', async () => {
-    const { withPassageLink } = await import('../../utils/passage-link.js');
+  // SHARE1 (Corbin 2026-11-12, "make it controllable"): When I copy and When I share each have From the
+  // Scriptures and From the letters, and under each a preview drawn from the same function the real text is.
+  it('previews what Copy and Share send, from the same function, for every choice and link setting', async () => {
+    const { sharePreviewText } = await import('./SettingsScreen.jsx');
+    const site = 'https://www.thevolumesoftruth.com/The_Wide_Path';
+    const app = 'https://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1';
     const cases = [
-      [{ shareLink: 'site', linkHighlight: false }, 'https://www.thevolumesoftruth.com/The_Wide_Path'],
-      [{ shareLink: 'site', linkHighlight: true }, 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=The%20words%20you%20picked'],
-      [{ shareLink: 'app' }, 'https://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1'],
+      [{}, 'copy', 'letter', '"The words you picked"\n\n' + site],
+      [{ shareLink: 'app' }, 'share', 'letter', '"The words you picked"\n\n' + app],
+      [{ shareLetters: 'title' }, 'share', 'letter', '"The words you picked"\n\nThe Wide Path\n' + site],
+      [{ copyLetters: 'citation' }, 'copy', 'letter', '"The words you picked"\n\nVolume Two, Letter 1: The Wide Path · 3/28/05\n' + site],
+      [{ shareLetters: 'none' }, 'share', 'letter', 'The words you picked'],
+      [{ linkHighlight: true }, 'share', 'letter', '"The words you picked"\n\n' + site + '#:~:text=The%20words%20you%20picked'],
     ];
-    for (const [settings, link] of cases) {
+    for (const [settings, action, kind, want] of cases) {
+      expect(sharePreviewText(/** @type {any} */ (action), /** @type {any} */ (kind), settings), JSON.stringify(settings)).toBe(want);
+    }
+    // Scripture: the reference by default, its translation, its link (the app's: the Bible has no page on the site), nothing.
+    expect(sharePreviewText('copy', 'scripture', {})).toMatch(/^"For God so loved the world that He gave His only begotten Son"\n\n\S.* 3:16$/);
+    expect(sharePreviewText('share', 'scripture', { shareScripture: 'translation' })).toMatch(/ 3:16 \([A-Z][A-Za-z-]*\)$/);
+    expect(sharePreviewText('share', 'scripture', { shareScripture: 'link' })).toMatch(/ 3:16\nhttps:\/\/votreader\.github\.io\/app\/\?p=bible%3Ajohn%3A3%3A16$/);
+    expect(sharePreviewText('copy', 'scripture', { copyScripture: 'none' })).toBe('For God so loved the world that He gave His only begotten Son');
+    // The cards show exactly those texts: a copy card and a share card, each with both kinds.
+    for (const settings of [{}, { copyScripture: 'link', shareLetters: 'citation', shareLink: 'app' }]) {
       cleanup();
       const { container } = renderSettings(settings);
-      const card = container.querySelector('.ws2-share-preview');
-      expect(card, JSON.stringify(settings)).toBeTruthy();
-      const lines = Array.from(card.querySelectorAll('p')).map((p) => p.textContent);
-      expect(lines).toEqual(['"The words you picked"', link]);
-      expect(card.textContent).not.toMatch(/Volume|The Volumes of Truth|·/);
+      const cards = Array.from(container.querySelectorAll('.ws2-share-preview'));
+      expect(cards.length).toBe(2);
+      cards.forEach((card, i) => {
+        const action = i === 0 ? 'copy' : 'share';
+        const samples = Array.from(card.querySelectorAll('.ws2-share-sample')).map((el) =>
+          Array.from(el.querySelectorAll('p')).map((p) => Array.from(p.childNodes).map((n) => n.textContent).join('\n')).join('\n\n'));
+        expect(samples).toEqual([sharePreviewText(action, 'scripture', settings), sharePreviewText(action, 'letter', settings)]);
+      });
     }
-    // The app link is exactly what Share builds for that passage.
-    expect(withPassageLink('"The words you picked"', 'letter:the-wide-path:1', 'The Wide Path'))
-      .toBe('"The words you picked"\n\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+  });
+
+  it('writes the four choices to their own keys', () => {
+    const onSetting = vi.fn();
+    renderSettings({}, { onSetting });
+    const field = (/** @type {string} */ name) => screen.getAllByRole('button', { name: new RegExp('^' + name + ': ') });
+    expect(field('From the Scriptures').map((b) => b.getAttribute('aria-label'))).toEqual(['From the Scriptures: Reference', 'From the Scriptures: Reference']);
+    expect(field('From the letters').map((b) => b.getAttribute('aria-label'))).toEqual(['From the letters: Link', 'From the letters: Link']);
+    fireEvent.click(field('From the Scriptures')[1]);
+    fireEvent.click(screen.getByRole('radio', { name: /^Reference and translation/ }));
+    expect(onSetting).toHaveBeenCalledWith('shareScripture', 'translation');
+    fireEvent.click(field('From the letters')[0]);
+    fireEvent.click(screen.getByRole('radio', { name: /^Full citation and link/ }));
+    expect(onSetting).toHaveBeenCalledWith('copyLetters', 'citation');
+  });
+
+  it('is found by "copy", "reference" and "citation"', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    for (const word of ['copy', 'reference', 'citation', 'version']) {
+      findSettings(word);
+      expect(foundPlaces(), word).toEqual(expect.arrayContaining([expect.stringMatching(/^Sharing · When I (copy|share)/)]));
+    }
   });
 
   it('is found by "share", "link" and "highlight"', () => {

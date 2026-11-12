@@ -14,6 +14,8 @@ import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { passageLinkFor, PUBLIC_APP_URL } from '../../utils/passage-link.js';
 import { siteUrl, pageTarget } from '../../utils/site-link.js';
+import { passageSourceFor } from '../../utils/passage-copy.js';
+import { SCRIPTURE_CHOICES, LETTER_CHOICES, endingChoice, endingKey, sharedText } from '../../utils/share-ending.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiParts.jsx';
@@ -678,6 +680,75 @@ export const SHARE_PREVIEW_QUOTE = '"The words you picked"';
 export function sharePreviewLink(which, highlight) {
   if (which === 'app') return passageLinkFor('letter:the-wide-path:1') || PUBLIC_APP_URL;
   return siteUrl(pageTarget('The Wide Path'), highlight ? [['The', 'words', 'you', 'picked']] : undefined);
+}
+
+/** SHARE1: the preview's two passages, named by the same functions Copy and Share use (utils/passage-copy.js
+    passageSourceFor, with the reader's translation), so the preview says what the real text will. The Wide Path is
+    named from its data when Volume Two is loaded, else from the same parts written out.
+    @param {Record<string, any>} settings */
+function previewSources(settings) {
+  const highlight = !!settings.linkHighlight;
+  const words = [['The', 'words', 'you', 'picked']];
+  let scripture = null, letter = null;
+  try { scripture = passageSourceFor(['bible:john:3:16']); } catch (_e) { scripture = null; }
+  try { letter = passageSourceFor(['letter:the-wide-path:1'], words); } catch (_e) { letter = null; }
+  return {
+    scripture: scripture || { kind: /** @type {'scripture'} */ ('scripture'), place: 'John 3:16', translation: 'NKJV', title: 'John 3:16',
+      citation: 'John 3:16 (NKJV)', siteLink: '', appLink: passageLinkFor('bible:john:3:16') || PUBLIC_APP_URL },
+    letter: letter || { kind: /** @type {'letter'} */ ('letter'), place: 'Volume Two, Letter 1: The Wide Path', translation: '',
+      title: 'The Wide Path', citation: 'Volume Two, Letter 1: The Wide Path \u00B7 3/28/05',
+      siteLink: sharePreviewLink('site', highlight), appLink: sharePreviewLink('app', highlight) },
+  };
+}
+export const SHARE_PREVIEW_VERSE = 'For God so loved the world that He gave His only begotten Son';
+
+/** SHARE1: exactly what Copy or Share sends for the preview's passage of this kind, with these settings.
+    @param {'copy' | 'share'} action @param {'scripture' | 'letter'} kind @param {Record<string, any>} settings */
+export function sharePreviewText(action, kind, settings) {
+  const src = previewSources(settings)[kind];
+  return sharedText(kind === 'scripture' ? SHARE_PREVIEW_VERSE : 'The words you picked', src, { action, settings });
+}
+
+/** One preview text as the card shows it: the words, then each added paragraph, a line per line; links in gold.
+    @param {{ text: string }} props */
+function SharePreviewSample({ text }) {
+  const paras = text.split('\n\n');
+  return (
+    <div className="ws2-share-sample">
+      <p className="ws2-share-quote">{paras[0]}</p>
+      {paras.slice(1).map((para, i) => (
+        <p key={i} className="ws2-share-link">
+          {para.split('\n').map((line, j) => <span key={j} className={'ws2-share-line' + (/^https?:/.test(line) ? '' : ' is-ref')}>{line}</span>)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** Settings > Sharing > When I copy / When I share: From the Scriptures and From the letters (the shared select
+    rows), then what each sends for a sample passage. @param {{ action: 'copy' | 'share', settings: Record<string, any>,
+    onSetting: (k: string, v: any) => void, preview: boolean }} props */
+function ShareEndingSection({ action, settings, onSetting, preview }) {
+  const heading = action === 'copy' ? 'When I copy' : 'When I share';
+  const verb = action === 'copy' ? 'copy copied clipboard' : 'share shared send';
+  return (
+    <SettingsSection label={heading}>
+      <SelectField eyebrow={heading} label="From the Scriptures" desc="A Bible passage"
+        find={verb + ' scripture bible verse reference range translation version link'}
+        value={endingChoice(settings, action, 'scripture')} options={SCRIPTURE_CHOICES}
+        onChange={(v) => onSetting(endingKey(action, 'scripture'), v)} />
+      <SelectField eyebrow={heading} label="From the letters" desc="And the other writings with a page on the website"
+        find={verb + ' letter letters title citation date volume link website'}
+        value={endingChoice(settings, action, 'letter')} options={LETTER_CHOICES}
+        onChange={(v) => onSetting(endingKey(action, 'letter'), v)} />
+      {preview ? (
+        <div className="ws2-share-preview" aria-label={action === 'copy' ? 'What a copy looks like' : 'What a share looks like'}>
+          <SharePreviewSample text={sharePreviewText(action, 'scripture', settings)} />
+          <SharePreviewSample text={sharePreviewText(action, 'letter', settings)} />
+        </div>
+      ) : null}
+    </SettingsSection>
+  );
 }
 
 /* WS2 settings (st-arrows, X-hidden 6 "Chapter & Letter Arrows"): the picker says where the arrows sit, each with a
@@ -1572,12 +1643,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             (utils/site-link.js); so does Share, unless the reader picks the app's. WS2 settings (st-share): the choice
             as two rows on the screen, Highlight the passage, then what a shared passage looks like. */}
         <SettingsGroup sub={glance.share} {...groupProps('share')}>
+          {/* SHARE1 (Corbin 2026-11-12, "For links, make it controllable ... Share should be a different thing"): what
+              Copy and Share add after the words, each set on its own, with what it sends under each. */}
+          <ShareEndingSection action="copy" settings={settings} onSetting={onSetting} preview={mode === 'screen'} />
+          <ShareEndingSection action="share" settings={settings} onSetting={onSetting} preview={mode === 'screen'} />
           <SettingsSection label="Links I share point to">
             <RadioRows label="Links I share point to" find="share link links copy website app"
               value={settings.shareLink === 'app' ? 'app' : 'site'} options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)} />
           </SettingsSection>
-          <p className="ws1-note">Share sends the words you picked, then this link alone under them. After a share, the note at the bottom of the screen has “Use the other link” to send the other one for that share; holding Share, or right-clicking it on a computer, offers both first. Copy ends the same way with the website link wherever the passage has a page there, and with its name where it has none.</p>
+          <p className="ws1-note">Wherever Copy or Share adds a link, it is this one; a passage with no page on the website, like the Bible, gets the app’s. After a share, the note at the bottom of the screen has “Use the other link” to send the other one for that share; holding Share, or right-clicking it on a computer, offers both first.</p>
           <SettingsSection label="Website links">
             <SettingsRow
               label="Highlight the passage"
@@ -1587,17 +1662,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               onToggle={() => onToggle("linkHighlight")}
             />
           </SettingsSection>
-          {mode === 'screen' && (
-            <>
-              <SectionLabel>What a shared passage looks like</SectionLabel>
-              <div className="ui-card ws2-share-preview">
-                {/* share-link (Corbin 2026-11-11, "Append only the link itself"): what Share sends, built by the
-                    same functions - the quoted words, a blank line, the link; no title line. */}
-                <p className="ws2-share-quote">{SHARE_PREVIEW_QUOTE}</p>
-                <p className="ws2-share-link">{sharePreviewLink(settings.shareLink === 'app' ? 'app' : 'site', !!settings.linkHighlight)}</p>
-              </div>
-            </>
-          )}
         </SettingsGroup>
 
         {/* WS2 settings (st-quality): on the root the Garden row opens this picker directly; it ends in a door to

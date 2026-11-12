@@ -9,6 +9,8 @@ import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { snapshotGroups, offerUndoRemoved } from '../../utils/annotation-undo.js';
 import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
+import { passageSourceFor } from '../../utils/passage-copy.js';
+import { sharedText } from '../../utils/share-ending.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 
 const STYLES = [['highlight', 'Highlight', 'Highlighter'], ['underline', 'Underline', 'Underline'], ['squiggle', 'Squiggle underline', 'Squiggle']];
@@ -62,8 +64,13 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   };
 
   const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
-  const copy = () => { onClose(); copyToClipboard(words).then((r) => toast(r === 'copied' ? 'Copied' : 'Could not copy')); };
-  const share = () => { onClose(); shareText(words).then((r) => { if (r === 'copied-instead') toast('Copied'); else if (r === 'failed') toast('Could not share'); }); };
+  // SHARE1 (Corbin 2026-11-12): a mark's Copy and Share add what Settings > Sharing says, as the selection's do.
+  const markKeys = [...new Set(segs.length ? segs.map((s) => s.key) : [hlKey])];
+  /** @param {'copy' | 'share'} action */
+  const textFor = (action) => sharedText(words, passageSourceFor(markKeys.length > 1 ? [markKeys[0], markKeys[markKeys.length - 1]] : markKeys,
+    words.split(' … ').map((l) => l.split(/\s+/))), { action });
+  const copy = () => { onClose(); copyToClipboard(textFor('copy')).then((r) => toast(r === 'copied' ? 'Copied' : 'Could not copy')); };
+  const share = () => { onClose(); shareText(textFor('share')).then((r) => { if (r === 'copied-instead') toast('Copied'); else if (r === 'failed') toast('Could not share'); }); };
 
   const convertToNote = () => {
     // Attach a note to this mark, keeping its style + colour; record it as the next note's default.
