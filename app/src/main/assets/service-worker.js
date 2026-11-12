@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-93524acf3c';
+const CACHE_VERSION = 'v1.0.2-e868cf9e7f';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -174,6 +174,10 @@ const CORPUS_PRECACHE = [
   // vendored dataset is refreshed. Stable corpus cache, never re-downloaded on
   // an app-version bump.
   './src/data/scripture-web-data.js',
+  // Search's "Letters that cite" row (FEAT1, 2026-11-11): the graph's own citation rows, ~119 KB, written
+  // with it by gen-scripture-web.mjs; injected the first time a Bible reference result shows. Joined by
+  // --rebaseline like answers.js (a new file changes no byte a client holds); a later edit is a bump.
+  './src/data/verse-cites.js',
   // Answers Only God Can Give (2026-09-22) — raw-injected by
   // utils/sync-loaders.js the first time a reader opens Answers, ~2.5 MB of
   // topic pages. Precached like Bible Studies: Answers is a Home card, and a
@@ -316,11 +320,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': '6b484ddc2f88cf81b22582c43cc6435c260713278049b68778ffd525f7d74d23',
-  './dist/app.min.css': '558792757627bbfdc5e6b2f2152d484d2f41e4f281c636ba676203254db19ec2',
+  './dist/app.min.css': 'a80282af7f08819eabcc26c200d55087cab09596a42ebe36cb0384578f9b050f',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '20d12650da1d39dc6201d270a1704d83aedf7f20d86631ff5f40d8ab769900f8',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': '026723cde3047f8a12d921fbbc48c2c4d29655b367abbb77fbdbab505b842c9d',
+  './dist/bundle-d.js': 'ed96541154d4281844f0f612b945aea7155ab9f109780bce0bdd9d2f93be27f8',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': '6b484ddc2f88cf81b22582c43cc6435c260713278049b68778ffd525f7d74d23',
@@ -437,6 +441,7 @@ const ASSET_REVISIONS = {
   './src/data/bible-web.js': '22b119d895aa329b2f62e6ba7b1b5978f1fbcf13fc474d1de5d9b72c9a3558c2',
   './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
   './src/data/scripture-web-data.js': '033ec47bbbbae873d457463f0ec9f5f7696b66f8e3ff24e35d15c22c02e81022',
+  './src/data/verse-cites.js': '0f40e34c1038cb12fa3a3464f3d30c79c481dc96f6f484839ad7e6040460f584',
   './study-chart-chronology.jpg': 'd8991646f54d4b9861ce85bb7ff59517623307b9c7c851a592bd48b7b5b854a8',
   './study-cover-lamb.jpg': 'dcb877b4ac506318d971b1d3f772862ad84cb5efb701dbf6387b42d3c1f31b58',
   './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',

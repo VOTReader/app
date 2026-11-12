@@ -172,6 +172,9 @@ const BUDGETS = [
   // 4,515 recordings, 168,220 B raw / 66 KB gzipped, lazy (fetched the first time a size or a length is wanted).
   // +50 % for new editions and recordings.
   { file: 'src/data/audio-lengths.js', measured: 168220, max: 252000 },
+  // Search's "Letters that cite" (FEAT1, tools/gen-scripture-web.mjs): the graph's votCites + mirrors and the
+  // chapter lengths, 122,015 B raw / 37 KB gzipped, lazy (the first Bible reference result). +20 % for corpus growth.
+  { file: 'src/data/verse-cites.js', measured: 122015, max: 146500 },
   // Answers Only God Can Give (ANSWERS, tools/fetch-answers.py): 121 topic pages,
   // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
   // Served raw like the timings; the site is complete, so +15 %. `measured` was

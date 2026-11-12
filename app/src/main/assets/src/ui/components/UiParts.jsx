@@ -61,10 +61,10 @@ export function ListGroup({ label, aside, onAside, inset = false, children, clas
  *   mark?: { label: string, icon?: string, tick?: boolean } | null, menu?: { label: string, onClick: () => void } | null,
  *   star?: { on: boolean, label: string, onClick: () => void } | null, remove?: { label: string, onClick: () => void } | null, switchOn?: boolean,
  *   onClick?: () => void, chevron?: boolean, one?: boolean, noLead?: boolean, ariaLabel?: string, className?: string,
- *   current?: boolean }} props
+ *   current?: boolean, expanded?: boolean }} props  (expanded: the row shows or hides a list under it, aria-expanded)
  */
 export function ListRow({ icon, lead, over, title, meta, value, valueNone = false, mark = null, menu = null, star = null, remove = null, switchOn, onClick, chevron,
-  one = false, noLead = false, ariaLabel, className = '', current = false }) {
+  one = false, noLead = false, ariaLabel, className = '', current = false, expanded = undefined }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
   const showChev = chevron === undefined ? !!onClick && !menu && !remove : chevron;
   const body = (
@@ -119,7 +119,7 @@ export function ListRow({ icon, lead, over, title, meta, value, valueNone = fals
     );
   }
   if (onClick) {
-    return <button type="button" className={cx(rowCls, 'ui-row-press')} onClick={onClick} aria-label={ariaLabel} aria-current={aria}>{body}</button>;
+    return <button type="button" className={cx(rowCls, 'ui-row-press')} onClick={onClick} aria-label={ariaLabel} aria-current={aria} aria-expanded={expanded}>{body}</button>;
   }
   return <div className={rowCls} aria-current={aria}>{body}</div>;
 }
