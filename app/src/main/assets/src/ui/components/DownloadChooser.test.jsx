@@ -257,6 +257,22 @@ describe('Choose: rows on their way', () => {
   });
 });
 
+// PL-LISTEN 2 (REVIEW-listen 3): 'failed' (the store's "will try again" list) counts as held, so it starts ticked, but
+// Apply left it out of the cancel: the tick came back and the store went on retrying it.
+describe('Choose: one that did not download yet', () => {
+  it('unticking it and Apply takes it off the will-try-again list', () => {
+    off.st.status.set(U('v2-one'), 'failed');
+    const { container, getByRole } = render(<DownloadChooser off={off} />);
+    fireEvent.click(within(container).getByRole('button', { name: /^Volume Two/ }));
+    expect(box(container, 'Letter One').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(box(container, 'Letter One'));
+    fireEvent.click(within(footer(container)).getByRole('button', { name: 'Apply' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    expect(off.cancel).toHaveBeenCalledWith([U('v2-one')]);
+    expect(off.remove).not.toHaveBeenCalled();
+  });
+});
+
 describe('Choose: the Bible', () => {
   it('a range in the chapter grid ticks its run; the sheet names it by chapters', () => {
     off.st.saved.set(U('ruth-4'), {});

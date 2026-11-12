@@ -653,7 +653,7 @@ export function DownloadChooser({ off, bibleAudio, focus, letterReader, after = 
     const cancelUrls = [];
     for (const u of plan.remove) for (const t of u.tracks) {
       const s = off.statusOf(t.url);
-      if (s === 'saved') removeUrls.push(t.url); else if (s === 'queued' || s === 'downloading') cancelUrls.push(t.url);
+      if (s === 'saved') removeUrls.push(t.url); else if (s === 'queued' || s === 'downloading' || s === 'failed') cancelUrls.push(t.url);
     }
     if (cancelUrls.length) off.cancel(cancelUrls);
     if (removeUrls.length) off.remove(removeUrls);
