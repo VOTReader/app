@@ -94,6 +94,22 @@ describe('Choose: ticks and the footer', () => {
     expect(off.download).toHaveBeenCalledWith([{ url: U('v2-one'), key: 'v2:one', title: 'Letter One' }], { priority: 'tap' });
   });
 
+  // PL-LISTEN (REVIEW-listen 12): a tick Apply had carried out stayed as an edit, so taking the letter off the phone
+  // afterwards (On this phone's x) left it ticked here and the next Apply downloaded it again.
+  it('a tick the phone has caught up with is over: removing the letter elsewhere unticks it', () => {
+    off.download.mockImplementation((items) => { for (const t of items) off.st.status.set(t.url, 'queued'); return true; });
+    const { container, getByRole, rerender } = render(<DownloadChooser off={off} />);
+    fireEvent.click(within(container).getByRole('button', { name: /^Volume Two/ }));
+    fireEvent.click(box(container, 'Letter One'));
+    fireEvent.click(within(footer(container)).getByRole('button'));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    expect(box(container, 'Letter One').getAttribute('aria-checked')).toBe('true');
+    off.st.status.delete(U('v2-one'));   // cancelled or removed from On this phone
+    rerender(<DownloadChooser off={off} />);
+    expect(box(container, 'Letter One').getAttribute('aria-checked')).toBe('false');
+    expect(footer(container)).toBeNull();
+  });
+
   it('a tap on a dash selects everything under it', () => {
     off.st.saved.set(U('v1-warning'), {});
     const { container } = render(<DownloadChooser off={off} />);
