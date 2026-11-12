@@ -5157,12 +5157,12 @@
       padding: 0 18px 20px;
       -webkit-overflow-scrolling: touch;
     }
+    /* POL7: the mock's plain group line (r-link1 "Titles and places"), not the old blue Cinzel. */
     .navpick-section-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      letter-spacing: 0.10em; color: var(--link-blue);
+      font-family: var(--font-ui); font-size: var(--ts-meta);
+      color: var(--text-2);
       padding: 12px 4px 6px;
     }
-    body.light .navpick-section-label { color: #2079a8; }
     .navpick-row {
       display: flex; align-items: center; gap: 14px;
       width: 100%; padding: 10px 6px;
@@ -6113,6 +6113,13 @@
        pager chevrons and the close at the right of its head; its in-app door a row (lead, title, what it is, chevron).
        The reader menu is a bottom sheet of three surface-2 groups of worded rows. ── */
     .fn-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
+    /* POL7 (r-foot started 35 px higher than the mock): the mock's sheet box - 8 px over the grabber, the 48 px head
+       4 px under it, the door 4 px under the head, 24 px at the foot, the 20 px gutter. */
+    .fn-sheet:not(.rail) { padding: 8px var(--gutter) 24px; }
+    .fn-sheet:not(.rail) .sheet-handle-row + .fn-sheet-num-row { min-height: 48px; margin-top: -28px; }   /* collapses with the handle row's -16 px: the head starts 16 px down */
+    .fn-sheet-num-row { margin-bottom: 4px; }
+    .fn-sheet-num-row + .fn-sheet-link-btn { margin-top: 0; }
+    .fn-sheet .fn-sheet-url-extra .fn-link { min-height: 48px; }
     .fn-sheet .sheet-handle-back { display: none; }
     .fn-sheet-num-row { flex-wrap: nowrap; gap: 4px; }
     .fn-sheet-num-row .fn-sheet-num { flex: 1; min-width: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; letter-spacing: 0; text-transform: none; }
@@ -6681,8 +6688,14 @@
     .rd-book-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin: 0 0 var(--sp-3); padding: var(--sp-2) 0 0; text-align: left; }
     .rd-book-head > * { margin-top: 0; margin-bottom: 0; }
     .rd-book-sub { flex: 1 1 12em; margin: 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
-    .rd-book-strip { display: flex; gap: var(--sp-2); overflow-x: auto; margin: 0 0 var(--sp-3); padding: 4px 2px var(--sp-1); scrollbar-width: none; }
+    /* POL7: the strip is its own size container so its gap can stretch to end on a chip cut clearly (about 60 %
+       hidden, a sure hint that it scrolls) instead of a half one: n whole chips + 14 px of the next fill the width. */
+    .rd-book-strip { display: flex; overflow-x: auto; margin: 0 0 var(--sp-3); padding: 4px 2px var(--sp-1); scrollbar-width: none; container-type: inline-size; }
     .rd-book-strip::-webkit-scrollbar { display: none; }
+    .rd-book-num + .rd-book-num { margin-left: var(--sp-2); }
+    @container (width < 303px) { .rd-book-num + .rd-book-num { margin-left: max(4px, calc((100cqi - 12px) / 6 - 36px)); } }
+    @container (303px <= width < 348px) { .rd-book-num + .rd-book-num { margin-left: calc((100cqi - 12px) / 7 - 36px); } }
+    @container (348px <= width < 394px) { .rd-book-num + .rd-book-num { margin-left: calc((100cqi - 12px) / 8 - 36px); } }
     .rd-book-num { position: relative; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid var(--hairline); border-radius: 50%; background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
     .rd-book-num::before { content: ''; position: absolute; inset: -4px; }
     .rd-book-num.is-current { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }

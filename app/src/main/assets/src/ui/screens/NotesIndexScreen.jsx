@@ -312,7 +312,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
 
   const emptyAll = (
     <EmptyState icon="note" title="No notes yet"
-      text="Select some words while you read and tap Note. Every note you write collects here."
+      text="Select some words while you read and tap Note; every note you write collects here."
       action={onStartReading ? { label: 'Start reading', onClick: onStartReading } : null} />
   );
   const noMatch = <p className="lib-none">No notes match “{searchQuery.trim()}”.</p>;

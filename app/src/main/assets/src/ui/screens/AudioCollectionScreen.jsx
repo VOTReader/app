@@ -218,7 +218,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
     return (
       <ScreenLayout utility={utility}>
         <div className="audio-library-screen listen-screen">
-          <EmptyState icon="music" title="No recordings to show" text="This source has no recordings. Step back to Listen to choose another."
+          <EmptyState icon="music" title="No recordings to show" text="This source has no recordings yet; choose another in Listen."
             action={{ label: 'Back to Listen', onClick: onBack }} />
         </div>
       </ScreenLayout>

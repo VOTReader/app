@@ -305,10 +305,11 @@ export function JournalHubScreen(props) {
           list.length > 0 ? (
             <EmptyState icon="search" title="No matches" text="Try a different search term." />
           ) : isPinnedTab ? (
-            <EmptyState icon="pin" title="No pinned entries" text="Pin your favorite or most-used journal entries here to find them easily." />
+            <EmptyState icon="pin" title="No pinned entries" text="Pin an entry from its menu and it waits here, at hand."
+              action={{ label: 'All entries', onClick: function() { setTab('all'); } }} />
           ) : (
             <EmptyState icon="journal" title="No entries yet"
-              text="Write what you are learning. An entry can hold letters, bookmarks, photos and voice recordings."
+              text="Write what you are learning; an entry can hold letters, bookmarks, photos and voice recordings."
               action={onCreateEntry ? { label: 'Write your first entry', icon: 'pen', onClick: function() { onCreateEntry(); } } : null} />
           )
         ) : (

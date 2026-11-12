@@ -287,7 +287,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
         {history.length === 0 ? (
           /* n118 / rule 15: one sentence, one button; it opens the first letter when the route offers that. */
           <EmptyState icon="clock" title="The scroll is blank."
-            text="Every chapter, letter and study you visit lands here. Begin reading and this fills."
+            text="Every chapter, letter and study you visit lands here."
             action={onStartReading ? { label: 'Start with Volume One, Letter 1', onClick: onStartReading }
               : onHome ? { label: 'Start reading', onClick: () => onHome() } : undefined} />
         ) : (

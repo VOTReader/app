@@ -189,7 +189,7 @@ export function BookmarksScreen(props) {
         {/* One empty-state pattern (rule 15): how it fills (the bar's bookmark button), one button, no search box. */}
         {allBookmarks.length === 0 ? (
           <EmptyState icon="mark" title="No bookmarks yet"
-            text="Tap the bookmark at the top of any letter or chapter to keep your place. Your bookmarks collect here."
+            text="Tap the bookmark at the top of any letter or chapter and your place is kept here."
             action={props.onHome ? { label: 'Start reading', onClick: function() { (props.onStartReading || props.onHome)(); } } : null} />
         ) : (
           <>
