@@ -45,11 +45,18 @@ import { UiIcon } from '../components/UiIcon.jsx';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
 import { answersSavedSum } from '../../utils/answers-extras.js';
+import { answersFromSearch, setAnswersFromSearch } from '../../utils/answers-from-search.js';
 
 /** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | null} AnswersSheetState */
 
 let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), all: false };
-export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, all: false }; }
+export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, all: false }; setAnswersFromSearch(null); }
+/** Search's "Or ask" row: the landing opens holding the words typed in Search, and its Back returns there. @param {string} q */
+export function openAnswersLandingFromSearch(q) {
+  resetAnswersLanding();
+  setAnswersFromSearch(q || '');
+  _landing.query = answersFromSearch() || '';
+}
 
 /* Recent searches: on this device only (f06c), the last five a reader went on to open. */
 const RECENT_KEY = 'vot-answers-recent';
@@ -434,13 +441,16 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const savedSum = answersSavedSum(useAnswersSaved(loaded ? list : null));
 
   // Back with a query typed clears it before it leaves the screen (Android Back order, §2.5).
+  // Opened from Search's "Or ask" with his words still in the box, Back goes straight back to Search (PL-SEARCH 2).
+  const carried = answersFromSearch();
+  const backClears = !!query && !(carried !== null && query.trim() === carried);
   React.useEffect(() => {
-    if (!query) return undefined;
+    if (!backClears) return undefined;
     const fn = () => { setQuery(''); return true; };
     window.__screenBack = fn;
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
-  }, [query]);
-  const handleNavBack = () => { if (query) setQuery(''); else onBack(); };
+  }, [backClears]);
+  const handleNavBack = () => { if (backClears) setQuery(''); else onBack(); };
   const closeSheet = React.useCallback(() => setSheet(null), []);
   const openTopic = (id, anchor, from, section, find) => (find ? onOpenTopic(id, anchor || null, from || 'Answers', section || null, find) : onOpenTopic(id, anchor || null, from || 'Answers'));
   const chip = (id) => openTopic(id, null, 'Answers');
@@ -518,7 +528,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
 
   return (
     <ScreenLayout className={answersLayoutClass(fontScale, true)}
-      navChildren={LibraryNav({ onBack: handleNavBack, backLabel: query ? 'Answers' : 'Home', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange,
+      navChildren={LibraryNav({ onBack: handleNavBack, backLabel: backClears ? 'Answers' : carried !== null ? 'Search' : 'Home', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange,
         hide: asking ? ['settings', 'history', 'search', 'theme'] : undefined,
         leftExtras: asking ? field : <BarTitle /> })}>
       <div className={'ans-page ans-landing' + (isQuery || recentMode ? ' is-query' : '') + (asking ? ' is-asking' : '')}>

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { AnswersHome, resetAnswersLanding } from './AnswersHome.jsx';
+import { AnswersHome, resetAnswersLanding, openAnswersLandingFromSearch } from './AnswersHome.jsx';
 import { AnswersShelf } from './AnswersShelf.jsx';
 import { AnswersMedia } from './AnswersMedia.jsx';
 import { passageCopy } from '../../utils/passage-copy.js';
@@ -428,6 +428,36 @@ describe('AnswersHome — search (f06)', () => {
     expect(texts('.ans-recent .ans-row-title')).toEqual(['sabbath', 'holy days']);
     fireEvent.click(screen.getByText('Clear'));
     expect(localStorage.getItem('vot-answers-recent')).toBeNull();
+  });
+});
+
+describe('AnswersHome — opened from the Or ask row of Search (PL-SEARCH 2)', () => {
+  it('holds the words typed in Search, and Back goes straight back; an edited box clears first', () => {
+    const onBack = vi.fn();
+    openAnswersLandingFromSearch('  sabbath ');
+    render(<AnswersHome {...base} onBack={onBack} />);
+    expect(field().value).toBe('sabbath');
+    expect(document.querySelector('.ans-landing').classList.contains('is-query')).toBe(true);
+    expect(navProps.backLabel).toBe('Search');
+    expect(window.__screenBack || null).toBeNull();
+    fireEvent.click(screen.getByTestId('nav-back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    // his own words in the Answers box clear first, as they always did; the emptied box then leaves for Search
+    fireEvent.change(field(), { target: { value: 'sabbath day' } });
+    expect(navProps.backLabel).toBe('Answers');
+    expect(typeof window.__screenBack).toBe('function');
+    fireEvent.click(screen.getByTestId('nav-back'));
+    expect(field().value).toBe('');
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(navProps.backLabel).toBe('Search');
+  });
+
+  it('entering from Home forgets Search: Back is Home again', () => {
+    openAnswersLandingFromSearch('sabbath');
+    resetAnswersLanding();
+    render(<AnswersHome {...base} />);
+    expect(field().value).toBe('');
+    expect(navProps.backLabel).toBe('Home');
   });
 });
 

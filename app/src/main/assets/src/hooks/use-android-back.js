@@ -160,6 +160,7 @@ import {
 } from '../utils/root-exit-toast.js';
 import { modalRegistry } from './use-modal-registry.js';
 import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
+import { answersFromSearch } from '../utils/answers-from-search.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, LETTER_SCREEN_SET } from '../data/scripture-resolution.js';
 import {
   clearSuppressNextHistoryPush, suppressNextHistoryPush, isHistoryPushSuppressed,
@@ -349,6 +350,8 @@ export function useAndroidBack({
       // n230: the one-line branches are a table (BACK_BY_SCREEN, above the hook): screen -> the
       // one nav call its Back makes. Every key is a plain screen name, disjoint from the branches that
       // remain, so its place in the chain changes nothing; the branches with conditions stay as code.
+      // The Answers landing opened from Search's "Or ask" row backs to Search, as its bar's Back does (PL-SEARCH 2).
+      if (s === "answers-home" && answersFromSearch() !== null) { setScreen("search"); return "true"; }
       { const simple = Object.prototype.hasOwnProperty.call(BACK_BY_SCREEN, s) ? BACK_BY_SCREEN[s] : null;
       if (simple) {
         if (s === "about") AboutSeenFlagStore.set();

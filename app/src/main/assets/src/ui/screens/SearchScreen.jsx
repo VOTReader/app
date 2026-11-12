@@ -1415,7 +1415,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <>
                 <h2 className="srch-section-label">Or ask</h2>
                 <div className="ui-group srch-ask">
-                  <button type="button" className="srch-row is-two" onClick={() => onOpenAnswers()}>
+                  <button type="button" className="srch-row is-two" onClick={() => onOpenAnswers(qTrim)}>
                     <span className="srch-row-ic" aria-hidden="true"><UiIcon name="quote" /></span>
                     <span className="srch-row-tx">
                       <span className="srch-row-t">Answers Only God Can Give</span>

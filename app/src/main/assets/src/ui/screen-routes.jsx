@@ -55,7 +55,8 @@ import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../util
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
-import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
+import { AnswersHome, resetAnswersLanding, openAnswersLandingFromSearch } from './screens/AnswersHome.jsx';
+import { answersFromSearch, setAnswersFromSearch } from '../utils/answers-from-search.js';
 import { openDownloadsAt } from './screens/AudioOfflineScreen.jsx';
 import { navOriginLabel } from '../utils/tabs.js';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
@@ -811,6 +812,8 @@ export function buildScreenRoutes({
     return true;
   };
   if (screen !== 'scripture-web' && window.navHandoff) window.navHandoff.clear('webStart');
+  // Home ends a visit to Answers that began in Search: the landing's Back is Home again (PL-SEARCH 2).
+  if (screen === 'home') setAnswersFromSearch(null);
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
@@ -1075,7 +1078,7 @@ export function buildScreenRoutes({
       entries={entries}
       site={entries ? _answersSite() : null}
       pathLast={_answersPathOn ? readAnswersPath() : null}
-      onBack={goHome}
+      onBack={answersFromSearch() !== null ? () => setScreen('search') : goHome}
       onOpenGroup={_openAnswersGroup}
       onOpenMedia={() => setScreen('answers-media')}
       onOpenSaved={() => setScreen('answers-saved')}
@@ -1261,7 +1264,7 @@ export function buildScreenRoutes({
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
         onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
         onOpenPlans={goReadingPlans}
-        onOpenAnswers={() => { resetAnswersLanding(); setScreen('answers-home'); }}
+        onOpenAnswers={(/** @type {string} */ q) => { openAnswersLandingFromSearch(q); setScreen('answers-home'); }}
         onOpenCite={(/** @type {any} */ endpoint) => _listOpen(endpoint, { sourceLetterTitle: 'Search' })}
         listenRef={{
           // WA4 (s-ref): a passage card's Listen plays its chapter in the reader's audio edition, the way a
