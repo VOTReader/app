@@ -380,7 +380,7 @@ async function runTheme(theme) {
     await tap('^about votreader'); await stop('about');
   });
   await step('dialog', async () => {
-    await tab('Read'); await tap('^settings$'); await tap('^your data'); await tap('^(erase|delete|wipe|clear|reset)'); await sleep(600); await stop('dialog'); await esc(2);
+    await tab('Read'); await tap('^quick settings$'); await tap('^settings$'); await tap('^your data'); await tap('^(erase|delete|wipe|clear|reset)'); await sleep(600); await stop('dialog'); await esc(2);
   });
 
   // the Garden
@@ -418,7 +418,7 @@ async function runTheme(theme) {
   }, i, k, n);
   const soft = async (what, fn) => { try { await fn(); } catch (e) { console.log(`${theme.padEnd(5)} seed: ${what} skipped (${String(e.message || e).slice(0, 160)})`); await esc(2); } };
 
-  if (want('lib-notes', 'lib-highlights', 'lib-bookmarks', 'lib-links', 'lib-journal', 'lib-notebooks', 'lib-history', 'lib-progress', 'journal-view', 'journal-edit')) await step('seed', async () => {
+  if (want('lib-notes', 'lib-highlights', 'lib-bookmarks', 'lib-links', 'lib-journal', 'lib-notebooks', 'lib-history', 'lib-progress', 'note-edit', 'journal-view', 'journal-edit', 'journal-insert')) await step('seed', async () => {
     await tab('Read'); await tap('volumes of truth'); await tap('^volume two'); await tap('the seventh day'); await sleep(1500); await top();
     await soft('highlight', async () => { await must(select(0, 0, 34), 'selection'); await sleep(1200); await tap('^yellow highlight'); await sleep(900); });
     await soft('note', async () => {
@@ -521,17 +521,17 @@ async function runTheme(theme) {
     await tap('^voice to download'); await sleep(700); await stop('dl-voice'); await esc();
   });
 
-  // Answers' sheets: share card, more, a command tablet, media, saved, a topic, its share card, on this page
+  // Answers' sheets: more, a command tablet, media, saved, a topic, its share card, on this page
   await step('answers-sheets', async () => {
     await tab('Read'); await tap('^topics & doctrines'); await sleep(1500);
-    await must(click('[aria-label="Share as a card"]'), 'share card'); await stop('ans-share'); await esc();
     await must(click('.ans-chip.is-more'), 'more chip'); await stop('ans-more'); await esc();
     if (await click('.ans-tablet', null, 3)) { await stop('ans-cmd'); await esc(); }
     if (await click('.ans-tile-btn', 'chart')) { await sleep(900); await stop('ans-media'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
     if (await click('.ans-tile-btn', 'saved')) { await sleep(900); await stop('ans-saved'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
     await ev(() => { const h = document.querySelector('.ans-hero-c'); if (h) h.closest('.screen-scroll').scrollTop = 0; });
     await tap('the sabbath.$'); await sleep(1200); await stop('ans-topic');
-    if (await click('[aria-label="Share as a card"], [aria-label^="Share"]')) { await sleep(900); await stop('ans-topic-card'); await esc(); }
+    // the landing has no card door since Answer of the day went (492955f64): a topic's ⋯ menu opens it
+    await tap('^more$'); await must(click('button, [role="menuitem"]', '^share as a card$'), 'share card'); await stop('ans-share'); await esc();
     await ev(() => { const h = document.querySelector('.ans-hero'); if (h) h.closest('.screen-scroll').scrollTop = 1800; }); await sleep(600);
     await must(click('.ans-runhead'), 'running head'); await stop('ans-onpage'); await esc(2);
   });
@@ -539,7 +539,7 @@ async function runTheme(theme) {
   // every Settings page and its sheets
   await step('settings-all', async () => {
     const back = async () => { await tap('^back to settings'); await top(); };
-    await tab('Read'); await tap('^settings$');
+    await tab('Read'); await tap('^quick settings$'); await tap('^settings$');   // GEAR1: the gear opens Quick settings
     await ev(() => { const i = document.getElementById('settings-find-input'); if (!i) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'keep'); i.dispatchEvent(new Event('input', { bubbles: true })); }); await sleep(1000); await stop('st-find');
     await ev(() => { const i = document.getElementById('settings-find-input'); if (!i) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); }); await sleep(600);
     await tap('^reading'); await stop('st-reading'); await scrollTo('end'); await stop('st-reading-2'); await top();
