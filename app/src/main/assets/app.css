@@ -3350,6 +3350,8 @@
     .listen-art:disabled { cursor: default; }
     .listen-art svg { width: var(--icon); height: var(--icon); }
     .listen-continue-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    button.listen-continue-text { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .listen-continue-meta.is-failed { color: var(--accent); }
     .listen-continue-title { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .listen-continue-meta { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .listen-play, .ui-play { flex: none; display: flex; align-items: center; justify-content: center; width: var(--btn-h); height: var(--btn-h); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); cursor: pointer; }

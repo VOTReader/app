@@ -23,6 +23,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { NetStatus } from '../../utils/net-status.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { AudioPlayerBar } from './AudioPlayerBar.jsx';
+import { requestFullPlayer } from './player-open.js';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -505,6 +506,23 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     expect(document.body.contains(sheet)).toBe(true);
     expect(container.querySelector('.audio-manager-sheet')).toBeNull();   // portal, not a child of the bar
     expect(screen.getByRole('heading', { name: 'The Seventh Day' })).toBeTruthy();
+  });
+
+  // FIXA (REVIEW-listen 1): on the Listen root the bar hides (the Continue card is the player there) but the full
+  // player it owns still opens when the card asks for it.
+  it('hidden on the Listen root, it draws no bar but still opens the full player when the card asks', () => {
+    render(<AudioPlayerBar hidden />);
+    playSingleLetter();
+    expect(bar()).toBeNull();
+    expect(barOpenClass()).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    act(() => { requestFullPlayer(); });
+    const sheet = screen.getByRole('dialog');
+    expect(sheet.classList.contains('audio-manager-sheet')).toBe(true);
+    drive(() => AudioPlayer.stop());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    act(() => { requestFullPlayer(); });                    // nothing in the player: nothing to open
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('the summary names what is playing, where, and how far, then what it opens (s13.1)', () => {

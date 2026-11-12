@@ -364,7 +364,7 @@ function _priOf(t) {
 
 /**
  * The queue a closed page left: what is not saved yet goes back in line and goes on by itself (only a Pause all the
- * listener chose holds it). The "will try again" list is tried again now: an open is one of its times. Once, with the
+ * listener chose holds it, or the old build's rule for a queue it saved). The "will try again" list is tried again now: an open is one of its times. Once, with the
  * cache read.
  */
 function _restoreQueue() {
@@ -387,7 +387,9 @@ function _restoreQueue() {
   if (!back.length) { _persistQueue(); return; }
   for (const t of _queue) t.seq = ++_seq;   // asked before the cache was read: after what the close left
   _queue = back.concat(_queue);
-  if (saved.paused === true) _paused = true;
+  // A queue the old build saved (no v) was held as 'closed' until Resume (h1104-19), so its paused: false is not a
+  // yes to use data: it waits, paused, unless it is only automatic downloads (Wi-Fi ones), which went on there too.
+  if (saved.paused === true || (saved.v !== 2 && back.some((t) => !t.wifi))) _paused = true;
   const b = saved.batch && typeof saved.batch === 'object' ? saved.batch : {};
   const done = Math.max(0, Number(b.done) || 0);
   const failed = back.filter((t) => t.later).length;

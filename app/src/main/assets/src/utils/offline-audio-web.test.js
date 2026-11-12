@@ -587,6 +587,43 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
     expect(localStorage.getItem('vot.offlineAudioQueue')).toBe(null);
   });
 
+  // FIXA (REVIEW-offline 1): main saved a queue cut off by a close as paused: false and held it as 'closed' until
+  // Resume. The update must not read that as "go": it waits, paused, until the listener starts it. One main saved
+  // as paused stays paused too; a queue of only automatic (Wi-Fi) downloads goes on, as main let it.
+  it('a queue the old build left, or one the listener paused, stays parked until Resume', async () => {
+    const mainQueue = (paused, items) => localStorage.setItem('vot.offlineAudioQueue', JSON.stringify({
+      items, paused, batch: { done: 1, total: 3, failed: 0 },
+    }));
+    const r = (i, wifi) => ({ url: URL_OF('m' + i), key: 'one:m' + i, title: 'Main ' + i, bytes: 5000, ...(wifi ? { wifi: true } : {}) });
+    for (const paused of [false, true]) {
+      WebOfflineAudio._reset(); OfflineAudio._reset(); fetchMock.mockClear();
+      const at = paused ? 10 : 0;
+      mainQueue(paused, [r(at + 1), r(at + 2)]);
+      await ready();
+      await vi.waitFor(() => expect(OfflineAudio.queue()).toHaveLength(2));
+      await new Promise((res) => setTimeout(res, 20));
+      expect(gets(), 'main paused: ' + paused).toEqual([]);
+      expect(OfflineAudio.paused()).toBe(true);
+      expect(OfflineAudio.reason()).toBe('paused');
+      // Still parked after another open: the parked queue is saved in the new shape, paused.
+      WebOfflineAudio._reset(); OfflineAudio._reset();
+      await ready();
+      await vi.waitFor(() => expect(OfflineAudio.queue()).toHaveLength(2));
+      await new Promise((res) => setTimeout(res, 20));
+      expect(gets()).toEqual([]);
+      expect(OfflineAudio.resume()).toBe(true);
+      await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m' + (at + 2)))).toBe(true));
+      localStorage.clear();
+    }
+    // Only automatic downloads (Wi-Fi ones, never the listener's to resume): they go on as they did on main.
+    WebOfflineAudio._reset(); OfflineAudio._reset(); fetchMock.mockClear();
+    mainQueue(false, [r(3, true)]);
+    define(navigator, 'connection', { type: 'wifi', addEventListener() {}, removeEventListener() {} });
+    await ready();
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m3'))).toBe(true));
+    expect(OfflineAudio.paused()).toBe(false);
+  });
+
   // dl-rework D (defects 18, 19): a failure was held in memory, so a restart forgot it and nothing tried it again.
   it('the will-try-again list survives a restart and is tried again at the next open', async () => {
     await ready();
