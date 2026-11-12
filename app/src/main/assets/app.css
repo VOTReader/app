@@ -1244,8 +1244,11 @@
       }
       .vol-index-title {
         font-family: 'Cinzel Decorative', serif; font-size: var(--fs-36);
-        color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2;
+        color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2; text-wrap: balance;
       }
+      /* A long study title steps down (studies pass): 108 characters at this size filled a third of the screen. */
+      .vol-index-title.is-longish { font-size: var(--fs-24); }
+      .vol-index-title.is-long { font-size: var(--fs-20); }
       .vol-index-subtitle {
         font-size: var(--fs-16); color: var(--cream-muted); font-style: italic; margin-bottom: 1.5rem;
       }
@@ -4401,22 +4404,11 @@
       margin-top:0.7rem; font-family:var(--font-body); font-style:italic; font-size:var(--fs-13);
       color:var(--cream-muted); text-align:center;
     }
-    /* ── Part group cards (3-part study hierarchy) ── */
-    /* Visual language matches .chapter-card-btn so Parts mesh with chapters. */
-    .part-group-card { display:flex; align-items:center; gap:0.9rem; width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 1.1rem; transition:border-color 0.18s, background 0.18s; position:relative; }
-    .part-group-card:active { background:var(--bg3); border-color:var(--gold-dim); }
-    .part-group-card.is-expanded { background:var(--gold-faint); border-color:rgba(200,164,86,0.5); }
-    body.light .part-group-card { background:var(--bg2); }
-    body.light .part-group-card.is-expanded { background:var(--gold-faint); }
-    .part-group-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
-    .part-group-card.is-expanded .part-group-num { color:var(--gold); }
-    .part-group-title { font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream); line-height:1.3; }
-    .part-group-subtitle { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
-    .part-group-info { flex:1; min-width:0; }
-    .part-chevron { font-size:var(--fs-20); color:var(--gold-dim); transition:transform 0.2s; flex-shrink:0; margin-left:auto; line-height:1; }
-    .part-chevron.is-open { transform:rotate(90deg); }
-    /* Expanded chapter list: flush-indented, no decorative vertical rule. */
-    .part-chapters { padding:0.5rem 0 0.2rem 0; margin:0.35rem 0 0.15rem 0; display:flex; flex-direction:column; gap:0.5rem; }
+    /* ── A study's parts (studies pass 2026-11-12): rows in the index-row language,
+       the label line and title the rows' own; an open part keeps the current row's gold. ── */
+    .chapter-cards:not(.two-col) .chapter-card-btn.part-row.is-open { background:var(--gold-faint); }
+    .part-row-sub { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-muted); line-height:1.35; margin-top:0.15rem; }
+    .part-row .ui-row-chev { margin-left:auto; color:var(--gold-dim); }
     /* Resume-reading dot — lives IN the top nav (right cluster, left of the
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav

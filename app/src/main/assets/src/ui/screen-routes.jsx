@@ -1937,6 +1937,7 @@ export function buildScreenRoutes({
           currentChapter={chapterIndexCurrentChapter(studyReadKey(study.slug), activeReadKey, lastReadChapters)}
           isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
           readCount={(chId) => Number(readItems[getReadKey(studyReadKey(study.slug), chId)]) || 0}
+          progressKeyFor={(chId) => getReadKey(studyReadKey(study.slug), chId)}
           markAsReadEnabled={settings.markAsRead}
           theme={theme} onThemeChange={setTheme}
           backHint={backHint} onTapThroughBack={tapThroughBack}

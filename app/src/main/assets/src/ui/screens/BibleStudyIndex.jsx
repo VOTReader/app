@@ -2,9 +2,41 @@
    BibleStudyIndex — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    scrollBehavior is a bundle-d global, read at call time rather than
-   imported, as the other Cluster G screens do. */
+   imported, as the other Cluster G screens do.
 
-export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, backHint = null, onTapThroughBack }) {
+   The study's contents in the index-row language Volume One uses (studies
+   pass, 2026-11-12): a part is a flat row like the sections under it, not a
+   boxed card. Its number column stays empty so part titles, the Preface and
+   the section titles share one left edge; a gold label line says "Part 1 ·
+   12 sections"; a chevron (the UI pass's) turns when the part is open. */
+
+import { UiIcon } from '../components/UiIcon.jsx';
+import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
+
+/**
+ * The title's size step: a long study title at Volume One's size filled a
+ * third of the screen (108 characters, five bold lines).
+ * @param {string} title
+ * @returns {string} the extra class for .vol-index-title ('' up to 40 characters)
+ */
+export function studyTitleSizeClass(title) {
+  const n = String(title || '').length;
+  if (n > 70) return ' is-long';
+  if (n > 40) return ' is-longish';
+  return '';
+}
+
+/**
+ * A part row's gold label: "Part 1 · 12 sections", or just "Part 4" for a part of one section.
+ * @param {{ num: any }} part
+ * @param {number} sections
+ * @returns {string}
+ */
+export function partRowLabel(part, sections) {
+  return sections > 1 ? `Part ${part.num} · ${sections} sections` : `Part ${part.num}`;
+}
+
+export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack }) {
   const currentRef = React.useRef(null);
   const [expandedPart, setExpandedPart] = React.useState(null);
 
@@ -28,6 +60,18 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
 
   const resolveChapter = (cid) => (study.chapters || []).find((c) => c.id === cid);
 
+  // "~N min" at the row's end, as Volume One's rows show it (the one shared chip).
+  // Not on a chapter holding prophecy cards: the counter leaves the cards out by
+  // rule (ProphecyCard's reading contract), so Section One, most of it cards,
+  // read "~1 min". No number beats a wrong one.
+  const _wpm = readingChipWpm();
+  const hasCards = (ch) => Array.isArray(ch.blocks) && ch.blocks.some((b) => b && b.type === 'prophecy-group');
+  const minChip = (ch) => hasCards(ch) ? null : readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.id) : null, _wpm);
+
+  const readTick = (ch) => (markAsReadEnabled && ch && isRead(ch.id))
+    ? <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>
+    : null;
+
   const renderChapterCard = (ch) => {
     if (!ch) return null;
     const isCurrent = ch.id === currentChapter;
@@ -47,10 +91,20 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
             : <div className="chapter-card-title untitled">Part {ch.num}</div>
           }
         </div>
-        {markAsReadEnabled && isRead(ch.id) && <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
+        {minChip(ch)}
+        {readTick(ch)}
       </button>
     );
   };
+
+  /** The text column of a part row: label line, title, subtitle. */
+  const partInfo = (part, sections) => (
+    <div className="chapter-card-info">
+      <div className="chapter-card-label">{partRowLabel(part, sections)}</div>
+      <div className="chapter-card-title">{part.title}</div>
+      {part.subtitle && <div className="part-row-sub">{part.subtitle}</div>}
+    </div>
+  );
 
   const navBar = LibraryNav({
     onBack, backLabel: 'Studies',
@@ -73,7 +127,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
       <div className="vol-index">
         <div className="vol-index-header">
           <div className="vol-index-eyebrow">Bible/Letter Study</div>
-          <h1 className="vol-index-title">{study.title}</h1>
+          <h1 className={'vol-index-title' + studyTitleSizeClass(study.title)}>{study.title}</h1>
           {study.subtitle && <div className="vol-index-subtitle">{study.subtitle}</div>}
           <div className="vol-index-ornament">
             <div className="vol-index-ornament-line" />
@@ -99,40 +153,32 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
                     <button
                       key={part.num}
                       ref={isCurrent ? currentRef : null}
-                      className={`part-group-card${isCurrent ? " is-expanded" : ""}`}
+                      className={`chapter-card-btn part-row${isCurrent ? " is-current" : ""}`}
                       aria-current={isCurrent ? 'true' : undefined}
                       onClick={() => ch && onSelect(ch.id)}
                     >
-                      <div className="part-group-info">
-                        <div className="part-group-num">Part {part.num}</div>
-                        <div className="part-group-title">{part.title}</div>
-                        {part.subtitle && <div className="part-group-subtitle">{part.subtitle}</div>}
-                      </div>
-                      {markAsReadEnabled && ch && isRead(ch.id) && <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
+                      <span className="chapter-card-num" />
+                      {partInfo(part, sectionCount)}
+                      {ch && minChip(ch)}
+                      {readTick(ch)}
                     </button>
                   );
                 }
 
-                /* Multi-section part: accordion expand */
+                /* Multi-section part: accordion; its sections follow it as plain rows */
+                const holdsCurrent = !!currentChapter && part.chapterIds.includes(currentChapter);
                 return (
                   <React.Fragment key={part.num}>
                     <button
-                      className={`part-group-card${isOpen ? " is-expanded" : ""}`}
+                      className={`chapter-card-btn part-row${isOpen || holdsCurrent ? " is-open" : ""}`}
                       onClick={() => setExpandedPart(isOpen ? null : part.num)}
                       aria-expanded={isOpen}
                     >
-                      <div className="part-group-info">
-                        <div className="part-group-num">Part {part.num}</div>
-                        <div className="part-group-title">{part.title}</div>
-                        {part.subtitle && <div className="part-group-subtitle">{part.subtitle}</div>}
-                      </div>
-                      <span className={`part-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true">{"›"}</span>
+                      <span className="chapter-card-num" />
+                      {partInfo(part, sectionCount)}
+                      <UiIcon name="chev" className="ui-row-chev" />
                     </button>
-                    {isOpen && (
-                      <div className="part-chapters">
-                        {partChapters.map((ch) => renderChapterCard(ch))}
-                      </div>
-                    )}
+                    {isOpen && partChapters.map((ch) => renderChapterCard(ch))}
                   </React.Fragment>
                 );
               })}

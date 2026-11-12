@@ -694,7 +694,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
     '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
-    '.part-group-num', '.idx-note-chip',
+    '.idx-note-chip',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   const blocksOf = (sel) => {
