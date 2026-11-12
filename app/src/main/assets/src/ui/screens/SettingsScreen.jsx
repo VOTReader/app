@@ -1189,7 +1189,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               find="version edition restored name yahushua"
               value={settings.translation || "nkjv"}
               valueLabel={editionShownLabel(settings.translation || "nkjv")}
-              options={TRANSLATION_OPTIONS}
+              options={TRANSLATION_OPTIONS.map((/** @type {any} */ o) => ({ ...o, desc: String(o.desc || '').replace(/\s—\s/g, ', ') }))}
               onChange={(v) => onSetting("translation", v)}
             />
             <OfflineEditionsRow translation={settings.translation || "nkjv"} />

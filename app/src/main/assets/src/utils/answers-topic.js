@@ -182,17 +182,22 @@ export function answersTocRows(entry, meta) {
     if (fd) sub = fds ? pl(fds, 'false doctrine') : '';
     else if (ex.length) sub = pl(ex.length, 'passage');
     else {
-      const med = pageMedia(meta).filter((m) => m.at !== 'end' && m.at >= s.at && m.at < end);
-      if (med.length) sub = mediaWords(med).join(SEP);
-      else {
-        let links = 0;
-        for (const [p, arr] of Object.entries((meta && meta.links) || {})) {
-          if (+p >= s.at && +p < end) links += /** @type {any[]} */ (arr).filter((l) => l.kind !== 'contents').length;
-        }
-        if (links) sub = pl(links, 'link');
+      // FINAL2 (a-onpage): the last section also holds the page's end media (the playlist the page closes on)
+      const last = k === all.length - 1;
+      const med = pageMedia(meta).filter((m) => (m.at === 'end' ? last : m.at >= s.at && m.at < end));
+      let links = 0, studies = 0;
+      for (const [p, arr] of Object.entries((meta && meta.links) || {})) {
+        if (+p < s.at || +p >= end) continue;
+        for (const l of /** @type {any[]} */ (arr)) { if (l.kind === 'study') studies++; else if (l.kind !== 'contents') links++; }
       }
+      const parts = [];
+      if (studies) parts.push(studies === 1 ? '1' + NBSP + 'study' : studies + NBSP + 'studies');
+      if (links && !med.length) parts.push(pl(links, 'link'));
+      sub = parts.concat(mediaWords(med)).join(SEP);
     }
-    return { ...s, end, num: nums.get(s.at) || '', sub, ex, trumpet: isTrumpetSection(s) };
+    // the mock's "See also": the closing study section, a list of where to go next, not a reading section
+    const seeAlso = !fd && !ex.length && k === all.length - 1 && /^(Extensive )?Bible\/Letter Study$/.test(String(s.title || ''));
+    return { ...s, ...(seeAlso ? { title: 'See also' } : {}), end, num: nums.get(s.at) || '', sub, ex, trumpet: isTrumpetSection(s) };
   });
 }
 
