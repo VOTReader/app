@@ -554,10 +554,39 @@ function recutStart(run, now) {
   return isReadingDay({ ...run, paused: undefined }, t) ? t : nthReadingDay(run, t, 0);
 }
 
-/** Catch me up: keep the daily amount, move the planned finish to the projected one. */
+/** Catch me up: keep the daily amount, move the planned finish to the projected one (a finish-by date moves with it,
+    FIXB: left at the old date, a later re-cut to it crammed everything left into one day). */
 export function catchUp(run, now) {
   const st = runStatus(run, now);
-  return { ...run, target: st.projected, updated: now.getTime() };
+  const pace = run.pace && run.pace.mode === 'by' ? { ...run.pace, date: st.projected } : run.pace;
+  return { ...run, ...(pace ? { pace } : {}), target: st.projected, updated: now.getTime() };
+}
+
+/** The first date a change of pace can re-cut from ('YYYY-MM-DD'): the earliest "Finish by" the plan can take. */
+export function firstRecutDate(run, now) {
+  return dateOf(recutStart(run, now));
+}
+
+/**
+ * The pace a finished run runs again with: a "Finish by" date is behind it now, so it runs again over as many days
+ * as it had (FIXB: the old date gave the new run one day holding every item).
+ * @param {PlanRun} run @returns {PlanPace | undefined}
+ */
+export function againPace(run) {
+  return run.pace && run.pace.mode === 'by' ? { mode: 'days', n: Math.max(1, totalDays(run)) } : run.pace;
+}
+
+/**
+ * The reading days a whole-plan length of `n` days leaves for what is still to read: n less the days already read
+ * ("90 days" means 90), but never more each day than twice that length's own daily amount (FIXB: a plan already at
+ * or past the length put everything left into one day).
+ * @param {PlanRun} run @param {number} n @param {number} day the first day not read @param {PlanItem[]} left
+ */
+function lengthDays(run, n, day, left) {
+  const all = run.tracks.flatMap((t) => t.items);
+  const total = itemsWords(all), rest = itemsWords(left);
+  const share = total > 0 ? rest / total : (all.length ? left.length / all.length : 0);
+  return Math.max(1, n - day, Math.ceil(n * share / 2));
 }
 
 /** Spread it out: keep the planned finish, share what is left over the reading days until it. */
@@ -578,7 +607,8 @@ export function spreadPreview(run, now) {
 
 /**
  * A new pace or length for what is left; the target follows. A length in days is the whole plan's ("90 days" means
- * 90: the days already read count toward it, plans2), never less than one day still to go.
+ * 90: the days already read count toward it, plans2), never more each day than twice that length's daily amount.
+ * A "Finish by" date before the first day it can re-cut from changes nothing.
  * @param {PlanRun} run @param {PlanPace} pace @param {Date} now @param {number} [keepDays] re-cut over exactly this many days
  */
 export function changePace(run, pace, now, keepDays) {
@@ -587,8 +617,13 @@ export function changePace(run, pace, now, keepDays) {
   const startN = recutStart(run, now);
   const left = [];
   for (let d = st.day; d < st.total; d++) left.push(...dayItems(run, d));
+  if (keepDays == null && pace.mode === 'by') {
+    // FIXB: a finish-by date before the first day it can re-cut from has no days to share; nothing changes.
+    const end = dayNum(pace.date || '');
+    if (end == null || end < startN) return run;
+  }
   const days = keepDays != null ? Math.max(1, keepDays)
-    : pace.mode === 'days' ? Math.max(1, Math.floor(Number(pace.n) || 1) - st.day) : daysForPace(run, pace, startN, left);
+    : pace.mode === 'days' ? lengthDays(run, Math.max(1, Math.floor(Number(pace.n) || 1)), st.day, left) : daysForPace(run, pace, startN, left);
   const next = recut({ ...run, pace }, days, now);
   return { ...next, target: dateOf(nthReadingDay(next, startN, days - 1)) };
 }
@@ -597,7 +632,10 @@ export function changePace(run, pace, now, keepDays) {
 export function changeWeekdays(run, weekdays, now) {
   const next = { ...run, weekdays: weekdays.map(Boolean), updated: now.getTime() };
   if (!run.pace) return next;
-  return run.pace.mode === 'by' ? changePace(next, run.pace, now) : changePace(next, run.pace, now, totalDays(run) - runStatus(run, now).day);
+  // FIXB: a finish-by date already behind the re-cut start keeps the days left instead (it gave one day).
+  const byEnd = run.pace.mode === 'by' ? dayNum(run.pace.date || '') : null;
+  return byEnd != null && byEnd >= recutStart(next, now) ? changePace(next, run.pace, now)
+    : changePace(next, run.pace, now, totalDays(run) - runStatus(run, now).day);
 }
 
 /**

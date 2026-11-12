@@ -16,7 +16,7 @@
 import { usePlanNav, planNavMounted, keepPlanNav, pushPlanView, replacePlanView, popPlanView, planNavToList } from '../../utils/plan-nav.js';
 import { endPlanSession } from '../../utils/plan-session.js';
 import { usePlanRuns, saveRun, shortDate } from '../../utils/plan-runs-view.js';
-import { runStatus, newRun, dayNum, itemKinds } from '../../data/plan-engine.js';
+import { runStatus, newRun, dayNum, itemKinds, againPace } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBarTitle, GEAR, countOf } from '../components/PlanBits.jsx';
@@ -145,7 +145,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   } else if ((v.v === 'plan' || v.v === 'finished') && run && (run.status === 'finished' || runStatus(run, now).finished)) {
     title = runName(run, null);
     body = <PlanFinished run={run} onFind={() => { planNavToList(); setFindFocus((n) => n + 1); }}
-      onAgain={() => { const r = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: run.pace, weekdays: run.weekdays }, new Date()); saveRun(r); replacePlanView({ v: 'plan', id: r.id }); }}
+      onAgain={() => { const r = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: againPace(run), weekdays: run.weekdays }, new Date()); saveRun(r); replacePlanView({ v: 'plan', id: r.id }); }}
       onDone={back} />;
   } else if (v.v === 'plan' && run) {
     title = runName(run, null);
