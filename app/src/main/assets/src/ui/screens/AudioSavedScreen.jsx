@@ -107,6 +107,22 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
   };
 
   const utility = { title: 'Saved', onBack, backLabel };
+  // Songs are starred but their list (the song catalog) is not in yet: that is not "Nothing saved yet".
+  const songIds = library && typeof library.songSaved === 'function' ? library.songSaved().length : 0;
+  if (!total && songIds && cat && !cat.loaded) {
+    return (
+      <ScreenLayout utility={utility}>
+        <div className="root-screen listen-saved">
+          {cat.error ? (
+            <EmptyState icon="star" title="Your saved songs need a signal"
+              text={(songIds === 1 ? '1 song is saved.' : songIds + ' songs are saved.') + ' The list loads when this phone is online.'} />
+          ) : (
+            <EmptyState icon="star" title="Loading your saved songs" text="They will be here in a moment." />
+          )}
+        </div>
+      </ScreenLayout>
+    );
+  }
   if (!total) {
     return (
       <ScreenLayout utility={utility}>

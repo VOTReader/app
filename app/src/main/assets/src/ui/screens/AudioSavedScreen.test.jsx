@@ -145,6 +145,24 @@ describe('AudioSavedScreen (listen.html au-saved, au-saved0)', () => {
     expect(onOpenVolumes).toHaveBeenCalled();
   });
 
+  // PL-LISTEN (REVIEW-listen 8): only songs saved and the song list not in yet read "Nothing saved yet".
+  it('only songs saved, their list not loaded yet: says so, never "Nothing saved yet"', () => {
+    installGlobals({ saved: [] });
+    globalThis.AudioLibraryStore.songSaved = () => ['s1', 's2'];
+    globalThis.SongCatalog = { loaded: false, error: false, subscribe: () => () => {}, getVersion: () => 0, load: vi.fn(), songById: () => null };
+    try {
+      const first = renderScreen();
+      expect(screen.queryByText('Nothing saved yet')).toBeNull();
+      expect(screen.getByText('Loading your saved songs')).toBeTruthy();
+      first.unmount();
+      globalThis.SongCatalog.error = true;   // no signal, and no copy kept
+      renderScreen();
+      expect(screen.queryByText('Nothing saved yet')).toBeNull();
+      expect(screen.getByText('Your saved songs need a signal')).toBeTruthy();
+      expect(screen.getByText(/2 songs are saved/)).toBeTruthy();
+    } finally { delete globalThis.SongCatalog; }
+  });
+
   it('a saved song sits in the same list, with its own play and star', () => {
     globalThis.SongCatalog = {
       loaded: true, subscribe: () => () => {}, getVersion: () => 0, load: vi.fn(),

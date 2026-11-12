@@ -121,6 +121,13 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     expect(onOpenSaved).toHaveBeenCalledTimes(1);
   });
 
+  // PL-LISTEN (REVIEW-listen 7): the row says "Recordings and songs you starred" and counted recordings only.
+  it('the Saved row counts starred songs too', () => {
+    globalThis.AudioLibraryStore.songSaved = () => ['s1', 's2', 's3'];
+    renderScreen();
+    expect(screen.getByRole('button', { name: /^Saved/ }).querySelector('.root-row-count').textContent).toBe('4');
+  });
+
   it('with nothing played yet there is no Continue card and no Recently played', () => {
     installGlobals({ recent: [] });
     renderScreen();

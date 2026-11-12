@@ -238,6 +238,8 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
   const queue = Array.isArray(state.queue) ? state.queue : [];
   const current = queue[state.qi] || null;
   const saved = library && typeof library.saved === 'function' ? library.saved() : [];
+  // The Saved shelf holds starred songs too (its row says so): they count.
+  const savedSongs = library && typeof library.songSaved === 'function' ? library.songSaved().length : 0;
   const recent = library && typeof library.recent === 'function' ? library.recent() : [];
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];
   // Every edition the registry OFFERS — one whose assets are not on the release is a row that opens onto 404s.
@@ -328,7 +330,7 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
             <ListRow icon={DOWNLOAD_ICON} title="Downloads" className="listen-downloads" onClick={() => { if (onOpenOffline) onOpenOffline(); }}
               sub={downloadsLine(offline, queueLine, busy, downloads)} />
           ) : null}
-          <ListRow icon={SAVED_ICON} title="Saved" count={saved.length} onClick={() => onOpenSaved()}
+          <ListRow icon={SAVED_ICON} title="Saved" count={saved.length + savedSongs} onClick={() => onOpenSaved()}
             sub="Recordings and songs you starred" />
           {onSetLetterReader ? (
             <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)}
