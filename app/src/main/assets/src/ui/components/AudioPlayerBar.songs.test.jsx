@@ -295,8 +295,8 @@ describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
     expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('Come, love awaits you');
     at(16);
     expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');
-    fireEvent.click(within(desk).getByRole('button', { name: 'Follow along' }));
-    expect(within(desk).getByRole('button', { name: 'Follow along' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(within(desk).getByRole('button', { name: 'Follows the song' }));
+    expect(within(desk).getByRole('button', { name: 'Follow the song' }).getAttribute('aria-pressed')).toBe('false');
     expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
 
@@ -403,7 +403,7 @@ describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
     expect(await within(desk).findByText('Plain words one')).toBeTruthy();
     at(11);
     expect(desk.querySelector('.song-lyrics-line.is-now')).toBeNull();
-    expect(within(desk).queryByRole('button', { name: 'Follow along' })).toBeNull();
+    expect(within(desk).queryByRole('button', { name: /^Follows? the song$/ })).toBeNull();
   });
 
   it('no lyrics hides the card; an instrumental says Instrumental', () => {

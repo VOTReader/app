@@ -114,7 +114,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
       {letter || instrumental || lines.length ? (
         <ListGroup ariaLabel="About this song" className="song-page-about">
           {letter ? (
-            <ListRow icon="book" title={letter.title || 'Open the letter'} meta={leadVerbatim ? 'From the letter' : 'Inspired by the letter'} onClick={openLetter} />
+            <ListRow icon="book" over={leadVerbatim ? 'From the letter' : 'Inspired by the letter'} title={letter.title || 'Open the letter'} onClick={openLetter} />
           ) : null}
           {instrumental ? <ListRow icon="quote" title="Lyrics" meta="Instrumental" /> : lines.length ? (
             <ListRow icon="quote" title="Lyrics" meta={songLyricsFoot(wordsVerbatim, letter)}

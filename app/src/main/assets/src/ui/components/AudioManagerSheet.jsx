@@ -442,7 +442,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
                 </>
               )}
               {lyrics ? <SongLyricsCard song={song} time={state.time} /> : null}
-              {song ? <SongVoteAsk song={song} title={current.title} /> : null}
+              {/* the lyrics view asks nothing more (au-lyrics): the song page and the song menu ask */}
+              {song && !lyrics ? <SongVoteAsk song={song} title={current.title} /> : null}
             </>
           ) : (
             <>

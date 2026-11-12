@@ -162,7 +162,7 @@ describe('a study in the recordings screen', () => {
     const onOpenText = vi.fn();
     render(<AudioCollectionScreen volKey="study:lamb-of-god" onBack={noop} onOpenText={onOpenText} {...common} />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('YahuShua The Messiah, The Lamb of God');
-    expect(document.querySelector('.listen-sum').textContent).toBe('2 recordings');
+    expect(document.querySelector('.listen-sum').textContent).toBe('Bible/Letter Study · 2 chapters');
     // Codex critique 4: the count names what a listener will skip, and each name opens its text.
     const skip = document.querySelector('.audio-collection-text-only');
     expect(skip.textContent).toBe('Text only: Preface');

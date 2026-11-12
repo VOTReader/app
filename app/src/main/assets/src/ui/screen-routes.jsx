@@ -624,7 +624,9 @@ export function buildScreenRoutes({
   // Back still returns to the shelf it came from (backActive, the History arm's rule). Songs and other pages keep theirs.
   const _openAudioText = (track, sourceScreen) => {
     const fromTitle = _audioTextFrom(sourceScreen);
-    const silent = sourceScreen !== SONGS_SCREEN && typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0;
+    // Home too (listen.html / readers.html r-listen): the bar's own back and Home already go there, so no pill.
+    const silent = sourceScreen === 'home'
+      || (sourceScreen !== SONGS_SCREEN && typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0);
     const linkMeta = silent ? { sourceLetterTitle: fromTitle, silent: true } : { sourceLetterTitle: fromTitle };
     // textKeyOf (AudioShelf): the track's own key, or for a WTLB compilation the
     // letter under the clock — the same rule hasTextDestination gates the tap on.

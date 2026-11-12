@@ -77,7 +77,7 @@ export function SongLyricsCard({ song, time }) {
       <div className="song-lyrics-head">
         <span>Lyrics</span>
         {synced ? (
-          <button type="button" className={'song-lyrics-follow' + (follow ? ' is-on' : '')} aria-pressed={follow} onClick={() => setFollow(!follow)}>Follow along</button>
+          <button type="button" className={'song-lyrics-follow' + (follow ? ' is-on' : '')} aria-pressed={follow} onClick={() => setFollow(!follow)}>{follow ? 'Follows the song' : 'Follow the song'}</button>
         ) : null}
       </div>
       <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} role="region" aria-label="Lyrics"
