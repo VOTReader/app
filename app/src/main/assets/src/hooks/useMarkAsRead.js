@@ -165,6 +165,10 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   // value without recreating the function each render.
   const enabledRef = useRefMirror(markAsReadEnabled);
 
+  // Keys whose FIRST mark was a claim with no measurement (a plan session reaching the end panel, a manual mark),
+  // made in this run of the app. The read detector's completion for such a key measures that same first read: it
+  // must not count a second time through (C4: a first read inside a plan session showed "Read 2 times").
+  const claimedRef = React.useRef(/** @type {Set<string>} */ (new Set()));
   const VERSION_ID = 'v1';
   const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
   const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
@@ -189,7 +193,8 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     // real data); a manual toggle only sets the first mark — tapping
     // "mark read" twice is a UI bounce, not a second read-through.
     if (payload) {
-      setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+      const sameRead = !!prev && claimedRef.current.delete(key);
+      if (!sameRead) setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
       // The stats ledger records only DETECTOR-verified completions —
       // payload carries the measured words + visibility-honest time.
       // Manual toggles are a claim, not a measurement, and skip it.
@@ -199,7 +204,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
             key,
             words: payload.words,
             activeMs: payload.activeMs,
-            wasReadBefore: !!prev,
+            wasReadBefore: !!prev && !sameRead,
           });
         } catch (e) { console.warn('reading-stats record failed', e); }
       }
@@ -214,6 +219,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
         catch (e) { console.warn('reading-streak record failed', e); }
       }
     } else if (!prev) {
+      claimedRef.current.add(key);
       setReadItems((p) => ({ ...p, [key]: 1 }));
       // A manual "read" claim supersedes any partial-read resume marker.
       // Without this, the index could show both a check and "60% left".
@@ -241,6 +247,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   // construction (BIBLE_AUDIO_BOOKS is generated from books.js).
   React.useEffect(() => {
     const credit = (key) => {
+      claimedRef.current.delete(key);
       setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
       // A full listen finishes the item, so a partial-read frontier left from an
       // earlier visit is stale: without this the index and History kept
@@ -285,6 +292,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
 
   const unmarkRead = (bid, cid) => {
     const key = getReadKey(bid, cid);
+    claimedRef.current.delete(key);
     setReadItems((prev) => { const next = { ...prev }; delete next[key]; return next; });
     // Symmetric with markRead's manual claim, which clears the frontier:
     // "I haven't read this" must not leave a stale partial-read record
