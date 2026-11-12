@@ -351,6 +351,9 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(s.cancelAll).toHaveBeenCalledTimes(1);
     fireEvent.click(getByRole('button', { name: 'Retry Letter c' }));
     expect(s.download).toHaveBeenCalledWith(failed, { priority: 'tap' });
+    // PL-LISTEN (REVIEW-listen 4): one that will never download can be dropped by itself, not only by Cancel all.
+    fireEvent.click(getByRole('button', { name: 'Take Letter c off the list' }));
+    expect(s.cancel).toHaveBeenCalledWith([U('c')]);
   });
 
   // dl-rework A (defect 2): every reading of a letter merged into one row with no reader, and × removed them all.
