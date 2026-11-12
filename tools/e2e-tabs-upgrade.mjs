@@ -9,7 +9,8 @@
  * This walk seeds that phone: open tabs of every page kind (letter, Bible chapter, Matthew chapter, study, Words To
  * Live By, an Answers topic, Hidden Manna, Home, History, Library, Settings) with the old build's JPEG rows in the
  * picture store, then opens the Tabs screen and checks:
- *   U1  no card draws an <img> or a CSS filter, in either theme;
+ *   U1  no card draws an <img> or a CSS filter of its own, in either theme (the page copy's own images and
+ *       filters are the page);
  *   U2  every tab whose page can be drawn off screen gets its true picture by itself (no visit), within a time limit;
  *       the rest wait on the page-coloured placeholder;
  *   U3  the old rows are gone from the picture store, and nothing else was written over;
@@ -235,7 +236,9 @@ export async function runUpgrade(o = {}) {
   const cards = () => page.evaluate(() => [...document.querySelectorAll('.tabs-overview .tab-card:not(.tab-card-new)')].map((c) => {
     const wrap = c.querySelector('.tab-card-thumb-wrap');
     let filter = null;
-    for (const el of [wrap, ...wrap.querySelectorAll('*')]) { const f = getComputedStyle(el).filter; if (f && f !== 'none') { filter = f; break; } }
+    // a filter of the card's own (an old picture drawn through one); a page's own filter inside its copy is the page
+    // (a study's white title plate is drawn light-on-dark through invert(1) in a dark theme), as its images are below
+    for (const el of [wrap, ...wrap.querySelectorAll('*')]) { if (el.parentElement && el.parentElement.closest('.tab-snap-page')) continue; const f = getComputedStyle(el).filter; if (f && f !== 'none') { filter = f; break; } }
     // an old picture is an <img> of the card's own (a page's own images inside its copy are the page)
     const img = [...wrap.querySelectorAll('img')].find((x) => !x.closest('.tab-snap-page')) || null;
     const pg = wrap.querySelector('.tab-snap-page');
