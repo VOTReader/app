@@ -5996,7 +5996,10 @@
     .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
     /* ── W2e readers (mock v2 r-bm): the bookmark sheet. A grab, the title, where it is, the name field on
        surface-2 with a clear, one line on where it is kept, then Cancel | Save at the foot. ── */
-    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6)); }
+    /* FIXC: no --inset-bottom here. Every form sheet sits in an overlay that already pads its foot by
+       max(--keyboard-height, --inset-bottom), and the APK writes the keyboard into --inset-bottom: added again here,
+       a keyboard's height of blank surface pushed Save and Cancel below the visible part. */
+    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) var(--sp-6); }
     .rd-form-sheet .ui-sheet-head { margin: 0 2px 10px; }
     .rd-field { background: var(--surface-2); cursor: text; }
     .rd-field-clear { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin-right: -12px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
