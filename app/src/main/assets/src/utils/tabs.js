@@ -172,7 +172,7 @@ export function describeTab(tab) {
   if (s === 'about') return { title: 'About', subtitle: 'VOTReader', resolved: true };
 
   // Default → Home
-  return { title: 'Home', subtitle: 'VOTReader', resolved: true };
+  return { title: 'Home', subtitle: 'Read', resolved: true };
 }
 
 /**

@@ -822,10 +822,12 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   function renderRecordingWave(samples) {
     var bars = [];
     var count = 48;
-    var src = samples && samples.length ? samples : [];
+    // mock l-jrec: what is recorded fills from the left, one bar a sample (the newest 48), and grey dots stand
+    // for the slots still to come
+    var src = samples && samples.length ? samples.slice(-count) : [];
     for (var i = 0; i < count; i++) {
-      var v = src.length ? src[Math.min(src.length - 1, Math.floor(i * src.length / count))] : 0.05;
-      var h = Math.max(4, Math.min(56, Math.round(v * 56)));
+      if (i >= src.length) { bars.push(<div key={i} className="bar is-rest" />); continue; }
+      var h = Math.max(4, Math.min(56, Math.round(src[i] * 56)));
       bars.push(<div key={i} className="bar" style={{ height: h + 'px' }} />);
     }
     return <div className="jrn-rec-waveform">{bars}</div>;

@@ -36,7 +36,7 @@ export function JournalCardMenu(props) {
     ? JournalStore.associatedDataSummary(entry.id) : null;
   var st = DELETE_STEPS[step];
   return step === 0 ? (
-    <ActionSheet id="journal-card-menu" open onClose={close} title={title} sub={when} actions={actions} portal className="jrn-entry-sheet" />
+    <ActionSheet id="journal-card-menu" open onClose={close} title={title} sub={when} actions={actions} portal className="jrn-entry-sheet ui-row-sheet" />
   ) : (
     <ActionSheet id="journal-card-menu" open onClose={close} title="Delete this entry?" portal className="jrn-del-sheet"
       confirm={{ label: st.go, danger: true, onConfirm: function() {

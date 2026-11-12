@@ -72,7 +72,7 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onRename, onD
   var words = bookmarkWords(bkm, source);
   var thought = bkm.thought && String(bkm.thought).trim();
   return (
-    <ActionSheet open={!!bkm} onClose={onClose} title={words.name} sub={words.where || undefined} portal
+    <ActionSheet open={!!bkm} onClose={onClose} title={words.name} sub={words.where || undefined} portal className="ui-row-sheet"
       actions={[
         { id: 'open', icon: 'book', label: 'Open', onSelect: function() { onNavigate(bkm); } },
         { id: 'rename', icon: 'pen', label: 'Rename', onSelect: function() { onRename(bkm); } },

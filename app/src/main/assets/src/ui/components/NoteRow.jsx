@@ -88,7 +88,7 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId, menu = null
                 {/* [11] the chip's folder icon carries the notebook's color
                     tag; no color set = the default (inherited gold). */}
                 <svg className="note-row-nb-icon" viewBox="0 0 24 24" aria-hidden="true"
-                  style={nb.color ? { color: 'var(--hl-' + nb.color + ')' } : undefined}>
+                  style={nb.color ? { color: 'var(--nb-' + nb.color + ', var(--hl-' + nb.color + '))' } : undefined}>
                   <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
                   <polyline points="15 4 15 9 20 9" />
                 </svg>

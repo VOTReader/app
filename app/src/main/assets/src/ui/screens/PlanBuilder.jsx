@@ -18,13 +18,12 @@ import { BIBLE_BOOKS } from '../../data/reading-plans.js';
 import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
 import { LETTER_CHAIN, bookTitle } from '../../data/plan-catalog.js';
 import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel } from '../../data/plan-engine.js';
-import { PlanSec, dayDate, minText } from '../components/PlanBits.jsx';
+import { PlanSec, PlanDays, dayDate, minText } from '../components/PlanBits.jsx';
 import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
 
 const ALL_WEEK = [true, true, true, true, true, true, true];
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** @param {{ state: boolean | 'mixed' }} props */
 function Box({ state }) {
@@ -313,12 +312,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
       </section>
       <section className="build-card" aria-label="Which days">
         <h2 className="build-card-title">Which days</h2>
-        <div className="build-days">
-          {DAY_NAMES.map((d, i) => (
-            <button key={d} type="button" aria-pressed={weekdays[i]} disabled={weekdays[i] && weekdays.filter(Boolean).length === 1}
-              onClick={() => setWeekdays(weekdays.map((v, j) => (j === i ? !v : v)))}>{d}</button>
-          ))}
-        </div>
+        <PlanDays value={weekdays} onChange={setWeekdays} />
       </section>
       <section className="build-card" role="radiogroup" aria-label="Order">
         <h2 className="build-card-title">Order</h2>
