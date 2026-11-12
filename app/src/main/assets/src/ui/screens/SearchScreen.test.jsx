@@ -1710,13 +1710,14 @@ describe('SearchScreen (search200 UX, track B)', () => {
 
   /* B2 (polish): the no-results screen was one grey line. It offers a way on: a tip, and the same Recent and
      Quick picks rows the empty screen has. */
-  it('B2: no results offers a tip and the Recent and Quick picks rows', async () => {
+  // FA2 (v2 s-none): nothing found offers the tip and a short list of picks; Recent stays on the empty screen
+  it('B2: no results offers a tip and the Quick picks rows, not Recent', async () => {
     const onQueryChange = vi.fn();
     /** @type {any} */ (window).getRecentSearches = () => ['mercy seat'];
     searchReturns({ results: [] });
     await typeIn({ ...baseProps(), onQueryChange }, 'zzqqxx nothing');
     expect(document.querySelector('.srch-no-results-tip').textContent).toMatch(/spelling/);
-    expect(screen.getByRole('button', { name: 'mercy seat' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'mercy seat' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Beatitudes' }));
     expect(onQueryChange).toHaveBeenCalledWith('beatitudes');
   });

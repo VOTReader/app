@@ -59,9 +59,11 @@ const px = (v) => { const m = /^(\d+(?:\.\d+)?)px$/.exec(String(v || '')); retur
 
 describe('the search box at large Text Size', () => {
   it('holds the box side padding to phone px', () => {
+    // FA2: the magnifier (left) and the clear (right) lie over the field's ends, so its padding is their room and
+    // no more: 14 + 18 + 10 at the left, the 48 px clear at the right
     const d = decls('.vot-large-text .search-input');
-    expect(px(d['padding-left'])).toBeLessThanOrEqual(12);
-    expect(px(d['padding-right'])).toBeLessThanOrEqual(12);
+    expect(px(d['padding-left'])).toBeLessThanOrEqual(42);
+    expect(px(d['padding-right'])).toBeLessThanOrEqual(48);
   });
   it('caps the box words at 36 px, never above the reader size', () => {
     expect(decls('.vot-large-text .search-input')['font-size']).toBe('min(var(--fs-16), 36px)');
@@ -73,8 +75,8 @@ describe('the search box at large Text Size', () => {
     expect(c['font-size']).toBe('min(var(--fs-20), 28px)');
   });
   it('leaves the box alone below large text', () => {
-    // WA3: the box is a pill; the field inside it pads 4px / 10px at its sides, at the control size
-    expect(decls('.search-input').padding).toBe('0 4px 0 10px');
+    // WA3: the box is a pill; FA2: the field is the whole pill, the magnifier and the clear over its ends (42 / 48)
+    expect(decls('.search-input').padding).toBe('0 48px 0 42px');
     expect(decls('.search-input')['font-size']).toBe('var(--ts-control)');
   });
 });

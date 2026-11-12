@@ -4345,14 +4345,16 @@
     .srch-loose-label, .srch-loose-more { border-top:2px solid var(--gold-border); margin-top:0.3rem; }
     /* ── WA3 search (v2 search.html, sheets v2-search-1..3): the box a pill, the tabs a segmented control, rows and
        cards on the surfaces, labels in sentence case but the 12px section label. Tokens carry the light theme. ── */
-    .srch-input-row { display:flex; align-items:center; flex:1; min-width:0; height:44px; margin-right:var(--gutter); background:var(--surface-1); border:1px solid transparent; border-radius:var(--r-pill); }
+    .srch-input-row { display:flex; align-items:center; flex:1; min-width:0; height:44px; margin-right:var(--gutter); position:relative; background:var(--surface-1); border:1px solid transparent; border-radius:var(--r-pill); }
     .srch-input-row:focus-within { border-color:var(--accent); }
     .srch-input-row:has(.search-input:focus-visible) { border-color:transparent; }
-    .srch-field-ic { display:inline-flex; flex:none; margin-left:14px; color:var(--text-2); }
-    .search-input { flex:1; min-width:0; height:100%; padding:0 4px 0 10px; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
+    /* FA2 (a-query, s-slash): the field is the whole pill, the magnifier and the clear laid over its ends, so the field's
+       own focus ring goes round all three as the mock draws it (the ring stays the input's, search200 audit 201) */
+    .srch-field-ic { position:absolute; z-index:1; left:14px; top:50%; transform:translateY(-50%); display:inline-flex; color:var(--text-2); pointer-events:none; }
+    .search-input { flex:1; min-width:0; height:100%; padding:0 48px 0 42px; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
     .search-input:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; border-radius:var(--r-pill); }
     .search-input::placeholder { color:var(--text-2); }
-    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; margin:-2px 0; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
+    .srch-clear-btn { display:inline-flex; align-items:center; justify-content:center; flex:none; position:absolute; z-index:1; right:0; top:50%; transform:translateY(-50%); width:48px; height:48px; margin:0; padding:0; background:none; border:0; color:var(--text-2); cursor:pointer; }
     .srch-corpus-row { display:flex; margin:2px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-field); }
     .srch-corpus-btn { flex:1; min-height:var(--tap); border:4px solid transparent; background:none; background-clip:padding-box; border-radius:var(--r-field); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-control); cursor:pointer; }
     .srch-corpus-btn.active { background-color:var(--surface-3); color:var(--text-1); }
@@ -4383,14 +4385,14 @@
     .srch-row-ic { flex:none; display:inline-flex; align-items:center; justify-content:center; width:var(--icon-chip); height:var(--icon-chip); border-radius:var(--r-chip); background:var(--surface-2); color:var(--accent); }
     .srch-row-t, .srch-suggest-label, .srch-songs-row-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-row-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:var(--fw-name); }
+    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; }
     .srch-row-m { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:var(--ts-meta); }
     .srch-row > svg:last-child, .srch-songs-row > svg:last-child { flex:none; color:var(--text-3); }
     .srch-kbd, .srch-suggest-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .srch-kbd { padding:5px 7px; border-radius:6px; background:var(--surface-2); line-height:1; }
     .srch-suggest-anchor { margin:12px var(--gutter) 0; }
     .srch-suggest-head { margin:6px 0 var(--label-below); }
-    .srch-suggest-item:not(:has(.srch-kbd)) .srch-suggest-label { font-family:var(--font-serif); font-size:var(--ts-body); font-weight:var(--fw-name); }
+    .srch-suggest-item:not(:has(.srch-kbd)) .srch-suggest-label { font-family:var(--font-serif); font-size:var(--ts-body); font-weight:600; }
     .srch-suggest { background:var(--surface-1); border-radius:var(--r-card); overflow:hidden; }
     .srch-songs-row { width:calc(100% - 2 * var(--gutter)); margin:8px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-card); }
     .srch-results-summary { margin:var(--label-above) var(--gutter) var(--label-below); }
@@ -4406,7 +4408,7 @@
     .srch-card { display:block; width:100%; padding:14px var(--card-pad) 12px; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
     .srch-card:active { background-color:var(--surface-2); }
     .srch-card-top { display:flex; align-items:baseline; gap:8px; }
-    .srch-card-ref { font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-weight:var(--fw-name); color:var(--text-1); }
+    .srch-card-ref { font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-weight:600; color:var(--text-1); }
     .srch-card-loc { margin-top:2px; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
     .srch-card-loc.is-inline { flex:1; min-width:0; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-card-snippet { margin-top:8px; font-family:var(--font-serif); font-size:var(--ts-body); line-height:1.5; color:var(--text-2); }
@@ -4416,10 +4418,7 @@
     .card-direct .srch-card-top { margin-top:5px; }
     .card-direct .srch-card-ref { font-size:var(--ts-title); line-height:1.25; font-weight:700; }
     .card-direct .srch-card-snippet { color:var(--text-1); font-size:var(--ts-headline); }
-    .srch-direct-acts { display:flex; gap:10px; margin-top:14px; }
-    .srch-direct-acts > .ui-btn { flex:1 1 0; }
-    .srch-direct-acts > .srch-direct-listen { background:var(--surface-2); }
-    .search-screen .srch-direct > .ui-label { background:none; border-radius:0; margin:6px 0 0; }
+    .srch-direct-open { margin-top:14px; }
     .srch-card-wrap > .srch-card { padding-bottom:8px; }
     .srch-places-toggle, .srch-also-toggle { width:calc(100% - 2 * var(--card-pad)); margin:0 var(--card-pad); border-top-color:var(--hairline); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
     .srch-also-item { font-family:var(--font-ui); letter-spacing:0; text-transform:none; }
@@ -4443,6 +4442,14 @@
     .srch-none-icon { display:flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0 auto 14px; border-radius:var(--r-card); background:var(--surface-1); color:var(--accent); }
     .srch-none-title { margin:0 0 6px; font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; color:var(--text-1); }
     .srch-no-results-tip, .srch-fewer { display:block; margin-top:4px; }
+    /* FA2 (s-results): a go-to suggestion's chevron, quiet as the rows' */
+    .srch-suggest-item > .ui-i:last-child { flex:none; margin-left:-6px; color:var(--text-3); }
+    /* FA2 (s-sections): under "Where it appears" a card's passage is two lines (SrchSnippet reads the box's height, so its
+       mark stays in them), cut with an ellipsis when the passage starts at its top */
+    .srch-groups.is-where .srch-group-items .srch-snippet-scroll { max-height:3em; }
+    .srch-groups.is-where .srch-group-items .srch-snippet-lines:not([style*="margin-top"]) { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+    /* FA2 (s-scriptures): the Scriptures tab's one collection goes straight to its verses (its head shows while closed) */
+    .srch-groups.is-lone > .srch-group:not(.collapsed) > .srch-group-h { display:none; }
     /* ── end WA3 search ── */
     /* ── FA search: the order as one "Relevance ⌄" control (mock search.html s-results) ── */
     .srch-sort-btn.srch-sort-pick { display:inline-flex; align-items:center; gap:4px; color:var(--text-1); font-weight:500; }
@@ -9217,7 +9224,7 @@ body.light .install-step-num { color: #fff; }
    ✕'s 60 px glyph left about three letters of the query in view. Held to phone px, and the box's own words to 36 px
    ("fear not" fits whole); the ✕ stays a 44 px target. */
 .vot-large-text .srch-input-row { gap: 4px; }
-.vot-large-text .search-input { padding-left: 10px; padding-right: 10px; font-size: min(var(--fs-16), 36px); }
+.vot-large-text .search-input { padding-left: 42px; padding-right: 48px; font-size: min(var(--fs-16), 36px); }
 .vot-large-text .srch-clear-btn { min-width: 44px; font-size: min(var(--fs-20), 28px); }
 
     /* ── THE LISTEN FAMILY (W3-listen, 2026-11-11; R/mock/v2/listen.html au-*). Built on the shared rows, sheets and
