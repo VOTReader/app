@@ -317,3 +317,19 @@ describe('search route: Reading plans row', () => {
     expect(el.props.onOpenPlans).toBe(goReadingPlans);
   });
 });
+
+/* REVIEW-readers 6: a swipe neighbour in ANOTHER volume kept this volume's isRead, so its "Mark as read" row asked the
+   wrong volume's record (and could show a false tick where two volumes share a letter id). */
+describe('a neighbour page reads its own volume’s read record', () => {
+  it('pagePropsFor hands a cross-volume neighbour an isRead bound to that volume', () => {
+    const isRead = vi.fn((rk, id) => rk === 'wtlb-one' && id === 'faith-and-works');
+    const { routes } = makeRoutes({ fromSearch: false, searchLanding: null, isRead });
+    const v = find(routes['vot-letter'](), G.LetterView);
+    expect(v.props.isRead('faith-and-works'), 'this page asks Volume Two').toBe(false);
+    const peek = v.props.pagePropsFor({ volKey: 'wtlb1', letterId: 'faith-and-works' });
+    expect(peek.isRead('faith-and-works')).toBe(true);
+    expect(isRead).toHaveBeenLastCalledWith('wtlb-one', 'faith-and-works');
+    // a Bible chapter neighbour has its own isRead prop on its own view: nothing is overridden there
+    expect('isRead' in v.props.pagePropsFor({ bookId: 'genesis', chapterNum: 2 })).toBe(false);
+  });
+});
