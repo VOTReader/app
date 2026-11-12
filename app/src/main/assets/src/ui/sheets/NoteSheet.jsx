@@ -6,8 +6,8 @@ import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText, shareLinkSetting, LINK_NAME, offerOtherLink } from '../../utils/copy-share.js';
-import { passageLinkFor } from '../../utils/passage-link.js';
-import { siteLinkForKey } from '../../utils/passage-copy.js';
+import { passageSourceFor } from '../../utils/passage-copy.js';
+import { sharedText, canSwapLink } from '../../utils/share-ending.js';
 import { relativeDate } from '../../utils/dates.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import {
@@ -227,19 +227,17 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // "My note:", so the note can't read as part of the verse.
     // share-fn (Corbin 2026-10-25): the link is the website's where the passage has a
     // page there, as the selection's Share sends, unless Share Includes says App Link.
-    const key = segs[0] && segs[0].key;
-    // ODDS1: with both links, the note after the share names the one sent and offers the other (FEAT1's).
-    const site = key ? siteLinkForKey(key) : null;
-    const which = site && shareLinkSetting() === 'site' ? 'site' : 'app';
-    const textWith = (/** @type {string | null} */ link) => (link
-      // share-link (Corbin 2026-11-11): the link stands in for the reference ("Append only the link itself").
-      ? '\u201C' + anchor + '\u201D'
-        + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link
-      : anchor + (note.body ? '\n\n' + note.body : ''));
-    const linkOf = (/** @type {'app' | 'site'} */ w) => (key ? (w === 'site' && site) || passageLinkFor(key) : null);
-    const text = textWith(linkOf(which));
-    const other = site ? (which === 'site' ? 'app' : 'site') : null;
-    const otherText = other ? textWith(linkOf(other)) : '';
+    // SHARE1 (Corbin 2026-11-12): what follows is Settings > Sharing > When I share (utils/share-ending.js), named by
+    // the note's first and last blocks ("John 3:16-18"); "My note:" sits between the quote and it.
+    const keys = [...new Set(segs.map((s) => s.key))];
+    const source = passageSourceFor(keys.length > 1 ? [keys[0], keys[keys.length - 1]] : keys, anchor.split(' … ').map((l) => l.split(/\s+/)));
+    const textFor = (/** @type {'app' | 'site'} */ w) => sharedText(anchor, source, { action: 'share', target: w, note: note.body || '' });
+    // ODDS1: where the text sent carries a link that has another (SHARE1's canSwapLink), the note after the share
+    // names the one sent and offers the other (FEAT1's), as the selection's Share does.
+    const which = shareLinkSetting();
+    const text = textFor(which);
+    const other = canSwapLink(source, 'share') ? /** @type {'app' | 'site'} */ (which === 'site' ? 'app' : 'site') : null;
+    const otherText = other ? textFor(other) : '';
     shareText(text).then((outcome) => {
       if (typeof showToast !== 'function') return;
       if (other && outcome !== 'failed') {

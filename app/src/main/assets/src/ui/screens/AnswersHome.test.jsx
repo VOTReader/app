@@ -283,12 +283,13 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     expect(document.activeElement).toBe(tablet);
   });
 
-  it('a copy of the commandment ends with its reference, once, in the translation shown', () => {
+  // MERGE8: SHARE1's default for Scripture is the reference alone ("no version number", Corbin 2026-11-11).
+  it('a copy of the commandment ends with its reference, once', () => {
     render(<AnswersHome {...base} onGoToRef={noop} />);
     fireEvent.click(screen.getByRole('button', { name: /^6\. You Shall Not Murder\./ }));
     const words = document.createRange();
     words.selectNodeContents(screen.getByRole('dialog').querySelector('.ans-verse'));
-    expect(passageCopy(words).text).toBe('"You shall not murder."\n\nExodus 20:13 (NKJV)');
+    expect(passageCopy(words).text).toBe('"You shall not murder."\n\nExodus 20:13');
   });
 
   it('the open sheet survives a round trip to a topic (U5)', () => {

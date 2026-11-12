@@ -6237,6 +6237,9 @@
     .ws2-share-preview p { margin:0; }
     .ws2-share-quote { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); font-style:italic; }
     .ws2-share-link { margin-top:var(--sp-4) !important; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); overflow-wrap:anywhere; }
+    .ws2-share-line { display:block; }
+    .ws2-share-line.is-ref { color:var(--text-2); }
+    .ws2-share-sample + .ws2-share-sample { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--hairline); }
     .ws2-opt-lead { display:inline-grid; place-items:center; flex:none; width:var(--icon-chip); height:var(--icon-chip); margin-right:var(--sp-3); border-radius:var(--r-chip); background:var(--surface-2); color:var(--text-2); }
     .ws2-pic-line { fill:currentColor; opacity:.7; }
     .ws2-pic-dot { fill:var(--accent); }

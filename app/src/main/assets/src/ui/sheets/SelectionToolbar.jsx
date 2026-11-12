@@ -9,9 +9,9 @@ import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
 import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils/answers-extras.js';
 import { answersIndexOf } from '../../utils/answers-search.js';
-import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
-import { passageCopy, passageLabel, translationTag, quotedPassage } from '../../utils/passage-copy.js';
+import { passageCopy, passageLabel, passageSourceFor } from '../../utils/passage-copy.js';
+import { sharedText, canSwapLink } from '../../utils/share-ending.js';
 import { readingBlocksIn, readingRange } from '../../utils/reading-range.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // A dragged selection stays in the reading column and scrolls it gently at the edges (rs1); the bottom dock's top.
@@ -460,14 +460,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const selShare = (() => {
         // cp4: quoted, as Copy's is, whenever it is named.
         // body: the words alone, unquoted and unnamed (a share card's passage, AOGCG O6).
-        if (copied) return { text: copied.reference ? quotedPassage(copied.body) : copied.body, body: copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
+        // SHARE1: `source` names the passage for Share's own setting (utils/share-ending.js); null: the words alone.
+        if (copied) return { text: copied.body, body: copied.body, keys: copied.keys, reference: copied.reference, source: copied.source };
         try {
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
           const words = blockAwareText(frag).trim() || text;
-          return { text: words, body: words, keys: [], reference: '', siteText: '' };
+          return { text: words, body: words, keys: [], reference: '', source: null };
         } catch (_e) {
-          return { text, body: text, keys: [], reference: '', siteText: '' };
+          return { text, body: text, keys: [], reference: '', source: null };
         }
       })();
       const selShareText = selShare.text;
@@ -1074,25 +1075,21 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // for someone without the app.
     const share = selInfo.share;
     setChoosingLink(false);
-    const textFor = (/** @type {'app' | 'site'} */ w) => {
-      if (w === 'site' && share && share.siteText) return share.siteText;
-      if (share && share.keys && share.keys.length) {
-        // The blocks the words came from: the first opens the link, and the
-        // reference is Copy's ("John 7:37-39 (NKJV)", "The Wide Path (Volume Two)").
-        return withPassageLink(share.text, share.keys[0], share.reference || null);
-      }
-      const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
-        ? selInfo.multiContainers[0].dataset.hlKey : null);
-      const many = selInfo.hlKey ? null : selInfo.multiContainers;
-      const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
-      return withPassageLink(selInfo.shareText || selInfo.text, key, key ? passageLabel(key, lastKey) + translationTag(key) : null);
-    };
+    // SHARE1 (Corbin 2026-11-12): what follows the words is Settings > Sharing > When I share, for Scripture or the
+    // letters (utils/share-ending.js), with the link `w`. A selection passageCopy could not read is named by its blocks.
+    const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
+      ? selInfo.multiContainers[0].dataset.hlKey : null);
+    const many = selInfo.hlKey ? null : selInfo.multiContainers;
+    const source = share && share.source ? share.source
+      : key ? passageSourceFor(many && many.length > 1 ? [key, many[many.length - 1].dataset.hlKey] : [key]) : null;
+    const words = share && share.body ? share.body : selInfo.shareText || selInfo.text;
+    const textFor = (/** @type {'app' | 'site'} */ w) => sharedText(words, source, { action: 'share', target: w });
     const text = textFor(which);
     // FEAT1 (st-share, "Use the other link"): a plain tap on Share, for a passage with both links, is
     // followed by a note naming the link it sent and offering the other one for this share, so the
     // choice is in sight without a tap in front of the usual share. A choice made by holding Share
     // needs no note. The other link's text is made now: the selection is gone by the time it is tapped.
-    const other = offerOther && share && share.siteText ? /** @type {'app' | 'site'} */ (which === 'site' ? 'app' : 'site') : null;
+    const other = offerOther && canSwapLink(source, 'share') ? /** @type {'app' | 'site'} */ (which === 'site' ? 'app' : 'site') : null;
     const otherText = other ? textFor(other) : '';
     window.getSelection().removeAllRanges();
     setVisible(false);
@@ -1117,7 +1114,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // both, in a row above the actions (the finger stays on Share, so lifting it
   // never lands on a choice), when the passage has a page there. The click that
   // ends a hold is not a share; the next press forgets the hold.
-  const canChooseLink = !!(selInfo && selInfo.share && selInfo.share.siteText);
+  const canChooseLink = !!(selInfo && selInfo.share && canSwapLink(selInfo.share.source, 'share'));
   const onShareTap = () => {
     if (shareHeldRef.current) { shareHeldRef.current = false; return; }
     handleShare(shareLinkSetting(), true);

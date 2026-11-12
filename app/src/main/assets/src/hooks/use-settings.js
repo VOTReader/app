@@ -245,6 +245,10 @@ export function useSettings({ savedSettings, theme }) {
       // link is the default since 2026-10-25 (DEFAULT_FLIPS round 2 carries it to older profiles).
       shareLink: "site",
       linkHighlight: false,
+      // SHARE1 (Corbin 2026-11-12, "For links, make it controllable"): what Copy and Share add after the words, each
+      // set on its own (utils/share-ending.js SHARE_ENDING_DEFAULTS): Scripture its reference without the translation,
+      // the letters their page on the website alone. New keys, so every profile starts on these.
+      copyScripture: "reference", copyLetters: "link", shareScripture: "reference", shareLetters: "link",
       showScrollNotch: true,
       // Settings › Reading › Answers Reading Path (AOGCG, 2026-10-22): the Answers landing's ticks,
       // "N read" counts and Continue row. A new key, so every profile starts on, as the row says.

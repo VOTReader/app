@@ -13,9 +13,11 @@ const V39 = 'But this He spoke concerning the Spirit, whom those believing in Hi
 
 const g = /** @type {any} */ (globalThis);
 
+// SHARE1: these pin the naming machinery, so Copy is set to "Reference and translation" (the default names the
+// place alone; every tier is in share-ending.test.js).
 beforeEach(() => {
   g._bookTitle = (/** @type {string} */ id) => ({ john: 'John', psalms: 'Psalms', 'matthew-plain': 'Matthew' })[id] || id;
-  g.StateStore = { get: () => ({ settings: { translation: 'rnkjv' } }) };
+  g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rnkjv' } }) };
   g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV' }, { id: 'rnkjv', label: 'NKJV-R' }, { id: 'kjv', label: 'KJV' }];
   g.findEntryContext = (/** @type {string} */ id) => ({
     'the-wide-path': { title: 'The Wide Path', collection: 'Volume Two', screen: 'vot-letter' },
@@ -238,7 +240,7 @@ describe('labels', () => {
 
   it('the translation is the reader\'s, read from Settings at the copy; unknown settings claim nothing', () => {
     expect(translationTag('bible:john:3:16')).toBe(' (NKJV)');
-    g.StateStore = { get: () => ({ settings: { translation: 'kjv' } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'kjv' } }) };
     expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
     expect(translationTag('letter:x:1')).toBe('');
     delete g.StateStore;
@@ -250,10 +252,10 @@ describe('labels', () => {
   it('a restored-name edition is cited by the edition it restores: NKJV-R as NKJV, KJV-R as KJV', () => {
     g.TRANSLATION_OPTIONS = [...g.TRANSLATION_OPTIONS, { id: 'rkjv', label: 'KJV-R' }, { id: 'rvr', label: 'RVR' }];
     expect(translationTag('bible:john:3:16')).toBe(' (NKJV)');
-    g.StateStore = { get: () => ({ settings: { translation: 'rkjv' } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rkjv' } }) };
     expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
     expect(passageReference(['bible:john:7'])).toBe('John 7 (KJV)');
-    g.StateStore = { get: () => ({ settings: { translation: 'rvr' } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rvr' } }) };
     expect(translationTag('bible:john:3:16')).toBe(' (RVR)');
     expect(['NKJV-R', 'KJV-R', 'KJV R', 'RVR', 'HNV', 'NKJV'].map(citedLabel)).toEqual(['NKJV', 'KJV', 'KJV', 'RVR', 'HNV', 'NKJV']);
     // the registry the picker, headers and compare read is untouched: they still say NKJV-R
@@ -394,7 +396,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
   };
   beforeEach(() => {
     // These pin the quote itself: Highlight the Passage on (cp3; off by default, see below).
-    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv', linkHighlight: true } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rnkjv', linkHighlight: true } }) };
     const base = g.findEntryContext;
     g.findEntryContext = (/** @type {string} */ id, /** @type {string} */ kind) => ({
       abortion: { kind: 'wtlb', screen: 'answers-entry', collection: 'Answers Only God Can Give', title: 'Thus Says The Lord Regarding Abortion', entry: ABORTION },
@@ -489,7 +491,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
   });
 
   it('cp3: by default the link names the letter alone (a compilation entry, its section); the setting adds the words', () => {
-    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv' } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rnkjv' } }) };
     const p = document.createElement('p');
     p.setAttribute('data-hl-key', 'letter:the-wide-path:4');
     p.textContent = 'Beloved, walk the narrow way.';
@@ -497,7 +499,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     const r = range(/** @type {Node} */ (p.firstChild), 0, /** @type {Node} */ (p.firstChild), 29);
     expect(/** @type {any} */ (passageCopy(r)).link).toBe(SITE + 'The_Wide_Path');
     expect(/** @type {any} */ (passageCopy(r, { quote: true })).link).toBe(SITE + 'The_Wide_Path#:~:text=Beloved%2C%20walk%20the%20narrow%20way%2E');
-    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv', linkHighlight: true } }) };
+    g.StateStore = { get: () => ({ settings: { copyScripture: 'translation', translation: 'rnkjv', linkHighlight: true } }) };
     expect(/** @type {any} */ (passageCopy(r)).link).toBe(SITE + 'The_Wide_Path#:~:text=Beloved%2C%20walk%20the%20narrow%20way%2E');
     expect(/** @type {any} */ (passageCopy(r, { quote: false })).link).toBe(SITE + 'The_Wide_Path');
   });

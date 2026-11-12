@@ -83,6 +83,8 @@ import { _bookmarkSourceLabel } from './bookmark-source.js';
 import { ANNOTATION_CHROME } from '../renderer/anchor-view.js';
 import { siteTarget, sourceTarget, pageTarget, siteUrl, collectionName, MATTHEW_STUDY_PAGE } from './site-link.js';
 import { passageSource, isQuotedWords } from './answers-contents.js';
+import { passageLinkFor } from './passage-link.js';
+import { quotedPassage, sharedText } from './share-ending.js';
 // Which blocks a range covers, and where its ends sit on a verse number (rs1): one definition with the toolbar's.
 import { OFF_PAGE, VERSE_NUMBER, readingBlocksIn, clipTo, readingRange } from './reading-range.js';
 
@@ -180,7 +182,8 @@ function isTranslatedBook(id) {
 }
 
 /**
- * @typedef {{ reference: string, target: import('./site-link.js').SiteTarget | null, quoteKeys?: Set<string> }} Origin
+ * @typedef {{ reference: string, target: import('./site-link.js').SiteTarget | null, quoteKeys?: Set<string>,
+ *   kind?: 'scripture' | 'letter', place?: string, translation?: string, title?: string, citation?: string }} Origin
  *   reference: the line a copy ends with ('' for none); target: where the words
  *   live on the site (null: nowhere, as for the Bible); quoteKeys: the blocks
  *   whose words the site's page has (all of them when absent).
@@ -202,19 +205,23 @@ function passageOrigin(keys) {
   const kind = p[0];
   if (!PUBLIC_KINDS.has(kind)) return none;
   const verses = keys.filter(isVerseKey);
+  /** SHARE1: a Bible place and its translation, kept apart for Settings > Sharing.
+      @param {string} place @param {string} tag  " (NKJV)" or '' @param {any} target */
+  const scripture = (place, tag, target) => ({
+    reference: place ? place + tag : '', target, kind: /** @type {'scripture'} */ ('scripture'), place,
+    translation: tag.replace(/^ \(|\)$/g, ''), title: place, citation: place + tag,
+  });
   if (verses.length) {
     const label = passageLabel(verses[0], verses[verses.length - 1]);
-    return kind === 'study'
-      ? { reference: label + STUDY_TAG, target: pageTarget(MATTHEW_STUDY_PAGE) }
-      : { reference: label + translationTag(verses[0]), target: null };
+    return kind === 'study' ? scripture(label, STUDY_TAG, pageTarget(MATTHEW_STUDY_PAGE)) : scripture(label, translationTag(verses[0]), null);
   }
   // A whole chapter (a page's own key): "John 7 (NKJV)", "Matthew 5 (Study Bible)".
-  if (kind === 'bible') return { reference: p.length === 3 ? _bookmarkSourceLabel(keys[0]) + translationTag(keys[0]) : '', target: null };
+  if (kind === 'bible') return p.length === 3 ? scripture(_bookmarkSourceLabel(keys[0]), translationTag(keys[0]), null) : none;
   if (kind === 'study') {
     const ch = p.length === 2 ? /^(.+)-(\d+)$/.exec(p[1] || '') : null;
-    const reference = p.length !== 2 ? _bookmarkSourceLabel(keys[0])
-      : ch ? ch[1].charAt(0).toUpperCase() + ch[1].slice(1) + ' ' + ch[2] + STUDY_TAG : '';
-    return { reference, target: pageTarget(MATTHEW_STUDY_PAGE) };
+    if (p.length !== 2) return { ...scripture(_bookmarkSourceLabel(keys[0]), '', pageTarget(MATTHEW_STUDY_PAGE)), kind: 'letter' };
+    return ch ? scripture(ch[1].charAt(0).toUpperCase() + ch[1].slice(1) + ' ' + ch[2], STUDY_TAG, pageTarget(MATTHEW_STUDY_PAGE))
+      : { reference: '', target: pageTarget(MATTHEW_STUDY_PAGE) };
   }
   const ctx = typeof findEntryContext === 'function' ? findEntryContext(p[1], kind) : null;
   if (!ctx || !ctx.title) return none;
@@ -223,7 +230,15 @@ function passageOrigin(keys) {
   const reference = !ctx.collection || ctx.screen === 'hm-letter' ? ctx.title
     : num ? ctx.collection + ', Letter ' + num + ': ' + ctx.title
       : ctx.title + ' (' + ctx.collection + ')';
-  return { reference, target: siteTarget(ctx) };
+  return { reference, target: siteTarget(ctx), ...letterParts(ctx.title, reference, ctx.entry) };
+}
+
+/** SHARE1: a letter's title and its full citation (the copy's reference line, then the date the letter gives:
+    "Volume Two, Letter 1: The Wide Path · 3/28/05"), for Settings > Sharing's letter tiers.
+    @param {string} title @param {string} reference @param {any} entry */
+function letterParts(title, reference, entry) {
+  const date = entry && typeof entry.date === 'string' ? entry.date.trim() : '';
+  return { kind: /** @type {'letter'} */ ('letter'), place: reference, translation: '', title, citation: reference + (date ? ' · ' + date : '') };
 }
 
 /** An Answers topic is passages quoted from the letters. Copied words within
@@ -239,22 +254,17 @@ function answersOrigin(ctx, keys) {
   const at = keys.map((k) => Number(k.split(':')[2])).filter((n) => Number.isInteger(n));
   const src = at.length ? passageSource(paras, Math.min(...at), Math.max(...at)) : null;
   const quoteKeys = new Set(keys.filter((k) => isQuotedWords(paras[Number(k.split(':')[2])])));
-  if (src) return { reference: src.title + ' (' + collectionName(src.collection) + ')', target: sourceTarget(src.title, src.collection), quoteKeys };
+  if (src) {
+    const reference = src.title + ' (' + collectionName(src.collection) + ')';
+    return { reference, target: sourceTarget(src.title, src.collection), quoteKeys, ...letterParts(src.title, reference, null) };
+  }
   const href = ctx.entry && typeof ctx.entry.siteUrl === 'string' ? ctx.entry.siteUrl : '';
-  return { reference: ctx.title + ' (' + ctx.collection + ')', target: href ? { href } : null, quoteKeys };
+  const reference = ctx.title + ' (' + ctx.collection + ')';
+  return { reference, target: href ? { href } : null, quoteKeys, ...letterParts(ctx.title, reference, null) };
 }
 
-/** cp4: copied words as a quotation, in ASCII double quotes (as the phone's
-    keyboard types them). Words that are already one quotation (an intro
-    quote copied alone) are not quoted twice.
-    @param {string} body */
-export function quotedPassage(body) {
-  const b = String(body || '').trim();
-  if (!b) return '';
-  const marks = b.match(/["\u201C\u201D]/g) || [];
-  if (marks.length === 2 && /^["\u201C]/.test(b) && /["\u201D]$/.test(b)) return b;
-  return '"' + b + '"';
-}
+/** cp4: copied words as a quotation (one definition, utils/share-ending.js). */
+export { quotedPassage };
 
 /** The line a copy of these blocks ends with, or '' for none.
     @param {string[]} keys  the copied blocks' keys, in reading order */
@@ -285,10 +295,52 @@ function declaredOrigin(range) {
   const host = el && el.closest ? el.closest('[data-copy-ref], [data-copy-key]') : null;
   if (!host || host.closest(OFF_PAGE)) return null;
   const literal = host.getAttribute('data-copy-ref');
-  if (literal) return { reference: literal, target: null };
+  if (literal) {
+    // A verse sheet's "John 14:6 (KJV)": its place and its translation, apart (SHARE1).
+    const m = /^(.*?)\s*\(([A-Za-z][A-Za-z0-9 -]*)\)$/.exec(literal);
+    const place = m ? m[1] : literal;
+    return { reference: literal, target: null, kind: 'scripture', place, translation: m ? m[2] : '', title: place, citation: literal };
+  }
   const key = host.getAttribute('data-copy-key') || '';
   const origin = key ? passageOrigin([key]) : null;
   return origin && origin.reference ? origin : null;
+}
+
+/** SHARE1: an origin as a share-ending source (null when it names nothing), with its website link and the app's
+    link for `key` (the first block).
+    @param {Origin} origin @param {string} siteLink @param {string | null | undefined} key
+    @returns {import('./share-ending.js').PassageSource | null} */
+function sourceOf(origin, siteLink, key) {
+  if (!origin || !origin.reference || !origin.kind) return null;
+  const k = key && /^bible:[^:]+:\d+$/.test(key) ? key + ':1' : key;   // a whole chapter opens at its first verse
+  return {
+    kind: origin.kind, place: origin.place || origin.reference, translation: origin.translation || '',
+    title: origin.title || origin.reference, citation: origin.citation || origin.reference,
+    siteLink: siteLink || '', appLink: (k && passageLinkFor(k)) || '',
+  };
+}
+
+/** The data-copy-key a range's words are declared under, or ''. @param {Range} range */
+function hostKey(range) {
+  const node = range.commonAncestorContainer;
+  const el = node && node.nodeType === 1 ? /** @type {Element} */ (node) : node && node.parentElement;
+  const host = el && el.closest ? el.closest('[data-copy-key]') : null;
+  return host ? host.getAttribute('data-copy-key') || '' : '';
+}
+
+/**
+ * SHARE1: where these blocks are from, as Copy and Share name them (utils/share-ending.js), for a passage
+ * that is not a selection on screen: a note's, a mark's. null for words no reader can open (the journal).
+ * @param {string[]} keys  the blocks' keys, in reading order
+ * @param {string[][]} [quote]  the words for a website link's text fragment (Highlight the passage)
+ * @returns {import('./share-ending.js').PassageSource | null}
+ */
+export function passageSourceFor(keys, quote) {
+  const list = (keys || []).map((k) => String(k || '').replace(/:\d+-\d+$/, '')).filter(Boolean);
+  if (!list.length) return null;
+  const origin = passageOrigin(list);
+  const site = origin.target ? siteUrl(origin.target, quote && highlightLinks() ? quote : undefined) || '' : '';
+  return sourceOf(origin, site, list[0]);
 }
 
 /** One block's page on the site, or null where the site has none (the Bible,
@@ -410,7 +462,8 @@ function verseNumberOf(el) {
  * a selection of one verse number alone copies its verse.
  * @param {Range} selected
  * @param {{ numbers?: boolean, quote?: boolean }} [opts]
- * @returns {{ text: string, body: string, reference: string, link: string, keys: string[], isPublic: boolean } | null}
+ * @returns {{ text: string, source: import('./share-ending.js').PassageSource | null, body: string, reference: string,
+ *   link: string, keys: string[], isPublic: boolean } | null}
  */
 export function passageCopy(selected, { numbers = true, quote = highlightLinks() } = {}) {
   if (!selected || selected.collapsed) return null;
@@ -431,8 +484,12 @@ export function passageCopy(selected, { numbers = true, quote = highlightLinks()
   });
   // share-link (Corbin 2026-11-11, "Append only the link itself"): a named passage with a link is the quoted words,
   // a blank line, then the link alone; with no link the reference stays under the quote.
-  const ending = (/** @type {string} */ body, /** @type {string} */ reference, /** @type {string} */ link) =>
-    reference ? quotedPassage(body) + '\n\n' + (link || reference) : body + (link ? '\n' + link : '');
+  // SHARE1 (Corbin 2026-11-12, "make it controllable"): what follows the words is the reader's Copy setting for
+  // Scripture or the letters (utils/share-ending.js); the source carries both links for Share's own setting.
+  const ending = (/** @type {string} */ body, /** @type {Origin} */ origin, /** @type {string} */ link, /** @type {string} */ key) => {
+    const source = sourceOf(origin, link, key);
+    return { text: sharedText(body, source, { action: 'copy' }), source };
+  };
   if (!parts.length) {
     // No verse block in it: words a page or a sheet declares a reference for
     // (a heading, an intro quote, a footnote's verse), or none of ours.
@@ -443,7 +500,8 @@ export function passageCopy(selected, { numbers = true, quote = highlightLinks()
     const words = declared ? plainText(frag, numbers && several) : '';
     if (!declared || !words) return null;
     const link = declared.target ? siteUrl(declared.target, quote ? quoteLines([range]) : undefined) : '';
-    return { text: ending(words, declared.reference, link), body: words, reference: declared.reference, link, keys: [], isPublic: true };
+    const done = ending(words, declared, link, hostKey(range));
+    return { text: done.text, source: done.source, body: words, reference: declared.reference, link, keys: [], isPublic: true };
   }
   const manyVerses = parts.filter((p) => isVerseKey(p.key)).length > 1;
   let text = '';
@@ -469,8 +527,10 @@ export function passageCopy(selected, { numbers = true, quote = highlightLinks()
   const link = origin.target
     ? siteUrl(origin.target, quote ? quoteLines(parts.filter((p) => !quoted || quoted.has(p.key)).map((p) => p.clip)) : undefined)
     : '';
+  const done = ending(text, origin, link, keys[0]);
   return {
-    text: ending(text, origin.reference, link),
+    text: done.text,
+    source: done.source,
     body: text,
     reference: origin.reference,
     link,
