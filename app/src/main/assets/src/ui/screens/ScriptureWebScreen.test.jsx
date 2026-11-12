@@ -1403,6 +1403,19 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     }
   });
 
+  /* REVIEW-android 8: the ⋯ menu is the only way to the guide and About the data, and it was not a registered layer,
+     so Android Back left the whole web with the menu still open. */
+  it('Back closes the open ⋯ menu through the registry instead of leaving the web', async () => {
+    await mountList();
+    const more = screen.getByRole('button', { name: 'More controls' });
+    fireEvent.click(more);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(modalRegistry.isAnyOpen(), 'the open menu is a layer Back closes').toBe(true);
+    act(() => { modalRegistry.peek().dismiss('back'); });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(modalRegistry.isAnyOpen()).toBe(false);
+  });
+
   it('(v08-03) Escape with nothing open leaves once, and the app dispatcher never leaves a second time', async () => {
     const appEscape = vi.fn();
     document.addEventListener('keydown', appEscape);

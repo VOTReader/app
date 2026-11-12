@@ -110,7 +110,7 @@ const REAL_RANGE_RECT_FN = Range.prototype.getBoundingClientRect;
 
 let scroller;
 
-function Host({ readAlongOn = true, readAlongFollow = true, seekTo = null, seekOffset = null }) {
+function Host({ readAlongOn = true, readAlongFollow = true, seekTo = null, seekOffset = null, nearIds = undefined }) {
   const mainRef = React.useRef(null);
   return (
     <div className="screen-scroll">
@@ -127,6 +127,7 @@ function Host({ readAlongOn = true, readAlongFollow = true, seekTo = null, seekO
         readAlongFollow={readAlongFollow}
         seekTo={seekTo}
         seekOffset={seekOffset}
+        nearIds={nearIds}
       />
     </div>
   );
@@ -327,6 +328,29 @@ describe('ReadAlongHighlight — the frame-driven clock', () => {
     expect(rafCbs.size).toBe(1);
     view.unmount();
     expect(rafCbs.size).toBe(0);
+  });
+});
+
+/* REVIEW-readers 7: the neighbour's wash (TABS5) ran its frame loop for ANY letter of the volume that was playing,
+   60 document queries a second for a peek that is not drawn. Only the page's swipe neighbours have a peek. */
+describe('ReadAlongHighlight — another letter of the volume is playing', () => {
+  const playOther = () => {
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol1:letter-z': [['idZ', 'B']] };
+    globalThis.AUDIO_SYNC = { ...SYNC, 'vol1:letter-z': [[1, 0, 0, 10, 0], [4, 0, 10, 20, 0]] };
+    act(() => { AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-z', title: 'Far Away' }, collectionLabel: 'Volume One' }); });
+    clockTo(2);
+  };
+  it('asks for no frames when that letter is not a swipe neighbour', () => {
+    mount({ readAlongFollow: false, nearIds: ['letter-b'] });
+    playOther();
+    frame(0);
+    expect(rafCbs.size).toBe(0);
+  });
+  it('keeps the frame clock for a neighbour (its peek shows the clause the turn will paint)', () => {
+    mount({ readAlongFollow: false, nearIds: ['letter-z'] });
+    playOther();
+    frame(0);
+    expect(rafCbs.size).toBe(1);
   });
 });
 

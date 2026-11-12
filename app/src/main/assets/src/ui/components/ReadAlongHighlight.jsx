@@ -881,8 +881,10 @@ export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
  *   (its hero pill's). Given, and with readAlongOn, this unit offers LISTEN FROM
  *   HERE through window.__votListenFrom; absent (no recording), or with the
  *   read-along off (no timings to find the place in), it offers nothing.
+ * @param {(string | null)[] | null} [props.nearIds] - a letter's swipe neighbours (previous, next): while one of
+ *   them plays, its clause is washed in its peek. Any other letter of the volume gets no frame loop here.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null, textKey = '' }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null, textKey = '', nearIds = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -1033,8 +1035,11 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // TABS5: the same for a letter. While the letter next to this one plays (same collection; a page with no offset map,
   // so the peek's clause offsets are the row's own), its clause is washed in that letter's peek, from the frame clock
   // the live pane paints by, so the clause under the thumb at release is the one the turn paints.
-  const nearLetterId = !chapter && !offsetMapFn && readAlongOn && track && typeof track.key === 'string'
+  // Only a swipe neighbour (`nearIds`, the page's previous and next letter) has a peek to wash: any other letter of the
+  // volume ran this frame loop, and a document query in it, for as long as it played.
+  const nearTrackId = !chapter && !offsetMapFn && readAlongOn && track && typeof track.key === 'string'
     && track.key !== key && track.key.indexOf(volKey + ':') === 0 ? track.key.slice(volKey.length + 1) : '';
+  const nearLetterId = nearTrackId && Array.isArray(nearIds) && nearIds.indexOf(nearTrackId) >= 0 ? nearTrackId : '';
   const nearLetterFrags = React.useMemo(() => {
     if (!nearLetterId) return null;
     const all = _syncFor(track.key, track, 0, '', null);

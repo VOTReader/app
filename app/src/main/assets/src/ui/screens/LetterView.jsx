@@ -745,7 +745,7 @@ export function LetterView(props) {
       {/* Opened from search: every place the words appear, marked, and the pill
           that steps between them. Live pane only, like the read-along. */}
       {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={unit.toLowerCase()} keyPrefix={letterHlPrefix(letter.id)} />}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} nearIds={[letter.prevLetter ? letter.prevLetter.id : null, letter.nextLetter ? letter.nextLetter.id : null]} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

@@ -16,6 +16,7 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
 import { showToast } from '../utils/toast.js';
 import { DOUBLE_TAP_MS, MAX_TAP_DISTANCE_PX, FULLSCREEN_GESTURE_EVENT } from '../utils/fullscreen-gesture-event.js';
 import { useRefMirror } from './use-ref-mirror.js';
+import { sectionOf } from '../utils/app-sections.js';
 
 const MAX_DRAG_DISTANCE_PX = 18;
 const FULLSCREEN_HINT_LIMIT = 3;
@@ -75,9 +76,10 @@ export function isFullscreenGestureTarget(target) {
 
 /**
  * `enabled` is the reader's setting; `paused` is a screen that owns immersive mode itself (GardenView).
- * @param {{ enabled: boolean, paused?: boolean, hintCount: unknown, onHintShown: (count: number) => void }} args
+ * `screen` is the screen on show: reaching one that carries the tab bar leaves Android immersive mode.
+ * @param {{ enabled: boolean, paused?: boolean, screen?: string, hintCount: unknown, onHintShown: (count: number) => void }} args
  */
-export function useFullscreenGesture({ enabled, paused = false, hintCount, onHintShown }) {
+export function useFullscreenGesture({ enabled, paused = false, screen, hintCount, onHintShown }) {
   const active = !!enabled && !paused;
   const previousTapRef = React.useRef(null);
   const pointerDownRef = React.useRef(null);
@@ -107,6 +109,16 @@ export function useFullscreenGesture({ enabled, paused = false, hintCount, onHin
     document.addEventListener('vot:fullscreen-toggle', onToggle);
     return () => document.removeEventListener('vot:fullscreen-toggle', onToggle);
   }, [paused]);
+
+  // Full screen taken in a reader does not ride onto a screen with the tab bar (Read, Listen, Library and their
+  // lists): with the system bars hidden the bar sat flush on the bottom edge, under the swipe that brings the bars
+  // back, and with the double tap off there was no way out there. Android only: a browser's fullscreen has Escape.
+  const onBarScreen = typeof screen === 'string' && sectionOf(screen).bar;
+  React.useEffect(() => {
+    if (!onBarScreen || !PlatformBridge.isAndroid || !androidFullscreenRef.current) return;
+    androidFullscreenRef.current = false;
+    PlatformBridge.setImmersiveMode(false);
+  }, [onBarScreen]);
 
   // The setting switched OFF while the gesture holds fullscreen hands the screen back (settings hunt,
   // 2026-11-04): the double tap was the only way out, and on Android the bars stayed hidden for the

@@ -414,6 +414,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     document.addEventListener('pointerdown', onDown, true);
     return () => document.removeEventListener('pointerdown', onDown, true);
   }, [menuOpen]);
+  // Android Back (and the app's Escape dispatcher) closes the open menu instead of leaving the web: the menu is the
+  // only way to the guide and About the data, so it is a layer like the panels (use-web-keys.js registers those).
+  useModalRegistry({ id: 'scripture-web-menu', dismiss: () => { setMenuOpen(false); if (moreBtnRef.current) moreBtnRef.current.focus(); }, active: collapse && menuOpen });
   /** A control in the menu closes the menu as it acts. @param {() => void} act */
   const fromMenu = (act) => () => { act(); setMenuOpen(false); };
 

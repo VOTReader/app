@@ -112,10 +112,17 @@ try {
         // The top bar is the same at the head (POL3: volume-index at 1.8 opens scrolled to the reader's letter, and Play
         // All sits half under the bar): a page control counts against a bar control only where the page one shows, so
         // what is covered at the middle of the overlap must not be the bar.
+        // At the tab bar only a row of the scrolling page passes: a fixed control (the audio bar, a FAB, a toast, the
+        // find pill) over or under a tab is two controls overlapping wherever it is drawn.
         const barOf = (e) => e.closest('.tabbar, .top-nav');
         if (!!barOf(a.e) !== !!barOf(b.e)) {
-          if (a.e.closest('.tabbar') || b.e.closest('.tabbar')) continue;
           const bar = barOf(a.e) || barOf(b.e);
+          const other = bar.contains(a.e) ? b.e : a.e;
+          if (bar.classList.contains('tabbar') && !other.closest('.screen-scroll')) {
+            const ix0 = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy0 = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+            if (ix0 > 6 && iy0 > 6) overlaps.push(`${label(a.e)} × ${label(b.e)}`);
+            continue;
+          }
           const top = document.elementFromPoint((Math.max(a.r.left, b.r.left) + Math.min(a.r.right, b.r.right)) / 2, (Math.max(a.r.top, b.r.top) + Math.min(a.r.bottom, b.r.bottom)) / 2);
           if (top && bar.contains(top)) continue;
         }

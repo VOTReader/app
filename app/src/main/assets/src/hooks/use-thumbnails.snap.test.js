@@ -9,7 +9,7 @@ vi.mock('../utils/tab-snap.js', () => ({
   readSnap: (v) => (v && v.v === 1 && typeof v.html === 'string' ? v : null),
 }));
 vi.mock('../stores/state-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StateStore() { return /** @type {any} */ (globalThis).StateStore; } }; });
-import { useThumbnails, SNAP_AFTER_NAV_MS } from './use-thumbnails.js';
+import { useThumbnails, SNAP_AFTER_NAV_MS, SNAP_AFTER_SCROLL_MS } from './use-thumbnails.js';
 
 const g = /** @type {any} */ (globalThis);
 let store;
@@ -59,6 +59,22 @@ describe('useThumbnails snapshots', () => {
     rerender(props(tabs, { theme: 'light' }));
     act(() => { vi.advanceTimersByTime(SNAP_AFTER_NAV_MS + 10); });
     expect(snapState.calls).toBe(after);
+  });
+
+  it('a scroll pause takes no picture while a finger is on the glass; it waits for the lift (android 7)', async () => {
+    renderHook((p) => useThumbnails(p), { initialProps: props(tabsOf('a')) });
+    await flush();
+    act(() => { vi.advanceTimersByTime(SNAP_AFTER_NAV_MS + 10); });
+    const sc = document.createElement('div'); sc.className = 'screen-scroll'; document.body.appendChild(sc);
+    const touch = (type, n) => { const e = new Event(type, { bubbles: true }); Object.defineProperty(e, 'touches', { value: new Array(n).fill({}) }); sc.dispatchEvent(e); };
+    const base = snapState.calls;
+    act(() => { sc.dispatchEvent(new Event('scroll')); });
+    // The finger comes back down before the second is up: the copy must not land in that touch.
+    act(() => { vi.advanceTimersByTime(700); touch('touchstart', 1); vi.advanceTimersByTime(2000); });
+    expect(snapState.calls).toBe(base);
+    act(() => { touch('touchend', 0); vi.advanceTimersByTime(SNAP_AFTER_SCROLL_MS + 50); });
+    expect(snapState.calls).toBe(base + 1);
+    sc.remove();
   });
 
   it('the same page again is not rewritten', async () => {

@@ -70,6 +70,24 @@ describe('useFullscreenGesture', () => {
     expect(PlatformBridge.setImmersiveMode).toHaveBeenNthCalledWith(2, false);
   });
 
+  it('Android: going from a reader to a tab screen hands the system bars back (android 9)', () => {
+    PlatformBridge.isAndroid = true;
+    const view = mount({ screen: 'vot-letter' });
+    act(() => { document.dispatchEvent(new Event('vot:fullscreen-toggle')); });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(true);
+    // another reading page keeps it
+    view.rerender({ enabled: true, hintCount: 0, onHintShown: vi.fn(), screen: 'bible-ch' });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(1);
+    // Back to Read: the tab bar would sit on the bottom edge with no way out
+    view.rerender({ enabled: true, hintCount: 0, onHintShown: vi.fn(), screen: 'home' });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(2);
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(false);
+    // and the next toggle enters again, not leaves twice
+    view.rerender({ enabled: true, hintCount: 0, onHintShown: vi.fn(), screen: 'vot-letter' });
+    act(() => { document.dispatchEvent(new Event('vot:fullscreen-toggle')); });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(true);
+  });
+
   it('ignores controls, modal surfaces, and disabled or GardenView calls', () => {
     const button = document.body.appendChild(document.createElement('button'));
     const prose = document.body.appendChild(document.createElement('p'));

@@ -93,7 +93,10 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const ensurePeeks = React.useCallback(() => {
     const c = live.current; const p = c.pager; const pk = c.peeks;
     if (PEEKS_MODE !== 'idle' || !p || typeof p.peek !== 'function') return;
-    if (pk.at === c.key && pk.src === p && _descKind(p.peek('prev')) + '|' + _descKind(p.peek('next')) === _descKind(pk.prev) + '|' + _descKind(pk.next)) return;
+    // Not `pk.src === p`: every reader hands a new pager object on each render, so that test redrew two whole screens
+    // inside the touch after any re-render (a recording's tick, a highlight). Neighbours drawn for this page, of the
+    // kinds the pager names now, are the ones the drag needs; the idle refresh below brings in what a re-render changed.
+    if (pk.at === c.key && pk.src && _descKind(p.peek('prev')) + '|' + _descKind(p.peek('next')) === _descKind(pk.prev) + '|' + _descKind(pk.next)) return;
     const draw = () => setPeeks((s) => ({ src: p, at: c.key, n: s.n + 1, prev: p.peek('prev'), next: p.peek('next') }));
     const RD = /** @type {any} */ (globalThis).ReactDOM;
     if (RD && typeof RD.flushSync === 'function') RD.flushSync(draw); else draw();

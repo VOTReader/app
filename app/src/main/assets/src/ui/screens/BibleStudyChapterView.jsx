@@ -124,6 +124,17 @@ export function BibleStudyChapterView({
     return { letter: shimFor(study.chapters[i], i), scrollKey: 'study-' + studyId + '-' + nb.id };
   };
 
+  // The edge cards of a neighbour drawn under the finger (LetterView spreads this over the peek's props): the first
+  // part's "Previous" study and the last part's "Next" study, as that part shows them once it is the page.
+  const edge = (e) => (e ? { short: studyShortTitle(e.title), title: studyShortTitle(e.title) } : null);
+  const boundaryFor = (_volKey, l) => {
+    const i = study.chapters.findIndex((c) => c.id === l.id);
+    return {
+      prevBoundary: i > 0 ? null : edge(prevChainEntry(studyId)),
+      nextBoundary: i < study.chapters.length - 1 ? null : edge(nextChainEntry(studyId)),
+    };
+  };
+
   // Where a link tapped in THIS chapter came from, for the back-pill.
   const pillSource = (destSnapshot) => ({
     sourceScreen: 'bible-study-chapter',
@@ -179,13 +190,14 @@ export function BibleStudyChapterView({
       readTrackKey={getReadKey ? getReadKey(studyReadKey(study.slug), studyChapterId) : undefined}
       onUnmark={() => unmarkRead(studyReadKey(study.slug), studyChapterId)}
       isRead={(id) => isRead(studyReadKey(study.slug), id)}
-      prevBoundary={prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null}
+      prevBoundary={edge(prevEntry)}
       onPrevBoundary={prevEntry ? goToChainEntryLast(prevEntry.slug) : null}
-      nextBoundary={nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null}
+      nextBoundary={edge(nextEntry)}
       onNextBoundary={nextEntry ? goToChainEntryFirst(nextEntry.slug) : null}
       prophecyCardStatesRef={prophecyCardStatesRef}
       saveProphecyCardStates={saveProphecyCardStates}
       resolvePeek={resolvePeek}
+      boundaryFor={boundaryFor}
     />
   );
 }

@@ -596,6 +596,8 @@ export function buildScreenRoutes({
       markAsReadEnabled: _markAsReadAt(at, false),
       backHint: sb ? { title: RESULTS_LABEL, volumeLabel: null, plain: true } : b.backHint,
       navBack: sb ? { onBack: _backToResults, label: RESULTS_LABEL } : null,
+      // a letter or entry asks ITS volume's read record: a neighbour across a volume edge is not this volume's
+      ...(col && !at.bookId ? { isRead: (/** @type {string} */ id) => isRead(col.readKey, id) } : null),
     };
   };
   const sharedViewProps = {
