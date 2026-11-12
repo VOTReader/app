@@ -90,9 +90,42 @@ describe('useReadProgress — markRead', () => {
       act(() => { result.current.markRead('matthew', 5); });          // manual — a claim
       expect(recordCompletion).not.toHaveBeenCalled();
       act(() => { result.current.markRead('matthew', 5, { words: 640, activeMs: 120000 }); });
+      // The manual mark made in this run was a claim; the detector's completion measures that same first read
+      // (C4): it is recorded once, as a first read, and the count stays 1.
+      expect(recordCompletion).toHaveBeenCalledTimes(1);
+      expect(recordCompletion).toHaveBeenCalledWith({
+        key: 'v1:matthew:5', words: 640, activeMs: 120000, wasReadBefore: false,
+      });
+      expect(result.current.readItems['v1:matthew:5']).toBe(1);
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
+
+  it('a detector completion with no mark before feeds ReadingStatsStore once, as a first read', () => {
+    const recordCompletion = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordCompletion, clearProgress: vi.fn() };
+    try {
+      const { result } = setup();
+      act(() => { result.current.markRead('matthew', 5, { words: 640, activeMs: 120000 }); });
+      expect(recordCompletion).toHaveBeenCalledTimes(1);
+      expect(recordCompletion).toHaveBeenCalledWith({
+        key: 'v1:matthew:5', words: 640, activeMs: 120000, wasReadBefore: false,
+      });
+      expect(result.current.readItems['v1:matthew:5']).toBe(1);
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
+
+  it('a detector completion on an item read before this run feeds ReadingStatsStore once, as a re-read', () => {
+    const recordCompletion = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordCompletion, clearProgress: vi.fn() };
+    try {
+      const { result } = setup({ savedReadItems: { 'v1:matthew:5': 1 } });
+      act(() => { result.current.markRead('matthew', 5); });          // a bounce on a read item claims nothing
+      act(() => { result.current.markRead('matthew', 5, { words: 640, activeMs: 120000 }); });
+      expect(recordCompletion).toHaveBeenCalledTimes(1);
       expect(recordCompletion).toHaveBeenCalledWith({
         key: 'v1:matthew:5', words: 640, activeMs: 120000, wasReadBefore: true,
       });
+      expect(result.current.readItems['v1:matthew:5']).toBe(2);
     } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
   });
 
