@@ -68,6 +68,7 @@ import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
+import { bibleChapterEdges } from '../hooks/use-reading-chain-nav.js';
 import { openYourData } from '../utils/your-data-link.js';
 import { readKind } from '../utils/read-kind.js';
 
@@ -196,6 +197,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {(endpoint: any, meta?: any) => void} navigateToLink
  * @property {(entry: any) => void} pushFromLetter
  * @property {*} backHint
+ * @property {*} [backAt]
  * @property {() => void} tapThroughBack
  * @property {(dest: any) => void} [retargetTop]
  * @property {(vol: any, letter: any, excerpt: any) => void} goToLetterFromMatthew
@@ -276,7 +278,7 @@ export function buildScreenRoutes({
   journalEntryId, createAndEditJournal,
   // ── Tap through / linking / overlays ──
   openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
-  backHint, tapThroughBack, goToLetterFromMatthew, retargetTop,
+  backHint, backAt, tapThroughBack, goToLetterFromMatthew, retargetTop,
   setNavOrigin, setNoteSheetTarget, setNotebookPickerTarget,
   // ── Bible chapter boundary props (from useReadingChainNav) ──
   bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
@@ -551,14 +553,40 @@ export function buildScreenRoutes({
   const _searchLook = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
   // plans2: following a plan is asking for its reads to count, so a plan's chapter or letter keeps the read detector on
   // with Mark as read off (only reads outside plans stay unmarked).
-  const _planHoldsOpen = () => {
+  // A place: { bookId, chapterNum } (a Bible or Matthew chapter) or { volKey, letterId } (a letter-shaped page).
+  const _planHoldsOpen = (/** @type {any} */ at) => {
     const store = _planStore();
     if (!store || typeof store.holds !== 'function') return false;
-    if (screen === 'bible-ch' || screen === 'matthew-ch') return store.holds(screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum);
-    const col = activeVolKey ? COL_BY_KEY.get(activeVolKey) : null;
-    return !!(col && letterId && store.holds(col.readKey, letterId));
+    if (at.bookId) return store.holds(at.bookId, at.chapterNum);
+    const col = at.volKey ? COL_BY_KEY.get(at.volKey) : null;
+    return !!(col && at.letterId && store.holds(col.readKey, at.letterId));
   };
-  const _readerMarkAsRead = _searchLook ? false : settings.markAsRead === false && _planHoldsOpen() ? true : settings.markAsRead;
+  const _markAsReadAt = (/** @type {any} */ at, /** @type {boolean} */ look) => (look ? false : settings.markAsRead === false && _planHoldsOpen(at) ? true : settings.markAsRead);
+  const _readerMarkAsRead = _markAsReadAt(screen === 'bible-ch' || screen === 'matthew-ch'
+    ? { bookId: screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum } : { volKey: activeVolKey, letterId }, _searchLook);
+  // TABS3: what the route decides for ONE page, asked for a swipe neighbour, so the peek is drawn with the neighbour's
+  // own values and not the page it hangs from: a search landing's look (mark-as-read off) and a plan page's mark-as-read
+  // are this page's. A neighbour is never the landing (leaving the landing retires it), so it is never a look.
+  // The back pill is the place's too: a tap-through pill belongs to the page the link opened (useFromLetterStack's
+  // backAt), and "Back to results" follows from that.
+  const pagePropsFor = (/** @type {any} */ at) => {
+    const col = at.volKey ? COL_BY_KEY.get(at.volKey) : null;
+    const place = at.bookId === 'matthew' ? { screen: 'matthew-ch', chapterNum: at.chapterNum }
+      : at.bookId ? { screen: 'bible-ch', bookId: at.bookId, chapterNum: at.chapterNum }
+      : at.letterId ? (col && col.letterScreen ? { screen: col.letterScreen, letterId: at.letterId } : screen === 'bible-study-chapter' ? { studyChapterId: at.letterId } : { letterId: at.letterId }) : {};
+    const b = backAt ? backAt(place) : { backHint, backActive };
+    const sb = searchBackActive({
+      screen: place.screen || screen, fromSearch, fromSurprise, fromWtlb,
+      fromMatthewCh: fromMatthewChRef ? fromMatthewChRef.current : null,
+      stackLength: fromLetterRef && Array.isArray(fromLetterRef.current) ? fromLetterRef.current.length : 0,
+      backActive: b.backActive, fromSearchIndex: _fromSearchIndex,
+    });
+    return {
+      markAsReadEnabled: _markAsReadAt(at, false),
+      backHint: sb ? { title: RESULTS_LABEL, volumeLabel: null, plain: true } : b.backHint,
+      navBack: sb ? { onBack: _backToResults, label: RESULTS_LABEL } : null,
+    };
+  };
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
@@ -567,6 +595,7 @@ export function buildScreenRoutes({
     onLinkOpen: openLinkSidebar,
     onBack: _navBack ? _navBack.onBack : () => window.handleAndroidBack && window.handleAndroidBack(),
     markAsReadEnabled: _readerMarkAsRead,
+    pagePropsFor,
     // Read-along (ui/components/ReadAlongHighlight.jsx). Two independent
     // gates: the sentence wash, and the follow-scroll that writes scrollTop
     // under the lease. Both default ON — an absent key must not silently
@@ -1796,6 +1825,8 @@ export function buildScreenRoutes({
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
         readTrackKey={getReadKey(bookId, chapterNum)}
         markAsReadEnabled={_readerMarkAsRead}
+        pagePropsFor={pagePropsFor}
+        bibleEdgesFor={bibleChapterEdges}
         translation={settings.translation}
         restoredNames={settings.restoredNames}
         showChapterTitle={settings.showChapterTitle !== false}
@@ -1869,6 +1900,7 @@ export function buildScreenRoutes({
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
           backHint={_readerBackHint} tapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}
           markAsReadEnabled={_readerMarkAsRead}
+          pagePropsFor={pagePropsFor}
           openLinkSidebar={openLinkSidebar}
           onNavigateToLink={navigateToLink}
         />

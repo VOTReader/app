@@ -92,7 +92,7 @@ export function ChapterView(props) {
   // TABS2: this page's own props with only the chapter swapped (see LetterView's _letterPeek): drawn as it will be.
   const _chPeek = (ch) => ({
     kind: 'screen',
-    el: <ChapterView {...props} chapter={ch} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(book.id + '-' + ch.num)} scrollKey={book.id + '-' + ch.num} />,
+    el: <ChapterView {...props} {...(props.pagePropsFor ? props.pagePropsFor(ch) : null)} chapter={ch} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(book.id + '-' + ch.num)} scrollKey={book.id + '-' + ch.num} />,
   });
   const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next Book' : 'Previous Book'), title: b.title } : null;
   const pager = {

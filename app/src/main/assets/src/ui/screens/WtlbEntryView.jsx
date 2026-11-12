@@ -308,7 +308,7 @@ export function WtlbEntryView(props) {
     const sk = letterScrollKey(volKey, full.id);
     return {
       kind: 'screen',
-      el: <WtlbEntryView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} entry={full} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
+      el: <WtlbEntryView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} {...(props.pagePropsFor ? props.pagePropsFor({ volKey: volKey, letterId: full.id }) : null)} entry={full} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   // Cross-COLLECTION neighbor along the reading chain (2026-07-19): when the
@@ -327,7 +327,7 @@ export function WtlbEntryView(props) {
     const sk = letterScrollKey(b.volKey, full.id);
     return {
       kind: 'screen',
-      el: <WtlbEntryView {...props} entry={full} volKey={b.volKey} partLabel={WTLB_PART_LABELS[b.volKey] || partLabel} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
+      el: <WtlbEntryView {...props} entry={full} volKey={b.volKey} partLabel={WTLB_PART_LABELS[b.volKey] || partLabel} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} {...(props.pagePropsFor ? props.pagePropsFor({ volKey: b.volKey, letterId: full.id }) : null)} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   const pager = {

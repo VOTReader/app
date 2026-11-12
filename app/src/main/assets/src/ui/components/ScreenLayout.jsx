@@ -296,9 +296,19 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       const next = el.scrollTop > 2;
       if (next !== on) { on = next; nav.classList.toggle('is-scrolled', on); }
     };
-    sync();
+    // TABS3: a page put at its place (a page turn, a restore) has the line it will have in that frame, with no fade;
+    // the fade is for the reader's own scrolling. The restorers announce `vot:placed` right after their scrollTop write.
+    const placed = () => {
+      if ((el.scrollTop > 2) === on) return;
+      nav.style.transition = 'none';
+      sync();
+      void nav.offsetWidth;
+      nav.style.transition = '';
+    };
+    placed();
     el.addEventListener('scroll', sync, { passive: true });
-    return () => el.removeEventListener('scroll', sync);
+    el.addEventListener('vot:placed', placed);
+    return () => { el.removeEventListener('scroll', sync); el.removeEventListener('vot:placed', placed); };
   }, [inert]);
 
   // Inert clone (a pager peek): render ONLY the scrollable content, in a

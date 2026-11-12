@@ -135,7 +135,7 @@ export function LetterView(props) {
     const sk = custom ? custom.scrollKey : letterScrollKey(volKey, full.id);
     return {
       kind: 'screen',
-      el: <LetterView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} letter={full} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
+      el: <LetterView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} {...(props.pagePropsFor ? props.pagePropsFor({ volKey: volKey, letterId: full.id }) : null)} letter={full} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   // Cross-VOLUME neighbor along the reading chain (2026-07-19, owner-directed
@@ -157,7 +157,7 @@ export function LetterView(props) {
     const sk = letterScrollKey(b.volKey, full.id);
     return {
       kind: 'screen',
-      el: <LetterView {...props} letter={full} volKey={b.volKey} volumeLabel={destCol.label} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
+      el: <LetterView {...props} letter={full} volKey={b.volKey} volumeLabel={destCol.label} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} {...(props.pagePropsFor ? props.pagePropsFor({ volKey: b.volKey, letterId: full.id }) : null)} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   const pager = {

@@ -48,6 +48,8 @@ export function MatthewChapterView({
   openLinkSidebar, onNavigateToLink,
   // search200 UX B1: the results back and the tracker switch for a search hit's look
   navBack = null, markAsReadEnabled,
+  // TABS3: the route's values for one page (screen-routes pagePropsFor), for a swipe neighbour
+  pagePropsFor = null,
 }) {
   if (!chapter) return null;
   // Chain-aware boundaries: when entered via Studies (fromStudies=true),
@@ -56,10 +58,17 @@ export function MatthewChapterView({
   // first chapter. Matthew's own ch N ↔ ch N±1 uses ChapterView's
   // built-in prevCh/nextCh so the inner chapters feel normal.
   const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-  const atFirstCh = chapter.num === 1;
-  const atLastCh = chapter.num === mtLastNum;
-  const chainPrev = fromStudies && atFirstCh ? prevChainEntry('matthew-study') : null;
-  const chainNext = fromStudies && atLastCh ? nextChainEntry('matthew-study') : null;
+  const chainPrevAt = (/** @type {number} */ num) => (fromStudies && num === 1 ? prevChainEntry('matthew-study') : null);
+  const chainNextAt = (/** @type {number} */ num) => (fromStudies && num === mtLastNum ? nextChainEntry('matthew-study') : null);
+  const edgeOf = (/** @type {any} */ e) => (e ? { short: studyShortTitle(e.title), title: studyShortTitle(e.title) } : null);
+  const chainPrev = chainPrevAt(chapter.num);
+  const chainNext = chainNextAt(chapter.num);
+  // TABS3: a swipe neighbour's own edges and mark-as-read (ChapterView's _chPeek), so chapter 1 or 28 under the finger
+  // carries the end card it will have.
+  const pageFor = (/** @type {any} */ ch) => ({
+    prevBoundary: edgeOf(chainPrevAt(ch.num)), nextBoundary: edgeOf(chainNextAt(ch.num)),
+    ...(pagePropsFor ? pagePropsFor({ bookId: 'matthew', chapterNum: ch.num }) : null),
+  });
   return (
     <>
       <ChapterView
@@ -74,9 +83,10 @@ export function MatthewChapterView({
         onMarkRead={(payload) => markRead('matthew', chapterNum, payload)}
         readTrackKey={getReadKey ? getReadKey('matthew', chapterNum) : undefined}
         markAsReadEnabled={markAsReadEnabled === undefined ? settings.markAsRead : markAsReadEnabled}
-        prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
+        pagePropsFor={pageFor}
+        prevBoundary={edgeOf(chainPrev)}
         onPrevBoundary={chainPrev ? () => { setFromStudies(true); goToChainEntryLast(chainPrev.slug)(); } : null}
-        nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}
+        nextBoundary={edgeOf(chainNext)}
         onNextBoundary={chainNext ? () => { setFromStudies(true); goToChainEntryFirst(chainNext.slug)(); } : null}
         onSearch={goSearch}
         onSettings={goSettings}

@@ -105,6 +105,21 @@ const ANALYSIS = () => {
       r.settleJump = +jump.toFixed(2); r.settleJumpAtMs = at;
       return r;
     },
+    // TABS3: the bars outside the reading area. Top bar: frames from release on against the settled frame (the
+    // drag itself does not touch it). Bottom (mini player, tab bar): every frame against the first, the mini
+    // player's moving progress line aside (a mad, not a pixel count, so a 1-px line stays far under 1).
+    async bars(frames, rect, tRel) {
+      const imgs = await Promise.all(frames.map((f) => load(f.url)));
+      const fin = imgs[imgs.length - 1];
+      const W0 = fin.width; const top = Math.max(1, Math.round(rect.y)); const by = Math.round(rect.y + rect.h); const bh = Math.max(1, fin.height - by);
+      const T = (img) => px(img, W0, top, 0, 0, W0, top).d; const B = (img) => px(img, W0, bh, 0, by, W0, bh).d;
+      let t = 0, ta = null, b = 0, ba = null;
+      for (let i = 0; i < imgs.length; i++) {
+        if (frames[i].t >= tRel + 0.36) { const c = cmp(T(imgs[i]), T(fin)).mad; if (c > t) { t = c; ta = Math.round((frames[i].t - tRel) * 1000); } }
+        const d = cmp(B(imgs[i]), B(imgs[0])).mad; if (d > b) { b = d; ba = Math.round((frames[i].t - tRel) * 1000); }
+      }
+      return { top: +t.toFixed(2), topAt: ta, bottom: +b.toFixed(2), bottomAt: ba };
+    },
   };
 };
 
@@ -252,7 +267,7 @@ async function main() {
   };
 
   /* ── a swipe: CDP touch drag on the reading area, screencast frames, then the numbers ── */
-  const swipe = async (label, dir, throttle) => {
+  const swipe = async (label, dir, throttle, bars = false) => {
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     const rect = await scrollerRect();
     const frames = [];
@@ -285,6 +300,11 @@ async function main() {
     for (const f of frames) { let d = null; for (const l of log) if (l.t <= f.t) d = l.dx; f.dx = d; }
     const r = await ana.evaluate((fr, rc, d, t, s) => window.__ana.swipe(fr, rc, d, t, s), frames, rect, dx, tRel, 0.36);
     r.label = label; r.throttle = throttle; r.dom = domDiff || 'same'; r.top = liveSig && liveSig.top;
+    // TABS3: the top bar (its hairline included) and, with sound, the mini player and tab bar: every frame against the
+    // settled one (A1 / T1). The top bar's line is drawn as the new page has it from the frame of release.
+    r.bars = await ana.evaluate((fr, rc, t) => window.__ana.bars(fr, rc, t), frames, rect, tRel);
+    need(r.bars.top <= LIMITS.settleJump, `T1 ${label} x${throttle}: the top bar changed after release (mad ${r.bars.top} at +${r.bars.topAt} ms)`);
+    if (bars) need(r.bars.bottom <= LIMITS.settleJump, `A1 ${label}: the mini player / tab bar moved during the swipe (mad ${r.bars.bottom} at +${r.bars.bottomAt} ms)`);
     out.swipes.push(r);
     if (SHOTS && r.release >= 0) {
       savePair(`tabs2-swipe-${label}-x${throttle}-release.png`, frames[r.release].url);
@@ -395,6 +415,126 @@ async function main() {
     const activeIdx = await page.evaluate(() => [...document.querySelectorAll('.tabs-overview .tab-card')].findIndex((c) => c.classList.contains('active')));
     await pickTab(activeIdx === 0 ? 1 : 0);
     await swipe('restored-next', 'next', 1);
+    await closeTabs().catch(() => {});
+
+    /* TABS3: the page kinds the swipes above do not reach, opened the way a listener does (the listening desk's title
+       button, __openAudioText), the sound then stopped: book and volume edges, a cross-book swipe, Words To Live By,
+       The Blessed, Holy Days, a study (letter-shaped and Matthew), a search landing. Then A1: a swipe while it plays. */
+    const ids = await page.evaluate(async () => {
+      await new Promise((done) => {
+        if (typeof window.BIBLE_STUDIES !== 'undefined') { done(); return; }
+        const s = document.createElement('script'); s.src = 'src/data/bible-studies.js'; s.onload = done; s.onerror = done; document.head.appendChild(s);
+      });
+      const arr = (n) => (Array.isArray(window[n]) ? window[n] : []);
+      const hd = arr('HOLY_DAYS');
+      let hdAt = -1;
+      for (let i = 0; i + 1 < hd.length; i++) if (hd[i].paragraphs && hd[i + 1].paragraphs) { hdAt = i; break; }
+      const v7 = arr('LETTERS_V7'); const w1 = arr('WTLB_ONE');
+      const studies = [];
+      for (const st of (window.BIBLE_STUDIES || [])) {
+        const ch = (st.chapters || []).filter((c) => Array.isArray(c.blocks));
+        if (ch.length >= 3) studies.push(ch[0].id, ch[1].id);
+      }
+      const study = studies;
+      return { v7a: v7.length > 1 ? v7[v7.length - 2].id : null, v1: arr('LETTERS_V1').length > 3 ? arr('LETTERS_V1')[3] : null,
+        w1: w1[1] && w1[1].id, w1last: w1.length ? w1[w1.length - 1].id : null, bl: arr('THE_BLESSED')[1] && arr('THE_BLESSED')[1].id,
+        hd: hdAt >= 0 ? hd[hdAt].id : null, study };
+    });
+    out.more = { ids: { ...ids, v1: ids.v1 && ids.v1.id } };
+    const viaDesk = async (how, arg, keepPlaying) => {
+      await page.evaluate(() => { if (window.__loadVotCorpus) window.__loadVotCorpus(); if (window.__loadBibleCorpus) window.__loadBibleCorpus(); });
+      await page.waitForFunction("typeof window.__openAudioText === 'function' && window.__votCorpus && window.__votCorpus.loaded && window.__bibleCorpus && window.__bibleCorpus.loaded");
+      const ok = await page.evaluate((h, a) => {
+        if (h === 'bible') {
+          window.__setBibleAudioEdition && window.__setBibleAudioEdition('brm-kjv');
+          const ed = window.BIBLE_AUDIO_EDITIONS && window.BIBLE_AUDIO_EDITIONS['brm-kjv'];
+          if (!ed) return false;
+          AudioPlayer.playBibleBook({ volKey: ed.volKey, bookId: a[0], label: ed.label, chapterNum: a[1] });
+        } else {
+          let l = null;
+          if (h === 'study') { for (const st of (window.BIBLE_STUDIES || [])) for (const c of (st.chapters || [])) if (c.id === a[1]) l = c; }
+          else l = (Array.isArray(window[a[2]]) ? window[a[2]] : []).find((x) => x.id === a[1]);
+          if (!l) return false;
+          AudioPlayer.playLetter({ volKey: a[0], letter: l, collectionLabel: 'e2e' });
+        }
+        const st = AudioPlayer.getState(); const tr = st.queue[st.qi];
+        if (!tr) return false;
+        window.__openAudioText(tr);
+        return true;
+      }, how, arg);
+      if (!ok) throw new Error(`walk: could not open ${how} ${JSON.stringify(arg)}`);
+      await sleep(1500);
+      if (!keepPlaying) { await page.evaluate(() => AudioPlayer.stop()); await sleep(800); }
+    };
+    const kinds = [
+      ['bible', ['genesis', 49], 'genesis-49-to-last', 'next'],          // the peek is a last chapter: its Exodus end card
+      [null, null, 'genesis-50-to-exodus', 'next'],                       // across books
+      [null, null, 'exodus-1-back-to-genesis', 'prev'],
+      ['bible', ['revelation', 21], 'revelation-21-to-last', 'next'],     // Revelation 22's Volume One bridge
+      ['letter', ['seven', ids.v7a, 'LETTERS_V7'], 'v7-to-last-letter', 'next'],
+      [null, null, 'v7-last-across-volumes', 'next'],
+      ['letter', ['wtlb1', ids.w1, 'WTLB_ONE'], 'wtlb-next', 'next'],
+      ['letter', ['wtlb1', ids.w1last, 'WTLB_ONE'], 'wtlb-part-one-to-two', 'next'],
+      ['letter', ['blessed', ids.bl, 'THE_BLESSED'], 'blessed-next', 'next'],
+      ['letter', ['holydays', ids.hd, 'HOLY_DAYS'], 'holydays-next', 'next'],
+      ['study', ['study', ids.study], 'study-next', 'next'],
+      ['bible', ['matthew', 27], 'matthew-27-to-last', 'next'],
+    ];
+    for (const [how, arg, label, dir] of kinds) {
+      try {
+        if (how) {
+          if (arg.some((x) => x == null)) { fails.push(`walk: ${label}: no page to open (${JSON.stringify(arg)})`); continue; }
+          if (how === 'study') {   // the first study chapter that has a recording
+            let opened = false;
+            for (const id of arg[1]) { try { await viaDesk(how, [arg[0], id], false); opened = true; out.more.ids.studyOpened = id; break; } catch { /* no recording */ } }
+            if (!opened) throw new Error('no study chapter with a recording');
+          } else await viaDesk(how, arg, false);
+        }
+        await swipe(label, dir, label === 'genesis-50-to-exodus' ? 4 : 1);
+      } catch (e) { fails.push(`walk: ${label}: ${(e && e.message) || e}`); }
+    }
+
+    // a search landing: the "Back to results" pill and the look's mark-as-read are that page's, not its neighbour's
+    try {
+      const title = ids.v1 && ids.v1.title;
+      await page.evaluate(() => window.__goSearch && window.__goSearch()); await sleep(900);
+      const inp = await page.waitForSelector('input[type="search"], input[type="text"]', { timeout: 8000 });
+      await inp.type(title, { delay: 10 }); await sleep(2500);
+      const hit = await page.evaluate((t) => {
+        const el = [...document.querySelectorAll('button, [role="button"], a, li')].find((b) => b.getClientRects().length && b.tagName !== 'INPUT'
+          && (b.textContent || '').includes(t) && !b.closest('form'));
+        if (!el) return false; el.click(); return true;
+      }, title);
+      if (!hit) throw new Error('no hit for ' + title);
+      await sleep(1800);
+      out.more.searchPill = await page.evaluate(() => /results/i.test((document.querySelector('.screen-layout') || document.body).textContent || ''));
+      await swipe('search-landing-next', 'next', 1);
+      await swipe('search-landing-back', 'prev', 1);
+    } catch (e) { fails.push(`walk: search landing: ${(e && e.message) || e}`); }
+
+    // A1: Genesis 2 playing; swipe to 3 and back. The sound runs on (same track, time only rises, no pause), the bars
+    // above and below the reading area hold still in every frame, and the page that plays still has read-along on it.
+    try {
+      await viaDesk('bible', ['genesis', 2], true);
+      await page.waitForFunction('AudioPlayer.getState().duration > 0', { timeout: 25000 });
+      await sleep(1500);
+      const aud = () => page.evaluate(() => { const s = AudioPlayer.getState(); const t = s.queue[s.qi]; const m = [...document.querySelectorAll('audio')].find((x) => x.currentSrc) || null; return { key: t && (t.key || t.id || JSON.stringify(t).slice(0, 80)), src: m && m.currentSrc.slice(-60), paused: m ? m.paused : null, time: m && !m.paused ? +m.currentTime.toFixed(2) : null }; });
+      const a0 = await aud();
+      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0 }; for (const m of document.querySelectorAll('audio')) { m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); } });
+      await swipe('audio-next', 'next', 1, true);
+      const a1 = await aud();
+      await swipe('audio-back', 'prev', 1, true);
+      const a2 = await aud();
+      const ra = await page.evaluate(() => !!document.querySelector('.screen-layout > .pager-viewport > .screen-scroll .reading-along'));
+      const ev = await page.evaluate(() => window.__a1);
+      out.more.audio = { a0, a1, a2, readAlongOnPlayingPage: ra, events: ev };
+      need(a1.key === a0.key && a2.key === a0.key, `A1 the track changed during a swipe (${a0.key} -> ${a1.key} -> ${a2.key})`);
+      need(a0.src === a1.src && a1.src === a2.src, `A1 the recording changed during a swipe (${a0.src} -> ${a1.src} -> ${a2.src})`);
+      need(a0.time == null || (a1.time > a0.time && a2.time > a1.time), `A1 the sound did not run on through the swipes (${a0.time}, ${a1.time}, ${a2.time})`);
+      need(ev.pauses === 0 && ev.seeks === 0, `A1 the audio paused or seeked during the swipes (${JSON.stringify(ev)})`);
+      need(ra, 'A1 back on the playing page, read-along is not on it');
+      await page.evaluate(() => AudioPlayer.stop());
+    } catch (e) { fails.push(`walk: audio: ${(e && e.message) || e}`); }
   } catch (e) {
     fails.push(`walk: ${(e && e.stack) || e}`);
   } finally {

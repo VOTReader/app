@@ -173,12 +173,12 @@ export function BibleChapterView(props) {
   // another book gets that book's own recording and edges (BIBLE_BOOK_LIST order; the far edge is not drawn this deep).
   const _versesPeek = (bk, ch) => {
     const same = bk.id === book.id;
-    const list = typeof BIBLE_BOOK_LIST !== 'undefined' ? BIBLE_BOOK_LIST : [];
-    const at = same ? -1 : list.findIndex((b) => b.id === bk.id);
-    const other = same ? null : {
-      bibleAudio: bibleAudioFor ? bibleAudioFor(bk.id) : null,
-      prevBook: at > 0 ? list[at - 1] : null, nextBook: at >= 0 && at < list.length - 1 ? list[at + 1] : null,
-      prevBoundaryTitle: null, nextBoundaryTitle: null,
+    // TABS3: the neighbour's OWN book edges (a first or last chapter's end card and arrow state, Revelation 22's
+    // Volume One bridge) and the route's own values for it (mark-as-read under a plan or a search look).
+    const other = {
+      ...(props.bibleEdgesFor ? props.bibleEdgesFor(bk, ch.num) : null),
+      ...(same ? null : { bibleAudio: bibleAudioFor ? bibleAudioFor(bk.id) : null }),
+      ...(props.pagePropsFor ? props.pagePropsFor({ bookId: bk.id, chapterNum: ch.num }) : null),
     };
     return {
       kind: 'screen',
