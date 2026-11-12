@@ -29,7 +29,7 @@ import { BarAction } from '../components/RootNav.jsx';
 import { GearMenuBtn } from '../components/GearMenu.jsx';
 import { SectionLabel, ListRow, EmptyState } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
-import { readKind, readWords } from '../../utils/read-kind.js';
+import { readKind, readWords, countedReads } from '../../utils/read-kind.js';
 import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
@@ -187,9 +187,12 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   }, []);
 
   // ── Aggregate ─────────────────────────────────────────────────────────
-  const totalRead = readItems ? Object.keys(readItems).length : 0;
+  // The marks Settings > Reading progress counts (no Answers topics, no Hidden Manna): one number on every screen (C3).
+  const counted = React.useMemo(() => countedReads(readItems), [readItems]);
+  const totalRead = Object.keys(counted).length;
+  const anyRead = readItems ? Object.keys(readItems).length > 0 : false;
   // POL5: the mock's "letter read" when every mark is a letter ("chapters read" when all are chapters); a mix keeps both words.
-  const readSaid = readWords(totalRead, readKind(readItems), 'chapter or letter read', 'chapters and letters read');
+  const readSaid = readWords(totalRead, readKind(counted), 'chapter or letter read', 'chapters and letters read');
   const jrnStats = (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.get() : { currentStreak: 0 };
   const streak = jrnStats.currentStreak || 0;
   const readStreak = (typeof ReadingStreakStore !== 'undefined') ? (ReadingStreakStore.get().currentStreak || 0) : 0;
@@ -374,7 +377,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   /* A NEW PROFILE IS ONE LINE AND ONE ACTION (n117, A08.3): it was the sentence and then a page of
      zero rows (0 read, 0 days, 0 entries, 0 notes...) that said the same thing ten times. Nothing kept
      anywhere: the sentence, a button that opens the first letter, and the Mark as Read note if it is off. */
-  const isEmpty = totalRead === 0 && readStreak === 0 && journalCount === 0 && streak === 0 && noteCount === 0
+  const isEmpty = !anyRead && readStreak === 0 && journalCount === 0 && streak === 0 && noteCount === 0
     && linkCount === 0 && bookmarkCount === 0 && markCount === 0 && !(historyCount > 0) && voiceMins === 0
     && listenFacts.length === 0 && planRows.length === 0 && finishedPlans.length === 0
     && !(journalWords > 0) && !(readingStats && readingStats.totalWordsRead > 0);

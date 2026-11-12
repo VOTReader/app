@@ -463,9 +463,18 @@ export function rowOnPhone(off, tracks) {
 /**
  * The whole minutes a Listen plays, for "Listen · 12 min" (player brief 3f), from the lengths baked at build time
  * (D1, the lazy AudioLengths table, loaded here on first use); null while any recording of it has none.
- * @param {Array<{ url?: string }>} tracks @returns {number | null}
+ * `paced` (a reading, not a song): the minutes at the reader's playback speed, since that is how long it plays (C5:
+ * "12 min" for a portion that plays in 8 at 1.5×). Songs always play at 1×, so their callers leave it off.
+ * @param {Array<{ url?: string }>} tracks @param {boolean} [paced] @returns {number | null}
  */
-export function useListenMinutes(tracks) {
+export function useListenMinutes(tracks, paced = false) {
+  const store = /** @type {any} */ (globalThis).AudioLibraryStore;
+  const lib = store && typeof store.getPlaybackRate === 'function' ? store : null;
+  React.useSyncExternalStore(
+    React.useCallback((/** @type {() => void} */ cb) => (lib && typeof lib.subscribe === 'function' ? lib.subscribe(cb) : () => {}), [lib]),
+    () => (lib && typeof lib.getVersion === 'function' ? lib.getVersion() : 0),
+  );
+  const rate = paced && lib ? Number(lib.getPlaybackRate()) : 1;
   const lengths = typeof AudioLengths !== 'undefined' ? AudioLengths : null;
   React.useSyncExternalStore(lengths ? lengths.lengthsStore.subscribe : _noSub, lengths ? lengths.lengthsStore.getVersion : _zero);
   React.useEffect(() => { if (lengths && !lengths.lengthsLoaded()) void lengths.lengthsReady(); }, [lengths]);
@@ -477,7 +486,7 @@ export function useListenMinutes(tracks) {
     if (s == null) return null;
     sec += s;
   }
-  return Math.max(1, Math.round(sec / 60));
+  return Math.max(1, Math.round(sec / (rate > 0 && isFinite(rate) ? rate : 1) / 60));
 }
 
 export function CloudOffIcon() {

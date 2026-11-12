@@ -22,6 +22,7 @@ import { ListGroup, ListRow } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { readWords } from '../../utils/read-kind.js';
 import { continueLabel } from './HomeScreen.jsx';
+import { useNow } from '../components/TodayCard.jsx';
 
 // The stores behind the Notes, Links, Bookmarks, Journal, Highlights and plan lines.
 const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore', 'ReadingStreakStore']);
@@ -44,24 +45,38 @@ export function readWhen(ts, now = new Date()) {
 }
 
 /** The second line of a History row: its place ("Volume Two, Letter 14", or the Bible) and when. @param {any} entry @param {any} lab */
-function recentLine(entry, lab) {
+function recentLine(entry, lab, now = new Date()) {
   // "Volume One · Letter 1 · today" (mock v2 l-root): the place's own comma reads as one more dot.
   const place = (lab.place || (entry.type === 'study-chapter' ? 'Studies' : entry.type === 'letter' ? '' : 'The Scriptures of Truth')).replace(', ', ' · ');
-  return [place, readWhen(entry.ts)].filter(Boolean).join(' · ');
+  return [place, readWhen(entry.ts, now)].filter(Boolean).join(' · ');
 }
 
-/** The Reading plans row's line: the plan that runs and its day, or what plans there are. @param {any[]} runs */
-export function plansLine(runs) {
+/** The Reading plans row's line: the plan that runs and its day, or what plans there are. @param {any[]} runs @param {Date} [now] */
+export function plansLine(runs, now = new Date()) {
   if (!runs.length) return 'The Bible, the letters, short starts';
   let first = runName(runs[0], null);
   try {
-    const row = runRow(runs[0], new Date());
+    const row = runRow(runs[0], now);
     // plans2: one phrase per state, the same as the plan's own page (paused, a later start, the day).
     if (row.paused) first += ' · paused';
     else if (row.notStarted) first += ' · starts ' + shortDate(row.start).replace(/, \d{4}$/, '');
     else if (!row.finished) first += ' · day ' + (row.day + 1) + ' of ' + row.totalDays;
   } catch (_e) { /* a Volumes plan before the letters load: its name alone */ }
   return runs.length > 1 ? first + ' · and ' + (runs.length - 1) + ' more' : first;
+}
+
+/**
+ * The reading streak as it stands on `now`: the stored count while its last reading day is today or yesterday, 0 once
+ * a whole day was missed. The store only applies that break at load and when Progress opens; the Library reads
+ * through this so an app left running over a missed day never shows the old count. Nothing is written.
+ * @param {any} data  ReadingStreakStore.get() @param {Date} [now] @returns {number}
+ */
+export function streakOn(data, now = new Date()) {
+  const n = data && data.currentStreak > 0 ? Math.floor(data.currentStreak) : 0;
+  const m = n && typeof data.lastReadDate === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(data.lastReadDate) : null;
+  if (!m) return n;
+  const gap = Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(+m[1], +m[2] - 1, +m[3])) / 86400000);
+  return gap >= 2 ? 0 : n;
 }
 
 /**
@@ -119,7 +134,9 @@ export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpe
   const linkCount = typeof g.LinkStore !== 'undefined' ? g.LinkStore.all().length : 0;
   const bookmarkCount = typeof g.BookmarkStore !== 'undefined' ? g.BookmarkStore.count() : 0;
   const journalCount = typeof g.JournalStore !== 'undefined' ? g.JournalStore.count() : 0;
-  const streak = g.ReadingStreakStore && typeof g.ReadingStreakStore.get === 'function' ? (g.ReadingStreakStore.get().currentStreak || 0) : 0;
+  // The day, re-read when the app comes back and at midnight: the streak, the plan's day and "today" follow it.
+  const now = useNow();
+  const streak = g.ReadingStreakStore && typeof g.ReadingStreakStore.get === 'function' ? streakOn(g.ReadingStreakStore.get(), now) : 0;
   // The mark walk runs once per AnnotationStore version, not on every render.
   const highlightCount = React.useMemo(
     () => (typeof g.AnnotationStore === 'undefined' ? 0 : countMarks(g.AnnotationStore.all())),
@@ -142,7 +159,7 @@ export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpe
     <ScreenLayout root navChildren={rootNavStart({ title: 'Library', onSearch })} navEnd={<RootGear onSettings={onSettings} />}>
       <div className="root-screen library-root">
         <ListGroup ariaLabel="Plans and progress">
-          <ListRow icon="cal" title="Reading plans" meta={plansLine(runningPlans)} onClick={onOpenPlans} />
+          <ListRow icon="cal" title="Reading plans" meta={plansLine(runningPlans, now)} onClick={onOpenPlans} />
           <ListRow icon="chart" title="Progress" meta={progressLine(totalReadCount, streak, readKind)} onClick={onOpenProgress} />
         </ListGroup>
 
@@ -156,7 +173,7 @@ export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpe
         {recent.length ? (
           <ListGroup label="History" aside={onOpenHistory ? 'See all' : undefined} onAside={onOpenHistory} className="lib-recent">
             {recent.map(({ entry, lab }, i) => (
-              <ListRow key={(entry.key || entry.ts || 0) + ':' + i} noLead title={lab.title} meta={recentLine(entry, lab)}
+              <ListRow key={(entry.key || entry.ts || 0) + ':' + i} noLead title={lab.title} meta={recentLine(entry, lab, now)}
                 onClick={() => { if (onOpenHistoryEntry) onOpenHistoryEntry(entry); }} />
             ))}
           </ListGroup>

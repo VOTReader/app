@@ -38,6 +38,10 @@ function _valid(r) {
 const _keysFor = (/** @type {string} */ bid, /** @type {any} */ cid) =>
   (bid === 'matthew' ? ['matthew:' + cid, 'matthew-plain:' + cid] : [bid + ':' + cid]);
 
+/** Whether a run's start date has come (a 'YYYY-MM-DD' key compares as text). Reads made before a later start are
+    counted only when the reader asks (Count my N, a session, a tick on the plan page), never on their own (C6). */
+const _begun = (/** @type {any} */ r, /** @type {string} */ key) => !(typeof r.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.start) && r.start > key);
+
 export const ReadingPlanStore = extendStore(
   CachedStore('vot-reading-plans', /** @type {PlanRun[]} */ ([]), { idb: true, crossTabMerge: mergePlanStore }),
   {
@@ -97,13 +101,13 @@ export const ReadingPlanStore = extendStore(
       if (!bid || cid == null || cid === '') return false;
       const keys = _keysFor(String(bid), cid);
       // P2 3.8: a paused plan counts nothing while paused, so only a running run ticks, or holds the read.
-      const held = this.all().some((r) => r.status === 'running' && r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
-      if (this._shouldDefer('noteRead', bid, cid, now)) return held;
       const when = now || new Date();
       const key = todayKey(when);
+      const held = this.all().some((r) => r.status === 'running' && _begun(r, key) && r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
+      if (this._shouldDefer('noteRead', bid, cid, now)) return held;
       let changed = false;
       const next = this._load().map((r) => {
-        if (!_valid(r) || r.status !== 'running') return r;
+        if (!_valid(r) || r.status !== 'running' || !_begun(r, key)) return r;
         let out = r;
         for (const k of keys) out = tickItem(out, k, key, when.getTime());
         if (out !== r) changed = true;
@@ -117,14 +121,15 @@ export const ReadingPlanStore = extendStore(
     },
 
     /**
-     * Whether a running or paused run holds this chapter or letter (plans2: the reader keeps its read detector on for
+     * Whether a running or paused run that has started holds this chapter or letter (plans2: the reader keeps its read detector on for
      * plan items when Mark as read is off).
      * @param {string} bid @param {string | number} cid
      */
     holds(bid, cid) {
       if (!bid || cid == null || cid === '') return false;
       const keys = _keysFor(String(bid), cid);
-      return this.active().some((r) => r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
+      const key = todayKey(new Date());
+      return this.active().some((r) => _begun(r, key) && r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
     },
 
     /**

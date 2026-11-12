@@ -217,7 +217,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
   const road = sections(run, bookTitle);
   const curSec = road.findIndex((s) => s.done < s.count);
   const roadShown = allRoad ? road : road.slice(Math.max(0, curSec), Math.max(0, curSec) + 3);
-  // The day the Today card shows (today's portion, tomorrow's once done, day 1 before the start) is not repeated here.
+  // The day the Today card shows (today's portion, tomorrow's once done, the first day not yet counted before the start) is not repeated here.
   const coming = days.filter((d) => !d.done && d.day > st.day).slice(0, 3);
   const listenRefs = left.map((it) => itemRef(it.k));
   const goldLate = !!(run.pace && run.pace.mode === 'by');
@@ -238,8 +238,8 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
     todayCard = (
       <div className="ui-card plan-today">
         <p className="plan-today-head"><span className="root-eyebrow">{'Starts ' + dayDate(run.start)}</span></p>
-        <p className="plan-today-title">{itemsLabel(dayItems(run, 0), bookTitle)}</p>
-        <p className="plan-today-sub">{'Day 1 · about ' + minText(minutesFor(itemsWords(dayItems(run, 0))))}</p>
+        <p className="plan-today-title">{itemsLabel(today, bookTitle)}</p>
+        <p className="plan-today-sub">{'Day ' + (st.day + 1) + ' · about ' + minText(minutesFor(itemsWords(today)))}</p>
         <button type="button" className="plan-text-btn plan-link" onClick={() => saveRun(startToday(run, new Date()))}>Start today instead</button>
       </div>
     );

@@ -172,7 +172,7 @@ export function HeroListen({ onClick, canPlay, resume, here, tracks, name = '', 
   const loading = isHere && st.status === 'loading';
   const late = useStillLoading(loading, (cur && cur.url) || '');
   const list = tracks ? tracks() : [];
-  const minutes = useListenMinutes(list);
+  const minutes = useListenMinutes(list, true);
   // The recording already sounding here can always pause, offline or not.
   const off = !isHere && !canPlay();
   const other = off && alt ? alt() : null;

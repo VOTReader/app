@@ -70,7 +70,7 @@ import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
 import { bibleChapterEdges } from '../hooks/use-reading-chain-nav.js';
 import { openYourData } from '../utils/your-data-link.js';
-import { readKind } from '../utils/read-kind.js';
+import { readKind, countedReads } from '../utils/read-kind.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1356,7 +1356,7 @@ export function buildScreenRoutes({
           onOpenProgress={goProgress}
           onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={(typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore ? ReadingPlanStore.active().length : 0) || (Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0)}
-          totalReadCount={Object.keys(readItems || {}).length} readKind={readKind(readItems)}
+          totalReadCount={Object.keys(countedReads(readItems)).length} readKind={readKind(countedReads(readItems))}
           onSearch={goSearch}
           onSettings={goSettings}
           historyEnabled={settings.historyEnabled !== false}

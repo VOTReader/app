@@ -119,6 +119,46 @@ describe('useReadProgress — audio listen bridge: Bible chapters', () => {
   });
 });
 
+describe('useReadProgress — a first read claimed, then measured, is one read (C4)', () => {
+  const stats = () => { window.ReadingStatsStore = { recordCompletion: vi.fn(), clearProgress: vi.fn() }; return window.ReadingStatsStore; };
+  afterEach(() => { delete window.ReadingStatsStore; });
+
+  it('a plan session marks the item at its end panel, then the detector completes: read once, not a re-read', () => {
+    const st = stats();
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+    act(() => result.current.markRead('genesis', 4));
+    expect(result.current.readItems['v1:genesis:4']).toBe(1);
+    act(() => result.current.markRead('genesis', 4, { words: 800, activeMs: 90000 }));
+    expect(result.current.readItems['v1:genesis:4']).toBe(1);
+    expect(st.recordCompletion).toHaveBeenCalledWith(expect.objectContaining({ key: 'v1:genesis:4', wasReadBefore: false }));
+    // The next completion is a real second time through.
+    act(() => result.current.markRead('genesis', 4, { words: 800, activeMs: 90000 }));
+    expect(result.current.readItems['v1:genesis:4']).toBe(2);
+    expect(st.recordCompletion).toHaveBeenLastCalledWith(expect.objectContaining({ wasReadBefore: true }));
+  });
+
+  it('a mark stored before this run (as main wrote it: true or a count) still counts a completion as a re-read', () => {
+    const st = stats();
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: { 'v1:genesis:4': true, 'v1:genesis:5': 2 }, markAsReadEnabled: true }));
+    act(() => result.current.markRead('genesis', 4));   // a bounce on an already-read item claims nothing
+    act(() => result.current.markRead('genesis', 4, { words: 800, activeMs: 90000 }));
+    expect(result.current.readItems['v1:genesis:4']).toBe(2);
+    expect(st.recordCompletion).toHaveBeenLastCalledWith(expect.objectContaining({ wasReadBefore: true }));
+    act(() => result.current.markRead('genesis', 5, { words: 800, activeMs: 90000 }));
+    expect(result.current.readItems['v1:genesis:5']).toBe(3);
+  });
+
+  it('Not read yet takes the claim back: the read that follows is a first read', () => {
+    const st = stats();
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+    act(() => result.current.markRead('genesis', 4));
+    act(() => result.current.unmarkRead('genesis', 4));
+    act(() => result.current.markRead('genesis', 4, { words: 800, activeMs: 90000 }));
+    expect(result.current.readItems['v1:genesis:4']).toBe(1);
+    expect(st.recordCompletion).toHaveBeenLastCalledWith(expect.objectContaining({ wasReadBefore: false }));
+  });
+});
+
 describe('useReadProgress — reading plans tick even with Mark as read off (mw18, call 3b; plans2 one read record)', () => {
   it('a completed read, a manual mark and a full listen each tick the running plan AND write the read record; a read outside plans stays unmarked', async () => {
     const { ReadingPlanStore } = await import('../stores/reading-plan-store.js');

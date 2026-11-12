@@ -5,7 +5,7 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
-import { LibraryScreen, readWhen, plansLine, progressLine, RECENT_ROWS } from './LibraryScreen.jsx';
+import { LibraryScreen, readWhen, plansLine, progressLine, streakOn, RECENT_ROWS } from './LibraryScreen.jsx';
 
 const GLOBALS = ['ScreenLayout', 'NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore', 'ReadingStreakStore', 'COL_BY_INDEX_SC'];
 
@@ -198,6 +198,32 @@ describe('LibraryScreen — the Progress line', () => {
     globalThis.ReadingStreakStore = { subscribe: () => () => {}, getVersion: () => 0, get: () => ({ currentStreak: 2 }) };
     renderLibrary({ totalReadCount: 5 });
     expect(screen.getByRole('button', { name: /Progress/ }).textContent).toContain('5 read · 2 days in a row');
+  });
+});
+
+describe('LibraryScreen — the streak on the day it is read (C2)', () => {
+  const day = (d) => new Date(2026, 10, d, 9, 0, 0);
+  it('keeps the count while the last reading day is today or yesterday, and drops it after a missed day', () => {
+    const data = { currentStreak: 5, longestStreak: 9, lastReadDate: '2026-11-09', totalDays: 40 };
+    expect(streakOn(data, day(9))).toBe(5);
+    expect(streakOn(data, day(10))).toBe(5);
+    expect(streakOn(data, day(11))).toBe(0);
+    expect(streakOn(data, day(12))).toBe(0);
+    expect(streakOn({ currentStreak: 0, lastReadDate: null }, day(12))).toBe(0);
+    expect(streakOn(null, day(12))).toBe(0);
+  });
+
+  it('the Library row drops a streak the store has not broken yet (app left running over a missed day)', () => {
+    setupGlobals();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(day(12));
+    try {
+      globalThis.ReadingStreakStore = { subscribe: () => () => {}, getVersion: () => 0, get: () => ({ currentStreak: 5, lastReadDate: '2026-11-09' }) };
+      renderLibrary({ totalReadCount: 5 });
+      const text = screen.getByRole('button', { name: /Progress/ }).textContent;
+      expect(text).toContain('5 read');
+      expect(text).not.toContain('in a row');
+    } finally { vi.useRealTimers(); }
   });
 });
 

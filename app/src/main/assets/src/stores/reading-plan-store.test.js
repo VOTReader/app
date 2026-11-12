@@ -41,6 +41,19 @@ describe('ReadingPlanStore', () => {
     expect(ReadingPlanStore.get(a.id).ticks).toEqual({});
   });
 
+  it('a run whose start is still ahead is not ticked by a read and does not hold it; from its start day it is (C6)', () => {
+    const a = { ...run(['genesis:1', 'genesis:2']), start: '2026-10-25' };
+    ReadingPlanStore.put(a);
+    expect(ReadingPlanStore.noteRead('genesis', 1, at('2026-10-23'))).toBe(false);
+    expect(ReadingPlanStore.get(a.id).ticks).toEqual({});
+    expect(ReadingPlanStore.noteRead('genesis', 1, at('2026-10-25'))).toBe(true);
+    expect(ReadingPlanStore.get(a.id).ticks).toEqual({ 'genesis:1': '2026-10-25' });
+    const later = { ...run(['exodus:1'], 'y'), start: '2999-01-01' };
+    ReadingPlanStore.put(later);
+    expect(ReadingPlanStore.holds('exodus', 1)).toBe(false);
+    expect(ReadingPlanStore.holds('genesis', 2)).toBe(true);
+  });
+
   it('a stopped or finished run is not ticked', () => {
     const a = { ...run(['genesis:1', 'genesis:2']), status: /** @type {'stopped'} */ ('stopped') };
     ReadingPlanStore.put(a);
