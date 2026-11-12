@@ -427,6 +427,7 @@
   R('.jrn-rec-waveform .bar { width: 3px; background: var(--accent); border-radius: 2px; transition: height 0.15s, background 0.1s; min-height: 6px; }');
   R('.jrn-rec-cap { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); margin-bottom: var(--sp-2); }');
   R('.jrn-rec-actions .ui-btn { flex: 1 1 0; gap: 8px; }');
+  R('.jrn-rec-actions .ui-btn:not(.is-primary) { background: var(--surface-2); }');
   R('.jrn-rec-actions .ui-btn svg { width: var(--icon-sm); height: var(--icon-sm); }');
   R('.jrn-rec-actions .jrn-rec-stop-btn, .jrn-rec-actions .jrn-rec-confirm-btn { flex-grow: 1.3; }');
   R('.jrn-insert-sheet .note-sheet-title, .jrn-rec-sheet .note-sheet-title { font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-1); }');

@@ -209,7 +209,7 @@ describe('axe — Notes', () => {
     fireEvent.click(menuRow('Colour'));
     const group = screen.getByRole('radiogroup', { name: 'Notebook colour' });
     const radios = [...group.querySelectorAll('[role="radio"]')];
-    expect(radios.length).toBe(4);
+    expect(radios.length).toBe(8); // gold and the seven notebook colours (POL6)
     expect(screen.getByRole('radio', { name: 'Blue' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: 'Gold' }).getAttribute('aria-checked')).toBe('false');
   });
