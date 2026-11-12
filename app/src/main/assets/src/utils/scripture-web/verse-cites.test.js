@@ -75,3 +75,22 @@ describe('lettersCiting: one row per letter', () => {
     expect(lettersCiting(cites, { bookId: 'numbers', chapter: 7, verse: quiet })).toEqual([]);
   });
 });
+
+describe('lettersCiting: the names Search uses, and verses that are not there (PL-SEARCH 1, 4)', () => {
+  it('finds Matthew under the id the search parser and the reader use', () => {
+    const plain = lettersCiting(cites, { bookId: 'matthew-plain', chapter: 5, verse: 3 });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(lettersCiting(cites, { bookId: 'matthew', chapter: 5, verse: 3 })).toEqual(plain);
+    expect(lettersCiting(cites, { bookId: 'matthew', chapter: 24 }).length).toBeGreaterThan(0);
+    expect(verseIdOf(cites, 'matthew', 5, 3)).toBe(verseIdOf(cites, 'matthew-plain', 5, 3));
+    expect(verseIdOf(cites, 'matthew', 5, 3)).toBeGreaterThan(0);
+  });
+
+  it('a verse past the chapter\'s end has no letters, and a range is cut at the end', () => {
+    expect(lettersCiting(cites, { bookId: 'john', chapter: 3, verse: 36 }).length).toBeGreaterThan(0);
+    expect(lettersCiting(cites, { bookId: 'john', chapter: 3, verse: 99 })).toEqual([]);
+    expect(lettersCiting(cites, { bookId: 'john', chapter: 3, verse: 40, verseEnd: 50 })).toEqual([]);
+    expect(lettersCiting(cites, { bookId: 'john', chapter: 3, verse: 30, verseEnd: 50 }))
+      .toEqual(lettersCiting(cites, { bookId: 'john', chapter: 3, verse: 30, verseEnd: 36 }));
+  });
+});

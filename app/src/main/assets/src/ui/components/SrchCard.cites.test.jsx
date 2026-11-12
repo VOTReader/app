@@ -2,7 +2,7 @@
    VERSE_CITES (src/data/verse-cites.js; utils/scripture-web/verse-cites.test.js holds it to the web's graph);
    here a small fixture of the same shape. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 
 // John: chapters of 51, 25 and 36 verses, so John 3:16 is verse id 51 + 25 + 15 = 91.
@@ -64,5 +64,43 @@ describe('Letters that cite a reference (FEAT1)', () => {
     cleanup();
     r = render(<SrchCard entry={{ __direct: true, __label: 'John', ref: { kind: 'ref-book', bookId: 'john' } }} terms={[]} onSelect={() => {}} isDirect />);
     expect(citeRow(r.container)).toBeNull();
+  });
+});
+
+describe('Letters that cite: late letters and an edited reference (PL-SEARCH 3, 5)', () => {
+  afterEach(() => { delete (/** @type {any} */ (globalThis)).WTLB_ONE; delete (/** @type {any} */ (globalThis)).__votCorpus; });
+
+  it('quotes the citing sentence once the letters land after the list was first worked out', () => {
+    /** @type {Set<() => void>} */
+    const subs = new Set();
+    let version = 0;
+    // the app's window is its global object; under vitest the two differ, and the card reads the global
+    /** @type {any} */ (globalThis).__votCorpus = { subscribe: (/** @type {() => void} */ cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => version };
+    const { container } = render(<SrchCard entry={ref({ chapter: 3, verseStart: 16 }, 'John 3:16')} terms={[]} onSelect={() => {}} isDirect />);
+    fireEvent.click(/** @type {HTMLElement} */ (citeRow(container)));
+    const snippet = () => [...container.querySelectorAll('button.srch-cite')][1].querySelector('.srch-card-snippet').textContent;
+    expect(snippet()).toBe('Paragraph 3');
+    /** @type {any} */ (globalThis).WTLB_ONE = [{ id: 'devotion', paragraphs: [{ text: 'One.' }, { text: 'Two.' }, { text: 'Before it. For God so loved the world {{ref:John 3:16}}. After it.' }] }];
+    act(() => { version++; subs.forEach((cb) => cb()); });
+    expect(snippet()).toMatch(/For God so loved the world/);
+  });
+
+  it('a list opened for one reference is closed for the next, and each is remembered under its own key', () => {
+    const memo = 'pl-search-5';
+    const at = (/** @type {number} */ v) => <SrchCard entry={ref({ chapter: 3, verseStart: v }, 'John 3:' + v)} terms={[]} onSelect={() => {}} isDirect memo={memo} />;
+    const r = render(at(16));
+    fireEvent.click(/** @type {HTMLElement} */ (citeRow(r.container)));
+    expect(r.container.querySelectorAll('.srch-cite').length).toBe(2);
+    r.rerender(at(17));
+    expect(citeRow(r.container).getAttribute('aria-expanded')).toBe('false');
+    expect(r.container.querySelectorAll('.srch-cite').length).toBe(0);
+    fireEvent.click(/** @type {HTMLElement} */ (citeRow(r.container)));
+    expect(r.container.querySelectorAll('.srch-cite').length).toBe(2);
+    // back at 3:16 its own choice (open) still stands; a fresh card for 3:17 comes back open too
+    r.rerender(at(16));
+    expect(citeRow(r.container).getAttribute('aria-expanded')).toBe('true');
+    cleanup();
+    const again = render(at(17));
+    expect(citeRow(again.container).getAttribute('aria-expanded')).toBe('true');
   });
 });

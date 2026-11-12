@@ -55,11 +55,22 @@ export function citesGraph(data) {
 }
 
 /**
+ * The file's book for an app book id. Search's parser and the reader say "matthew"; the file, like the graph it is
+ * cut from, files the plain-Bible Matthew as "matthew-plain" (ref-parse.js bookIndexOf maps it the same way).
+ * @param {any} data @param {string} bookId @returns {number} index into data.books, or -1
+ */
+function bookIndex(data, bookId) {
+  if (!data || !Array.isArray(data.books) || !bookId) return -1;
+  const i = data.books.indexOf(bookId);
+  return i >= 0 ? i : data.books.indexOf(bookId + '-plain');
+}
+
+/**
  * The graph's verse id of a verse (0 = Genesis 1:1), or -1 when the book, chapter or verse is not there.
  * @param {any} data @param {string} bookId @param {number} chapter @param {number} verse
  */
 export function verseIdOf(data, bookId, chapter, verse) {
-  const b = data && Array.isArray(data.books) ? data.books.indexOf(bookId) : -1;
+  const b = bookIndex(data, bookId);
   if (b < 0) return -1;
   const lens = data.verses[b] || [];
   if (!(chapter >= 1 && chapter <= lens.length && verse >= 1 && verse <= lens[chapter - 1])) return -1;
@@ -80,10 +91,11 @@ export function verseIdOf(data, bookId, chapter, verse) {
  */
 export function lettersCiting(data, ref, corpus) {
   if (!data || !ref || !ref.bookId || !(ref.chapter >= 1)) return [];
-  const b = data.books.indexOf(ref.bookId);
+  const b = bookIndex(data, ref.bookId);
   const len = b >= 0 ? (data.verses[b] || [])[ref.chapter - 1] || 0 : 0;
-  if (!len) return [];
-  const from = ref.verse >= 1 ? Math.min(ref.verse, len) : 1;
+  // A verse past the chapter's end ("John 3:99") is no verse: no letters, never the last verse's under its label.
+  if (!len || ref.verse > len) return [];
+  const from = ref.verse >= 1 ? ref.verse : 1;
   const to = ref.verse >= 1 ? Math.min(Math.max(ref.verseEnd || ref.verse, from), len) : len;
   const g = citesGraph(data);
   const start = verseIdOf(data, ref.bookId, ref.chapter, from);

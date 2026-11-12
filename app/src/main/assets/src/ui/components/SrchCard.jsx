@@ -2,7 +2,7 @@
    SrchCard — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { translationLabel, translateVerse, loadTranslation, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
+import { translationLabel, translateVerse, loadTranslation, holdTranslation, isTranslationLoaded, loadBibleStudies } from '../../data/translations.js';
 import { kjvVisitEdition } from '../../utils/kjv-visit.js';
 import { recall, remember, docKey } from './srch-memory.js';
 import { formsToMark } from '../../utils/marked-forms.js';
@@ -12,6 +12,7 @@ import { ListGroup, ListRow } from './UiParts.jsx';
 import { ensureVerseCites, lettersCiting } from '../../utils/scripture-web/verse-cites.js';
 import { windowCorpus, endpointFor } from '../../utils/scripture-web/vot-citations.js';
 import { countOf } from '../../utils/download-tree.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /* FEAT1 (s-ref): the letters citing a Bible reference ("John 3:16", a range in one chapter, or a whole chapter),
    one per letter, from src/data/verse-cites.js: injected the first time such a card shows, never at boot, and
@@ -28,8 +29,21 @@ function useLettersCiting(/** @type {any} */ r) {
     ensureVerseCites().then((d) => { if (live && d) setData(d); });
     return () => { live = false; };
   }, [key, data]);
+  /* The citing sentences come from the letters, which load lazily: a list worked out before they landed (a cold
+     start straight into Search) read "Paragraph N" on every card until the query changed. It is worked out again
+     when the Volumes land (the loader's version) and when the studies do. */
+  const votV = useStoreVersionByName('__votCorpus');
+  const [studiesV, setStudiesV] = React.useState(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- key is ref by value.
-  const letters = React.useMemo(() => (ref && data ? lettersCiting(data, ref, windowCorpus()) : null), [key, data]);
+  const letters = React.useMemo(() => (ref && data ? lettersCiting(data, ref, windowCorpus()) : null), [key, data, votV, studiesV]);
+  const needStudies = !!letters && typeof w.BIBLE_STUDIES === 'undefined' &&
+    letters.some((l) => String(l.letterKey).indexOf('study:') === 0 && !l.first.excerpt);
+  React.useEffect(() => {
+    if (!needStudies) return undefined;
+    let live = true;
+    loadBibleStudies().then((ok) => { if (live && ok) setStudiesV((n) => n + 1); });
+    return () => { live = false; };
+  }, [needStudies]);
   return { key, letters };
 }
 
@@ -201,10 +215,13 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   const doc = (!isDirect && entry && entry.doc) || null;
   const citing = useLettersCiting(isDirect && entry ? entry.ref : null);
   const citesKey = citing.key ? 'cites|' + citing.key : '';
-  const [citesOpen, setCitesOpen] = React.useState(() => !!(citesKey && recall(memo, citesKey)));
+  /* The direct card is one component across edits of the box ("John 3:16" to "John 3:17"), so the open state is
+     held with the reference it was chosen for: another reference reads its own remembered choice (closed, new). */
+  const [citesFor, setCitesFor] = React.useState(() => ({ key: citesKey, open: !!(citesKey && recall(memo, citesKey)) }));
+  const citesOpen = citesFor.key === citesKey ? citesFor.open : !!(citesKey && recall(memo, citesKey));
   const toggleCites = () => {
     remember(memo, citesKey, !citesOpen);
-    setCitesOpen(!citesOpen);
+    setCitesFor({ key: citesKey, open: !citesOpen });
   };
   const hlTerms = cardTerms(entry, terms, stopTyped);
   const kjv = useKjvWording(doc ? entry : null);
