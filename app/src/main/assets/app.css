@@ -7988,7 +7988,11 @@
        landscape frame" is the one that reads the floor, and the 568x320 probe
        arm is what measures the geometry. Text guards the value, pixels guard
        the layout, and neither substitutes for the other.
-       Portrait (.sw-narrow) keeps 42 %, which was measured clear. */
+       Portrait (.sw-narrow) keeps 42 %, which was measured clear.
+       FA2 (w-mine0): centred in the frame as the mock, 51 % (was 58 %); the 200 px floor stays, and 51 % still
+       clears the 360 px case. It stays HERE, ahead of the short-landscape band's rules for the same selector
+       (app-css.test.js reads the first one). */
+    .sw-root:not(.sw-narrow) .sw-empty { top: max(51%, 200px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
          web beneath it — a real <button> inside an inert panel, and it works
@@ -8343,9 +8347,6 @@
        of Back on the left and as far in on the right; the keyboard's side still pushes it in (its max) */
     .sw-root .sw-goto.is-compact { max-width: 616px; margin: 0 auto; right: max(calc(68px + var(--sw-topbar-pad)), calc(16px + var(--sw-goto-inset, 0px))); }
     .sw-root.sw-rotated > .sw-goto.is-compact { right: max(calc(68px + var(--sw-topbar-pad)), calc(16px + max(var(--sw-goto-inset, 0px), var(--keyboard-height, 0px), var(--inset-bottom, 0px)))); }
-    /* FA2 (w-mine0): My Web's empty card centred in the frame as the mock (was 58 %); the 200 px floor is the
-       measured one that keeps it off the strip on short frames, and 51 % still clears the 360 px case */
-    .sw-root:not(.sw-narrow) .sw-empty { top: max(51%, 200px); }
     /* ── end WA6 web ── */
 
       /* ══════════════════════════════════════════════════════════════════
