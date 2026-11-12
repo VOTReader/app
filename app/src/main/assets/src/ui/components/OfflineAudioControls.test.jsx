@@ -377,6 +377,23 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  // PL-LISTEN 1 (REVIEW-listen 2): 72466aa1b cut the shelf's list to "Didn't download yet"; the ones running and
+  // waiting, each with its own x, had no list anywhere.
+  it('lists what is downloading and what waits in line, each with its own cancel', () => {
+    const s = fakeStore();
+    s.queue = () => [{ url: U('w1'), key: 'two:w1', title: 'W1' }, { url: U('w2'), key: 'two:w2', title: 'W2' }];
+    s.actives = () => [U('w1')];
+    s.pending = () => ({ busy: 2, failed: [] });
+    s.st.progress.set(U('w1'), { bytes: 2e6, total: 8e6 });
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const rows = [...container.querySelectorAll('.dl-queue-row')].map((r) => r.textContent);
+    expect(rows).toEqual(['W12 of 8 MB', 'W2Waiting · 1st in line']);
+    fireEvent.click(getByRole('button', { name: 'Take W2 off the queue' }));
+    expect(s.cancel).toHaveBeenCalledWith([U('w2')]);
+    fireEvent.click(getByRole('tab', { name: 'Choose' }));
+    expect(container.querySelector('.dl-queue-row')).toBeNull();   // Choose keeps to what did not download
+  });
+
   // dl-rework E: the Choose tab showed the strip but not what did not download.
   it('what did not download yet shows on the Choose tab too', () => {
     const s = fakeStore();

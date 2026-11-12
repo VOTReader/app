@@ -435,7 +435,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bible
       <div className="audio-library-screen dl-screen">
         {top}
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
-          {off ? <DownloadQueue off={off} only="failed" /> : null}
+          {off ? <DownloadQueue off={off} /> : null}
           {/* The browser refused persistent storage (brief section 7 item 3): say plainly what that can mean. */}
           {items.length && off.evictable && off.evictable() ? (
             <p className="listen-dl-note audio-offline-evictable">This browser may clear downloads when the phone runs low on space. Adding VOTReader to the Home Screen helps keep them.</p>
