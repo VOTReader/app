@@ -181,6 +181,7 @@ const SONGS_ICON = <svg {...ICON}><path d="M9 18V5l11-2v13" /><circle cx="6.5" c
 const DOWNLOAD_ICON = <svg {...ICON}><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></svg>;
 const SAVED_ICON = <svg {...ICON}><path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" /></svg>;
 const VOICE_ICON = <svg {...ICON}><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3zM6 11v1a6 6 0 0012 0v-1M12 18v3" /></svg>;
+const HEADPHONES_ICON = <svg {...ICON}><path d="M4 16v-4a8 8 0 0116 0v4M4 16a2 2 0 012-2h1v6H6a2 2 0 01-2-2zM20 16a2 2 0 00-2-2h-1v6h1a2 2 0 002-2z" /></svg>;
 
 /**
  * The LISTEN tab's root (the layout pass, 2026-11-10, mock listen.png): Continue listening; "Listen to": the
@@ -274,7 +275,7 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
           <section className={'listen-continue' + (active ? ' is-active' : '')} aria-labelledby="listen-continue-title">
             <div className="listen-continue-main">
               <button type="button" className="listen-art" disabled={!hasTextDestination(resume)} onClick={() => onOpenTrack(resume)}
-                aria-label={'Open the text of ' + trackName(resume)} title="Open text">{BIBLE_ICON}</button>
+                aria-label={'Open the text of ' + trackName(resume)} title="Open text">{HEADPHONES_ICON}</button>
               <div className="listen-continue-text">
                 <span className="root-eyebrow">Continue listening</span>
                 <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>

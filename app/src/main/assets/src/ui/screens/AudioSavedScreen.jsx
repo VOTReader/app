@@ -135,8 +135,10 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
             const playing = !!(current && current.url === track.url && active);
             // au-saved: "Volume Two · Text-to-speech · 1:43": where it is from, the voice, and its length (or time left)
             const secs = secondsOf(track.url);
-            const meta = [trackMeta(track), readerName(track.readerCode), remainingLabel(track) || (secs ? formatClock(secs) : '')]
-              .filter(Boolean).join(' · ');
+            // FINAL1: the names shorten, never the time
+            const head = [trackMeta(track), readerName(track.readerCode)].filter(Boolean).join(' · ');
+            const time = remainingLabel(track) || (secs ? formatClock(secs) : '');
+            const meta = time ? <><span className="ui-meta-cut">{head}</span><span className="ui-meta-keep">{(head ? ' · ' : '') + time}</span></> : head;
             return (
               <ListRow key={track.url} current={!!(current && current.url === track.url)}
                 lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + name} playing={playing} onClick={() => playTrack(track)} />}

@@ -421,7 +421,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
                   <SongCover song={song || { id: songId }} className="np-cover-small" />
                   <div>
                     <h2 className="np-title np-title-song" id="audio-manager-title">{current.title || 'Untitled song'}</h2>
-                    {versionAt >= 0 ? <p className="np-byline">{versionWord}</p> : null}
+                    {song ? <p className="np-lyrics-meta">{[song.v ? String(song.v).split(' · ').pop() : '', song.d ? songClock(song.d) : ''].filter(Boolean).join(' · ')}</p> : null}
                   </div>
                 </div>
               ) : (

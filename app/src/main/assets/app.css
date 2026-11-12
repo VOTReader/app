@@ -1433,7 +1433,7 @@
          its own family (the Cinzel labels). */
       :where(.audio-bar, .audio-manager-sheet, .np-sheet) button { font-family: inherit; }
       .np-head { flex: 0 0 auto; display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-height: 56px; }
-      .now-playing .np-close { width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: none; color: var(--gold); cursor: pointer; }
+      .now-playing .np-close { width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: none; color: var(--text-1); cursor: pointer; }
       .now-playing .np-close svg { width: 26px; height: 26px; }
       .np-kicker {
         min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 6px; text-align: center;
@@ -1497,7 +1497,8 @@
       .np-from { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; cursor: pointer; }
       .np-from em { font-style: normal; }
       .np-lyrics-head { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; }
-      .now-playing .np-cover-small { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 8px; }
+      .now-playing .np-cover-small { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 8px; }
+      .np-lyrics-meta { margin: 2px 0 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
       .np-lyrics-head .np-title { font-size: var(--fs-24); }
       .np-body .song-lyrics-card { width: 100%; max-width: 560px; margin: 0; text-align: left; }
       .np-body .song-lyrics-lines { max-height: none; }
@@ -1531,7 +1532,7 @@
       }
       .audio-manager-round svg { width: 26px; height: 26px; }
       .np-transport .np-skip svg { width: 34px; height: 34px; }
-      .np-transport .audio-manager-round { border: 0; } /* listen.html au-player: bare icons around the one gold disc */
+      .np-transport .audio-manager-round { border: 0; color: var(--text-1); } /* listen.html au-player: bare icons around the one gold disc */
       .audio-manager-play { width: 76px; height: 76px; border-color: var(--gold); background: var(--gold); color: var(--bg); }
       .audio-manager-play svg { width: 32px; height: 32px; }
       .audio-manager-play.is-loading { animation: audio-bar-pulse 1.1s ease-in-out infinite; }
@@ -1803,7 +1804,7 @@
       .dl-footer-text p { margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; line-height:1.35; }
       .dl-footer-text .dl-footer-sub { margin-top:2px; color:var(--text-2); font-size:var(--ts-meta); font-weight:400; }
       .dl-footer-warn { color:var(--dl-brick); }
-      .dl-footer-go { flex:0 0 auto; min-height:var(--btn-h-sm); padding:0 var(--sp-5); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--accent-ink); font-family:var(--font-ui); font-size:var(--ts-control); font-weight:600; cursor:pointer; }
+      .dl-footer-go { flex:0 0 auto; min-height:var(--btn-h); padding:0 26px; border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--accent-ink); font-family:var(--font-ui); font-size:var(--ts-control); font-weight:600; cursor:pointer; }
       .dl-footer-go:disabled { background:var(--surface-3); color:var(--text-3); cursor:default; }
       .dl-sheet .dl-sheet-title { text-align:left; }
       .dl-sheet-body { max-height:50vh; overflow-y:auto; margin:var(--sp-2) 0 0; }
@@ -3310,6 +3311,7 @@
     .root-row-text, .ui-row-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
     .root-row-title, .ui-row-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .root-row-sub, .ui-row-meta { margin-top: 1px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ui-row-meta:has(> .ui-meta-cut) { display: flex; } .ui-meta-cut { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .ui-meta-keep { flex: none; white-space: pre; }
     .root-row-count, .ui-row-value { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); }
     .ui-row-value.is-none { color: var(--text-3); }
     .root-row-chev { flex: none; padding: 0 2px; color: var(--text-3); font-size: var(--fs-24); line-height: 1; transition: transform 0.15s ease; }
