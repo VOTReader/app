@@ -139,6 +139,41 @@ describe('the renderer survives a lost and restored context (F1, bugs #1 and #3)
     expect(first.r.dispose, 'no renderer outlives the canvas it drew on').toHaveBeenCalledTimes(1);
   });
 
+  /* REVIEW-web 1: the 3 s ran on in the background (the WebView's timers are never paused), where
+     Android does not give a context back, so the reader came back to the list */
+  it('a loss while the app is in the background waits: back in view, the restore brings the web back', async () => {
+    const { container } = await mount();
+    const first = BUILDS[0];
+    const see = (state) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    vi.useFakeTimers();
+    try {
+      act(() => { see('hidden'); });
+      act(() => { first.opts.onContextLost(); });
+      act(() => { vi.advanceTimersByTime(60000); });
+      expect(list(container), 'no list while nobody is looking').toBeNull();
+      act(() => { see('visible'); });
+      act(() => { vi.advanceTimersByTime(1000); });
+      act(() => { first.opts.onContextRestored(); });
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(list(container)).toBeNull();
+      expect(BUILDS.length, 'the web is rebuilt on the restored context').toBe(2);
+      // and a loss that is still not restored 3 s after the reader is back does land on the list
+      act(() => { see('hidden'); });
+      act(() => { BUILDS[1].opts.onContextLost(); });
+      act(() => { vi.advanceTimersByTime(60000); });
+      act(() => { see('visible'); });
+      act(() => { vi.advanceTimersByTime(2900); });
+      expect(list(container)).toBeNull();
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(list(container)).toBeTruthy();
+    } finally {
+      delete document.visibilityState;
+    }
+  });
+
   /* w4 interaction hunt: a reader at Romans 8:28 with its panel open was dropped at "Connections
      from John 3" (History's chapter, or the default) when the context was lost for good */
   it('a loss nothing restores: the list opens where the reader was in the web, not at the default', async () => {
