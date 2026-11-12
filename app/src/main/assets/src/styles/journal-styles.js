@@ -287,7 +287,7 @@
 
   // Unified block delete (×) + inline confirm in the editor
   R('.jrn-block-edit { position: relative; padding-right: 36px; display: flex; flex-direction: column; }');
-  R('.jrn-block-del-btn { position: absolute; top: 8px; right: 4px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.55; transition: opacity 0.12s, color 0.12s, background 0.12s, border-color 0.12s; z-index: 2; }');
+  R('.jrn-block-del-btn { position: absolute; top: 8px; right: 4px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.62; transition: opacity 0.12s, color 0.12s, background 0.12s, border-color 0.12s; z-index: 2; }');
   R('.jrn-block-del-btn:hover { opacity: 1; color: #c75c4a; background: rgba(199, 92, 74, 0.12); border-color: rgba(199, 92, 74, 0.45); }');
   R('.jrn-block-del-btn:active { transform: scale(0.92); }');
   R('.jrn-block-del-btn svg { width: 14px; height: 14px; }');
@@ -297,7 +297,7 @@
   // Plainness (session 3): TEXT blocks show their delete × as a whisper until
   // the block is engaged — one always-on control per paragraph read as
   // clutter. Media/card blocks (no focus state) keep the default visibility.
-  R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.22; }');
+  R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.62; }');   // LIGHT2: a control's graphic keeps 3:1 (was .22, 1.35:1)
   R('.jrn-block-edit.is-text:focus-within .jrn-block-del-btn { opacity: 0.8; }');
   R('.jrn-block-edit.is-text .jrn-block-del-btn:hover { opacity: 1; }');
   // Every editor block reads as a discrete gold-outlined card. Text, quote and
@@ -311,8 +311,9 @@
   // the same grab-left / destroy-right separation the tab cards use.
   // touch-action:none = grabbing it never scrolls; the drag starts instantly.
   R('.jrn-editor .jrn-blocks { padding-left: 44px; }');
-  R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.45; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }');
+  R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.62; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }');
   R('.jrn-block-drag-btn:hover { opacity: 1; color: var(--gold); }');
+  R('body.light :is(.jrn-block-del-btn, .jrn-block-drag-btn), body.light .jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.8; }');   // LIGHT2: the light gold-dim at .62 read 2.65:1
   R('.jrn-block-drag-btn:active { cursor: grabbing; }');
   R('.jrn-block-drag-btn svg { width: 15px; height: 15px; pointer-events: none; }');
   R('.jrn-block-drag-btn::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; }');
@@ -415,6 +416,7 @@
   R('.jrn-insert-sheet .sheet-handle-row { margin: 0 0 var(--sp-1); }');
   R('.jrn-ins-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin: 14px 2px 8px; }');
   R('.jrn-ins-label:first-child { margin-top: 0; }');
+  R('body.light .jrn-ins-label { color: var(--text-1); }');   // LIGHT2: --text-2 on the cream sheet read 4.49:1
   R('.jrn-ins-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }');
   R('.jrn-ins-tile { min-height: 52px; border-radius: var(--r-field); background: var(--surface-2); border: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; color: var(--text-1); text-align: left; cursor: pointer; }');
   R('.jrn-ins-tile:active { background: var(--surface-3); }');
