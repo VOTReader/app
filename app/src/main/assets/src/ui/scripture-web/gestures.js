@@ -35,7 +35,7 @@ import { prefersReducedMotion } from '../../utils/reduced-motion.js';
  * control lands outside a `.sw-*` wrapper).
  */
 export const SW_CHROME_SELECTOR =
-  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-choice, .sw-list, .sw-goto, .sw-filter-sheet, .sw-filter-pill, '
+  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-choice, .sw-list, .sw-goto, .sw-filter-sheet, .sw-filter-pill, .sw-guide, '
   + 'button, input, select, textarea';
 
 /** True when `target` is the chrome itself, or nested inside it. */

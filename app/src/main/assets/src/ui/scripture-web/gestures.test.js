@@ -129,6 +129,14 @@ describe('SW_CHROME_SELECTOR / isChromeTarget', () => {
     expect(SW_CHROME_SELECTOR).toContain('.sw-tip');
     expect(SW_CHROME_SELECTOR).toContain('button');
   });
+  it('WEB2: the How-to-read card is chrome (a drag or wheel on the modal card left the web behind it panning)', () => {
+    const card = document.createElement('div');
+    card.className = 'sw-guide';
+    const line = document.createElement('span');
+    card.appendChild(line);
+    expect(isChromeTarget(card)).toBe(true);
+    expect(isChromeTarget(line)).toBe(true);
+  });
 });
 
 describe('wheel: chrome scrolls or selects natively, the open canvas zooms', () => {
