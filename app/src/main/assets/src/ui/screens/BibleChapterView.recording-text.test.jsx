@@ -150,3 +150,18 @@ describe('BibleChapterView — the edition switch is announced (RC.12)', () => {
     expect(toast()).toBeNull();
   });
 });
+
+/* FIXC (REVIEW-readers 3): with the book's recording loaded, a translation picked from the pill or the ⋯ menu did
+   nothing: the words followed the voice whatever was picked. The pick now shows, while that recording stays loaded. */
+describe('BibleChapterView — a translation picked over a loaded recording shows at once', () => {
+  it('the ⋯ menu\'s pick (vot:translation-pick): the reader\'s edition replaces the recording\'s, and says so', async () => {
+    const { rerender } = render(view());
+    await landKjv();
+    expect(screen.getByText('For God so loved (kjv)')).toBeTruthy();
+    act(() => { document.dispatchEvent(new CustomEvent('vot:translation-pick')); });
+    rerender(view());
+    expect(screen.getByText('For God so loved (nkjv)')).toBeTruthy();
+    expect(banner()).toBeNull();
+    expect(document.getElementById('vot-toast-audio').textContent).toBe('Back to the NKJV text.');
+  });
+});

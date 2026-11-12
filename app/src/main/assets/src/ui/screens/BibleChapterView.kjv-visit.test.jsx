@@ -5,7 +5,7 @@
    touched: the row's button, another chapter or the next visit read the reader's own again. A loaded recording still
    wins (the words follow the voice). */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { BibleChapterView } from './BibleChapterView.jsx';
@@ -124,5 +124,30 @@ describe('BibleChapterView — the KJV for this visit (idea A)', () => {
     render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }, { inert: true }));
     expect(verse(13)).toContain('You shall not murder.');
     expect(row()).toBeNull();
+  });
+});
+
+/* FIXC (REVIEW-readers 3): a translation picked from the pill during a KJV visit did nothing (the visit held the page,
+   and picking the reader's own edition changed no setting). A pick ends the visit and shows what was picked. */
+describe('BibleChapterView — a translation picked during the visit shows at once', () => {
+  it('the pill: picking NKJV (the reader\'s own) leaves the KJV visit', () => {
+    const onTranslation = vi.fn();
+    render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }, { onTranslation }));
+    expect(verse(13)).toContain('Thou shalt not kill.');
+    fireEvent.click(document.querySelector('.rd-trans-pill'));
+    const nkjv = [...document.querySelectorAll('[role="radio"]')].find((b) => {
+      const c = b.querySelector('.select-sheet-option-code');
+      return c && c.textContent === 'NKJV';
+    });
+    fireEvent.click(nkjv);
+    expect(onTranslation).toHaveBeenCalledWith('nkjv');
+    expect(verse(13)).toContain('You shall not murder.');
+    expect(row()).toBeNull();
+  });
+
+  it('the ⋯ menu\'s "Bible translation" (vot:translation-pick) leaves it too', () => {
+    render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }));
+    act(() => { document.dispatchEvent(new CustomEvent('vot:translation-pick')); });
+    expect(verse(13)).toContain('You shall not murder.');
   });
 });
