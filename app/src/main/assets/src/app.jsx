@@ -229,7 +229,7 @@ function App() {
   // Fullscreen is a user-gesture-only browser API. GardenView owns its own
   // always-on immersive view, so this shortcut never competes with it.
   useFullscreenGesture({
-    enabled: settings.doubleTapFullscreen !== false, paused: screen === 'garden-view',
+    enabled: settings.doubleTapFullscreen !== false, paused: screen === 'garden-view', screen,
     hintCount: settings.fullscreenHintCount,
     onHintShown: (count) => updateSetting('fullscreenHintCount', count),
   });
