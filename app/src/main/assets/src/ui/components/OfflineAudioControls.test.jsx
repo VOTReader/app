@@ -424,6 +424,27 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(queryByRole('button', { name: 'Remove Volume Two from this phone' })).toBeNull();
   });
 
+  // PL-LISTEN (REVIEW-listen 5): a Bible book's queued chapters counted as 1 ("10 of 11"), a letter with one part
+  // here and one coming counted twice, and a book with nothing here yet had no row.
+  it('"N of M · the rest are on their way" counts chapters and letters once each', () => {
+    const s = fakeStore();
+    globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis'], ['ruth', 'Ruth']];
+    const q = (id, key, title) => ({ url: U(id), key, title });
+    s.queue = () => [q('gen2', 'bible-brm-kjv:genesis', 'Genesis · Chapter 2'), q('gen3', 'bible-brm-kjv:genesis', 'Genesis · Chapter 3'),
+      q('gen4', 'bible-brm-kjv:genesis', 'Genesis · Chapter 4'), q('ruth1', 'bible-brm-kjv:ruth', 'Ruth · Chapter 1'), q('ruth2', 'bible-brm-kjv:ruth', 'Ruth · Chapter 2'),
+      q('x2', 'two:x', 'Christmas · Part 2'), q('y', 'two:y', 'Why')];
+    s.pending = () => ({ busy: 7, failed: [] });
+    s.st.saved.set(U('gen1'), { url: U('gen1'), key: 'bible-brm-kjv:genesis', title: 'Genesis · Chapter 1', bytes: 1e6, savedAt: 1 });
+    s.st.saved.set(U('x1'), { url: U('x1'), key: 'two:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 2 });
+    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect([...container.querySelectorAll('.dl-kept')].map((k) => k.textContent)).toEqual([
+      'Genesis1 of 4 chapters · the rest are on their way',
+      'Ruth0 of 2 chapters · the rest are on their way',
+      'Volume Two1 of 2 recordings · the rest are on their way',
+    ]);
+  });
+
   it('nothing on the phone opens Choose; the empty shelf says how to fill it and its button goes there (au-dlphone0)', () => {
     fakeStore();
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
