@@ -8442,8 +8442,8 @@
          never a float. Words left, × at the top right; Show me around (primary) and Later (text) under them. */
       .tour-prompt.tour-strip.tour-inline {
         position: relative; left: auto; right: auto; bottom: auto; z-index: auto; max-width: none; max-height: none;
-        margin: var(--label-above) 0 0; padding: 12px 6px 10px var(--card-pad); overflow: visible;
-        border: 0; border-radius: var(--r-card); background: var(--surface-1); color: var(--text-1); box-shadow: none;
+        margin: 16px 0 0; padding: 12px 6px 10px var(--card-pad); overflow: visible;
+        border: 0; border-radius: var(--r-card); background: var(--surface-2); color: var(--text-1); box-shadow: none;
         font-family: var(--font-ui); justify-content: flex-start; gap: var(--sp-2);
       }
       .tour-inline .tour-prompt-text { flex: 1 1 calc(100% - 56px); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.4; }

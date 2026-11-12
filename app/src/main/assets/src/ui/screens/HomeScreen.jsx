@@ -82,7 +82,7 @@ export function readTileOrder(stored) {
 
 const SEARCH_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>;
 const WEB_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="7" r="2" /><circle cx="12" cy="18" r="2" /><path d="M7 6.4l10 .4M6 8l5 8.4M18 9l-5 7.4" /></svg>;
-const STAR_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l2.2 5.6L20 9.3l-4.4 3.9L17 19l-5-3-5 3 1.4-5.8L4 9.3l5.8-.7z" /></svg>;
+const SHUFFLE_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h3c4 0 6 10 10 10h3M4 17h3c1.5 0 2.7-1.4 3.7-3M14 9.5c.9-1.4 2-2.5 3-2.5h3M18 4l3 3-3 3M18 14l3 3-3 3" /></svg>;
 
 /**
  * @param {{ onSelect: (id: string) => void, onSurprise: () => void, showSurprise?: boolean, onSettings: () => void,
@@ -211,7 +211,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
               {showSurprise ? (
                 <button type="button" className="root-explore-btn surprise-btn" onClick={openSurprise} disabled={surpriseBusy} aria-busy={surpriseBusy}
                   title="Surprise me — open a random chapter or letter" aria-label="Surprise me — open a random chapter or letter">
-                  {STAR_ICON}<span aria-hidden="true">Surprise me</span>
+                  {SHUFFLE_ICON}<span aria-hidden="true">Surprise me</span>
                 </button>
               ) : null}
             </div>
