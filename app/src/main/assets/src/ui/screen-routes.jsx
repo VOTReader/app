@@ -1695,7 +1695,8 @@ export function buildScreenRoutes({
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'Back to The Volumes of Truth'
+        backLabel={navOrigin && navOrigin.screen === 'bible-study-index' && navOrigin.label ? navOrigin.label
+          : navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'Back to The Volumes of Truth'
           : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Back to Studies'
           : navOrigin && navOrigin.screen === 'audio-library-bible' ? 'Back to The Bible'
           : 'Back to Listen'}
@@ -1926,8 +1927,16 @@ export function buildScreenRoutes({
     'bible-study-index': () => {
       const study = studyId ? getStudyById(studyId) : null;
       if (!study) return _deadStudy();   // W28
+      // A study with a recording gets Volume One's pill, opening its recordings as Listen > Studies does.
+      const _manifest = typeof AUDIO_MANIFEST !== 'undefined' && AUDIO_MANIFEST ? AUDIO_MANIFEST : null;
+      const _recorded = !!_manifest && (study.chapters || []).some((c) => c && _manifest['study:' + c.id]);
       return (
         <BibleStudyIndex
+          onListen={_recorded ? () => {
+            setAudioColKey('study:' + studyId);
+            setNavOrigin({ screen: 'bible-study-index', studyId, label: 'Back to ' + studyShortTitle(study.title), returnOrigin: navOrigin || null });
+            setScreen('audio-library-collection');
+          } : null}
           study={study}
           onSelect={(chId) => { _startNewTrail(); selectStudyChapter(studyId, chId); }}
           onBack={goStudiesHome}

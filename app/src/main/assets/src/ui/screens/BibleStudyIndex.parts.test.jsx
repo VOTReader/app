@@ -134,3 +134,18 @@ describe('BibleStudyIndex — the title steps down with length', () => {
     expect(partRowLabel({ num: 1 }, 12)).toBe('Part 1 · 12 sections');
   });
 });
+
+describe('BibleStudyIndex — the Listen pill', () => {
+  it('a study with a recording shows Volume One\u2019s pill under the ornament, and it opens the recordings', () => {
+    const onListen = vi.fn();
+    render(<BibleStudyIndex {...common} onListen={onListen} />);
+    const pill = document.querySelector('.vol-index-header .vol-index-play-row .hero-play-pill');
+    expect(pill.textContent).toBe('Listen');
+    fireEvent.click(pill);
+    expect(onListen).toHaveBeenCalledTimes(1);
+  });
+  it('a study with none shows no pill', () => {
+    render(<BibleStudyIndex {...common} />);
+    expect(document.querySelector('.vol-index-play-row')).toBeNull();
+  });
+});

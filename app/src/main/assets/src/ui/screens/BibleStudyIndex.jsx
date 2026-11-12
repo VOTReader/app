@@ -11,6 +11,7 @@
    12 sections"; a chevron (the UI pass's) turns when the part is open. */
 
 import { UiIcon } from '../components/UiIcon.jsx';
+import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 
 /**
@@ -36,7 +37,7 @@ export function partRowLabel(part, sections) {
   return sections > 1 ? `Part ${part.num} · ${sections} sections` : `Part ${part.num}`;
 }
 
-export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack }) {
+export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack, onListen = null }) {
   const currentRef = React.useRef(null);
   const [expandedPart, setExpandedPart] = React.useState(null);
 
@@ -57,6 +58,12 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
     }, 180);
     return () => clearTimeout(timer);
   }, [expandedPart]);
+
+  // A study's recordings ride AUDIO_MANIFEST in the lazy letter corpus: warm it as
+  // the chapter page does, so the Listen pill can appear (the route re-renders when it lands).
+  React.useEffect(() => {
+    if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
+  }, []);
 
   const resolveChapter = (cid) => (study.chapters || []).find((c) => c.id === cid);
 
@@ -134,6 +141,12 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
             <div className="vol-index-ornament-diamond" />
             <div className="vol-index-ornament-line r" />
           </div>
+          {/* A study with a recording: Volume One's pill, opening what Listen > Studies > this study opens. */}
+          {onListen && (
+            <div className="vol-index-play-row">
+              <AudioPlayButton variant="playall" label="Listen" onClick={onListen} />
+            </div>
+          )}
         </div>
         <div className="chapter-cards">
           {study.parts ? (

@@ -105,7 +105,8 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className,
   const chip = variant === 'chip';
   const playAll = variant === 'playall';
   const listen = chip || playAll ? null : face || listenFace({ playing: false, loading: false, late: false, resume, minutes });
-  const text = chip ? (label || 'Play') : playAll ? 'Play All' : listen.text;
+  // playall's own words unless a caller names its pill (a study's contents page says Listen)
+  const text = chip ? (label || 'Play') : playAll ? (label || 'Play All') : listen.text;
 
   return (
     <button
