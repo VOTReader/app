@@ -226,7 +226,7 @@ function refresh() {
   for (const t of Array.isArray(s.later) ? s.later : []) {
     if (!t || typeof t.url !== 'string') continue;
     const it = { url: t.url, key: String(t.key || ''), title: String(t.title || ''), reason: String(t.reason || 'network'),
-      status: Number(t.status) || 0, tries: Number(t.tries) || 0, at: Number(t.at) || 0 };
+      status: Number(t.status) || 0, tries: Number(t.tries) || 0, at: Number(t.at) || 0, ...(t.stopped === true ? { stopped: true } : {}) };
     _later.set(t.url, it);
     if (!_asked.has(t.url)) _asked.set(t.url, { url: t.url, key: it.key, title: it.title });
   }
@@ -291,8 +291,8 @@ function _onEvent(json) {
       const reason = typeof e.reason === 'string' ? e.reason : 'network';
       _failed.set(url, reason);
       const t = _asked.get(url) || { url, key: '', title: '' };
-      _later.set(url, { ...t, reason, status: Number(e.status) || 0, tries: 0, at: 0 });
-      _say(reason === 'space' ? 'Not downloaded yet: not enough room on this phone' : 'Not downloaded yet. It will try again by itself.');
+      _later.set(url, { ...t, reason, status: Number(e.status) || 0, tries: 0, at: 0, ...(e.stopped === true ? { stopped: true } : {}) });
+      _say(reason === 'space' ? 'Not downloaded yet: not enough room on this phone' : e.stopped === true ? 'Not downloaded. It stopped trying by itself.' : 'Not downloaded yet. It will try again by itself.');
       break;
     }
     case 'cancelled':

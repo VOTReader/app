@@ -4,7 +4,7 @@
    Under the strip: the ones downloading (up to the store's 3 at once) with their rings and "4.1 of 7 MB"; then each
    waiting one with its place and a × to take it off the queue, a page at a time (a whole edition is 1,189: never
    cut at 30); then "Didn't download yet": each one the store keeps to try again, why in plain words and when it tries
-   next, with Retry and Retry all. A hand-over that stopped midway says what was not queued, with Try again.
+   next, with Retry, a × to drop it, and Retry all. A hand-over that stopped midway says what was not queued, with Try again.
 
    `only="failed"` shows just "Didn't download yet" (the Choose tab: dl-rework E, visible on both tabs).
    Titles are what each was asked as (the stores keep them across a restart); one with none is named from its file.
@@ -159,9 +159,10 @@ export function DownloadQueue({ off, only = 'all' }) {
                   <span className="dl-queue-mark"><AlertIcon /></span>
                   <span className="dl-queue-copy">
                     <strong>{nameOf(t)}</strong>
-                    <small>{why + (l ? ' · tries again ' + nextTryWords(l.at, now) : '')}</small>
+                    <small>{why + (l ? (l.stopped ? ' · stopped trying' : ' · tries again ' + nextTryWords(l.at, now)) : '')}</small>
                   </span>
                   <button type="button" className="dl-link" onClick={() => retry([t])} aria-label={'Retry ' + nameOf(t)}>Retry</button>
+                  <button type="button" className="dl-icon-btn" onClick={() => off.cancel([t.url])} aria-label={'Take ' + nameOf(t) + ' off the list'}><CloseGlyph /></button>
                 </li>
               );
             })}

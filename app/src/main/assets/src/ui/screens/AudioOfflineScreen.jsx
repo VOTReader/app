@@ -202,8 +202,9 @@ let _openAt = /** @type {null | { tab: 'choose' | 'phone', focus?: string | null
 /** @param {{ tab: 'choose' | 'phone', focus?: string | null }} at */
 export function openDownloadsAt(at) { _openAt = at; }
 
-/** What is on its way, by the shelf branch it lands in (a collection's volKey, a Bible book's key, 'study'):
- *  the recordings (keys) still to come. @param {any[]} queue @returns {Map<string, Set<string>>} */
+/** What is on its way, by the shelf branch it lands in (a collection's volKey, a Bible book's key, 'study'): what is
+ *  still to come, as that branch's rows count it (a book's chapters by url, a collection's letters by key).
+ *  @param {any[]} queue @returns {Map<string, Set<string>>} */
 function onItsWay(queue) {
   /** @type {Map<string, Set<string>>} */
   const by = new Map();
@@ -212,9 +213,10 @@ function onItsWay(queue) {
     const colon = key.indexOf(':');
     if (colon <= 0) continue;
     const volKey = key.slice(0, colon);
-    const id = volKey === 'study' ? 'study' : _edition(volKey) ? key : volKey;
+    const book = !!_edition(volKey);
+    const id = volKey === 'study' ? 'study' : book ? key : volKey;
     if (!by.has(id)) by.set(id, new Set());
-    /** @type {Set<string>} */ (by.get(id)).add(key);
+    /** @type {Set<string>} */ (by.get(id)).add(book ? String(t.url || '') : key);
   }
   return by;
 }
@@ -298,6 +300,18 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bible
   // A set only on its way still has its row (au-dlrun: "12 of 29 recordings · the rest are on their way").
   for (const id of way.keys()) {
     if (sections.some((sec) => sec.branches.some((b) => b.id === id))) continue;
+    // A Bible book with no chapter here yet has its row too.
+    const colon = id.indexOf(':');
+    const edition = colon > 0 ? _edition(id.slice(0, colon)) : null;
+    if (edition) {
+      const books = typeof BIBLE_AUDIO_BOOKS !== 'undefined' && Array.isArray(BIBLE_AUDIO_BOOKS) ? BIBLE_AUDIO_BOOKS : [];
+      const bookAt = books.findIndex((b) => b[0] === id.slice(colon + 1));
+      if (bookAt < 0) continue;
+      let bible = sections.find((x) => x.id === 'bible');
+      if (!bible) { bible = { id: 'bible', title: 'The Bible', branches: [], order: 1 }; sections.push(bible); sections.sort((a, b) => a.order - b.order); }
+      bible.branches.push({ id, title: books[bookAt][1], noun: 'chapter', rows: [], bytes: 0, order: bookAt, edition: String(edition.short || edition.label || '') });
+      continue;
+    }
     const label = _collectionLabel(id);
     if (!label) continue;
     let sec = sections.find((x) => x.id === 'tvot');
@@ -370,7 +384,9 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bible
     a.order - b.order || a.title.localeCompare(b.title, undefined, { numeric: true });
   const askedBranch = asking && asking.kind === 'branch' ? branchesAll.find((b) => b.id === asking.id) || null : null;
   const lineOf = (/** @type {ShelfBranch} */ b) => {
-    const coming = way.has(b.id) ? /** @type {Set<string>} */ (way.get(b.id)).size : 0;
+    // A letter with a part here and a part coming is one row already: it is not counted again.
+    const here = new Set(b.noun === 'chapter' ? [] : b.rows.map((r) => (r.items[0] && r.items[0].key) || ''));
+    const coming = way.has(b.id) ? [.../** @type {Set<string>} */ (way.get(b.id))].filter((k) => !here.has(k)).length : 0;
     if (coming) return b.rows.length + ' of ' + countOf(b.rows.length + coming, b.noun) + ' · the rest are on their way';
     return [b.edition || '', countOf(b.rows.length, b.noun), formatBytes(b.bytes)].filter(Boolean).join(' · ');
   };
@@ -435,7 +451,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bible
       <div className="audio-library-screen dl-screen">
         {top}
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
-          {off ? <DownloadQueue off={off} only="failed" /> : null}
+          {off ? <DownloadQueue off={off} /> : null}
           {/* The browser refused persistent storage (brief section 7 item 3): say plainly what that can mean. */}
           {items.length && off.evictable && off.evictable() ? (
             <p className="listen-dl-note audio-offline-evictable">This browser may clear downloads when the phone runs low on space. Adding VOTReader to the Home Screen helps keep them.</p>

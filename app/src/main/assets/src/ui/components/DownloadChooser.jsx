@@ -618,6 +618,13 @@ export function DownloadChooser({ off, bibleAudio, focus, letterReader, after = 
   const base = initialWanted(off, allUnits);
   const wanted = new Set(base);
   for (const [id, on] of edits) { if (on) wanted.add(id); else wanted.delete(id); }
+  // An edit the phone has caught up with is over (an Apply carried it out): dropped, so taking that letter off the
+  // phone later does not bring the old tick back.
+  const settled = [...edits].some(([id, on]) => on === base.has(id));
+  React.useEffect(() => {
+    if (settled) setEdits((prev) => new Map([...prev].filter(([id, on]) => on !== base.has(id))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- base is rebuilt every render; `settled` says when it matters
+  }, [settled]);
   // Letter ids and reading ids (`<letter>@<reader>`) alike: every id either side holds.
   const setWanted = (/** @type {Set<string>} */ next) => {
     const e = new Map();
@@ -653,7 +660,7 @@ export function DownloadChooser({ off, bibleAudio, focus, letterReader, after = 
     const cancelUrls = [];
     for (const u of plan.remove) for (const t of u.tracks) {
       const s = off.statusOf(t.url);
-      if (s === 'saved') removeUrls.push(t.url); else if (s === 'queued' || s === 'downloading') cancelUrls.push(t.url);
+      if (s === 'saved') removeUrls.push(t.url); else if (s === 'queued' || s === 'downloading' || s === 'failed') cancelUrls.push(t.url);
     }
     if (cancelUrls.length) off.cancel(cancelUrls);
     if (removeUrls.length) off.remove(removeUrls);

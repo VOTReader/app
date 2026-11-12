@@ -438,6 +438,24 @@ describe('a song row\'s ⋯: Play next / Add to queue (pl-l2 L3)', () => {
   });
 });
 
+// PL-LISTEN (REVIEW-listen 11): offline, a song not kept cannot play (its row's play is off), yet its menu still
+// lined it up in Up next, where it failed or was skipped when its turn came.
+describe('a song row\'s menu with no signal', () => {
+  it('offers no Play next or Up next for a song that is not on the phone; Save stays', async () => {
+    const { NetStatus } = await import('../../utils/net-status.js');
+    try {
+      const song = songById('bbbbbbbbbbb1');
+      render(<SongListRow song={song} title="Lead Me To That Place" onPlay={() => {}} />);
+      act(() => { NetStatus.reportFailure(); });
+      fireEvent.click(screen.getByRole('button', { name: 'More for Lead Me To That Place' }));
+      const sheet = screen.getByRole('dialog', { name: 'Lead Me To That Place' });
+      expect(within(sheet).queryByRole('button', { name: 'Play next' })).toBeNull();
+      expect(within(sheet).queryByRole('button', { name: 'Add to the end of Up next' })).toBeNull();
+      expect(within(sheet).getByRole('group', { name: 'Your vote on Lead Me To That Place' })).toBeTruthy();
+    } finally { NetStatus._reset(); }
+  });
+});
+
 describe('textKeyOf: a song\'s text is the letter it came from', () => {
   it('only at medium or high confidence, never the song key itself', () => {
     expect(textKeyOf({ key: 'song:aaaaaaaaaaa1' })).toBe('wtlb1:come-love-awaits-you');

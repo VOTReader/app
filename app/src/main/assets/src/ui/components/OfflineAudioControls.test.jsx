@@ -351,6 +351,9 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(s.cancelAll).toHaveBeenCalledTimes(1);
     fireEvent.click(getByRole('button', { name: 'Retry Letter c' }));
     expect(s.download).toHaveBeenCalledWith(failed, { priority: 'tap' });
+    // PL-LISTEN (REVIEW-listen 4): one that will never download can be dropped by itself, not only by Cancel all.
+    fireEvent.click(getByRole('button', { name: 'Take Letter c off the list' }));
+    expect(s.cancel).toHaveBeenCalledWith([U('c')]);
   });
 
   // dl-rework A (defect 2): every reading of a letter merged into one row with no reader, and × removed them all.
@@ -377,6 +380,23 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  // PL-LISTEN 1 (REVIEW-listen 2): 72466aa1b cut the shelf's list to "Didn't download yet"; the ones running and
+  // waiting, each with its own x, had no list anywhere.
+  it('lists what is downloading and what waits in line, each with its own cancel', () => {
+    const s = fakeStore();
+    s.queue = () => [{ url: U('w1'), key: 'two:w1', title: 'W1' }, { url: U('w2'), key: 'two:w2', title: 'W2' }];
+    s.actives = () => [U('w1')];
+    s.pending = () => ({ busy: 2, failed: [] });
+    s.st.progress.set(U('w1'), { bytes: 2e6, total: 8e6 });
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const rows = [...container.querySelectorAll('.dl-queue-row')].map((r) => r.textContent);
+    expect(rows).toEqual(['W12 of 8 MB', 'W2Waiting · 1st in line']);
+    fireEvent.click(getByRole('button', { name: 'Take W2 off the queue' }));
+    expect(s.cancel).toHaveBeenCalledWith([U('w2')]);
+    fireEvent.click(getByRole('tab', { name: 'Choose' }));
+    expect(container.querySelector('.dl-queue-row')).toBeNull();   // Choose keeps to what did not download
+  });
+
   // dl-rework E: the Choose tab showed the strip but not what did not download.
   it('what did not download yet shows on the Choose tab too', () => {
     const s = fakeStore();
@@ -386,6 +406,10 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     fireEvent.click(getByRole('tab', { name: 'Choose' }));
     expect(container.textContent).toMatch(/Didn’t download yet/);
     expect(container.textContent).toMatch(/Letter cThe server had a problem \(503\) · tries again in 12 min/);
+    // PL-LISTEN 4: one the store stopped trying by itself says so, not a time.
+    s.later = () => [{ url: U('c'), key: 'one:c', title: 'Letter c', reason: 'server', status: 404, tries: 6, at: 0, stopped: true }];
+    act(() => s.bump());
+    expect(container.textContent).toMatch(/Letter cThe server answered 404 \(not found\) · stopped trying/);
   });
 
   // W3b (au-dlrun): while a set downloads, its card takes the storage card's place and its row says how much is here.
@@ -401,6 +425,27 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(container.querySelector('.dl-phone').previousElementSibling.textContent).toMatch(/^On this phone so far/);
     expect(container.querySelector('.dl-kept').textContent).toBe('Volume Two1 of 3 recordings · the rest are on their way');
     expect(queryByRole('button', { name: 'Remove Volume Two from this phone' })).toBeNull();
+  });
+
+  // PL-LISTEN (REVIEW-listen 5): a Bible book's queued chapters counted as 1 ("10 of 11"), a letter with one part
+  // here and one coming counted twice, and a book with nothing here yet had no row.
+  it('"N of M · the rest are on their way" counts chapters and letters once each', () => {
+    const s = fakeStore();
+    globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis'], ['ruth', 'Ruth']];
+    const q = (id, key, title) => ({ url: U(id), key, title });
+    s.queue = () => [q('gen2', 'bible-brm-kjv:genesis', 'Genesis · Chapter 2'), q('gen3', 'bible-brm-kjv:genesis', 'Genesis · Chapter 3'),
+      q('gen4', 'bible-brm-kjv:genesis', 'Genesis · Chapter 4'), q('ruth1', 'bible-brm-kjv:ruth', 'Ruth · Chapter 1'), q('ruth2', 'bible-brm-kjv:ruth', 'Ruth · Chapter 2'),
+      q('x2', 'two:x', 'Christmas · Part 2'), q('y', 'two:y', 'Why')];
+    s.pending = () => ({ busy: 7, failed: [] });
+    s.st.saved.set(U('gen1'), { url: U('gen1'), key: 'bible-brm-kjv:genesis', title: 'Genesis · Chapter 1', bytes: 1e6, savedAt: 1 });
+    s.st.saved.set(U('x1'), { url: U('x1'), key: 'two:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 2 });
+    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect([...container.querySelectorAll('.dl-kept')].map((k) => k.textContent)).toEqual([
+      'Genesis1 of 4 chapters · the rest are on their way',
+      'Ruth0 of 2 chapters · the rest are on their way',
+      'Volume Two1 of 2 recordings · the rest are on their way',
+    ]);
   });
 
   it('nothing on the phone opens Choose; the empty shelf says how to fill it and its button goes there (au-dlphone0)', () => {
