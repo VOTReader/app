@@ -7,12 +7,12 @@
    design f01, f02, f05, f06), top to bottom:
 
      the head (Topics & Doctrines, the (i) About), the title and the site's
-     tagline; "Start with a question" with the search field, six question
-     chips and "More questions"; the reading path (Continue in the site's
-     order, kept on this device); the Answer of the day; then Contents | A–Z.
+     tagline; "Start with a question" with the search field, the question
+     chips, "More questions" and "Surprise me"; the reading path (Start here
+     or Continue in the site's order, kept on this device); then Contents | A–Z.
 
-   Contents is the site's own sidebar in its order: the Main Page, the Ten
-   Commandments, Other Topics (its page outside the menu last), the twelve
+   Contents is the site's own sidebar in its order (the Main Page is the
+   Start here card above it, not a row again: ANS1): the Ten Commandments, Other Topics (its page outside the menu last), the twelve
    numbered "Thus Says The Lord..." groups with our short names, the False
    Doctrines index, then Charts & videos and the credit. A query of two or
    more characters replaces everything under the field with the results,
@@ -34,24 +34,22 @@ import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle } from '.
 import { ANSWERS_SIDEBAR, ANSWERS_FD_INDEX_ID, ANSWERS_FD_INDEX_TEXT, ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU, answersSiteOrder } from '../../utils/answers-site.js';
 import {
   NBSP, SEP, pl, ANSWERS_QUESTIONS, ANSWERS_AZ_KEYS, ANSWERS_TAGLINE, answersRowSub, answersSizeWords, answersBrowseShelves,
-  answersPlaceOf, answersAZGroups, answersSourceParts, answersInlinePieces, answersDailyPool, answersDailyPick,
-  answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
+  answersPlaceOf, answersAZGroups, answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
   answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, ANSWERS_TSTL_HEAD,
+  ANSWERS_BAR_TITLE, answersBarTitleFit,
 } from '../../utils/answers-browse.js';
 import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
 import { answersEngineReady, answersRankedSearch } from '../../utils/answers-ranked.js';
-import { passageTextBefore } from '../../utils/answers-contents.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
-import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
-import { answersSavedSum, answersCardFor, answersShownText } from '../../utils/answers-extras.js';
+import { answersSavedSum } from '../../utils/answers-extras.js';
 
-/** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | { kind: 'card', card: any } | null} AnswersSheetState */
+/** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | null} AnswersSheetState */
 
-let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), dailyOpen: false, all: false };
-export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, dailyOpen: false, all: false }; }
+let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), all: false };
+export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, all: false }; }
 
 /* Recent searches: on this device only (f06c), the last five a reader went on to open. */
 const RECENT_KEY = 'vot-answers-recent';
@@ -67,49 +65,12 @@ function rememberQuery(q) {
   writeRecent([t].concat(readRecent().filter((x) => x.toLowerCase() !== t.toLowerCase())).slice(0, 5));
 }
 
-/* The day's pool costs tens of ms on a phone; the corpus and its sidecars are fixed arrays once
-   loaded, so it is built once per array, not on every landing mount (the search index likewise:
-   answersIndexOf). */
-let _pool = { of: /** @type {any} */ (null), meta: /** @type {any} */ (null), v: /** @type {any} */ (null) };
-/** @param {any[]} entries @param {Record<string, any>} meta */
-export function dailyPoolOf(entries, meta) {
-  if (_pool.of !== entries || _pool.meta !== meta) _pool = { of: entries, meta, v: answersDailyPool(entries, meta) };
-  return _pool.v;
-}
-
-/** "Volume 7" → "Volume Seven", the registry's label a letter tap resolves by (as the topic page's source lines). */
-function collectionLabel(vol) {
-  const s = String(vol || '').trim().toLowerCase();
-  const NUMS = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven' };
-  const m = s.startsWith('volume ') ? s.slice(7).trim() : s;
-  const n = /** @type {Record<string, string>} */ (NUMS)[m];
-  if (n) return 'Volume ' + n;
-  const word = Object.values(NUMS).find((w) => w.toLowerCase() === m);
-  if (word) return 'Volume ' + word;
-  if (typeof COLLECTIONS !== 'undefined') {
-    const col = COLLECTIONS.find((c) => c.registryLabel && (c.registryLabel.toLowerCase() === s || (c.label || '').toLowerCase() === s));
-    if (col) return col.registryLabel;
-  }
-  return null;
-}
-
-/** A Format B paragraph as the reading page draws its marks: bold, italic, line breaks, "(ref)". */
-function Inline({ text }) {
-  return (
-    <>
-      {answersInlinePieces(text).map((p, i) => {
-        if (p.br) return <br key={i} />;
-        const t = p.i ? <em>{p.t}</em> : p.t;
-        return p.b ? <strong key={i}>{t}</strong> : <React.Fragment key={i}>{t}</React.Fragment>;
-      })}
-    </>
-  );
-}
+/** The sentence the question chips finish (U9): the field's placeholder when it fits, else the line above the chips. */
+export const ANSWERS_ASK_LEAD = 'What does The Lord say about…';
 
 /** "What does The Lord say about…", or "Search Answers…" when the long words would not fit the field (U9). */
 function usePlaceholder(inputRef) {
-  const LONG = 'What does The Lord say about…';
-  const [ph, setPh] = React.useState(LONG);
+  const [ph, setPh] = React.useState(ANSWERS_ASK_LEAD);
   React.useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el || typeof getComputedStyle !== 'function') return undefined;
@@ -120,7 +81,7 @@ function usePlaceholder(inputRef) {
       const cs = getComputedStyle(el);
       ctx.font = 'italic ' + cs.fontSize + ' ' + cs.fontFamily;
       const room = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
-      if (room > 0) setPh(ctx.measureText(LONG).width <= room ? LONG : 'Search Answers…');
+      if (room > 0) setPh(ctx.measureText(ANSWERS_ASK_LEAD).width <= room ? ANSWERS_ASK_LEAD : 'Search Answers…');
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
@@ -129,65 +90,6 @@ function usePlaceholder(inputRef) {
     return () => ro.disconnect();
   }, [inputRef]);
   return ph;
-}
-
-/**
- * The Answer of the day (f01 #9-13): one whole excerpt by the local date, the same for everyone on
- * that date: its dated header, every quote paragraph, its source; Read in context, Open to an answer.
- */
-function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter, onShare }) {
-  const pool = React.useMemo(() => dailyPoolOf(entries, meta), [entries, meta]);
-  const pick = answersDailyPick(pool, now || new Date());
-  const e = pick ? byId.get(pick.id) : null;
-  if (!pick || !e) return null;
-  const P = e.paragraphs;
-  const src = answersSourceParts(P[pick.attr].text);
-  const wording = ((((meta && meta[pick.id]) || {}).attr || {})[pick.attr] || {}).wording || 'From';
-  const openSource = (ev) => {
-    ev.preventDefault();
-    const collection = src ? collectionLabel(src.collection) : null;
-    if (!src || !collection || !onOpenLetter) return;
-    const title = src.title.replace(/^[“"]/, '').replace(/[”"]$/, '');
-    const excerpt = passageTextBefore(P, pick.attr);
-    onOpenLetter(excerpt ? { collection, letterTitle: title, excerpt } : { collection, letterTitle: title });
-  };
-  // O6: today's excerpt as a card, its words as the page shows them, its source and date its own.
-  const share = () => {
-    const item = answersIndexOf(entries).find((t) => t.entry === e);
-    const words = pick.quote.map((i) => answersShownText(P[i].text)).join('\n');
-    onShare(answersCardFor(e, item, pick.quote[0], words, ((meta && meta[pick.id]) || {}).sections));
-  };
-  const randomAnswer = () => {
-    const all = answersOpenablePool(entries, meta);
-    if (!all.length) return;
-    const at = all[Math.floor(Math.random() * all.length)];
-    const t = byId.get(at.id);
-    if (t) onOpenTopic(at.id, t.paragraphs[at.index].text, 'Answers');
-  };
-  // WA1 (a-land): the dated head line gives only its date to the source line ("“Abasement” · The Lord’s Rebuke · 7/26/11").
-  const date = pick.head >= 0 ? (/(\d{1,2}\/\d{1,2}\/\d{2,4})/.exec(answersPlainText(P[pick.head].text)) || [])[1] || '' : '';
-  return (
-    <section className="ans-daily" aria-labelledby="ans-daily-h">
-      <h2 className="ans-k" id="ans-daily-h">Answer of the day</h2>
-      <blockquote className="ans-quote">
-        {pick.quote.map((i, k) => (k ? <React.Fragment key={i}>{' '}<Inline text={P[i].text} /></React.Fragment> : <Inline key={i} text={P[i].text} />))}
-      </blockquote>
-      {src ? (
-        <p className="ans-src">
-          <a href="#" onClick={openSource} aria-label={`${wording} ${src.title}, ${src.collection}. Opens the letter.`}>
-            {(/\p{Ll}/u.test(src.title) ? src.title : src.title.toLowerCase().replace(/(^|[\s“"(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()))
-              + SEP + src.collection + (date ? SEP + date : '')}
-          </a>
-        </p>
-      ) : null}
-      <div className="ans-actions">
-        <button type="button" className="ans-textbtn ans-gold" onClick={() => onOpenTopic(pick.id, P[pick.quote[0]].text, 'Answers')}>Read in context<Chev /></button>
-        <span className="ans-sp" />
-        {onShare ? <button type="button" className="ans-textbtn" aria-haspopup="dialog" aria-label="Share as a card" onClick={share}><AnsIcon name="share" />Share</button> : null}
-        <button type="button" className="ans-textbtn" onClick={randomAnswer}><AnsIcon name="shuffle" />Surprise me</button>
-      </div>
-    </section>
-  );
 }
 
 /**
@@ -286,6 +188,45 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   );
 }
 
+/**
+ * The landing's scrolled-in bar title (ANS1): "Answers Only God Can Give" whole on one line, made smaller when it must
+ * be (15 px at least), else "Answers"; never cut. The outer span holds the room and the CSS size, the inner the fit.
+ */
+function BarTitle() {
+  const ref = React.useRef(/** @type {HTMLSpanElement | null} */ (null));
+  const [fit, setFit] = React.useState(/** @type {{ full: boolean, size: number | null }} */ ({ full: true, size: null }));
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof getComputedStyle !== 'function') return undefined;
+    let ctx = null;
+    try { ctx = document.createElement('canvas').getContext('2d'); } catch (_e) { ctx = null; }
+    if (!ctx) return undefined;
+    const c2 = ctx;
+    let live = true;
+    const measure = () => {
+      if (!live) return;
+      const cs = getComputedStyle(el);
+      const base = parseFloat(cs.fontSize);
+      c2.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + base + 'px ' + cs.fontFamily;
+      const next = answersBarTitleFit(c2.measureText(ANSWERS_BAR_TITLE).width, el.clientWidth, base, c2.measureText('Answers').width);
+      setFit((f) => (f.full === next.full && f.size === next.size ? f : next));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(el);
+    // a reading face arrives after first paint: measure again once it is in
+    const fonts = /** @type {any} */ (document).fonts;
+    if (fonts && fonts.addEventListener) fonts.addEventListener('loadingdone', measure);
+    if (fonts && fonts.ready) fonts.ready.then(measure, () => {});
+    return () => { live = false; if (ro) ro.disconnect(); if (fonts && fonts.removeEventListener) fonts.removeEventListener('loadingdone', measure); };
+  }, []);
+  return (
+    <span className="ans-bar-title" aria-hidden="true" ref={ref}>
+      <span style={fit.size ? { fontSize: fit.size + 'px' } : undefined}>{fit.full ? ANSWERS_BAR_TITLE : 'Answers'}</span>
+    </span>
+  );
+}
+
 const GROUPS_SHOWN = 8;
 
 /** f06: the results, one group per topic, its first hit under it; f06b when nothing answers. */
@@ -360,13 +301,12 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
   const { loaded, byId, shelves, meta, isRead, site, onOpenTopic, onOpenGroup, setSheet } = props;
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
-  const { cur, atEnd, onStripScroll, jump } = useJumpStrip(rootRef, stripRef, 'data-jump', 'main');
+  const { cur, atEnd, onStripScroll, jump } = useJumpStrip(rootRef, stripRef, 'data-jump', 'cmd');
   const openTopic = (id) => onOpenTopic(id, null, 'Answers');
   const openSheet = (s) => { if (loaded) setSheet(s); };
   const sub = (e) => (
     <>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>
   );
-  const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
   const cmdShelves = shelves.commandments;
   const cmdTotal = cmdShelves.reduce((a, s) => a + s.topics.length, 0);
   const groupTotal = shelves.groups.reduce((a, s) => a + s.topics.length, 0);
@@ -387,7 +327,8 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
     );
   });
 
-  const parts = [['main', 'Main Page'], ['cmd', 'Ten Commandments']].concat(loaded ? [['other', 'Other topics'], ['tstl', 'Thus Says The Lord']] : [],
+  // ANS1: the Main Page is the Start here card above, so neither the strip nor the list offers it again
+  const parts = [['cmd', 'Ten Commandments']].concat(loaded ? [['other', 'Other topics'], ['tstl', 'Thus Says The Lord']] : [],
     loaded && (shelves.index || fdEntry) ? [['fd', 'False doctrines']] : []);
   return (
     <div role="tabpanel" id="ans-panel-c" aria-labelledby="ans-tab-c" ref={rootRef}>
@@ -395,7 +336,6 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
       <nav className={'ans-az-strip ans-jump-strip' + (atEnd ? ' is-end' : '')} aria-label="Jump to a part" ref={stripRef} onScroll={onStripScroll}>
         {parts.map(([k, t]) => <button key={k} type="button" className="ans-az-key" aria-current={cur === k ? 'true' : undefined} onClick={() => jump(k)}>{t}</button>)}
       </nav>
-      <div className="ans-box" data-jump="main"><AnsRow title="Main Page" sub={main ? sub(main) : null} onClick={() => openTopic(ANSWERS_MAIN_PAGE_ID)} /></div>
       <div className="ans-sechead" data-jump="cmd"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic')}</span> : null}</div>
       <div className="ans-tablets ans-box">{tablets}</div>
       {loaded ? (
@@ -438,12 +378,12 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
 
 /**
  * @param {{ entries: any[] | null, site?: any, isRead?: (id: string) => boolean, pathOn?: boolean, pathLast?: string | null,
- *   fontScale?: any, now?: Date, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
+ *   fontScale?: any, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
  *   onThemeChange?: any, onOpenTopic: Function, onOpenGroup?: (key: string) => void, onOpenMedia?: () => void,
- *   onOpenSaved?: () => void, onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
+ *   onOpenSaved?: () => void, onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void }} props
  */
-export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, now, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
-  onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef, onOpenLetter }) {
+export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
+  onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef }) {
   const meta = useAnswersMeta();
   const loaded = Array.isArray(entries) && entries.length > 0;
   const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
@@ -506,6 +446,14 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const chip = (id) => openTopic(id, null, 'Answers');
 
   const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
+  // Surprise me: a quote paragraph anywhere in Answers, opened on its own words.
+  const surprise = () => {
+    const all = loaded ? answersOpenablePool(list, meta) : [];
+    if (!all.length) return;
+    const at = all[Math.floor(Math.random() * all.length)];
+    const t = byId.get(at.id);
+    if (t) openTopic(at.id, t.paragraphs[at.index].text, 'Answers');
+  };
 
   // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start.
   let path = null;
@@ -518,7 +466,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
     } else if (st.kind === 'again') {
       path = { k: 'Start again', title: 'Main Page', sub: 'in the site’s order', id: main.id };
     } else {
-      path = { k: 'Start here', title: 'Main Page', sub: answersSizeWords(main, meta && meta[main.id], { about: true }), id: main.id };
+      path = { k: 'Start here', title: 'Main Page', sub: answersSizeWords(main, meta && meta[main.id]), id: main.id };
     }
   }
 
@@ -572,7 +520,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
     <ScreenLayout className={answersLayoutClass(fontScale, true)}
       navChildren={LibraryNav({ onBack: handleNavBack, backLabel: query ? 'Answers' : 'Home', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange,
         hide: asking ? ['settings', 'history', 'search', 'theme'] : undefined,
-        leftExtras: asking ? field : <span className="ans-bar-title" aria-hidden="true">Answers Only God Can Give</span> })}>
+        leftExtras: asking ? field : <BarTitle /> })}>
       <div className={'ans-page ans-landing' + (isQuery || recentMode ? ' is-query' : '') + (asking ? ' is-asking' : '')}>
         <div className="ans-landing-a">
           {/* WA1 (a-land): the hero centred; About lives at the foot of Contents */}
@@ -584,10 +532,15 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
           <section className="ans-ask" aria-label="Start with a question" role="search">
             {asking ? null : field}
             {asking || recentMode ? null : (
-              <div className="ans-chips">
-                {ANSWERS_QUESTIONS.slice(0, 6).filter(([qq]) => !/holidays/.test(qq)).map(([qq, id]) => <button key={id} type="button" className="ans-chip" onClick={() => chip(id)}>{qq}</button>)}
-                <button type="button" className="ans-chip is-more" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'more' })}>More questions</button>
-              </div>
+              <>
+                {/* ANS1: the chips finish this sentence; when the field cannot hold it, it stands above them */}
+                {placeholder === ANSWERS_ASK_LEAD ? null : <p className="ans-ask-lead">{ANSWERS_ASK_LEAD}</p>}
+                <div className="ans-chips">
+                  {ANSWERS_QUESTIONS.slice(0, 6).filter(([qq]) => !/holidays/.test(qq)).map(([qq, id]) => <button key={id} type="button" className="ans-chip" onClick={() => chip(id)}>{qq}</button>)}
+                  <button type="button" className="ans-chip is-more" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'more' })}>More questions</button>
+                  <button type="button" className="ans-chip is-surprise" disabled={!loaded} onClick={surprise}><AnsIcon name="shuffle" />Surprise me</button>
+                </div>
+              </>
             )}
           </section>
           {isQuery && loaded ? (
@@ -612,7 +565,6 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
                   <span className="ans-row-body"><span className="ans-k">{path.k}</span><span className="ans-row-title">{path.title}</span><span className="ans-row-sub">{path.sub}</span></span><Chev />
                 </button>
               ) : null}
-              {loaded && meta ? <DailyAnswer entries={list} byId={byId} meta={meta} now={now} onOpenTopic={openTopic} onOpenLetter={onOpenLetter} onShare={(card) => setSheet({ kind: 'card', card })} /> : null}
               {/* WA1 (a-land, a-media, a-saved): both doors always on the landing */}
               <div className="ans-two">
                 <button type="button" className="ans-tile-btn" onClick={() => onOpenMedia && onOpenMedia()} aria-label={'Charts and videos' + (media ? ', ' + answersMediaSummary(media) : '')}><UiIcon name="film" size="sm" />Charts and videos</button>
@@ -638,7 +590,6 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
       {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onClose={closeSheet} tall={ts2} /> : null}
       {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onStep={(n) => openSheet({ kind: 'cmd', n })} onClose={closeSheet} tall={ts2} /> : null}
       {sheet && sheet.kind === 'about' && site ? <AboutSheet site={site} onOpenTopic={openTopic} onClose={closeSheet} /> : null}
-      {sheet && sheet.kind === 'card' && loaded ? <AnswersCardSheet card={sheet.card} onClose={closeSheet} /> : null}
     </ScreenLayout>
   );
 }

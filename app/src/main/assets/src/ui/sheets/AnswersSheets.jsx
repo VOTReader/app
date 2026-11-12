@@ -21,7 +21,7 @@
 
 import { h, Fragment } from '../jsx-h.js';
 import { ANSWERS_COMMANDMENTS } from '../../utils/answers-shelves.js';
-import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource } from '../../utils/answers-browse.js';
+import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource, answersSisterRow } from '../../utils/answers-browse.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from '../components/AnswersParts.jsx';
 import { sheetReference } from '../../utils/passage-copy.js';
 
@@ -160,7 +160,7 @@ export function AboutSheet({ site, onOpenTopic, onClose }) {
       <div className="ans-sechead"><h3 className="ans-h2">Sister Sites</h3><span className="ans-count">Open in your browser</span></div>
       <div className="ans-box is-inset">
         <AnsRow title={'Visit ' + answersDomain(site.site)} sub="Opens in your browser" href={site.site} />
-        {(site.sisterSites || []).map((s) => <AnsRow key={s.url} title={s.label} sub={answersDomain(s.url)} href={s.url} />)}
+        {(site.sisterSites || []).map((s) => { const r = answersSisterRow(s); return <AnsRow key={s.url} title={r.title} sub={r.sub} href={s.url} label={r.title === s.label ? undefined : s.label + ', ' + r.sub} />; })}
       </div>
       {site.promotion ? (
         <>
@@ -188,7 +188,7 @@ export function AboutSheet({ site, onOpenTopic, onClose }) {
       <p className="ans-credit">
         {site.copyright}<br />
         {'This is the site’s page “My wiki:About”, captured from ' + answersDomain(site.site) + ' on' + NBSP + site.capturedAt + '.'}<br />
-        The words, headings and order are the site’s. These are the app’s: the group short names, the commandment short labels (“No other gods” to “Do not covet”), the “Topics & Doctrines” and “Official website” labels, Charts & videos, the questions, Answer of the day and the reading path.
+        The words, headings and order are the site’s. These are the app’s: the group short names, the commandment short labels (“No other gods” to “Do not covet”), the “Topics & Doctrines” and “Official website” labels, Charts & videos, the questions, Surprise me and the reading path.
       </p>
     </AnsSheet>
   );

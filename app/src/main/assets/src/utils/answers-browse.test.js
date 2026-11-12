@@ -8,7 +8,7 @@ import { runInNewContext } from 'node:vm';
 import {
   NBSP, SEP, pl, answersLeadSplit, isDateHead, dateOfHead, answersMinutes, answersMediaKinds, answersSizeWords,
   answersRowSub, answersPlaceOf, answersBrowseShelves, answersShelfByKey, ANSWERS_QUESTIONS, answersAZGroups,
-  answersSourceParts, answersInlinePieces, answersWordCount, answersDailyPool, answersDayNumber, answersDailyPick,
+  answersSourceParts, answersInlinePieces, answersWordCount, answersBarTitleFit, ANSWERS_BAR_MIN_PX, answersSisterRow, answersMinWords,
   answersOpenablePool, answersPathState, answersMediaIndex, ANSWERS_TAGLINE, answersDomain, answersMediaTitle, answersMediaLines,
   answersMediaSource, answersMediaSub, answersMediaSummary, answersSearchSum, answersSearchSub, answersHitSource, answersClosest,
 } from './answers-browse.js';
@@ -70,10 +70,18 @@ describe('copy rules', () => {
 
 describe('on the real corpus', () => {
   it('row subs say the size, then the media', () => {
-    expect(show(answersRowSub(E('answers-main-page'), M['answers-main-page']))).toBe('12~passages~· ~12~min~· video~· downloads');
+    expect(show(answersRowSub(E('answers-main-page'), M['answers-main-page']))).toBe('12~passages~· 12~min~· video~· downloads');
     expect(show(answersSizeWords(E('false-doctrines-within-the-churches-of-men-regarding'), M['false-doctrines-within-the-churches-of-men-regarding']))).toBe('46~categories');
     // before the sidecar lands, no minutes are guessed
     expect(show(answersSizeWords(E('answers-main-page'), null))).toBe('12~passages');
+  });
+  // ANS1: one form for a reading time everywhere in Answers, "25 min" (no "~", no "about")
+  it('a reading time reads "N min" and nothing else', () => {
+    expect(show(answersMinWords({ words: 2400 }))).toBe('12~min');
+    for (const e of A) {
+      const s = answersRowSub(e, M[e.id]);
+      expect(s, e.id).not.toMatch(/~|about/);
+    }
   });
   it('the shelves in the sidebar\'s order: ten commandments, Other Topics (16), twelve groups', () => {
     const b = answersBrowseShelves(A);
@@ -124,23 +132,7 @@ describe('on the real corpus', () => {
     ]);
     expect(answersWordCount('**One** _two_ three\nfour')).toBe(4);
   });
-  it('the answer of the day: whole excerpts of 12-80 words, the same for everyone, turning at local midnight', () => {
-    const pool = answersDailyPool(A, M);
-    expect(pool.length).toBe(355);
-    expect(pool[0]).toEqual({ id: 'there-is-no-other', head: 0, quote: [1], attr: 2 });
-    for (const x of pool) {
-      const P = E(x.id).paragraphs;
-      expect(x.quote.every((k) => k > x.head && k < x.attr && !isDateHead(P[k].text)), x.id).toBe(true);
-      const words = x.quote.reduce((n, k) => n + answersWordCount(P[k].text), 0);
-      expect(words >= 12 && words <= 80 && words <= 120, x.id).toBe(true);
-    }
-    expect(answersDayNumber(new Date(2026, 9, 20, 0, 1))).toBe(answersDayNumber(new Date(2026, 9, 20, 23, 59)));
-    expect(answersDayNumber(new Date(2026, 9, 21))).toBe(answersDayNumber(new Date(2026, 9, 20)) + 1);
-    expect(answersDailyPick(pool, new Date(2026, 9, 20))).toBe(pool[answersDayNumber(new Date(2026, 9, 20)) % pool.length]);
-    expect(answersDailyPick([], new Date())).toBeNull();
-    expect(answersDailyPool(A, null)).toEqual([]);
-  });
-  it('"Open to an answer" lands only on a quote paragraph', () => {
+  it('"Surprise me" lands only on a quote paragraph', () => {
     const op = answersOpenablePool(A, M);
     expect(op.length).toBe(2255);
     for (const { id, index } of op.slice(0, 400)) {
@@ -248,5 +240,38 @@ describe('the retired screens (answers-retired.js)', () => {
     expect(['0', '13', '1.5', '', null, 'x'].map(isAnswersGroupKey)).toEqual([false, false, false, false, false, false]);
     expect(answersRetiredPlace({ screen: 'answers-subject', letterId: 'marriage-family-and-body' })).toEqual({ screen: 'answers-group', letterId: '11' });
     expect(answersRetiredPlace({ screen: 'answers-entry', letterId: 'x' })).toEqual({ screen: 'answers-entry', letterId: 'x' });
+  });
+});
+
+// ANS1: the landing's bar title is the whole name, smaller down to 15 px, else "Answers"; never an ellipsis.
+describe('the landing bar title', () => {
+  it('fits at its own size, shrinks to no less than 15 px, else gives way to "Answers"', () => {
+    expect(answersBarTitleFit(200, 260, 18)).toEqual({ full: true, size: null });
+    const f = answersBarTitleFit(240, 222, 18);
+    expect(f.full).toBe(true);
+    expect(f.size).toBeGreaterThanOrEqual(ANSWERS_BAR_MIN_PX);
+    expect(f.size * 240 / 18).toBeLessThanOrEqual(220);
+    expect(answersBarTitleFit(300, 200, 18)).toEqual({ full: false, size: null });
+    expect(answersBarTitleFit(300, 200, 18, 90)).toEqual({ full: false, size: null });
+    // "Answers" too gets smaller rather than cut, should even it not fit
+    const s = answersBarTitleFit(600, 100, 54, 200);
+    expect(s.full).toBe(false);
+    expect(s.size * 200 / 54).toBeLessThanOrEqual(98);
+    // nothing measured yet: the whole title, as drawn
+    expect(answersBarTitleFit(0, 0, 18)).toEqual({ full: true, size: null });
+  });
+});
+
+// ANS1 (mock a-about): the site's long sister-site names as short row names, the address under each.
+describe('About this collection rows', () => {
+  it('names the official pages short and puts their address under them', () => {
+    expect(answersSisterRow({ label: 'Answers Only God Can Give - Official YouTube Channel', url: 'https://www.youtube.com/AnswersOnlyGodCanGive' }))
+      .toEqual({ title: 'YouTube channel', sub: 'youtube.com/AnswersOnlyGodCanGive' });
+    expect(answersSisterRow({ label: 'Answers Only God Can Give - Official Facebook Page', url: 'https://www.facebook.com/AnswersOnlyGodCanGive' }))
+      .toEqual({ title: 'Facebook page', sub: 'facebook.com/AnswersOnlyGodCanGive' });
+    expect(answersSisterRow({ label: 'Answers Only God Can Give - Official Twitter X Page', url: 'https://x.com/DailyTrumpet' }))
+      .toEqual({ title: 'X page', sub: 'x.com/DailyTrumpet' });
+    expect(answersSisterRow({ label: 'TheVolumesofTruth.com', url: 'https://www.thevolumesoftruth.com/Main_Page' }))
+      .toEqual({ title: 'TheVolumesofTruth.com', sub: 'thevolumesoftruth.com' });
   });
 });

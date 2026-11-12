@@ -11,8 +11,8 @@
    Copy rules:
    - a number and its unit never part: U+00A0 between them ("12 passages");
    - a line never starts with a middot: every separator is U+00A0 + "· " (A29);
-   - a row's sub: its size ("12 passages · ~12 min", "46 categories",
-     "3 letters · ~4 min", "6 links" or "~3 min"), then its media words
+   - a row's sub: its size ("12 passages · 12 min", "46 categories",
+     "3 letters · 4 min", "6 links" or "3 min"), then its media words
      in one fixed order (video · audio · PDF · chart · downloads);
    - a place: the commandment ("The Fourth Commandment"), the numbered group
      with our short name ("5 · Scripture & doctrine"), "Other Topics" or
@@ -118,16 +118,20 @@ export function answersTopSections(meta) {
   return ((meta && meta.sections) || []).filter((s) => s.level === 1 && !isTrumpetSection(s));
 }
 
+/** A reading time in the one form Answers uses everywhere (ANS1): "25 min". */
+export function answersMinWords(meta) {
+  return answersMinutes(meta) + NBSP + 'min';
+}
+
 /**
- * A topic's size: "12 passages · ~12 min", "46 categories", "3 letters · ~4 min", "6 links", "~3 min";
- * "about 12 min" with opts.about (FA: the mock's words on a card or a topic's head, "~" in a list row).
+ * A topic's size: "12 passages · 12 min", "46 categories", "3 letters · 4 min", "6 links", "3 min".
  * @param {any} entry
  * @param {any} meta its sidecar (null before answers-meta.js lands)
- * @param {{ minutes?: boolean, about?: boolean }} [opts]
+ * @param {{ minutes?: boolean }} [opts]
  */
 export function answersSizeWords(entry, meta, opts) {
   const minutes = !(opts && opts.minutes === false) && !!meta;
-  const min = (opts && opts.about ? 'about' + NBSP : '~') + answersMinutes(meta) + NBSP + 'min';
+  const min = answersMinWords(meta);
   const n = answersPassageCount(entry);
   if (n) return pl(n, 'passage') + (minutes ? SEP + min : '');
   if (entry && entry.id === ANSWERS_FD_INDEX_ID) return meta ? pl(answersTopSections(meta).length, 'category') : '';
@@ -142,11 +146,34 @@ export function answersSizeWords(entry, meta, opts) {
  * A topic row's sub without its read mark: size, then media words.
  * @param {any} entry
  * @param {any} meta
- * @param {{ about?: boolean }} [opts]
  */
-export function answersRowSub(entry, meta, opts) {
+export function answersRowSub(entry, meta) {
   const k = answersMediaKinds(meta);
-  return [answersSizeWords(entry, meta, opts)].concat(k).filter(Boolean).join(SEP);
+  return [answersSizeWords(entry, meta)].concat(k).filter(Boolean).join(SEP);
+}
+
+/* ── The landing's bar title ───────────────────────────────────────── */
+
+export const ANSWERS_BAR_TITLE = 'Answers Only God Can Give';
+/** The smallest size the whole title may take in the bar before it gives way to "Answers". */
+export const ANSWERS_BAR_MIN_PX = 15;
+
+/**
+ * The bar title's fit (ANS1): the whole title when it fits at its own size, or smaller down to 15 px; else
+ * "Answers", itself made smaller should even that not fit. Never an ellipsis. `width` and `shortWidth` are the whole
+ * title's and "Answers"' widths at `base` px, `room` the space they have.
+ * @param {number} width
+ * @param {number} room
+ * @param {number} base
+ * @param {number} [shortWidth]
+ * @returns {{ full: boolean, size: number | null }}
+ */
+export function answersBarTitleFit(width, room, base, shortWidth) {
+  const r = room - 2; // a hair for rounding between the canvas and the layout
+  if (!(width > 0) || !(r > 0) || !(base > 0) || width <= r) return { full: true, size: null };
+  const fitted = (w) => Math.floor((base * r / w) * 10) / 10;
+  if (fitted(width) >= ANSWERS_BAR_MIN_PX) return { full: true, size: fitted(width) };
+  return { full: false, size: shortWidth && shortWidth > r ? fitted(shortWidth) : null };
 }
 
 /* ── Places ────────────────────────────────────────────────────────── */
@@ -299,77 +326,17 @@ export function answersInlinePieces(text) {
   return out;
 }
 
-/** The words a paragraph shows (marks and markers out), for the daily pool's length rule. */
+/** The words a paragraph shows (marks and markers out): a card's length rule counts these. */
 export function answersWordCount(text) {
   let n = 0;
   for (const p of answersInlinePieces(text)) if (!p.br) n += p.t.split(' ').filter((w) => w.trim()).length;
   return n;
 }
 
-/* ── Answer of the day ─────────────────────────────────────────────── */
+/* ── Surprise me ──────────────────────────────────────────────────── */
 
 /**
- * Every whole excerpt of 12-80 words: the quote paragraphs before a source line, after its
- * optional dated header, inside one section (no section heading among them), no ornament
- * or second header inside. The same for everyone (it reads only the corpus and its sidecars).
- * @param {any[]} entries ANSWERS
- * @param {Record<string, any> | null} metaAll ANSWERS_META
- * @returns {{ id: string, head: number, quote: number[], attr: number }[]}
- */
-export function answersDailyPool(entries, metaAll) {
-  /** @type {{ id: string, head: number, quote: number[], attr: number }[]} */
-  const pool = [];
-  if (!metaAll) return pool;
-  for (const e of answersTopicEntries(entries)) {
-    const P = e.paragraphs || [];
-    const secAt = new Set(((metaAll[e.id] || {}).sections || []).filter((s) => !s.synthetic).map((s) => s.at));
-    let start = 0;
-    for (let i = 0; i < P.length; i++) {
-      if (!isAttribution(P[i] && P[i].text)) continue;
-      let s = start;
-      while (s < i && String(P[s].text || '').trim() === '✦') s++;
-      start = i + 1;
-      if (s >= i) continue;
-      const head = isDateHead(P[s].text) ? s : -1;
-      const from = head >= 0 ? s + 1 : s;
-      if (from >= i) continue;
-      let ok = true, words = 0;
-      for (let k = s; k < i && ok; k++) {
-        if (secAt.has(k)) ok = false;
-        else if (k >= from) {
-          const t = String(P[k].text || '');
-          if (isDateHead(t) || t.trim() === '✦') ok = false;
-          else words += answersWordCount(t);
-        }
-      }
-      if (!ok || words < 12 || words > 80) continue;
-      const quote = [];
-      for (let k = from; k < i; k++) quote.push(k);
-      pool.push({ id: e.id, head, quote, attr: i });
-    }
-  }
-  return pool;
-}
-
-/** The local calendar day as a whole number (days since 1970-01-01 on that date). */
-export function answersDayNumber(date) {
-  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 864e5);
-}
-
-/**
- * Today's excerpt: the pool by local day number, so it turns at the reader's midnight.
- * @template T
- * @param {T[]} pool
- * @param {Date} date
- * @returns {T | null}
- */
-export function answersDailyPick(pool, date) {
-  if (!pool || !pool.length) return null;
-  return pool[((answersDayNumber(date) % pool.length) + pool.length) % pool.length];
-}
-
-/**
- * The quote paragraphs "Open to an answer" may land on: justified text, never a heading,
+ * The quote paragraphs "Surprise me" may land on: justified text, never a heading,
  * a dated header, an ornament, a link line or a source line.
  * @param {any[]} entries ANSWERS
  * @param {Record<string, any> | null} metaAll
@@ -510,6 +477,25 @@ export function answersMediaSource(m) {
   if (host.endsWith('bandcamp.com')) return 'Bandcamp';
   if (host.endsWith('dropbox.com')) return 'Dropbox';
   return host;
+}
+
+/**
+ * A sister-site row in About this collection (ANS1, the mock's a-about): the site's own "Answers Only God Can Give -
+ * Official YouTube Channel" as "YouTube channel" with its address under it ("youtube.com/AnswersOnlyGodCanGive");
+ * any other link keeps its label, its domain under it.
+ * @param {{ label: string, url: string }} s
+ * @returns {{ title: string, sub: string }}
+ */
+export function answersSisterRow(s) {
+  const label = String((s && s.label) || '');
+  const url = String((s && s.url) || '');
+  const m = /^Answers Only God Can Give\s*-\s*Official\s+(?:Twitter\s+)?(.+)$/i.exec(label);
+  if (!m) return { title: label, sub: answersDomain(url) };
+  const words = m[1].trim().split(/\s+/);
+  const title = words.map((w, i) => (i === words.length - 1 && words.length > 1 ? w.toLowerCase() : w)).join(' ');
+  const at = url.indexOf('//');
+  const rest = (at >= 0 ? url.slice(at + 2) : url).split(/[?#]/)[0].replace(/^www\./i, '').replace(/\/$/, '');
+  return { title, sub: rest };
 }
 
 /** A media row's sub: its topic, then where it opens. */

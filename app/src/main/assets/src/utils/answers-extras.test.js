@@ -7,10 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import {
   answersKeyParts, answersIsTopicKey, answersSaved, answersSavedSum, answersParaSource, answersCardFor, answersCardWords,
-  answersShownText, answersWrap, answersCardLayout, ANSWERS_CARD_THEMES, ANSWERS_CARD_MAX_WORDS, ANSWERS_CARD_SITE,
+  answersShownText, answersWrap, answersCardLayout, ANSWERS_CARD_THEMES, ANSWERS_CARD_SITE,
 } from './answers-extras.js';
 import { answersIndexOf, answersSearch } from './answers-search.js';
-import { answersDailyPool } from './answers-browse.js';
 import { answersSiteOrder } from './answers-site.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -99,16 +98,6 @@ describe('Share as a card (O6)', () => {
     const card = answersCardFor(fd, itemOf(fd), 10, 'x', META[fd.id].sections);
     expect(card.cite).toBe('Capital Punishment · ' + fd.title);
     expect(card.date).toBe('');
-  });
-
-  it('every Answer of the day fits a card (80 words at most), by the pool\'s own count', () => {
-    const pool = answersDailyPool(A, META);
-    expect(pool.length).toBeGreaterThan(300);
-    for (const p of pool) {
-      const e = byId(p.id);
-      const words = p.quote.map((i) => answersShownText(e.paragraphs[i].text)).join('\n');
-      expect(answersCardWords(words)).toBeLessThanOrEqual(ANSWERS_CARD_MAX_WORDS);
-    }
   });
 
   it('shows a paragraph as the page draws it: marks out, a cite as (X), its breaks kept', () => {

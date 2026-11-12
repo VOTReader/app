@@ -365,6 +365,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   const sheetRef = React.useRef(sheet);
   sheetRef.current = sheet;
   const [layoutEl, setLayoutEl] = React.useState(/** @type {Element | null} */ (null));
+  const runRef = React.useRef(/** @type {HTMLElement | null} */ (null));
 
   React.useEffect(() => { setSheet(null); setCur(0); setShown(false); setFoldOn(readFold(entry.id)); setOpenSecs(new Set()); }, [entry.id]);
 
@@ -648,14 +649,39 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   // under two sections the head names the page and shows the bar; it opens nothing
   const btn = counted.length >= 2 && !!curRow;
   const runhead = !inert && layoutEl && ready ? ReactDOM.createPortal(h(btn ? 'button' : 'div', btn ? {
-    type: 'button', className: 'ans-runhead' + (shown ? '' : ' is-hidden'), 'aria-haspopup': 'dialog',
+    type: 'button', className: 'ans-runhead' + (shown ? '' : ' is-hidden'), 'aria-haspopup': 'dialog', ref: runRef,
     'aria-label': 'Contents: ' + short + ', section ' + curRow.num + ' ' + curRow.title, onClick: () => setSheet({ kind: 'contents' }),
-  } : { className: 'ans-runhead' + (shown ? '' : ' is-hidden') },
+  } : { className: 'ans-runhead' + (shown ? '' : ' is-hidden'), ref: runRef },
   <span className="ans-runhead-text">
     {btn ? <span className="ans-runhead-s"><span className="ans-runhead-num">{curRow.num}</span> <span className="ans-runhead-sec">{curRow.title}</span></span> : null}
     <span className="ans-runhead-t">{btn ? short + NBSP + '·' + NBSP : short}</span>
   </span>,
   btn ? <AnsIcon name="down" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
+
+  /* ANS1: the running head sits in the bar between its own buttons, measured, not assumed (four icons at the right
+     was the old guess): its sides are the back button's right edge and the first right-hand button's left edge. */
+  React.useLayoutEffect(() => {
+    const rh = runRef.current;
+    const nav = layoutEl ? layoutEl.querySelector('.top-nav') : null;
+    if (!rh || !layoutEl || !nav) return undefined;
+    const fit = () => {
+      const box = layoutEl.getBoundingClientRect();
+      if (!box.width) return;
+      const split = box.left + box.width * 0.4;
+      let l = 0, r = box.width;
+      for (const b of nav.querySelectorAll('button, a, [role="button"]')) {
+        const q = b.getBoundingClientRect();
+        if (!q.width || rh.contains(b)) continue;
+        if (q.right <= split) l = Math.max(l, q.right - box.left);
+        else if (q.left >= split) r = Math.min(r, q.left - box.left);
+      }
+      rh.style.setProperty('--rh-left', Math.round(l + 4) + 'px');
+      rh.style.setProperty('--rh-right', Math.round(box.width - r + 4) + 'px');
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [layoutEl, shown, ready, btn]);
 
   const top = meta ? answersTopSections(meta).length : 0;
   const passages = answersPassageCount(entry);
@@ -765,10 +791,10 @@ const RELATED_SHOWN = 6;
 function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShelf, onLetter, tc }) {
   const [all, setAll] = React.useState(false);
   React.useEffect(() => { setAll(false); }, [entry.id]);
-  const topicSub = (id, about = false) => {
+  const topicSub = (id) => {
     const e = byId.get(id);
     if (!e) return null;
-    return <>{answersRowSub(e, metaAll && metaAll[id], { about })}{pathOn && isRead(id) ? <>{SEP}<ReadMark /></> : null}</>;
+    return <>{answersRowSub(e, metaAll && metaAll[id])}{pathOn && isRead(id) ? <>{SEP}<ReadMark /></> : null}</>;
   };
   const topicRow = (id, key) => {
     const e = byId.get(id);
@@ -838,7 +864,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       const step = [];
       if (sn && sn.next && byId.has(sn.next)) {
         const nx = byId.get(sn.next);
-        rows.push(<KRow key="n" kicker={'Next' + SEP + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next, true)} onClick={() => nav.go(sn.next)} />);
+        rows.push(<KRow key="n" kicker={'Next' + SEP + answersEyebrow(entries, nx).text} title={<LeadTitle title={nx.title} />} sub={topicSub(sn.next)} onClick={() => nav.go(sn.next)} />);
       }
       if (sn && sn.prev && byId.has(sn.prev)) {
         const pv = byId.get(sn.prev);

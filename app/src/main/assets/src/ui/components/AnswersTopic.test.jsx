@@ -198,10 +198,10 @@ describe('AnswersTopic — hero words (f07)', () => {
   it('reads the meta line in words; a page of links says "N links", never "0 passages"', () => {
     const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
     expect(NB(answersHeroMeta(byId.get('regarding-the-holy-days-of-god'), M['regarding-the-holy-days-of-god'])))
-      .toBe('26 passages · about 31 min · 2 playlists · 1 video · audio · PDF · 2 charts');
+      .toBe('26 passages · 31 min · 2 playlists · 1 video · audio · PDF · 2 charts');
     expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('6 links');
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
-      .toBe('12 passages · about 12 min · 2 videos · downloads · YouTube channel');
+      .toBe('12 passages · 12 min · 2 videos · downloads · YouTube channel');
   });
 });
 
