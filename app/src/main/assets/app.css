@@ -986,11 +986,11 @@
       .pager-track .letter-para,
       .pager-track .letter-poetry,
       .pager-track .section-block,
+      .pager-track .songs-list > .songs-row,
+      .pager-peek .songs-list > .songs-row,
       .pager-peek .letter-para,
       .pager-peek .letter-poetry,
-      .pager-peek .section-block,
-      .pager-track .songs-list > .songs-row,
-      .pager-peek .songs-list > .songs-row { content-visibility: visible; }
+      .pager-peek .section-block { content-visibility: visible; }
 
       .scroll-notch-marker {
         position: absolute; right: 0; width: 10px; height: 3px;
