@@ -861,7 +861,7 @@
     try {
       // 1. Enable Tabs via the Settings UI (idempotent — skip if already on).
       await goHome(); await sleep(200);
-      clickByText(/App Configuration|^Settings/); await sleep(420);
+      await openSettings(); await sleep(420);   // GEAR1: Settings sits behind the gear's Quick settings
       var tabsRow = [].slice.call(document.querySelectorAll('.settings-row'))
         .find(function (r) {
           var l = r.querySelector('.settings-row-label');
