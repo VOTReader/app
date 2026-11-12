@@ -149,6 +149,33 @@ import { COLLECTIONS, COL_BY_KEY, READING_CHAIN, _boundaryShort, colLetterArr, c
 import { tabActionCount } from './use-navigate-to-link.js';
 import { noteLoading, noteDone, noteGaveUp } from '../utils/wait-notice.js';
 
+/**
+ * A Bible chapter's own book edges, for the page and for a swipe neighbour drawn as it will be (TABS3): a first chapter
+ * gets the previous book (BIBLE_BOOK_LIST order), a last chapter the next book, and Revelation's last the Volume One
+ * bridge, named as the page that jump opens in its own hero's words (Volume One opens on its Preface; reading-flow
+ * hunt, 2026-11-04; before the letters land only the volume is known).
+ * @param {any} book @param {number} num
+ * @returns {{ prevBook: any, nextBook: any, prevBoundaryTitle: null, nextBoundaryTitle: string | null }}
+ */
+export function bibleChapterEdges(book, num) {
+  const list = typeof BIBLE_BOOK_LIST !== 'undefined' ? BIBLE_BOOK_LIST : [];
+  const at = list.findIndex((/** @type {any} */ b) => b.id === book.id);
+  const first = !book.chapters.find((/** @type {any} */ c) => c.num === num - 1);
+  const last = !book.chapters.find((/** @type {any} */ c) => c.num === num + 1);
+  const rev = last && book.id === 'revelation';
+  let v1 = 'Volume One';
+  if (rev) {
+    const col = COL_BY_KEY.get('one');
+    v1 = colPreface(col) ? 'Volume One · Preface' : colLetterArr(col).length > 0 ? 'Volume One · Letter 1' : 'Volume One';
+  }
+  return {
+    prevBook: first && at > 0 ? list[at - 1] : null,
+    nextBook: !last ? null : rev ? { title: 'Volume One', chapters: [{ num: 1 }] } : at >= 0 && at < list.length - 1 ? list[at + 1] : null,
+    prevBoundaryTitle: null,
+    nextBoundaryTitle: rev ? v1 : null,
+  };
+}
+
 const JUMP_WAIT_MS = 8000;
 let _pendingJumpCancel = null;
 function _cancelPendingJump() {
@@ -388,33 +415,15 @@ export function useReadingChainNav({
   // ── Computed BibleChapterView boundary props ─────────────────────────
   const chIsFirst = chapter && !book?.chapters.find((c) => c.num === chapter.num - 1);
   const chIsLast = chapter && !book?.chapters.find((c) => c.num === chapter.num + 1);
-
-  // Prev: first chapters → previous book in BIBLE_BOOK_LIST
-  const bcvPrevBook = chIsFirst ? prevBibleBook : null;
+  const _edges = book && chapter ? bibleChapterEdges(book, chapter.num) : null;
+  const bcvPrevBook = _edges ? _edges.prevBook : null;
   const bcvOnPrevBook = goPrevBibleBook;
   const bcvPrevBoundaryTitle = null;
-
-  // Next: revelation last → Volume One; other last → next book
-  const bcvNextBook = chIsLast ?
-    bookId === 'revelation' ?
-      { title: 'Volume One', chapters: [{ num: 1 }] } :
-      nextBibleBook :
-    null;
+  const bcvNextBook = _edges ? _edges.nextBook : null;
   const bcvOnNextBook = chIsLast && bookId === 'revelation' ?
     _goFirst.one :
     goNextBibleBook;
-  // The page that jump opens, in its own hero's words: Volume One opens on its
-  // Preface ("A Word of Warning", _first), and the card said "Letter 1" over it
-  // (reading-flow hunt, 2026-11-04). Before the letters land the jump waits for
-  // them, so only the volume is known.
-  const _v1OpensOn = () => {
-    const v1 = COL_BY_KEY.get('one');
-    if (colPreface(v1)) return 'Volume One · Preface';
-    return colLetterArr(v1).length > 0 ? 'Volume One · Letter 1' : 'Volume One';
-  };
-  const bcvNextBoundaryTitle = chIsLast && bookId === 'revelation' ?
-    _v1OpensOn() :
-    null;
+  const bcvNextBoundaryTitle = _edges ? _edges.nextBoundaryTitle : null;
 
   // The full surface — including the helpers that App() doesn't
   // CURRENTLY destructure (goToRevelationLast / bookIdx /

@@ -20,7 +20,7 @@
    component and dispatching real events. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { ScreenLayout } from './ScreenLayout.jsx';
 
 beforeEach(() => {
@@ -196,10 +196,23 @@ describe('ScreenLayout pager wiring', () => {
     expect(document.querySelector('.ann-hint-pill')).toBeNull();
   });
 
-  it('pre-mounts both peeks at rest (parked off-screen at CSS ±100%)', () => {
-    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}>x</SL>);
-    // Both peeks are in the DOM immediately — no swipe needed — so the gesture
-    // controller can drive them with zero React state delay.
+  it('draws both peeks after the page has painted, not in its first render (TABS4)', async () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager} placeKey="v:a">x</SL>);
+    // The page's own render carries no neighbour: two more screens would hold its first paint up.
+    expect(container.querySelector('.pager-peek')).toBeNull();
+    // A frame and an idle moment later both are there, parked off-screen at CSS ±100%, before any swipe.
+    await waitFor(() => expect(container.querySelector('.pager-peek-prev')).toBeTruthy());
+    expect(container.querySelector('.pager-peek-next')).toBeTruthy();
+  });
+
+  it('draws the peeks at once when a finger comes down before they are there (TABS4)', () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager} placeKey="v:b">x</SL>);
+    expect(container.querySelector('.pager-peek')).toBeNull();
+    const sc = container.querySelector('.screen-scroll');
+    const ev = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(ev, 'touches', { value: [{ identifier: 1, clientX: 300, clientY: 400 }] });
+    act(() => { sc.dispatchEvent(ev); });
+    // in the touchstart task itself, so the first drag frame has its neighbour
     expect(container.querySelector('.pager-peek-prev')).toBeTruthy();
     expect(container.querySelector('.pager-peek-next')).toBeTruthy();
   });

@@ -54,6 +54,8 @@
        DiagnosticLog) so a failing device names itself.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { placePeek } from '../ui/components/pager-preview.jsx';
+
 // Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
 const SLOP = 8;
 // Settle animation: a decelerate curve ≈ Android FastOutSlowInInterpolator.
@@ -146,6 +148,7 @@ export function velocityFromSamples(samples) {
  *   getWidth: () => number,
  *   getTrack: () => any,
  *   getPeek: (dir: 'prev'|'next') => any,
+ *   prepare?: (peek: any) => void,
  *   peekFor: (side: 'prev'|'next') => any,
  *   commit: (side: 'prev'|'next') => void,
  *   reducedMotion: () => boolean,
@@ -192,6 +195,12 @@ const SWIPE_WATCHDOG_MS = 3000;
 export function commitReadingNav(go) {
   if (typeof ReactDOM !== 'undefined' && ReactDOM.flushSync) ReactDOM.flushSync(go);
   else go();
+  paintAnnotations();
+}
+
+/** The document-wide annotation pass (highlights, links, bookmarks, note icons): after a reading page or a swipe
+ *  neighbour (ScreenLayout, TABS4) is put in the DOM outside the screen's own render. */
+export function paintAnnotations() {
   try { if (typeof applyDOMHighlights === 'function') applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
   try { if (typeof applyDOMLinks === 'function') applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
   try { if (typeof applyDOMBookmarks === 'function') applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
@@ -290,6 +299,8 @@ export function createPagerGesture(io) {
     st.desc = st.pinned ? null : (io.peekFor(dir) || null);
     const trk = io.getTrack();
     const pk = st.desc ? io.getPeek(dir) : null;
+    // TABS2: the neighbour goes to its page's saved place before its first drag frame: the place the turn restores.
+    if (pk && io.prepare) { try { io.prepare(pk); } catch (_e) { /* a misplaced peek is never worth a failed swipe */ } }
     if (trk && trk.style) trk.style.willChange = 'transform';
     if (pk && pk.style) pk.style.willChange = 'transform';
   }
@@ -509,14 +520,18 @@ export function createPagerGesture(io) {
  *   onPrev: () => void,
  *   onNext: () => void
  * } | null | undefined} pager
+ * @param {(() => void) | null} [ensurePeeks] TABS4: called as one finger comes down (not while a settle runs), before
+ *   the controller sees it: ScreenLayout puts the neighbours in the DOM now if they are not drawn yet.
  * @returns {{ trackRef: {current:any}, peekPrevRef: {current:any}, peekNextRef: {current:any} }}
  */
-export function usePagerGesture(scrollRef, pager) {
+export function usePagerGesture(scrollRef, pager, ensurePeeks = null) {
   const trackRef = React.useRef(null);
   const peekPrevRef = React.useRef(null);
   const peekNextRef = React.useRef(null);
   const pagerRef = React.useRef(pager);
   pagerRef.current = pager;
+  const ensureRef = React.useRef(ensurePeeks);
+  ensureRef.current = ensurePeeks;
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -526,6 +541,7 @@ export function usePagerGesture(scrollRef, pager) {
       getWidth: () => el.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 0) || 0,
       getTrack: () => trackRef.current,
       getPeek: (dir) => dir === 'prev' ? peekPrevRef.current : peekNextRef.current,
+      prepare: placePeek,
       peekFor: (side) => { const p = pagerRef.current; return p && typeof p.peek === 'function' ? p.peek(side) : null; },
       commit: (side) => {
         const p = pagerRef.current;
@@ -553,7 +569,12 @@ export function usePagerGesture(scrollRef, pager) {
         } catch (_e) { /* ignore */ }
       },
     });
-    const onStart = (e) => ctrl.start(e);
+    const onStart = (e) => {
+      if (ensureRef.current && !ctrl.isSettling() && e.touches && e.touches.length === 1) {
+        try { ensureRef.current(); } catch (_e) { /* a neighbour that cannot be drawn is never worth a failed swipe */ }
+      }
+      ctrl.start(e);
+    };
     const onMove = (e) => ctrl.move(e);
     const onEnd = (e) => ctrl.end(e);
     const onCancel = (e) => ctrl.cancel(e);

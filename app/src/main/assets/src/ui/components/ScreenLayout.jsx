@@ -2,8 +2,10 @@
    ScreenLayout — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
+import { usePagerGesture, paintAnnotations } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
+import { onIdle } from '../../utils/on-idle.js';
+import { placeTarget, announcePlaced } from '../../utils/scroll-place.js';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 import { MoreMenuBtn } from './MoreMenu.jsx';
 import { NavGearHost } from './NavButtons.jsx';
@@ -18,30 +20,26 @@ function selectionText() {
   } catch (_e) { return ''; }
 }
 
-// Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
-// given scroll container — used for the inert peek so it renders already at the
-// neighbor's saved offset (a swipe lands where the live screen restores to, no
-// top-then-jump). Prefers the content anchor (its data-hl-key element); falls
-// back to the saved pixel y. The peek's reading blocks are content-visibility:
-// visible, so heights are REAL and the anchor position is accurate immediately.
+// Put the inert peek at its page's saved place before it paints, by the SAME rule the live restore uses
+// (utils/scroll-place.js placeTarget), so a swipe lands where the turn then restores to. The peek's reading blocks are
+// content-visibility: visible, so heights are REAL and the anchor position is right at once.
 function applySavedScrollToEl(el, saved) {
-  if (!el || !saved) return;
-  const anchorKey = (typeof saved === 'object') ? saved.anchorKey : null;
-  if (anchorKey) {
-    const a = el.querySelector('[data-hl-key="' + String(anchorKey).replace(/"/g, '\\"') + '"]');
-    if (a) {
-      const aTop = (a.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
-      el.scrollTop = Math.max(0, Math.round(aTop + (saved.anchorOff || 0)));
-      return;
-    }
-  }
-  const y = (typeof saved === 'number') ? saved : (typeof saved.y === 'number' ? saved.y : 0);
-  if (y > 0) el.scrollTop = y;
+  if (!el) return;
+  // A peek's box is kept from one neighbour to the next, so no saved place means the top, not "leave it be".
+  const y = placeTarget(el, saved).y;
+  if (Math.abs(el.scrollTop - y) >= 1) el.scrollTop = y;
+  announcePlaced(el);
 }
+
+// TABS4: when the swipe neighbours are drawn. 'idle' (the app): after the page they hang from has painted and the
+// main thread is idle, or at once when a finger comes down first. 'eager' (the page's own render) and 'off' (none,
+// swiping turns no page) exist only to measure first paint: tools/perf-first-paint.mjs sets window.__votPeeks.
+const PEEKS_MODE = typeof window !== 'undefined' && (window.__votPeeks === 'off' || window.__votPeeks === 'eager') ? window.__votPeeks : 'idle';
+const _descKind = (d) => (d ? d.kind + ':' + (d.kind === 'boundary' ? d.title : '') : '');
 
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
- *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
+ *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, scrollKey?: string, placeKey?: string, landmarks?: boolean,
  *   className?: string, root?: boolean, navEnd?: any,
  *   utility?: { title: string, onBack?: () => void, backLabel?: string, actions?: any[], menu?: any, lead?: any, titleId?: string } }} props
  *   className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2).
@@ -51,7 +49,7 @@ function applySavedScrollToEl(el, saved) {
  *   screen's own ⋯ (`menu`) only when it has one. No resume dot, no gear slot, no app-wide ⋯ menu. `navChildren` is
  *   ignored in this mode.
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '', root = false, navEnd = null, utility = null }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, scrollKey = '', placeKey = '', landmarks = true, className = '', root = false, navEnd = null, utility = null }) {
   const scrollRef = React.useRef(null);
   const navRef = React.useRef(/** @type {any} */ (null));
   // The slot after Tabs where NavButtons draws the Settings gear (NavGearHost, NavButtons.jsx).
@@ -69,17 +67,61 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   // by data-hl-key so it isolates the two panes) is NOT suppressed — that's what
   // makes the peek arrive already painted, before release.
   const activePager = inert ? null : pager;
+  // Neighbor peeks; never when inert (a clone must not build grand-neighbor peeks). TABS4: never in the page's own
+  // render. A peek is a whole second screen, and drawing two of them with the page held its first paint up (+26% at
+  // 4x CPU, R/build/TABS4.handover.md). Their descriptors are kept in state, built for one page (`at`, its placeKey)
+  // from one pager object (`src`): after the page has painted and the thread is idle (a transition, so a page update
+  // interrupts it), or at once when a finger comes down first (ensurePeeks). A page re-render hands PagerPeek the same
+  // elements, so React skips them; a new pager object (the screen re-rendered) is refreshed at the next idle moment.
+  const [peeks, setPeeks] = React.useState({ src: /** @type {any} */ (null), at: /** @type {string|null} */ (null), n: 0, prev: /** @type {any} */ (null), next: /** @type {any} */ (null) });
+  const canPeek = !!activePager && typeof activePager.peek === 'function' && PEEKS_MODE !== 'off';
+  const eager = canPeek && PEEKS_MODE === 'eager';
+  const prevDesc = eager ? activePager.peek('prev') : canPeek && peeks.at === placeKey ? peeks.prev : null;
+  const nextDesc = eager ? activePager.peek('next') : canPeek && peeks.at === placeKey ? peeks.next : null;
+  // What is on screen, from the last COMMITTED render (a layout effect: the idle draw is a transition, and a render
+  // that has not committed must not tell a finger the neighbours are there).
+  const live = React.useRef({ key: placeKey, pager: activePager, peeks });
+  React.useLayoutEffect(() => { live.current = { key: placeKey, pager: activePager, peeks }; });
+  // A finger came down (the pager's touchstart, before any move): the neighbours must be in the DOM and be the ones
+  // the drag will ask for (built from this page's pager, and resolved as the pager resolves them now). Drawn in this
+  // task, they are there before the first drag frame.
+  const ensurePeeks = React.useCallback(() => {
+    const c = live.current; const p = c.pager; const pk = c.peeks;
+    if (PEEKS_MODE !== 'idle' || !p || typeof p.peek !== 'function') return;
+    if (pk.at === c.key && pk.src === p && _descKind(p.peek('prev')) + '|' + _descKind(p.peek('next')) === _descKind(pk.prev) + '|' + _descKind(pk.next)) return;
+    const draw = () => setPeeks((s) => ({ src: p, at: c.key, n: s.n + 1, prev: p.peek('prev'), next: p.peek('next') }));
+    const RD = /** @type {any} */ (globalThis).ReactDOM;
+    if (RD && typeof RD.flushSync === 'function') RD.flushSync(draw); else draw();
+  }, []);
   // Finger-follow page swipe. No-op when `pager` is absent (every non-reading
-  // screen) or when inert (a clone never nests its own gesture/peeks). When
-  // present, both neighbor peeks are pre-mounted and parked at their CSS ±100%
-  // defaults; usePagerGesture hands their refs to the controller which drives
-  // them imperatively — no React state fires during the swipe.
-  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, activePager);
-  // Compute neighbor peek descriptors at render time. Pre-mounted peeks update
-  // on each screen render (e.g. after navigation) with zero swipe-path cost.
-  // Never computed when inert — a clone must not build grand-neighbor peeks.
-  const prevDesc = activePager && typeof activePager.peek === 'function' ? activePager.peek('prev') : null;
-  const nextDesc = activePager && typeof activePager.peek === 'function' ? activePager.peek('next') : null;
+  // screen) or when inert (a clone never nests its own gesture/peeks). The
+  // neighbor peeks are parked at their CSS ±100% defaults; usePagerGesture hands
+  // their refs to the controller which drives them imperatively — no React state
+  // fires during the swipe.
+  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, activePager, ensurePeeks);
+  const stale = canPeek && !eager && (peeks.at !== placeKey || peeks.src !== activePager);
+  // One refresh waits at a time and is not cancelled by a re-render (a screen that re-renders often, as while a
+  // recording plays, must not starve it); it reads the page as it stands when it runs.
+  const pendingDraw = React.useRef(/** @type {null | (() => void)} */ (null));
+  React.useEffect(() => {
+    if (!stale || pendingDraw.current) return;
+    let cancelIdle = null;
+    const draw = () => {
+      pendingDraw.current = null;
+      React.startTransition(() => setPeeks((s) => {
+        const c = live.current; const p = c.pager;
+        if (!p || typeof p.peek !== 'function' || (s.at === c.key && s.src === p)) return s;
+        return { src: p, at: c.key, n: s.n + 1, prev: p.peek('prev'), next: p.peek('next') };
+      }));
+    };
+    const raf = requestAnimationFrame(() => { cancelIdle = onIdle(draw, { timeout: 1200, fallbackDelay: 0 }); });
+    pendingDraw.current = () => { cancelAnimationFrame(raf); if (cancelIdle) cancelIdle(); };
+  });
+  React.useEffect(() => () => { if (pendingDraw.current) pendingDraw.current(); pendingDraw.current = null; }, []);
+  // The annotation pass is document-wide and ran with the page; neighbours drawn after it get it here.
+  React.useLayoutEffect(() => {
+    if (PEEKS_MODE === 'idle' && peeks.n > 0) paintAnnotations();
+  }, [peeks.n]);
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
     // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
@@ -111,7 +153,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
     if (!inert) return;
     applySavedScrollToEl(inertScrollRef.current, restoreScroll);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on the saved record's primitive fields (not its object identity, which is rebuilt each render) so this re-applies only when the target offset actually changes.
-  }, [inert, restoreScroll && restoreScroll.anchorKey, restoreScroll && restoreScroll.anchorOff, restoreScroll && restoreScroll.y]);
+  }, [inert, scrollKey, restoreScroll && restoreScroll.anchorKey, restoreScroll && restoreScroll.anchorOff, restoreScroll && restoreScroll.y]);
 
   /* Mark-as-read detection (2026-08-03): the old trigger here fired
      __onReadingComplete at scroll ≥90% toward the sentinel — no time
@@ -305,9 +347,19 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
       const next = el.scrollTop > 2;
       if (next !== on) { on = next; nav.classList.toggle('is-scrolled', on); }
     };
-    sync();
+    // TABS3: a page put at its place (a page turn, a restore) has the line it will have in that frame, with no fade;
+    // the fade is for the reader's own scrolling. The restorers announce `vot:placed` right after their scrollTop write.
+    const placed = () => {
+      if ((el.scrollTop > 2) === on) return;
+      nav.style.transition = 'none';
+      sync();
+      void nav.offsetWidth;
+      nav.style.transition = '';
+    };
+    placed();
     el.addEventListener('scroll', sync, { passive: true });
-    return () => el.removeEventListener('scroll', sync);
+    el.addEventListener('vot:placed', placed);
+    return () => { el.removeEventListener('scroll', sync); el.removeEventListener('vot:placed', placed); };
   }, [inert]);
 
   // Inert clone (a pager peek): render ONLY the scrollable content, in a
@@ -318,7 +370,8 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   // The `.pager-peek` parent (PagerPeek) is position:absolute with a fixed
   // height, so height:100% sizes this without a flex parent.
   if (inert) {
-    return <div className="screen-scroll" style={{ height: '100%' }} ref={inertScrollRef}>{children}</div>;
+    // data-scroll-key: the pager re-places the peek from it as a drag begins (pager-preview placePeek).
+    return <div className="screen-scroll" style={{ height: '100%' }} ref={inertScrollRef} data-scroll-key={scrollKey || undefined}>{children}</div>;
   }
 
   // THE ONE LANDMARK. This live `.screen-scroll` is the document's single

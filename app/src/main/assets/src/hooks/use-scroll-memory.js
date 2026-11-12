@@ -76,6 +76,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { hasBox, placeTarget, announcePlaced } from '../utils/scroll-place.js';
 import { COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
 
 // ── scrollPositions LRU bound (Wave 0) ─────────────────────────────────────
@@ -204,7 +205,6 @@ function scrollKeyOf(scr, bid, cnum, lid, sid, scid, jid, songsPlace, genrePlace
 // rect and no place in the order: a probe that lands on one steps to the next
 // laid-out element (sweep mw13: read as 'above the viewport', they sent the
 // search to the first paragraph after the card, far below the reader).
-function hasBox(r) { return r.width > 0 || r.height > 0; }
 function captureAnchor(el) {
   if (!el) return { anchorKey: null, anchorOff: 0 };
   var cRect = el.getBoundingClientRect();
@@ -237,29 +237,8 @@ function liveScrollRecord() {
   return { y: scrollTop, pct: Math.max(0, Math.min(1, scrollTop / max)), anchorKey: a.anchorKey, anchorOff: a.anchorOff };
 }
 
-// Content-coordinate Y of an anchor element's top (distance from the top of the
-// scrollable content), or null if it isn't in the DOM yet or has no box now (a
-// collapsed card). Invariant of the current scrollTop because the rect-delta
-// and scrollTop cancel.
-function anchorContentTop(el, anchorKey) {
-  if (!el || !anchorKey) return null;
-  var anchor = el.querySelector('[data-hl-key="' + String(anchorKey).replace(/"/g, '\\"') + '"]');
-  if (!anchor) return null;
-  var r = anchor.getBoundingClientRect();
-  if (!hasBox(r)) return null;
-  return (r.top - el.getBoundingClientRect().top) + el.scrollTop;
-}
-
-// Is `anchorKey` the FIRST laid-out data-hl-key element of the scroller (nothing
-// but the header above it; a collapsed card's paragraphs do not count)?
-// Document order is vertical order for reading content.
-function isFirstContent(el, anchorKey) {
-  var list = el ? el.querySelectorAll('[data-hl-key]') : [];
-  for (var i = 0; i < list.length; i++) {
-    if (hasBox(list[i].getBoundingClientRect())) return list[i].getAttribute('data-hl-key') === anchorKey;
-  }
-  return false;
-}
+// anchorContentTop / isFirstContent / the header rule: utils/scroll-place.js (placeTarget), shared with the swipe
+// neighbour so the page that slides in sits where this restore then puts it (TABS2).
 
 // Land a saved position on the current __scrollEl. Returns a cleanup fn.
 // Accepts the full saved record { y, pct, anchorKey, anchorOff }, a legacy plain
@@ -283,11 +262,10 @@ function startRestore(saved) {
   var legacyY = (saved == null) ? 0
     : (typeof saved === 'number' ? saved : (typeof saved.y === 'number' ? saved.y : 0));
   var anchorKey = (saved && typeof saved === 'object') ? (saved.anchorKey || null) : null;
-  var anchorOff = (saved && typeof saved === 'object' && typeof saved.anchorOff === 'number') ? saved.anchorOff : 0;
 
   // Nothing meaningful to restore (top of page, no anchor) — top is top.
   if (!anchorKey && legacyY <= 0) {
-    if (__scrollEl) __scrollEl.scrollTop = 0;
+    if (__scrollEl) { __scrollEl.scrollTop = 0; announcePlaced(__scrollEl); }
     return function () {};
   }
   document.body.classList.add('scroll-restoring');
@@ -296,26 +274,10 @@ function startRestore(saved) {
 
   // Best target available THIS frame: the content anchor if its element is in
   // the DOM (precise), else the saved pixel y.
-  function best() {
-    var aTop = anchorContentTop(__scrollEl, anchorKey);
-    if (aTop != null) {
-      // A NEGATIVE offset on the FIRST content element means the viewport top sat
-      // above all content — in the header (hero, meta) — whose height at boot is
-      // not its height at capture (the title's web font swaps in, a pill row
-      // mounts), so aTop + anchorOff would land the reader that difference DOWN a
-      // page they left at the top (99 px in a Verifier rehearsal arm,
-      // restore-anchor-top-of-letter-1). The pixel y describes the header region
-      // exactly, so it wins there. A negative offset on any LATER element is a gap
-      // between two content elements, stable across boots: the anchor keeps
-      // winning. (Restore-side on purpose: saved records already carry the anchor.)
-      if (anchorOff < 0 && isFirstContent(__scrollEl, anchorKey)) return { y: legacyY, anchored: true };
-      return { y: Math.max(0, Math.round(aTop + anchorOff)), anchored: true };
-    }
-    return { y: legacyY, anchored: false };
-  }
+  function best() { return placeTarget(__scrollEl, saved); }
   function settle() {
     raf = requestAnimationFrame(function () {
-      if (__scrollEl) __scrollEl.scrollTop = best().y; // re-apply post-commit layout pass
+      if (__scrollEl) { __scrollEl.scrollTop = best().y; announcePlaced(__scrollEl); } // re-apply post-commit layout pass
       raf2 = requestAnimationFrame(function () { document.body.classList.remove('scroll-restoring'); });
     });
   }
@@ -326,6 +288,7 @@ function startRestore(saved) {
       void __scrollEl.scrollHeight; // force real-geometry layout (cv lifted)
       var t = best();
       __scrollEl.scrollTop = t.y;
+      announcePlaced(__scrollEl);
       // Ready when the anchor resolved (precise), OR — no anchor wanted/found —
       // the container is tall enough for the pixel fallback. While an anchor IS
       // wanted but its element hasn't rendered yet (cold boot), keep retrying.

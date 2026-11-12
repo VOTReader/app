@@ -141,6 +141,7 @@ export function reopenFootnoteOf(entry) {
  *   fromLetterRef: { current: any[] },
  *   backHint: any,
  *   backActive: boolean,
+ *   backAt: (place: any) => { backHint: any, backActive: boolean },
  *   retargetTop: (dest: any) => void
  * }}
  */
@@ -280,9 +281,21 @@ export function useFromLetterStack({
     volumeLabel: _liveTop.sourceVolumeLabel || null
   } : null;
   const backActive = !!_liveTop;
+  // TABS3: the same two for ANOTHER place of this tab (a swipe neighbour, drawn as it will be): the pill is the
+  // destination's own, so a page turn off a tap-through destination drops it and the turn back brings it again.
+  /** @param {any} place @returns {{ backHint: any, backActive: boolean }} */
+  const backAt = (place) => {
+    const top = fromLetterStack.length > 0 ? fromLetterStack[fromLetterStack.length - 1] : null;
+    const here = { screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, ...place };
+    const live = top && (!top.destSnapshot || _matchesAt(top.destSnapshot, here)) ? top : null;
+    return {
+      backHint: live && !live.silent ? { title: live.sourceLetterTitle || "previous", volumeLabel: live.sourceVolumeLabel || null } : null,
+      backActive: !!live,
+    };
+  };
 
   return {
     fromLetterStack, setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint, backActive, retargetTop,
+    tapThroughBack, fromLetterRef, backHint, backActive, backAt, retargetTop,
   };
 }

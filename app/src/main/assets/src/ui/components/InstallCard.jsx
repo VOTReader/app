@@ -217,7 +217,8 @@ export function InstallCard({ unitKey, inert = false }) {
     else setStepsFor(PROMPT_FALLBACK());
   }, [flow, end]);
 
-  if (inert) return null;
+  // A swipe peek keeps the sentinel's line (TABS2: the page under the finger is laid out as the page it becomes).
+  if (inert) return <div className="install-card-sentinel" aria-hidden="true" />;
   const desktop = flow === 'desktop' || (flow === 'prompt' && !/Android|iPhone|iPad/.test(navigator.userAgent || ''));
   return (
     <>

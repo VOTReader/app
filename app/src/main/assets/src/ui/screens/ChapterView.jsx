@@ -13,7 +13,8 @@ import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse
 import { studyHlKey } from '../../utils/hl-keys.js';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, heroExtra = null, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function ChapterView(props) {
+  const { book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, heroExtra = null, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true } = props;
   const bodyRef = React.useRef(null);
   /* The eyebrow ("Book · Chapter N") is what the narrator says before verse 1:
      the read-along's lead-in (ReadAlongHighlight, 2026-09-22). */
@@ -88,24 +89,10 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   // release"). A study boundary peeks a card. Render-affecting settings (mode,
   // showStudy/Echoes, chapter-title visibility) are threaded so the clone
   // matches exactly what the committed chapter will show.
+  // TABS2: this page's own props with only the chapter swapped (see LetterView's _letterPeek): drawn as it will be.
   const _chPeek = (ch) => ({
     kind: 'screen',
-    el: (
-      // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onIndex/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
-      <ChapterView
-        book={book}
-        chapter={ch}
-        mode={mode}
-        showStudy={showStudy}
-        showEchoes={showEchoes}
-        showChapterTitle={showChapterTitle}
-        titleFocusHidden={titleFocusHidden}
-        theme={theme}
-        markAsReadEnabled={false}
-        inert={true}
-        restoreScroll={savedScrollFor(book.id + '-' + ch.num)}
-      />
-    ),
+    el: <ChapterView {...props} {...(props.pagePropsFor ? props.pagePropsFor(ch) : null)} chapter={ch} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(book.id + '-' + ch.num)} scrollKey={book.id + '-' + ch.num} />,
   });
   const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next Book' : 'Previous Book'), title: b.title } : null;
   const pager = {
@@ -132,6 +119,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
     <ScreenLayout
       inert={inert}
       restoreScroll={restoreScroll}
+      scrollKey={props.scrollKey}
       pager={inert ? undefined : pager}
       placeKey={(book && book.id) + '-' + (chapter && chapter.num)}
       stickyNav={<StickyChapterNav

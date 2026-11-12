@@ -35,6 +35,8 @@
    wiring (ScreenLayout.jsx).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { placeTarget, announcePlaced } from '../../utils/scroll-place.js';
+
 // ── Neighbor resolution (Letter / WTLB) ─────────────────────────────────────
 // Bible/Matthew screens already hold full neighbor chapter objects; only the
 // VOT letter / WTLB screens need to resolve {id} → full entry from the
@@ -85,6 +87,21 @@ export function letterScrollKey(volKey, neighborId) {
   if (!col) return null;
   const pfx = col.kind === 'holy-days' ? 'holyday' : col.kind === 'letter' ? 'letter' : col.kind;
   return pfx + '-' + neighborId;
+}
+
+/**
+ * Put a parked neighbour at its page's saved place NOW (TABS2). A peek is built when the page it hangs from renders,
+ * which is in the same task as the turn that saves the place of the page just left, so a peek of that page could carry
+ * its place from before (or none). The pager calls this as a drag begins: the place saved by then is the one the turn
+ * will restore, and the band and the rest of the peek follow it in the same frame (`vot:placed`).
+ * @param {any} peek the `.pager-peek` element
+ */
+export function placePeek(peek) {
+  const sc = peek && peek.querySelector ? peek.querySelector('.screen-scroll[data-scroll-key]') : null;
+  if (!sc) return;
+  const y = placeTarget(sc, savedScrollFor(sc.getAttribute('data-scroll-key'))).y;
+  if (Math.abs(sc.scrollTop - y) >= 1) sc.scrollTop = y;
+  announcePlaced(sc);
 }
 
 /* PagerPeek — the absolutely-positioned neighbor page that slides in during a

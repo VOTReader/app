@@ -1013,7 +1013,64 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // loader's version, for the loop reason above.
   }, [needLetterSync, key, playerVersion]);
 
-  const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey, sectionKey) : null;
+  // TABS4: the wash on a swipe neighbour. While the recording plays the chapter next to this one (the reader swiped
+  // off it), its verse is washed in that chapter's pager peek too, so the page that slides in under the thumb already
+  // has the wash the turn would paint (measured: the wash arriving at release was the last difference, mad 1.8).
+  // Drawing only: no follow, no hold, no pill; the peek is the same markup, so the same block key.
+  const nearCh = chapter && loaded && readAlongOn && track && track.key ? AudioPlayer.bibleChapterOfTrack(track) : 0;
+  const nearRows = nearCh && nearCh !== chapter && Math.abs(nearCh - chapter) === 1 ? _bibleRowsFor(letterId, nearCh, paintVolKey) : null;
+  const nearAt = nearRows ? fragmentAt(nearRows, st.time) : -1;
+  React.useEffect(() => {
+    if (!nearRows || nearAt < 0 || typeof document === 'undefined') return;
+    const H = /** @type {any} */ (globalThis).Highlight;
+    const reg = typeof CSS !== 'undefined' ? /** @type {any} */ (CSS).highlights : null;
+    const el = document.querySelector('.screen-layout > .pager-viewport > .pager-peek [data-hl-key="bible:' + letterId + ':' + nearCh + ':' + nearRows[nearAt][1] + '"]');
+    if (!el || typeof H !== 'function' || !reg) return;
+    const r = document.createRange();
+    try { r.selectNodeContents(el); } catch (_e) { return; }
+    reg.set(HL_NAME, new H(r));
+  }, [nearRows, nearAt, nearCh, letterId, st.time]);
+  // TABS5: the same for a letter. While the letter next to this one plays (same collection; a page with no offset map,
+  // so the peek's clause offsets are the row's own), its clause is washed in that letter's peek, from the frame clock
+  // the live pane paints by, so the clause under the thumb at release is the one the turn paints.
+  const nearLetterId = !chapter && !offsetMapFn && readAlongOn && track && typeof track.key === 'string'
+    && track.key !== key && track.key.indexOf(volKey + ':') === 0 ? track.key.slice(volKey.length + 1) : '';
+  const nearLetterFrags = React.useMemo(() => {
+    if (!nearLetterId) return null;
+    const all = _syncFor(track.key, track, 0, '', null);
+    if (!all || !all.length) return null;
+    const want = all === _altRowsFor(track) ? 0 : Math.max(0, _partOf(track.key, track));
+    const only = all.filter((f) => (f[4] || 0) === want);
+    return only.length ? only : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearLetterId, track, corpusVersion]);
+  const nearLetterPlaying = !!nearLetterFrags && (st.status === 'playing' || st.status === 'loading');
+  React.useEffect(() => {
+    const reg = typeof CSS !== 'undefined' ? /** @type {any} */ (CSS).highlights : null;
+    const H = /** @type {any} */ (globalThis).Highlight;
+    if (!nearLetterFrags || !reg || typeof H !== 'function' || typeof document === 'undefined') return undefined;
+    let last = -1; let lastEl = /** @type {Element | null} */ (null);
+    let id = /** @type {number | null} */ (null); let stopped = false;
+    const paint = () => {
+      const i = fragmentAt(nearLetterFrags, AudioPlayer.getPreciseTime() + LEAD_S);
+      if (i < 0) return;
+      const f = nearLetterFrags[i];
+      const el = document.querySelector('.screen-layout > .pager-viewport > .pager-peek [data-hl-key="' + hlKeyFn(nearLetterId, f[1]) + '"]');
+      if (!el || (i === last && el === lastEl)) return;   // no peek drawn yet: the next frame asks again
+      let r = null;
+      if (f[3] === -1) { r = document.createRange(); try { r.selectNodeContents(el); } catch (_e) { return; } } else r = rangeIn(el, f[2], f[3]);
+      if (!r) return;
+      last = i; lastEl = el;
+      reg.set(HL_NAME, new H(r));
+    };
+    const tick = () => { id = null; paint(); if (!stopped && nearLetterPlaying && typeof requestAnimationFrame === 'function') id = requestAnimationFrame(tick); };
+    tick();
+    return () => {
+      stopped = true;
+      if (id != null) { try { cancelAnimationFrame(id); } catch (_e) { /* frame source gone */ } }
+    };
+  }, [nearLetterFrags, nearLetterPlaying, nearLetterId, hlKeyFn, st.time]);
+  const rows =(loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey, sectionKey) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
   // nothing to them. Bible rows are per CHAPTER and likewise always part 0, and
@@ -1122,7 +1179,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
     if (!supported) return undefined;
     if (!frags || !mainRef.current) {
-      /** @type {any} */ (CSS).highlights.delete(HL_NAME);
+      // the wash a swipe neighbour holds (TABS4, above) is not this pane's to clear
+      if (!(nearRows && nearAt >= 0) && !nearLetterFrags) /** @type {any} */ (CSS).highlights.delete(HL_NAME);
       lastFrag.current = -1;
       return undefined;
     }
@@ -1131,7 +1189,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     if (i === lastFrag.current) return undefined;
     owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn, hold.current);
     return undefined;
-  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey]);
+  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey, nearRows, nearAt, nearLetterFrags]);
 
   // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
   // decoration with no box and no events — so the tap is resolved from the

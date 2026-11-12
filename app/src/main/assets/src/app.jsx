@@ -203,7 +203,7 @@ function App() {
   const [journalEntryId, setJournalEntryId] = tabField('journalEntryId');
   const {
     setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint, backActive, retargetTop,
+    tapThroughBack, fromLetterRef, backHint, backActive, backAt, retargetTop,
   } = useFromLetterStack({
     tabField,
     screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
@@ -677,7 +677,7 @@ function App() {
     searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
     journalEntryId, createAndEditJournal,
     openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
-    backHint, tapThroughBack, goToLetterFromMatthew, retargetTop,
+    backHint, backAt, tapThroughBack, goToLetterFromMatthew, retargetTop,
     setNavOrigin, setNoteSheetTarget, setNotebookPickerTarget,
     bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,

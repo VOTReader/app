@@ -115,9 +115,10 @@ describe('LetterView — the sticky mini title (B10 item 1)', () => {
     expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('Preface');
   });
 
-  it('an inert peek of the next page draws no band', () => {
+  it('an inert peek of the next page draws the band as the page it becomes will (TABS2), hidden at the top', () => {
     renderLetter({ inert: true });
-    expect(band()).toBeNull();
+    expect(band()).not.toBeNull();
+    expect(band().classList.contains('shown')).toBe(false);
   });
 
   it('starts hidden again on the next letter (the view stays mounted)', () => {
