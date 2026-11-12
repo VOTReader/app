@@ -11,6 +11,8 @@ import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
+import { passageLinkFor, PUBLIC_APP_URL } from '../../utils/passage-link.js';
+import { siteUrl, pageTarget } from '../../utils/site-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiParts.jsx';
@@ -656,6 +658,15 @@ const SHARE_LINK_OPTIONS = [
   { id: 'site', label: 'The website', desc: 'Opens the letter on thevolumesoftruth.com, for anyone, with a connection' },
   { id: 'app', label: 'The app', desc: 'Opens the passage in VOTReader, even offline, for anyone who has the app' },
 ];
+/** The preview's words, quoted as passage-copy's quotedPassage quotes them (ASCII double quotes). */
+export const SHARE_PREVIEW_QUOTE = '"The words you picked"';
+/** The link the preview shows under its words: the one Share would send for The Wide Path's first paragraph,
+    from passage-link (the app) or site-link (the website, the words as a text fragment when Highlight is on).
+    @param {'app' | 'site'} which @param {boolean} highlight */
+export function sharePreviewLink(which, highlight) {
+  if (which === 'app') return passageLinkFor('letter:the-wide-path:1') || PUBLIC_APP_URL;
+  return siteUrl(pageTarget('The Wide Path'), highlight ? [['The', 'words', 'you', 'picked']] : undefined);
+}
 
 /* WS2 settings (st-arrows, X-hidden 6 "Chapter & Letter Arrows"): the picker says where the arrows sit, each with a
    small picture, and no option calls itself the default. Same ids and settings.arrowLayout key as index.html's list. */
@@ -1548,7 +1559,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               value={settings.shareLink === 'app' ? 'app' : 'site'} options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)} />
           </SettingsSection>
-          <p className="ws1-note">Share puts this link under the passage. Hold Share, or right-click it on a computer, to send the other one for a single share. Copy adds the website link wherever the passage has a page there.</p>
+          <p className="ws1-note">Share sends the words you picked, then this link alone under them. Hold Share, or right-click it on a computer, to send the other one for a single share. Copy ends the same way with the website link wherever the passage has a page there, and with its name where it has none.</p>
           <SettingsSection label="Website links">
             <SettingsRow
               label="Highlight the passage"
@@ -1562,11 +1573,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             <>
               <SectionLabel>What a shared passage looks like</SectionLabel>
               <div className="ui-card ws2-share-preview">
-                <p className="ws2-share-quote">“The words you picked”</p>
-                <p className="ws2-share-src">The Wide Path · The Volumes of Truth</p>
-                <p className="ws2-share-link">{settings.shareLink === 'app'
-                  ? 'votreader.github.io/app/?p=…'
-                  : 'thevolumesoftruth.com/The_Wide_Path' + (settings.linkHighlight ? '#:~:text=…' : '')}</p>
+                {/* share-link (Corbin 2026-11-11, "Append only the link itself"): what Share sends, built by the
+                    same functions - the quoted words, a blank line, the link; no title line. */}
+                <p className="ws2-share-quote">{SHARE_PREVIEW_QUOTE}</p>
+                <p className="ws2-share-link">{sharePreviewLink(settings.shareLink === 'app' ? 'app' : 'site', !!settings.linkHighlight)}</p>
               </div>
             </>
           )}

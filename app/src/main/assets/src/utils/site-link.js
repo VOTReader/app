@@ -6,7 +6,9 @@
 
    cp2 (Corbin 2026-09-27): a copy from a letter ends with the letter's name
    AND the closest link to it on the website proper, so a reader pasting it
-   never hunts for the link. The site is a MediaWiki (1.32) that names every
+   never hunts for the link (since 2026-11-11, "Append only the link itself",
+   the link alone stands in for the name: the quoted words, a blank line, the
+   link). The site is a MediaWiki (1.32) that names every
    letter's page by the letter's own title, and 349 of the app's 350 letter
    titles are that name exactly, so no list of links ships: the address is
    built from the title.

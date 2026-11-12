@@ -1004,8 +1004,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which) => {
     if (!selInfo) return;
-    // A8: the quote travels with its reference and a link that opens the
-    // passage (utils/passage-link.js); a key that may not travel (the reader's
+    // A8: the quote travels with a link that opens the passage
+    // (utils/passage-link.js; since 2026-11-11 the link alone, no reference
+    // line: "Append only the link itself"); a key that may not travel (the reader's
     // own journal) sends the words alone. A multi-verse selection links to
     // its first verse. cp2: that is the app's link (Corbin: "share just links
     // to the app"); held and chosen, the website's instead, Copy's own text,

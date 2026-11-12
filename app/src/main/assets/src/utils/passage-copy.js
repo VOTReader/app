@@ -399,10 +399,10 @@ function verseNumberOf(el) {
 
 /**
  * What a copy of `range` puts on the clipboard, or null when the range holds
- * no reading text (the browser's own copy stands then). `text` is `body`, then
- * `reference` and `link` (its place on thevolumesoftruth.com, cp2) each on its
- * own line; with a reference, `text` quotes `body` and leaves a blank line
- * before the reference (cp4). With `numbers` false the verse numbers are left
+ * no reading text (the browser's own copy stands then). With a reference,
+ * `text` quotes `body`, leaves a blank line, then gives the `link` (its place
+ * on thevolumesoftruth.com, cp2) alone, or the `reference` where there is no
+ * link (cp4; Corbin 2026-11-11). Without one, `text` is `body`, then the link. With `numbers` false the verse numbers are left
  * out, and a single verse never has one. The link
  * names the letter's page (a compilation entry's section) and quotes the copied
  * words only with `quote` (by default the reader's Highlight the Passage, cp3).

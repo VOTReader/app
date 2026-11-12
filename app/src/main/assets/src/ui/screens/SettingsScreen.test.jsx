@@ -314,6 +314,29 @@ describe('Copy & Share group', () => {
     expect(onSetting).toHaveBeenCalledWith('shareLink', 'app');
   });
 
+  // share-link (Corbin 2026-11-11, "Append only the link itself"): the preview is what Share sends - the quoted
+  // words, then the link alone; no title line.
+  it('previews a shared passage as the quoted words and the link alone, for each link setting', async () => {
+    const { withPassageLink } = await import('../../utils/passage-link.js');
+    const cases = [
+      [{ shareLink: 'site', linkHighlight: false }, 'https://www.thevolumesoftruth.com/The_Wide_Path'],
+      [{ shareLink: 'site', linkHighlight: true }, 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=The%20words%20you%20picked'],
+      [{ shareLink: 'app' }, 'https://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1'],
+    ];
+    for (const [settings, link] of cases) {
+      cleanup();
+      const { container } = renderSettings(settings);
+      const card = container.querySelector('.ws2-share-preview');
+      expect(card, JSON.stringify(settings)).toBeTruthy();
+      const lines = Array.from(card.querySelectorAll('p')).map((p) => p.textContent);
+      expect(lines).toEqual(['"The words you picked"', link]);
+      expect(card.textContent).not.toMatch(/Volume|The Volumes of Truth|·/);
+    }
+    // The app link is exactly what Share builds for that passage.
+    expect(withPassageLink('"The words you picked"', 'letter:the-wide-path:1', 'The Wide Path'))
+      .toBe('"The words you picked"\n\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+  });
+
   it('is found by "share", "link" and "highlight"', () => {
     renderSettings({}, {}, { expandGroups: false });
     for (const word of ['share', 'link', 'highlight']) {

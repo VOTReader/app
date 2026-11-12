@@ -220,7 +220,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   // screen, so a refusal points the reader at its text rather than at a
   // second sheet; a cancelled native share stays quiet.
   const share = () => {
-    // n6-08: the passage travels with its reference and a link, as the
+    // n6-08: the passage travels with a link (since 2026-11-11 the link alone), as the
     // selection Share's does (A8); the link names the passage, never the
     // note, and the reader's own journal sends the words alone.
     // U07.2: the passage goes in quotes with its reference (Copy's: "John 3:16 (NKJV)") and the reader's words as
