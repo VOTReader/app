@@ -690,6 +690,8 @@
         body:has(.find-pill) .ascroll-dwell-row { display: none; }
         body.autoscroll-on:has(.ascroll-pill.is-expanded):has(.find-pill) { --dock-transport: 60px; }
       }
+      /* While the tour card is up a toast sits beside it, never over its Back (TourOverlay sets the two lengths). */
+      body.tour-open { --dock-toast-bottom: var(--tour-toast-bottom, var(--dock-message)); --dock-toast-top: var(--tour-toast-top, auto); }
 
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
