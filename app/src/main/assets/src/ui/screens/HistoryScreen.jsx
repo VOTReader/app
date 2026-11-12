@@ -236,7 +236,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
     if (!item) return null;
     const key = (typeof READ_VERSION_ID === 'string')
       ? `${READ_VERSION_ID}:${sourceId}:${itemKey}` : null;
-    return readingMinChip(item, key, chipWpm);
+    return readingMinChip(item, key, chipWpm, { about: true });   // POL5: mock l-hist "about 1 min"
   };
 
   // Render one day-section. Used both for current-month days (top of screen)

@@ -1583,6 +1583,8 @@
         font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 600; cursor: pointer;
       }
       .np-sheet-link { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; cursor: pointer; }
+      /* POL4: a head link (Up next's Clear) sits level with the title line and the sheet's x, not centred on title + sub. */
+      .np-sheet-head > .np-sheet-link { align-self: flex-start; margin-top: calc(var(--ts-sheet) * 0.625 - 22px); }
       .np-chips, .np-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(var(--np-cols, 3), minmax(0, 1fr)); }
       .np-sleep-mins { --np-cols: 4; }
       .np-sleep-ends { --np-cols: 2; margin-top: var(--sp-2); }
@@ -3479,7 +3481,6 @@
     .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
     .today-actions { display:flex; gap:0.5rem; }
     .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
-    .today-btn-wide { width:100%; margin-top:0.6rem; }
     @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
     .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
@@ -3537,10 +3538,7 @@
     .build-days { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; padding-top:0.3rem; }
     .build-days button { min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); cursor:pointer; }
     .build-days button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
-    .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
-    .build-each p { margin:0.1rem 0; }
-    .build-each .today-btn-wide { margin-top:0.8rem; }
-    .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
+    .plan-start .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
     .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
     .plan-ribbon-copy { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -5684,7 +5682,7 @@
     .link-foot-web { display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); }
     .link-arrow { color: var(--accent); }
     .links-broken { margin-top: var(--sp-3); }
-    .links-empty-web { display: flex; justify-content: center; margin-top: calc(-1 * var(--sp-4)); }
+    .links-empty-web { display: flex; justify-content: center; margin-top: var(--sp-2); }   /* POL4: the mock's air under Start reading (it sat on the button) */
     /* ── end W2 LIBRARY FAMILY: the lists ── */
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
@@ -6643,10 +6641,12 @@
     .rd-trans-pill:active { background: var(--surface-2); }
     .rd-trans-code { color: var(--accent); font-weight: 700; font-size: var(--ts-label); letter-spacing: 0.04em; }
     .rd-trans-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .select-sheet-option.has-code { display: grid; grid-template-columns: 64px 1fr; column-gap: var(--sp-2); align-items: center; }
+    /* POL5: the mock's translation rows: the code is gold on every row (13 px 600, a 54 px column) and the chosen
+       one is marked by its tick alone (its name stays white). */
+    .select-sheet-option.has-code { display: grid; grid-template-columns: 54px 1fr; column-gap: var(--sp-2); align-items: center; }
     .select-sheet-option.has-code > :not(.select-sheet-option-code) { grid-column: 2; }
-    .select-sheet-option-code { grid-row: 1 / span 2; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 700; letter-spacing: 0.04em; }
-    .select-sheet-option.selected .select-sheet-option-code { color: var(--accent); }
+    .select-sheet-option-code { grid-row: 1 / span 2; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 600; letter-spacing: 0; }
+    .select-sheet-option.has-code.selected .select-sheet-option-label { color: var(--text-1); }
     /* ── end W2h readers (r-bindex, r-trans) ── */
     /* ── W2h readers (r-bible, r-study, r-book): Bible and study chapters are titled "John 3" with the headings as the
        italic line; Listen and the translation pill share a row; the study-notes switch sits under them, in words. ── */
@@ -6698,6 +6698,12 @@
     .rd-bindex.rd-genre { justify-content: flex-start; min-height: 0; }
     .rd-bindex .ui-row-text, .vot-large-text .lib-row .ui-row-text { flex: 1 0 auto; max-width: 100%; }
     .rd-bindex .ui-row-value, .vot-large-text .lib-row .ui-row-value { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: right; }
+    /* POL4: a Bible index name is never cut (it wraps), and at large text the count is its own line under the name
+       (it wrapped to four short lines beside it at 2). */
+    .rd-bindex .ui-row-title { white-space: normal; }
+    .vot-large-text .rd-bindex .ui-row { flex-wrap: wrap; row-gap: 2px; }
+    .vot-large-text .rd-bindex .ui-row-text { flex: 1 1 0; }
+    .vot-large-text .rd-bindex .ui-row-value { order: 3; flex: 1 0 100%; text-align: left; }
     /* ── end W2i readers (r-book, r-bindex, r-trans, gospels) ── */
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);

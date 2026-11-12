@@ -7,7 +7,7 @@ import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText, shareLinkSetting } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
-import { passageLabel, translationTag, siteLinkForKey } from '../../utils/passage-copy.js';
+import { siteLinkForKey } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import {
@@ -228,10 +228,10 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // share-fn (Corbin 2026-10-25): the link is the website's where the passage has a
     // page there, as the selection's Share sends, unless Share Includes says App Link.
     const key = segs[0] && segs[0].key;
-    const lastKey = segs.length > 1 ? segs[segs.length - 1].key : null;
     const link = key ? (shareLinkSetting() === 'site' && siteLinkForKey(key)) || passageLinkFor(key) : null;
     const text = link
-      ? '\u201C' + anchor + '\u201D \u2014 ' + passageLabel(key, lastKey) + translationTag(key)
+      // share-link (Corbin 2026-11-11): the link stands in for the reference ("Append only the link itself").
+      ? '\u201C' + anchor + '\u201D'
         + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link
       : anchor + (note.body ? '\n\n' + note.body : '');
     shareText(text).then((outcome) => {

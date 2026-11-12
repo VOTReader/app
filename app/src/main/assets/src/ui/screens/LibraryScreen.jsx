@@ -20,6 +20,7 @@ import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { ListGroup, ListRow } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
+import { readWords } from '../../utils/read-kind.js';
 import { continueLabel } from './HomeScreen.jsx';
 
 // The stores behind the Notes, Links, Bookmarks, Journal, Highlights and plan lines.
@@ -66,11 +67,12 @@ export function plansLine(runs) {
 /**
  * The Progress row's line: what has been read and the reading streak, in plain units ("12 read · 3 days in a row"),
  * or what the screen holds while nothing is read yet.
- * @param {number} read @param {number} streak @returns {string}
+ * POL5: the mock's words ("1 letter read") when every mark is a letter (or every one a chapter); a mix stays "12 read".
+ * @param {number} read @param {number} streak @param {'letter' | 'chapter' | null} [kind] @returns {string}
  */
-export function progressLine(read, streak) {
+export function progressLine(read, streak, kind = null) {
   const parts = [];
-  if (read > 0) parts.push(read.toLocaleString('en-US') + ' read');
+  if (read > 0) parts.push(read.toLocaleString('en-US') + ' ' + readWords(read, kind, 'read', 'read'));
   if (streak > 0) parts.push(countOf(streak, 'day') + ' in a row');
   return parts.length ? parts.join(' · ') : 'Your reading at a glance';
 }
@@ -100,10 +102,10 @@ export function recentPlaces(history, max = RECENT_ROWS) {
 /**
  * @param {{ onOpenNotes: () => void, onOpenLinks: () => void, onOpenBookmarks: () => void, onOpenJournal: () => void,
  *   onOpenHighlights: () => void, onOpenProgress: () => void, onOpenPlans: () => void, readingPlanCount?: number,
- *   totalReadCount?: number, onSearch: () => void, onSettings: () => void, historyEnabled?: boolean, history?: any[],
+ *   totalReadCount?: number, readKind?: 'letter' | 'chapter' | null, onSearch: () => void, onSettings: () => void, historyEnabled?: boolean, history?: any[],
  *   onOpenHistory?: () => void, onOpenHistoryEntry?: (entry: any) => void, isRead?: any }} props
  */
-export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, totalReadCount = 0, onSearch, onSettings, historyEnabled, history, onOpenHistory, onOpenHistoryEntry }) {
+export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, totalReadCount = 0, readKind = null, onSearch, onSettings, historyEnabled, history, onOpenHistory, onOpenHistoryEntry }) {
   // The lines below read these stores directly; subscribing to each one is what keeps a count live while the
   // Library stays open (a note saved in a sheet, a bookmark removed). Fixed list — stable hook order.
   const storeVersions = LIBRARY_COUNT_STORES.map(useStoreVersionByName);
@@ -141,7 +143,7 @@ export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpe
       <div className="root-screen library-root">
         <ListGroup ariaLabel="Plans and progress">
           <ListRow icon="cal" title="Reading plans" meta={plansLine(runningPlans)} onClick={onOpenPlans} />
-          <ListRow icon="chart" title="Progress" meta={progressLine(totalReadCount, streak)} onClick={onOpenProgress} />
+          <ListRow icon="chart" title="Progress" meta={progressLine(totalReadCount, streak, readKind)} onClick={onOpenProgress} />
         </ListGroup>
 
         <ListGroup label="Yours" className="lib-yours">

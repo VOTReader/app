@@ -127,6 +127,11 @@ setup effect.
 - **Cleanup:** the next build overwrites it (null off the Songs screen)
 - **Consumers:** `hooks/use-android-back.js` (the `audio-library-songs` arm: pop one Songs frame from `audioColKey`, else leave by the navOrigin)
 
+### `__journalEditorBack`
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: the journal editor's Back while `screen === 'journal-editor'`, else `null`; the same function is the editor's Done)
+- **Cleanup:** the next build overwrites it (null off the editor)
+- **Consumers:** `hooks/use-android-back.js` (the `journal-editor` arm: a plan day's note returns to its plan, a new entry to the Journal list, else the entry's read-only view)
+
 ### `__openSongs`
 - **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: `(frames, label) => _openSongs(frames, { screen, letterId, label })`; on the Songs screen itself the frames go on top of its stack instead, so Back returns to the list, and a frame equal to the one already on top is dropped, W2-03; an empty label names the page it was opened from, W-03)
 - **Cleanup:** none — the next build overwrites it

@@ -28,6 +28,7 @@ import { countMarks } from '../../utils/mark-kinds.js';
 import { BarAction } from '../components/RootNav.jsx';
 import { SectionLabel, ListRow, EmptyState } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
+import { readKind, readWords } from '../../utils/read-kind.js';
 import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
@@ -186,6 +187,8 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
 
   // ── Aggregate ─────────────────────────────────────────────────────────
   const totalRead = readItems ? Object.keys(readItems).length : 0;
+  // POL5: the mock's "letter read" when every mark is a letter ("chapters read" when all are chapters); a mix keeps both words.
+  const readSaid = readWords(totalRead, readKind(readItems), 'chapter or letter read', 'chapters and letters read');
   const jrnStats = (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.get() : { currentStreak: 0 };
   const streak = jrnStats.currentStreak || 0;
   const readStreak = (typeof ReadingStreakStore !== 'undefined') ? (ReadingStreakStore.get().currentStreak || 0) : 0;
@@ -284,7 +287,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   const plural = (n, one, many) => n.toLocaleString('en-US') + ' ' + (n === 1 ? one : many);
   const summary = (() => {
     const bits = [];
-    if (totalRead > 0) bits.push(plural(totalRead, 'chapter or letter read', 'chapters and letters read'));
+    if (totalRead > 0) bits.push(totalRead.toLocaleString('en-US') + ' ' + readSaid);
     // A 1-day streak is said only when nothing else is (U01.2): "Nothing read yet" above "Reading streak 1 day"
     // contradicted itself for a reader whose day counted but who finished nothing yet.
     if (readStreak >= 2 || (readStreak === 1 && totalRead === 0)) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
@@ -418,7 +421,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
         <p className="sr-only prg-summary">{summary}</p>
         <div className="prg-tiles">
           <div className="prg-tile"><b>{readStreak.toLocaleString('en-US')}</b><span>{readStreak === 1 ? 'day in a row' : 'days in a row'}</span></div>
-          <div className="prg-tile"><b>{totalRead.toLocaleString('en-US')}</b><span>{totalRead === 1 ? 'chapter or letter read' : 'chapters and letters read'}</span></div>
+          <div className="prg-tile"><b>{totalRead.toLocaleString('en-US')}</b><span>{readSaid}</span></div>
           {wordDays ? <div className="prg-tile"><b>{_fmtWords(weekWords)}</b><span>{weekWords === 1 ? 'word this week' : 'words this week'}</span></div>
             : <div className="prg-tile"><b>{journalCount.toLocaleString('en-US')}</b><span>{journalCount === 1 ? 'journal entry' : 'journal entries'}</span></div>}
         </div>

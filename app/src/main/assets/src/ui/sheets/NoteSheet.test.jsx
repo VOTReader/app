@@ -285,8 +285,9 @@ describe('NoteSheet Share outcome (A15)', () => {
     }
     expect(sent.length).toBe(2);
     // U07.2: quoted and cited, the note marked as the reader's own, so it can't read as Scripture.
-    expect(sent[0].text.startsWith('\u201Canchor\u201D \u2014 ')).toBe(true);
-    expect(sent[0].text.split('\n')[0]).toContain('3:16');
+    // 2026-11-11: the link stands in for the reference ("Append only the link itself").
+    expect(sent[0].text.split('\n')[0]).toBe('\u201Canchor\u201D');
+    expect(sent[0].text).not.toContain('3:16');
     expect(sent[0].text).toContain('\n\nMy note: Saved note\n\n');
     expect(sent[0].text).toContain('?p=bible%3Ajohn%3A3%3A16');
     expect(sent[1].text).toBe('anchor\n\nSaved note');

@@ -54,15 +54,17 @@ export function sharedPassageKey(search) {
 }
 
 /**
- * What Share sends: the quote, then the reference and the link, or the
- * quote alone when the passage may not travel.
+ * What Share sends: the quote, a blank line, then the link alone (Corbin
+ * 2026-11-11), or the quote alone when the passage may not travel.
  * @param {string} text
  * @param {unknown} key
- * @param {string | null | undefined} label  e.g. "John 3:16"
+ * @param {string | null | undefined} _label  e.g. "John 3:16" (no longer sent: the link stands in for it)
  * @returns {string}
  */
-export function withPassageLink(text, key, label) {
+export function withPassageLink(text, key, _label) {
+  // share-link (Corbin 2026-11-11, "Append only the link itself"): the words, a blank line, the link; the link
+  // stands in for the reference line. A passage that may not travel (the reader's journal) sends the words alone.
   const link = passageLinkFor(key);
   if (!link) return text;
-  return text + '\n\n' + (label ? label + '\n' : '') + link;
+  return text + '\n\n' + link;
 }

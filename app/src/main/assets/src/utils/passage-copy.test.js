@@ -141,7 +141,7 @@ describe('passageCopy — letters and poems', () => {
   it('paragraphs a blank line apart, a poem a line per line, the heading left out, the letter named with its volume', () => {
     const body = letter();
     const out = /** @type {any} */ (passageCopy(range(body, 0, body, body.childNodes.length)));
-    expect(out.text).toBe('"Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!"\n\nThe Wide Path (Volume Two)\n'
+    expect(out.text).toBe('"Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!"\n\n'
       + 'https://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
@@ -154,7 +154,7 @@ describe('passageCopy — letters and poems', () => {
     document.body.appendChild(p);
     const out = /** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length)));
     expect(out.reference).toBe('Volume One, Letter 1: Chosen by God');
-    expect(out.text).toBe('"You are chosen."\n\nVolume One, Letter 1: Chosen by God\n' + out.link);
+    expect(out.text).toBe('"You are chosen."\n\n' + out.link);   // the link stands in for the reference (2026-11-11)
     const q = document.createElement('p');
     q.className = 'letter-para';
     q.setAttribute('data-hl-key', 'letter:v1-preface:0');
@@ -169,7 +169,7 @@ describe('passageCopy — letters and poems', () => {
     p.innerHTML = 'Take your every thought captive<br><br>That you may be set apart';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length))).text)
-      .toBe('"Take your every thought captive\n\nThat you may be set apart"\n\nFaith (Words To Live By: Part One)\n'
+      .toBe('"Take your every thought captive\n\nThat you may be set apart"\n\n'
         + 'https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Faith');
   });
 
@@ -187,7 +187,7 @@ describe('passageCopy — letters and poems', () => {
     p.textContent = 'I AM the Bread of Life.';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('"I AM the Bread of Life."\n\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life');
+      .toBe('"I AM the Bread of Life."\n\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life');
   });
 
   it('the reader\'s own journal: the words alone, and not public (the browser keeps its own copy)', () => {
@@ -352,7 +352,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     document.body.appendChild(page);
     const p = /** @type {Element} */ (page.firstElementChild);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('"Hear the Word of The Lord."\n\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
+      .toBe('"Hear the Word of The Lord."\n\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
   it('a control\'s label inside a sheet is not the passage', () => {
@@ -420,7 +420,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     expect(out.reference).toBe('The Wide Path (Volume Two)');
     // "eloved," is not a word the page has; "way. Few" runs across the site's "[3]".
     expect(out.link).toBe(SITE + 'The_Wide_Path#:~:text=walk%20the%20narrow%20way.,they%20who%20find%20it%2E');
-    expect(out.text).toBe('"' + out.body + '"\n\n' + out.reference + '\n' + out.link);
+    expect(out.text).toBe('"' + out.body + '"\n\n' + out.link);
   });
 
   it('marks left alone past a footnote ("dunghill³...") are not quoted: the quote ends on words', () => {
@@ -485,7 +485,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     document.body.appendChild(page);
     const h = /** @type {Element} */ (page.firstElementChild);
     const out = /** @type {any} */ (passageCopy(range(h, 0, h, 1)));
-    expect(out.text).toBe('"The Wide Path"\n\nThe Wide Path (Volume Two)\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
+    expect(out.text).toBe('"The Wide Path"\n\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
   });
 
   it('cp3: by default the link names the letter alone (a compilation entry, its section); the setting adds the words', () => {

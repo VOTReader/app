@@ -42,7 +42,8 @@ export function readingChipWpm() {
  * @param {string | null} [progressKey]  the tracker's `v1:<bookId>:<cid>` key;
  *                          omit (or pass null) for the cold chip only
  * @param {number | null} [wpm]  from {@link readingChipWpm}
- * @param {{ plain?: boolean }} [opts]  plain: "4 min" with no ~ (a book's chapter list)
+ * @param {{ plain?: boolean, about?: boolean }} [opts]  plain: "4 min" with no ~ (a book's chapter list);
+ *   about: "about 4 min" in words, as the mock's History meta line says it
  * @returns {any} a JSX <span> or null
  */
 export function readingMinChip(item, progressKey = null, wpm = null, opts = {}) {
@@ -63,5 +64,5 @@ export function readingMinChip(item, progressKey = null, wpm = null, opts = {}) 
   }
   const m = readingMinutes(words, wpm);
   // a book's chapter list prints the plain minutes, as mock r-book does (opts.plain)
-  return m > 0 ? <span className="idx-min-chip">{opts && opts.plain ? '' : '~'}{m} min</span> : null;
+  return m > 0 ? <span className="idx-min-chip">{opts && opts.plain ? '' : opts && opts.about ? 'about ' : '~'}{m} min</span> : null;
 }
