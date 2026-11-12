@@ -367,11 +367,15 @@ try {
   }));
 
   // ── text size 1.3 through the Settings slider (a persisted setting, changed the reader's way) ──
-  await page.evaluate(() => {
-    const gear = document.querySelector('[aria-label="Settings"]');
-    const tile = gear || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent));
-    if (!tile) throw new Error('no way into Settings from here');
-    /** @type {HTMLElement} */ (tile).click();
+  await page.evaluate(async () => {
+    // GEAR1: the gear opens Quick settings; Settings is its last row.
+    const gear = document.querySelector('[aria-label="Quick settings"]');
+    if (!gear) throw new Error('no way into Settings from here');
+    /** @type {HTMLElement} */ (gear).click();
+    await new Promise((r) => setTimeout(r, 120));
+    const row = [...document.querySelectorAll('.quick-settings-sheet [role="menuitem"]')].find((b) => b.textContent.trim() === 'Settings');
+    if (!row) throw new Error('no Settings row in Quick settings');
+    /** @type {HTMLElement} */ (row).click();
   });
   await sleep(600);
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((b) => /Appearance/.test(b.textContent)); if (b) b.click(); });

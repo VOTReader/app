@@ -373,7 +373,7 @@ async function runTheme(theme) {
 
   // Settings, its sheets, About, a dialog
   await step('settings', async () => {
-    await tab('Read'); await tap('^settings$'); await stop('settings');
+    await tab('Read'); await tap('^quick settings$'); await tap('^settings$'); await stop('settings');   // GEAR1: the gear opens Quick settings
     await tap('^appearance'); await stop('settings-look'); await tap('^reading font'); await stop('settings-font'); await esc(); await tap('^back to settings'); await top();
     await tap('^your data'); await stop('settings-data'); await tap('^back to settings'); await top();
     await ev(() => { const s = document.querySelector('.screen-scroll'); if (s) s.scrollTop = s.scrollHeight; }); await sleep(400);

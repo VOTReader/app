@@ -14,7 +14,7 @@
  * highlight bar), walked through onboarding, Home, the volumes, a letter top and end, the More menu, History,
  * Open tabs, Search, Settings, Library, Listening, the Bible and a chapter end, and the highlight bar on a
  * selected passage. The walk drives the three-tab layout (2026-11-10): Home is the Read tab, Library and Listening
- * are tabs, Settings is the gear, History is the Library's "Recently read" See all, and the ⋯ menu is a reader's. On each screen it asks Chrome (CDP CSS.getPlatformFontsForNode) which faces painted every
+ * are tabs, Settings is the last row of the gear's Quick settings, History is the Library's "Recently read" See all, and the ⋯ menu is a reader's. On each screen it asks Chrome (CDP CSS.getPlatformFontsForNode) which faces painted every
  * visible text run, and asserts:
  *   F1  every face is one the app ships (isCustomFont: a bundled @font-face), never a system fallback;
  *   W1  the highlight bar's swatches all sit inside the viewport at 360 and 412 (no sideways overflow);
@@ -337,7 +337,7 @@ async function main() {
       await page.waitForSelector('.srch-sort-btn', { timeout: 30000 });
       await check('search');
     });
-    await step('settings', async () => { await goHome(); await clickText(/^Settings$/); await check('settings'); });
+    await step('settings', async () => { await goHome(); await clickText(/^Quick settings$/); await clickText(/^Settings$/); await check('settings'); });
     await step('library', async () => { await goHome(); await clickText(/^Library$/, '.tabbar-tab'); await check('library'); });
     await step('listening', async () => { await goHome(); await clickText(/^Listen$/, '.tabbar-tab'); await check('listening'); });
     await step('bible', async () => {

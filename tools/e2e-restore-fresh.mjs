@@ -141,13 +141,17 @@ async function click(page, label) { need(await clickIf(page, label), `no control
 
 /** Settings -> Your Data, open. */
 async function openYourData(page) {
-  // Settings is the gear in the top bar of every screen with a bar (the three tabs, 2026-11-10; the More menu is
-  // gone there). Where a screen has no gear, the walk goes to Home by the Read tab first.
-  if (!(await page.evaluate(() => !!document.querySelector('[aria-label="Settings"]')))) await openTab(page, 'Read');
-  const via = await page.evaluate(() => {
-    const gear = document.querySelector('[aria-label="Settings"]');
+  // Settings is the last row of Quick settings, which the gear in the top bar of every screen with a bar opens
+  // (GEAR1, 2026-11-12). Where a screen has no gear, the walk goes to Home by the Read tab first.
+  if (!(await page.evaluate(() => !!document.querySelector('[aria-label="Quick settings"]')))) await openTab(page, 'Read');
+  const via = await page.evaluate(async () => {
+    const gear = document.querySelector('[aria-label="Quick settings"]');
     if (!gear) return null;
     /** @type {HTMLElement} */ (gear).click();
+    await new Promise((r) => setTimeout(r, 120));
+    const row = [...document.querySelectorAll('.quick-settings-sheet [role="menuitem"]')].find((b) => b.textContent.trim() === 'Settings');
+    if (!row) return null;
+    /** @type {HTMLElement} */ (row).click();
     return 'gear';
   });
   need(via, 'no Settings gear on this screen');

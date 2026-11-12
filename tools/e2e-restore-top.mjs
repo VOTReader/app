@@ -184,7 +184,7 @@ try {
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, { timeout: 90000 });
   await page.reload({ waitUntil: 'load' }); await booted(); await sleep(700);
   note(`boot: tour offer ${await declineTour() ? 'declined' : 'not shown'}; controlled`);
-  await page.evaluate(() => { const gear = document.querySelector('[aria-label="Settings"]'); const tile = gear || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent)); if (!tile) throw new Error('no way into Settings'); /** @type {HTMLElement} */ (tile).click(); });
+  await page.evaluate(async () => { const gear = document.querySelector('[aria-label="Quick settings"]'); if (!gear) throw new Error('no way into Settings'); /** @type {HTMLElement} */ (gear).click(); await new Promise((r) => setTimeout(r, 120)); const row = [...document.querySelectorAll('.quick-settings-sheet [role="menuitem"]')].find((b) => b.textContent.trim() === 'Settings'); if (!row) throw new Error('no Settings row in Quick settings'); /** @type {HTMLElement} */ (row).click(); });
   await sleep(600);
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((b) => /Appearance/.test(b.textContent)); if (b) b.click(); });
   await sleep(400);
