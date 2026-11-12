@@ -2510,11 +2510,12 @@
 
     /* ── PROPHECY GROUP (collapsible stacked cards) ── */
     /* ── STUDY COVER IMAGE (inline in preface) ── */
-    .study-cover-inline { text-align:center; margin:0 -1.5rem 2rem; }
+    /* the bleed matches .page-wrapper's capped side padding: -1.5rem ran 20 px off the screen at Text Size 2 */
+    .study-cover-inline { text-align:center; margin:0 calc(-1 * min(1.5rem, max(24px, 7vw))) 2rem; }
     .study-cover-inline img { width:100%; max-width:420px; border-radius:var(--r-card); box-shadow:0 6px 30px rgba(0,0,0,0.5); }
 
     /* ── STUDY INLINE IMAGE (figures, charts, diagrams) ── */
-    .study-image-block { margin:1.5rem -1.5rem; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .study-image-block { margin:1.5rem calc(-1 * min(1.5rem, max(24px, 7vw))); overflow-x:auto; -webkit-overflow-scrolling:touch; }
     /* Default: scale the image to fit the reading column (title/banner images
        like the Part-One section title are ~1227px wide and otherwise overflow).
        Genuinely-wide diagrams (the chronology chart) opt back into natural width
@@ -4397,6 +4398,9 @@
     .chapter-cards:not(.two-col) .chapter-card-btn.part-row.is-open { background:var(--gold-faint); }
     .part-row-sub { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-muted); line-height:1.35; margin-top:0.15rem; }
     .part-row .ui-row-chev { margin-left:auto; color:var(--gold-dim); }
+    /* a part's label and title are short: they wrap rather than cut (at Text Size 2 they read 'Part 1 · 12 S…', 'The Fulfillme…') */
+    .part-row .chapter-card-label { white-space:normal; }
+    .chapter-cards:not(.two-col) .part-row .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; hyphens:auto; }
     /* Resume-reading dot — lives IN the top nav (right cluster, left of the
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav
