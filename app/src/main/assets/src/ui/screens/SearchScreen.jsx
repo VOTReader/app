@@ -1270,7 +1270,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <button type="button" className="srch-row is-two" onClick={() => handleSelect(findHere.entry)}>
                 <span className="srch-row-ic" aria-hidden="true"><UiIcon name="search" /></span>
                 <span className="srch-row-tx">
-                  <span className="srch-row-t">Find “{qTrim}” in this {findHere.noun}</span>
+                  {/* the words this result was found for (the box runs ahead of it while a search is on its way) */}
+                  <span className="srch-row-t">Find “{answered}” in this {findHere.noun}</span>
                   <span className="srch-row-m">{findHere.where}</span>
                 </span>
                 <UiIcon name="chev" size="sm" />
@@ -1302,8 +1303,6 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 <div className="srch-sort">
                   <button type="button" className="srch-sort-btn srch-sort-pick" aria-haspopup="dialog" aria-label={'Order: ' + (bookOrder ? 'Book order' : 'Relevance')}
                     onClick={() => setSortOpen(true)}>{bookOrder ? 'Book order' : 'Relevance'}<UiIcon name="down" size="sm" /></button>
-                  <SelectSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Order results" value={sortMode}
-                    options={[{ id: 'relevance', label: 'Relevance' }, { id: 'canonical', label: 'Book order' }]} onChange={(v) => setSortMode(v)} />
                 </div>
               ) : null}
             </div>
@@ -1326,6 +1325,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             </div>
           </div>
         )}
+
+        {/* Outside the summary, which shows only while a search is done: a search starting again under the open
+            sheet (a typed change landing, a setting) took the sheet away mid-pick. */}
+        <SelectSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Order results" value={sortMode}
+          options={[{ id: 'relevance', label: 'Relevance' }, { id: 'canonical', label: 'Book order' }]} onChange={(v) => setSortMode(v)} />
 
         {!bookOrder && topic ? <SrchTopicCard topic={topic} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} /> : null}
 
