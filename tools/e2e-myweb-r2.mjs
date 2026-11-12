@@ -128,10 +128,11 @@ const NAV_MS = 60000;
    S (one rail zoomed, Corbin's screenshot frame) keeps horiz, now midway between today (0.487,
    0.382, 0.285) and the w3 smear (0.553, 0.430, 0.382); main's r2 defect (0.874 / 0.900) fails it
    by far. T (both rails zoomed) is gated on LEVEL instead: the share of edges flatter than 4 deg,
-   the flat law arm C holds each followed thread to (FLAT_DEG.leg); today 0.23/0.21 (phoneLand),
-   the w3 smear 0.43/0.48: the gate sits midway. */
+   the flat law arm C holds each followed thread to (FLAT_DEG.leg); today T1/T2 0.23/0.21
+   (phoneLand), 0.18/0.16 (pixelLand), 0.09/0.08 (desktop), the w3 smear 0.43/0.48, 0.43/0.50,
+   0.34/0.47: each gate sits midway between today's worst and the smear's best. */
 const STREAK_HORIZ = { phoneLand: 0.52, pixelLand: 0.40, desktop: 0.33 };   // arm S, per frame
-const STREAK_LEVEL = { phoneLand: 0.32, pixelLand: 0.32, desktop: 0.27 };   // arm T, per frame
+const STREAK_LEVEL = { phoneLand: 0.32, pixelLand: 0.30, desktop: 0.21 };   // arm T, per frame
 /* pixelLand (fix-review #6) starts at phoneLand's gate: the same phone geometry (a 411 px frame's gap under
    891 px), registered from its first measured run. */
 const NOTCHES = 22;
