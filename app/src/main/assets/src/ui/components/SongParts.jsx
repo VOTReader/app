@@ -225,6 +225,9 @@ function songLibrary() {
  */
 export function SongMenuSheet({ song, title, line = '', onOpenPage, onClose }) {
   const id = String(song.id);
+  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  // With no signal a song that is not on the phone cannot play: it is not lined up either (its row's play is off).
+  const canPlay = useSongsOnline() || SongKeep.isKept(id);
   const vote = useSongVote(id);
   const library = songLibrary();
   const saved = !!library && typeof library.isSongSaved === 'function' && library.isSongSaved(id);
@@ -233,7 +236,7 @@ export function SongMenuSheet({ song, title, line = '', onOpenPage, onClose }) {
   const sub = [SongCatalog.songAlbumLabel(song) || line, songClock(song.d)].filter(Boolean).join(' · ');
   const say = (/** @type {string} */ text) => { if (typeof showToast === 'function') showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'polite' }); };
   const actions = [
-    ...queueMenuItems({ tracks: [songTrack(song)], name: title }).map((m) => ({
+    ...(canPlay ? queueMenuItems({ tracks: [songTrack(song)], name: title }) : []).map((m) => ({
       id: m.id, icon: m.id === 'next' ? 'next' : 'plus', label: m.id === 'queue' ? 'Add to the end of Up next' : m.text, onSelect: m.onSelect,
     })),
     ...(library ? [{ id: 'save', icon: 'star', label: saved ? 'Remove from Saved' : 'Save', onSelect: () => { library.toggleSongSaved(id); say(saved ? 'Removed from Saved' : 'Saved: ' + title); } }] : []),
