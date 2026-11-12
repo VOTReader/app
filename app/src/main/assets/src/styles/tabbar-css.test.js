@@ -18,7 +18,7 @@ const rule = (sel) => {
 describe('the tab bar CSS', () => {
   it('pads its foot with the gesture-bar inset, which is the safe-area inset (or the APK’s)', () => {
     expect(css).toMatch(/--dock-sys: max\(env\(safe-area-inset-bottom, 0px\), var\(--inset-bottom, 0px\)\);/);
-    expect(rule('    .tabbar')).toMatch(/padding: 0 max\(0px, calc\(\(100vw - 36rem\) \/ 2\)\) var\(--dock-sys\);/);
+    expect(rule('    .tabbar')).toMatch(/padding: 0 max\(0px, calc\(\(100vw - 36rem\) \/ 2\)\) min\(var\(--dock-sys\), 64px\);/);
     expect(css).toMatch(/--dock-tabbar: calc\(var\(--tabbar-h\) \+ var\(--dock-sys\)\);/);
     // Its buttons are a 44 px press at least, above that inset.
     expect(rule('    .tabbar-tab')).toMatch(/min-height: 44px/);

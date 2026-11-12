@@ -78,3 +78,14 @@ describe('the player\'s small sheets count the nav bar once', () => {
     expect(pad).toContain('max(0px, env(safe-area-inset-bottom, 0px) - var(--inset-bottom, 0px))');
   });
 });
+
+/* REVIEW-android 6: --inset-bottom climbs through every frame of the keyboard's slide, and the tab bar is hidden only
+   past 120 px (html.kb-up). Sized by the raw inset it stretched upward for those frames, on every open and close. */
+describe('the tab bar does not grow with the keyboard', () => {
+  it('its height and foot padding take the system inset only up to the size of a nav bar', () => {
+    const [b] = blocks('.tabbar');
+    expect(b).toBeTruthy();
+    expect(decl(b, 'height')).toBe('calc(var(--tabbar-h) + min(var(--dock-sys), 64px))');
+    expect(decl(b, 'padding')).toMatch(/ min\(var\(--dock-sys\), 64px\)$/);
+  });
+});

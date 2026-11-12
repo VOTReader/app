@@ -3178,8 +3178,10 @@
     .tabbar {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 140;
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-      height: var(--dock-tabbar); box-sizing: border-box;
-      padding: 0 max(0px, calc((100vw - 36rem) / 2)) var(--dock-sys);
+      /* Its own inset stops at a nav bar's size (64px): on the APK --inset-bottom also climbs with the keyboard, frame
+         by frame, and the bar grew tall under it until kb-up hid it at 120px. */
+      height: calc(var(--tabbar-h) + min(var(--dock-sys), 64px)); box-sizing: border-box;
+      padding: 0 max(0px, calc((100vw - 36rem) / 2)) min(var(--dock-sys), 64px);
       background: var(--tabbar-bg); border-top: 1px solid var(--hairline);
     }
     /* The UI pass (W1, mock/v2 base.css .tabbar): sentence-case labels in the UI face; the lit tab is a gold icon with a
