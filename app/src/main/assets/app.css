@@ -6267,7 +6267,9 @@
     .ws3-meter-used.is-text { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:400; }
     .ws3-meter-of { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws3-meter .settings-row-desc { display:block; margin-top:var(--sp-3); }
-    .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter); }
+    /* FIXC: centred, but over the keyboard (the APK writes it into --inset-bottom): the flat padding dropped the
+       overlay's lift and left "Type DELETE" and Delete behind it. */
+    .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter) var(--gutter) max(var(--gutter), var(--keyboard-height, 0px), var(--inset-bottom, 0px)); }
     .note-sheet.ws3-dialog { width:100%; max-width:420px; border-radius:var(--r-sheet); padding:var(--sp-6) var(--gutter) var(--gutter); background:var(--surface-1); }
     .ws3-dialog-title { margin:0 0 var(--sp-3); color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; }
     .ws3-dialog-text, .ws3-sheet-text { margin:0 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }

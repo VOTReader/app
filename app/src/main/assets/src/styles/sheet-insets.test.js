@@ -38,3 +38,11 @@ describe('the five form sheets (note, bookmark, link, link list, notebook) leave
     }
   });
 });
+
+describe('the "Delete all your data?" dialog stays above the keyboard', () => {
+  it('its centred overlay keeps the keyboard lift at its foot (the flat padding beat .note-sheet-overlay\'s)', () => {
+    const [b] = blocks('.note-sheet-overlay.ws3-dialog-overlay');
+    expect(b).toBeTruthy();
+    expect(decl(b, 'padding')).toMatch(/max\(var\(--gutter\), var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)$/);
+  });
+});
