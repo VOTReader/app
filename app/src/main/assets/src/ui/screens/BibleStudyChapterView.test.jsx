@@ -39,13 +39,13 @@ const STUDY = {
 };
 
 const noop = () => {};
-const renderView = () => render(
+const renderView = (chain = {}) => render(
   <BibleStudyChapterView
     studyId="s1" studyChapterId="ch2"
     getStudyById={() => STUDY}
     getStudyChapter={(s, id) => s.chapters.find((c) => c.id === id)}
     studiesLoading={false}
-    prevChainEntry={() => null} nextChainEntry={() => null}
+    prevChainEntry={chain.prev || (() => null)} nextChainEntry={chain.next || (() => null)}
     goToChainEntryFirst={() => noop} goToChainEntryLast={() => noop}
     setStudyChapterId={noop} setScreen={noop} setBookId={noop} setChapterNum={noop}
     setFromStudies={noop} setLetterId={noop} setActiveReadKey={noop} setSurpriseAnchor={noop}
@@ -107,5 +107,20 @@ describe('BibleStudyChapterView → LetterView resolvePeek', () => {
   it('resolvePeek returns null for an id outside the study (falls back to a boundary card)', () => {
     renderView();
     expect(captured.resolvePeek({ id: 'not-a-chapter', title: 'X' })).toBeNull();
+  });
+});
+
+/* REVIEW-readers 5: the neighbour drawn under the finger keeps THIS chapter's edges unless boundaryFor corrects them.
+   From the middle part those are null, so the last part slid in with the placeholder "Next part" card and the first
+   with no "Previous" card, and changed on release. */
+describe('BibleStudyChapterView hands LetterView each neighbour’s own study edges', () => {
+  const chain = { prev: () => ({ slug: 'before', title: 'The Study Before' }), next: () => ({ slug: 'after', title: 'The Study After' }) };
+  it('this (middle) part has no edge card; the last part’s peek gets the next study, the first part’s the previous one', () => {
+    renderView(chain);
+    expect(captured.prevBoundary).toBeNull();
+    expect(captured.nextBoundary).toBeNull();
+    expect(typeof captured.boundaryFor).toBe('function');
+    expect(captured.boundaryFor('study', { id: 'ch3' })).toEqual({ prevBoundary: null, nextBoundary: { short: 'The Study After', title: 'The Study After' } });
+    expect(captured.boundaryFor('study', { id: 'ch1' })).toEqual({ prevBoundary: { short: 'The Study Before', title: 'The Study Before' }, nextBoundary: null });
   });
 });
