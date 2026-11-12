@@ -154,6 +154,26 @@ function ShareLinkChoice({ onApp, onSite, onCancel }) {
   );
 }
 
+/** What the reader calls each link (Settings > Sharing: "The website", "The app"). */
+const LINK_NAME = { site: 'website', app: 'app' };
+const OTHER_LINK_TOAST = 'vot-toast-share-link';
+/** FEAT1 (st-share): after a plain Share, a note names the link it sent and offers "Use the other link" for
+    this one share (the share sheet itself is the phone's, so the offer sits under it, in the app). The
+    sentence is one of these fixed strings, never passage text (showToast's html is trusted markup only).
+    @param {'app' | 'site'} which @param {string} outcome @param {() => void} useOther */
+function offerOtherLink(which, outcome, useOther) {
+  const sent = outcome === 'copied-instead' ? 'Copied with the ' + LINK_NAME[which] + ' link. Paste it where you want to share it.'
+    : outcome === 'cancelled' ? 'Not shared. Share sends the ' + LINK_NAME[which] + ' link.'
+      : 'Shared with the ' + LINK_NAME[which] + ' link.';
+  showToast({
+    id: OTHER_LINK_TOAST, className: 'vot-toast vot-toast-action', durationMs: 8000,
+    html: sent + ' <button type="button" class="vot-escape-btn">Use the other link</button>',
+  });
+  const el = typeof document !== 'undefined' ? document.getElementById(OTHER_LINK_TOAST) : null;
+  const btn = el && el.querySelector('button');
+  if (btn) btn.addEventListener('click', () => { if (typeof hideToast === 'function') hideToast(OTHER_LINK_TOAST); useOther(); }, { once: true });
+}
+
 /** The recolour step of applyHighlight: what happens to the groups whose range
     exactly matches the new selection. A recolour never deletes a note (sr14,
     sweep batch 2026-10-14 #0: notes are keyed by groupId, and removing the group
@@ -1002,7 +1022,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/createdGroup);
   }, [selInfo, onNoteRequest]);
 
-  const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which) => {
+  const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which, /** @type {boolean} */ offerOther = false) => {
     if (!selInfo) return;
     // A8: the quote travels with a link that opens the passage
     // (utils/passage-link.js; since 2026-11-11 the link alone, no reference
@@ -1013,27 +1033,40 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // for someone without the app.
     const share = selInfo.share;
     setChoosingLink(false);
-    let text;
-    if (which === 'site' && share && share.siteText) {
-      text = share.siteText;
-    } else if (share && share.keys && share.keys.length) {
-      // The blocks the words came from: the first opens the link, and the
-      // reference is Copy's ("John 7:37-39 (NKJV)", "The Wide Path (Volume Two)").
-      text = withPassageLink(share.text, share.keys[0], share.reference || null);
-    } else {
+    const textFor = (/** @type {'app' | 'site'} */ w) => {
+      if (w === 'site' && share && share.siteText) return share.siteText;
+      if (share && share.keys && share.keys.length) {
+        // The blocks the words came from: the first opens the link, and the
+        // reference is Copy's ("John 7:37-39 (NKJV)", "The Wide Path (Volume Two)").
+        return withPassageLink(share.text, share.keys[0], share.reference || null);
+      }
       const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
         ? selInfo.multiContainers[0].dataset.hlKey : null);
       const many = selInfo.hlKey ? null : selInfo.multiContainers;
       const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
-      text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? passageLabel(key, lastKey) + translationTag(key) : null);
-    }
+      return withPassageLink(selInfo.shareText || selInfo.text, key, key ? passageLabel(key, lastKey) + translationTag(key) : null);
+    };
+    const text = textFor(which);
+    // FEAT1 (st-share, "Use the other link"): a plain tap on Share, for a passage with both links, is
+    // followed by a note naming the link it sent and offering the other one for this share, so the
+    // choice is in sight without a tap in front of the usual share. A choice made by holding Share
+    // needs no note. The other link's text is made now: the selection is gone by the time it is tapped.
+    const other = offerOther && share && share.siteText ? /** @type {'app' | 'site'} */ (which === 'site' ? 'app' : 'site') : null;
+    const otherText = other ? textFor(other) : '';
     window.getSelection().removeAllRanges();
     setVisible(false);
     // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,
     // and closing it on purpose is not an error.
     shareText(text).then((outcome) => {
+      if (outcome === 'failed') { setCopyFallback({ text, verb: 'share' }); return; }
+      if (other && typeof showToast === 'function') {
+        offerOtherLink(which, outcome, () => shareText(otherText).then((again) => {
+          if (again === 'copied-instead') confirmCopied('Copied with the ' + LINK_NAME[other] + ' link. Paste it where you want to share it.');
+          else if (again === 'failed') setCopyFallback({ text: otherText, verb: 'share' });
+        }));
+        return;
+      }
       if (outcome === 'copied-instead') confirmCopied('Copied instead. Paste the passage where you want to share it.');
-      else if (outcome === 'failed') setCopyFallback({ text, verb: 'share' });
     });
   }, [selInfo, confirmCopied]);
 
@@ -1046,7 +1079,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const canChooseLink = !!(selInfo && selInfo.share && selInfo.share.siteText);
   const onShareTap = () => {
     if (shareHeldRef.current) { shareHeldRef.current = false; return; }
-    handleShare(shareLinkSetting());
+    handleShare(shareLinkSetting(), true);
   };
   const onShareRelease = () => { if (shareHoldRef.current) { clearTimeout(shareHoldRef.current); shareHoldRef.current = null; } };
   const onSharePress = () => {

@@ -9,6 +9,29 @@ import { formsToMark } from '../../utils/marked-forms.js';
 import { snippetText, markSpans } from './SrchSnippet.jsx';
 import { UiIcon } from './UiIcon.jsx';
 import { ListGroup, ListRow } from './UiParts.jsx';
+import { ensureVerseCites, lettersCiting } from '../../utils/scripture-web/verse-cites.js';
+import { windowCorpus, endpointFor } from '../../utils/scripture-web/vot-citations.js';
+import { countOf } from '../../utils/download-tree.js';
+
+/* FEAT1 (s-ref): the letters citing a Bible reference ("John 3:16", a range in one chapter, or a whole chapter),
+   one per letter, from src/data/verse-cites.js: injected the first time such a card shows, never at boot, and
+   never the Scripture Web's graph. null while it loads (no row yet); [] when no letter cites it (no row). */
+function useLettersCiting(/** @type {any} */ r) {
+  const ref = r && r.kind === 'ref-bible' && r.bookId && r.chapter && !r.chapterEnd
+    ? { bookId: String(r.bookId), chapter: Number(r.chapter), verse: r.verseStart || null, verseEnd: r.verseEnd || null } : null;
+  const key = ref ? [ref.bookId, ref.chapter, ref.verse, ref.verseEnd].join('|') : '';
+  const w = /** @type {any} */ (typeof window !== 'undefined' ? window : {});
+  const [data, setData] = React.useState(() => w.VERSE_CITES || null);
+  React.useEffect(() => {
+    if (!key || data) return undefined;
+    let live = true;
+    ensureVerseCites().then((d) => { if (live && d) setData(d); });
+    return () => { live = false; };
+  }, [key, data]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- key is ref by value.
+  const letters = React.useMemo(() => (ref && data ? lettersCiting(data, ref, windowCorpus()) : null), [key, data]);
+  return { key, letters };
+}
 
 /* What one unit of a kind is called in "3 more passages in this letter": the kinds
    whose one doc is a whole letter, entry, topic or study chapter, so its text can
@@ -174,8 +197,15 @@ function useKjvWording(entry) {
 /* `also`: the reprints Best Matches folded under this card (search200 UX B10 2), offered in an
    "Also in N places" row after the snippet, each its own tap. `why`: one quiet line under the
    snippet saying how a card that holds no typed word matched ("by meaning", search200 ideas E/G). */
-export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '', listenRef = null }) {
+export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '', listenRef = null, onOpenCite = null }) {
   const doc = (!isDirect && entry && entry.doc) || null;
+  const citing = useLettersCiting(isDirect && entry ? entry.ref : null);
+  const citesKey = citing.key ? 'cites|' + citing.key : '';
+  const [citesOpen, setCitesOpen] = React.useState(() => !!(citesKey && recall(memo, citesKey)));
+  const toggleCites = () => {
+    remember(memo, citesKey, !citesOpen);
+    setCitesOpen(!citesOpen);
+  };
   const hlTerms = cardTerms(entry, terms, stopTyped);
   const kjv = useKjvWording(doc ? entry : null);
   // Every OTHER place this unit says the words (Brianna, 2026-09-26): a letter's
@@ -241,6 +271,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       : r.kind !== 'ref-bible' || !r.chapter ? null
       : r.verseStart ? { verse: { bookId: r.bookId, chapter: r.chapter, verse: r.verseStart } } : { book: r.bookId, chapter: r.chapter };
     const hasWeb = !!(webStart && openWeb(webStart, { check: true }));
+    const nCites = citing.letters ? citing.letters.length : 0;
     return (
       <>
         <div className="srch-card card-direct">
@@ -260,10 +291,28 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
             ) : null}
           </div>
         </div>
-        {hasWeb ? (
+        {hasWeb || nCites ? (
           <ListGroup label="Also" className="srch-direct-also">
-            <ListRow icon="web" one title="See it in the Scripture Web" onClick={() => openWeb(webStart)} />
+            {/* FEAT1 (s-ref): "Letters that cite John 3:16 · 9"; the list opens under the group, in the results' card
+                style, each card opening its letter at the citation (its first one, when it cites the passage twice). */}
+            {nCites ? (
+              <ListRow icon="search" one title={'Letters that cite ' + (entry.__label || '')} value={String(nCites)}
+                expanded={citesOpen} onClick={toggleCites} />
+            ) : null}
+            {hasWeb ? <ListRow icon="web" one title="See it in the Scripture Web" onClick={() => openWeb(webStart)} /> : null}
           </ListGroup>
+        ) : null}
+        {nCites && citesOpen ? (
+          <>
+            {citing.letters.map((l) => (
+              <button key={l.letterKey} type="button" className="srch-card srch-cite"
+                onClick={() => { const to = endpointFor(l.first); if (to && onOpenCite) onOpenCite(to); }}>
+                <div className="srch-card-top"><span className="srch-card-ref">{l.title}</span></div>
+                <div className="srch-card-loc">{l.collectionName + (l.places > 1 ? ' · ' + countOf(l.places, 'place') : '')}</div>
+                <div className="srch-card-snippet">{l.first.excerpt || 'Paragraph ' + (l.first.paragraph + 1)}</div>
+              </button>
+            ))}
+          </>
         ) : null}
       </>
     );

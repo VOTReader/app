@@ -3316,7 +3316,7 @@
     .ui-row-value.is-none { color: var(--text-3); }
     .root-row-chev { flex: none; padding: 0 2px; color: var(--text-3); font-size: var(--fs-24); line-height: 1; transition: transform 0.15s ease; }
     .ui-row-chev { flex: none; width: var(--icon-sm); height: var(--icon-sm); color: var(--text-3); transition: transform 0.15s ease; }
-    .root-row-chev.is-open, .ui-row-chev.is-open { transform: rotate(90deg); }
+    .root-row-chev.is-open, .ui-row-chev.is-open, [aria-expanded="true"] > .ui-row-chev { transform: rotate(90deg); }
     /* a state (On this phone, Saved, Read) is a mark, never a button */
     .ui-row-mark { flex: none; display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; }
     .ui-row-mark svg { width: 14px; height: 14px; stroke-width: 2.4; }
@@ -4215,8 +4215,9 @@
     .srch-syn-line { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
     .srch-syn-line .srch-more-link { display:inline-flex; align-items:center; justify-content:center; min-height:44px; min-width:44px; margin:-12px -4px; padding:0 4px; vertical-align:middle; color:var(--accent); text-decoration:none; }
     .srch-top-results, .srch-direct, .srch-nearest { display:flex; flex-direction:column; gap:10px; margin:0 var(--gutter) 10px; }
-    .search-screen :is(.srch-top-results, .srch-direct) > *, .search-screen .srch-nearest > :is(.srch-card, .srch-card-wrap) { background:var(--surface-1); border-radius:var(--r-card); overflow:hidden; }
+    .search-screen :is(.srch-top-results, .srch-direct) > :not(.ui-label), .search-screen .srch-nearest > :is(.srch-card, .srch-card-wrap) { background:var(--surface-1); border-radius:var(--r-card); overflow:hidden; }
     .srch-nearest > .srch-section-label { margin:var(--label-above) 0 0; }
+    .search-screen .srch-direct > .ui-group { margin:0; }
     .srch-card { display:block; width:100%; padding:14px var(--card-pad) 12px; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
     .srch-card:active { background-color:var(--surface-2); }
     .srch-card-top { display:flex; align-items:baseline; gap:8px; }

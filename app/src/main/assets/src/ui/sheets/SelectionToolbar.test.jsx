@@ -35,7 +35,7 @@ import * as ReactDOM from 'react-dom';
 import { SelectionToolbar } from './SelectionToolbar.jsx';
 import { dockTop } from './selection-drag.js';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
-import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
+import { showToast as realShowToast, hideToast as realHideToast, _resetToasts } from '../../utils/toast.js';
 
 let _origGetSelection;
 
@@ -1556,6 +1556,73 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
     await settle();
     expect(sent.map((d) => d.text)).toEqual(['"For God so loved the world"\n\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
+  });
+  /* FEAT1 (st-share, "Use the other link"): a plain tap shares at once with the Sharing setting's link, then a
+     note names that link and offers the other for this one share; the text stays the words, a blank line, the link. */
+  describe('the note after a share offers the other link', () => {
+    const APP = 'https://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1';
+    beforeEach(() => { _resetToasts(); g.showToast = realShowToast; g.hideToast = realHideToast; });
+    afterEach(() => { _resetToasts(); delete g.showToast; delete g.hideToast; });
+    const note = () => /** @type {any} */ (document.getElementById('vot-toast-share-link'));
+    const other = () => /** @type {any} */ (note() && note().querySelector('button'));
+
+    it('a tap sends the website link, then "Use the other link" sends the app link', async () => {
+      raise('letter:the-wide-path:1', WORDS);
+      act(() => { fire(shareBtn(), 'click'); });
+      await settle();
+      expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\n' + SITE]);
+      expect(note().textContent).toBe('Shared with the website link. Use the other link');
+      act(() => { fire(other(), 'click'); });
+      await settle();
+      expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\n' + SITE, '"' + WORDS + '"\n\n' + APP]);
+      expect(note().classList.contains('show')).toBe(false);
+    });
+
+    it('with The app chosen in Settings the other link is the website\'s; a closed share sheet says so', async () => {
+      g.StateStore = { get: () => ({ settings: { shareLink: 'app' } }) };
+      Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return sent.length === 1 ? Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })) : Promise.resolve(); }, writable: true, configurable: true });
+      raise('letter:the-wide-path:1', WORDS);
+      act(() => { fire(shareBtn(), 'click'); });
+      await settle();
+      expect(note().textContent).toBe('Not shared. Share sends the app link. Use the other link');
+      act(() => { fire(other(), 'click'); });
+      await settle();
+      expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\n' + APP, '"' + WORDS + '"\n\n' + SITE]);
+    });
+
+    it('a computer with no share sheet copies, and the other link is copied in its place', async () => {
+      delete /** @type {any} */ (navigator).share;
+      /** @type {string[]} */ const copied = [];
+      const origClip = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: (/** @type {string} */ t) => { copied.push(t); return Promise.resolve(); } }, configurable: true });
+      try {
+        raise('letter:the-wide-path:1', WORDS);
+        act(() => { fire(shareBtn(), 'click'); });
+        await settle();
+        expect(copied).toEqual(['"' + WORDS + '"\n\n' + SITE]);
+        expect(note().textContent).toBe('Copied with the website link. Paste it where you want to share it. Use the other link');
+        act(() => { fire(other(), 'click'); });
+        await settle();
+        expect(copied).toEqual(['"' + WORDS + '"\n\n' + SITE, '"' + WORDS + '"\n\n' + APP]);
+        expect(/** @type {any} */ (document.getElementById('vot-toast-copy')).textContent).toBe('Copied with the app link. Paste it where you want to share it.');
+      } finally {
+        if (origClip) Object.defineProperty(navigator, 'clipboard', origClip); else delete /** @type {any} */ (navigator).clipboard;
+      }
+    });
+
+    it('no note after a link chosen by holding Share, nor for a passage with one link', async () => {
+      raise('letter:the-wide-path:1', WORDS);
+      await hold();
+      act(() => { fire(choice('App link'), 'click'); });
+      await settle();
+      expect(note()).toBeNull();
+      cleanup(); document.body.innerHTML = '';
+      raise('bible:john:3:16', 'For God so loved the world');
+      act(() => { fire(shareBtn(), 'click'); });
+      await settle();
+      expect(sent.length).toBe(2);
+      expect(note()).toBeNull();
+    });
   });
 });
 
