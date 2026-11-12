@@ -5907,6 +5907,12 @@
     /* the chosen option's radio (listen.html / settings.html .rad.on); the others draw the empty ring (.rad) */
     .select-sheet-option-check { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--accent); background: radial-gradient(circle, var(--accent) 0 5px, transparent 5.5px); }
     :is(.select-sheet-options[role="radiogroup"], .song-choice-sheet .select-sheet-options) > .select-sheet-option:not(.selected) .select-sheet-option-main::after { content: ''; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--text-3); }
+    /* MERGE5: the radio sits on the row's centre (the mocks' .rad), not on the label's line, so a row with a line under
+       its name (desc, sample) carries it in the middle; the row keeps its right side clear for it. */
+    :is(.select-sheet-options[role="radiogroup"], .song-choice-sheet .select-sheet-options) > .select-sheet-option,
+    .select-sheet-option:has(.select-sheet-option-check) { padding-right: calc(var(--card-pad) + 22px + var(--sp-3)); }
+    .select-sheet-option-check,
+    :is(.select-sheet-options[role="radiogroup"], .song-choice-sheet .select-sheet-options) > .select-sheet-option:not(.selected) .select-sheet-option-main::after { position: absolute; top: 50%; right: var(--card-pad); margin-top: -11px; }
     .select-sheet-option-meta { flex-shrink: 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; white-space: nowrap; }
     .select-sheet-option-desc { margin-top: 2px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: 1.45; }
     .select-sheet-group { position: relative; display: block; margin: 0; padding: 14px var(--card-pad) 4px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
