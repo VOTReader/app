@@ -53,7 +53,7 @@ export function answersIsTopicKey(entries, key) {
 }
 
 /**
- * @typedef {{ gid: string, kind: string, index: number, start: number, text: string, note: string }} AnswersSavedItem
+ * @typedef {{ gid: string, kind: string, index: number, start: number, text: string, note: string, created?: number }} AnswersSavedItem
  * @typedef {{ entry: any, items: AnswersSavedItem[] }} AnswersSavedTopic
  * @typedef {{ topics: AnswersSavedTopic[], marks: number, notes: number }} AnswersSaved
  */
@@ -71,7 +71,7 @@ export function answersSaved(entries, all, noteOf) {
   /** @type {AnswersSaved} */
   const out = { topics: [], marks: 0, notes: 0 };
   if (!Array.isArray(entries) || !entries.length || !all) return out;
-  /** @type {Map<string, { gid: string, id: string, kind: string, index: number, start: number, segs: { index: number, start: number, text: string }[] }>} */
+  /** @type {Map<string, { gid: string, id: string, kind: string, index: number, start: number, created: number, segs: { index: number, start: number, text: string }[] }>} */
   const groups = new Map();
   for (const key of Object.keys(all)) {
     const k = answersIsTopicKey(entries, key);
@@ -81,7 +81,8 @@ export function answersSaved(entries, all, noteOf) {
       const gid = String(a.groupId || a.id);
       const start = a.start || 0;
       let g = groups.get(gid);
-      if (!g) { g = { gid, id: k.id, kind: a.kind, index: k.index, start, segs: [] }; groups.set(gid, g); }
+      if (!g) { g = { gid, id: k.id, kind: a.kind, index: k.index, start, created: 0, segs: [] }; groups.set(gid, g); }
+      if (a.created && (!g.created || a.created < g.created)) g.created = a.created;
       if (k.index < g.index || (k.index === g.index && start < g.start)) { g.id = k.id; g.index = k.index; g.start = start; }
       if (a.kind === 'note') g.kind = 'note';
       g.segs.push({ index: k.index, start, text: String(a.text || '') });
@@ -100,7 +101,7 @@ export function answersSaved(entries, all, noteOf) {
     const note = g.kind === 'note' && noteOf ? String(noteOf(g.gid) || '').trim() : '';
     let t = byTopic.get(g.id);
     if (!t) { t = { entry: byId.get(g.id), items: [] }; byTopic.set(g.id, t); }
-    t.items.push({ gid: g.gid, kind: g.kind, index: g.index, start: g.start, text, note });
+    t.items.push({ gid: g.gid, kind: g.kind, index: g.index, start: g.start, text, note, created: g.created });
     if (g.kind === 'note') out.notes++; else out.marks++;
   }
   out.topics = [...byTopic.values()].sort((a, b) => (pos.get(a.entry.id) || 0) - (pos.get(b.entry.id) || 0));
