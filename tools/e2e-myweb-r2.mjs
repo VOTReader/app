@@ -26,8 +26,10 @@
  *                     from the same corridor drawn line by line (both read
  *                     about 0.73 at 800x360 on the w3 path); ribbon can
  *                     (0.139 against 0.060).
- *      PASS: horiz <= STREAK_HORIZ[frame] (registered per frame at measured
- *      plus margin, the way R5 ceilings are keyed; main reads the BEFORE).
+ *        level        of EDGE pixels, the share flatter than 4 deg (arm C's
+ *                     flat law), the gate of the T arm's both-rails frames
+ *      PASS: S horiz <= STREAK_HORIZ[frame], T level <= STREAK_LEVEL[frame]
+ *      (registered per frame between today and the w3 smear: WEB2, below).
  *   O  overview shot at rest, for the byte-wise comparison between tips.
  *   C  continuity notch strip, Corbin's exact ask ("one tiny little increment
  *      of zoom later ... the green lines have merged"): from T1's frame the
@@ -113,7 +115,23 @@ const NAV_MS = 60000;
    0.365 / 0.219. The gate sits at the midpoint so a regression halfway back to
    the streak field fails. The phone frame's 0.365 is its geometry, not a
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
-const STREAK_HORIZ = { phoneLand: 0.45, pixelLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+/* WEB2 (2026-11-11) re-registered both. The 2026-09-11 numbers were read on the r2 path, which HID
+   every line with no foot on screen and bent a far leg into a level run ON the far rail (where a
+   stack of them collapses into the rail's own row and leaves few edges). fix-review #1/#2 (8d097fdc9)
+   replaced it with one S-curve to a projected far foot, and Q3 ii draws the fly-overs: an honest
+   curve to a foot off screen crosses a 160 px gap under an 800 px width at well under 18 deg for
+   most of its length (a line from one edge to the other averages under 11 deg), so 18 deg cannot
+   tell that picture from the smear. Measured on this instrument, same frames: today T1/T2
+   0.70/0.69 (phoneLand), 0.70/0.71 (pixelLand), 0.63/0.63 (desktop); the w3 smear (FAR_FOOT 1e6,
+   the fix-review #1 blocker, every far foot drawn at its true x) 0.85/0.85, 0.88/0.87, 0.90/0.85;
+   with the fly-overs not drawn at all T1 still 0.69: the legs carry it, not a corridor.
+   S (one rail zoomed, Corbin's screenshot frame) keeps horiz, now midway between today (0.487,
+   0.382, 0.285) and the w3 smear (0.553, 0.430, 0.382); main's r2 defect (0.874 / 0.900) fails it
+   by far. T (both rails zoomed) is gated on LEVEL instead: the share of edges flatter than 4 deg,
+   the flat law arm C holds each followed thread to (FLAT_DEG.leg); today 0.23/0.21 (phoneLand),
+   the w3 smear 0.43/0.48: the gate sits midway. */
+const STREAK_HORIZ = { phoneLand: 0.52, pixelLand: 0.40, desktop: 0.33 };   // arm S, per frame
+const STREAK_LEVEL = { phoneLand: 0.32, pixelLand: 0.32, desktop: 0.27 };   // arm T, per frame
 /* pixelLand (fix-review #6) starts at phoneLand's gate: the same phone geometry (a 411 px frame's gap under
    891 px), registered from its first measured run. */
 const NOTCHES = 22;
@@ -254,7 +272,8 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
   const lum = new Float32Array(W * H);
   for (let i = 0, p = 0; i < lum.length; i++, p += 4) lum[i] = d[p] + d[p + 1] + d[p + 2];
   const R = 8;
-  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0, nRibbon = 0;
+  const LEVEL_TAN = Math.tan((4 * Math.PI) / 180);   // the flat law's 4 deg (arm C's FLAT_DEG.leg)
+  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0, nLevel = 0, nRibbon = 0;
   for (let y = y0; y < y1; y++) {
     let row = 0;
     for (let x = 0; x < W; x++) {
@@ -264,7 +283,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
         const gx = (lum[i - W + 1] + 2 * lum[i + 1] + lum[i + W + 1]) - (lum[i - W - 1] + 2 * lum[i - 1] + lum[i + W - 1]);
         const gy = (lum[i + W - 1] + 2 * lum[i + W] + lum[i + W + 1]) - (lum[i - W - 1] + 2 * lum[i - W] + lum[i - W + 1]);
         const ax = Math.abs(gx), ay = Math.abs(gy);
-        if (ax + ay > 40 * 4) { nEdge++; if (ay >= 3 * ax) nHoriz++; }
+        if (ax + ay > 40 * 4) { nEdge++; if (ay >= 3 * ax) nHoriz++; if (ax <= LEVEL_TAN * ay) nLevel++; }
       }
       if (!lit[y * W + x]) continue;
       row++; nLit++;
@@ -276,7 +295,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
     }
     if (row / W >= 0.6) streakRows++;
   }
-  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3), ribbon: +(nRibbon / Math.max(1, (y1 - y0) * W)).toFixed(4) };
+  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3), level: +(nLevel / Math.max(1, nEdge)).toFixed(3), ribbon: +(nRibbon / Math.max(1, (y1 - y0) * W)).toFixed(4) };
 }, b64, 0.22, 0.80);
 
 async function shot(page, name) { if (OUT) await page.screenshot({ path: resolve(OUT, name + '.png') }); }
@@ -330,6 +349,7 @@ async function armS(page, tag, fname, c, r0) {
   const gate = STREAK_HORIZ[fname];
   note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px), ribbon ${s.ribbon}`);
   if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
+  note(`${tag} S: level ${s.level} (information)`);
   await resetBoth(page); await sleep(600);
   return s;
 }
@@ -358,8 +378,8 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
   await shot(page, `${fname}-T${suffix}-${topLabel}-${bottomLabel}`.replace(/\s+/g, '_'));
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}, ribbon ${s.ribbon}`);
-  if (!(s.horiz <= STREAK_HORIZ[fname])) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ[fname]} with both rails zoomed`);
+  note(`${tag} T${suffix}: streak level ${s.level} (gate <= ${STREAK_LEVEL[fname]}), horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}, ribbon ${s.ribbon}`);
+  if (!(s.level <= STREAK_LEVEL[fname])) fails.push(`${tag} T${suffix}: level ${s.level} > ${STREAK_LEVEL[fname]} with both rails zoomed: the context runs level across the gap`);
   return { t, b, after, before };
 }
 
