@@ -742,6 +742,20 @@
         --tone-danger: #a02622;
         --tone-warn:   #8a5a00;
       }
+      /* LIGHT1: the palette drawn as a LINE on parchment (underline, squiggle, their swatch rings, a note's icon): the
+         same hues taken down to 3:1 on --bg / --surface-2. Highlighter swatches and fills keep the bright ones. */
+      body.light :is(.hl-underline, .hl-squiggle, .sel-color-underline, .sel-color-squiggle, .hl-note-icon, .hlx-row.is-underline, .hlx-row.is-squiggle) {
+        --hl-yellow: #967f00; --hl-green: #439200; --hl-pink: #e0004c; --hl-red: #d93022; --hl-orange: #bd6b00;
+        --hl-blue: #0c7fd9; --hl-purple: #a74fb6; --hl-teal: #008d9e; --hl-gray: #7f7f7f;
+      }
+      /* LIGHT1: one scrim on parchment. These sheets drew the dark theme's near-black wash in light too (a dirty
+         grey over cream); --scrim is the warm one the reader menu already uses. */
+      body.light :is(.sh-modal-backdrop, .audio-manager-backdrop, .fn-sheet-backdrop, .select-sheet-backdrop, .disable-tabs-overlay,
+        .link-picker-overlay, .note-sheet-overlay, .nb-picker-overlay, .multinote-overlay, .install-steps-backdrop) { background: var(--scrim); }
+      body.light :is(.home-eyebrow, .vol-index-eyebrow, .coverage-badge-no-recording) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
+      /* words drawn in the tertiary ink: --text-3 (#8a8070) is the chevrons' 3:1 ink, 3.5:1 on parchment; text takes --text-2 */
+      body.light :is(.dl-unit-num, .plan-ribbon-why, .prg-days-axis, .link-half-word, .ws3-about-build, .tour-never) { color: var(--text-2); }
+      body.light .audio-bar-mark { background: radial-gradient(circle at 30% 25%, var(--surface-1), var(--surface-3) 72%); }
             /* ── Right-cluster alignment ──────────────────────────────────────────
          Back + Home stay on the LEFT; every other nav control hugs the RIGHT,
          on every screen and in every settings combination. The push comes from
@@ -1906,7 +1920,6 @@
       body.light .audio-library-list { background:rgba(255,255,255,.4); }
       @media (prefers-reduced-motion:reduce) { .audio-library-search,.audio-library-row,.audio-library-shelf-row,.audio-library-disclosure svg { transition:none; } }
       @media (max-width:560px) { .audio-library-screen { padding-left:1rem; padding-right:1rem; }.audio-library-row { grid-template-columns:44px minmax(0,1fr); gap:.54rem; padding:.46rem .45rem; }.audio-library-row-actions { grid-column:2; justify-content:flex-start; margin-top:-.22rem; }.audio-library-row-actions > span { max-width:none; padding-left:0; text-align:left; }.audio-library-section-head { align-items:flex-start; }.audio-library-section-head > strong { padding-top:.35rem; } }
-      @media (max-width:360px) {.audio-library-shelf-row { grid-template-columns:30px minmax(0,1fr) auto; padding:.55rem .55rem; }.audio-library-shelf-mark { width:28px; height:28px; } }
       /* ── SONGS OF THE LETTERS: the hub and its lists (L2, 2026-09-25). The approved pictures final-01/02/07 and their
          build rules: primary actions FILLED gold, secondary OUTLINED, 56 px covers, one 44 px round play per row that
          fills gold while its song plays, navigation rows with a plain chevron (never circled). Tokens only. ── */
@@ -3292,9 +3305,9 @@
     /* tiles: two columns, 12 apart; label on top, the title in the serif, the meta pinned to the foot; all one height */
     .root-tiles, .ui-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); }
     .root-tile, .ui-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-height: 118px; padding: 14px var(--card-pad); border: 0; border-radius: var(--r-card); background: var(--surface-1); color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }
-    .root-tile-eyebrow, .ui-tile-label { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
+    .root-tile-eyebrow { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
     .root-tile-title, .ui-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .root-tile-detail, .ui-tile-meta { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
+    .root-tile-detail { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
     /* Large text (the root class vot-large-text, 1.8 and up; POL2): the Read tab's tiles go one to a row, and the search
        field and the Today card's titles wrap instead of cutting off. */
     .vot-large-text .root-tiles { grid-template-columns: minmax(0, 1fr); }
@@ -3333,7 +3346,8 @@
     .root-row-title, .ui-row-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .root-row-sub, .ui-row-meta { margin-top: 1px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .root-row-count, .ui-row-value { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); }
-    .ui-row-value.is-none { color: var(--text-3); }
+    .ui-row-value.is-none { color: var(--text-2); }   /* "None yet" is read: muted, not tertiary (LIGHT1: --text-3 read 4.11:1 dark, 3.13 light) */
+    ::placeholder { color: var(--text-2); opacity: 1; }   /* a field without its own: Chrome's grey read 3.6:1 on a sheet */
     .root-row-chev { flex: none; padding: 0 2px; color: var(--text-3); font-size: var(--fs-24); line-height: 1; transition: transform 0.15s ease; }
     .ui-row-chev { flex: none; width: var(--icon-sm); height: var(--icon-sm); color: var(--text-3); transition: transform 0.15s ease; }
     .root-row-chev.is-open, .ui-row-chev.is-open { transform: rotate(90deg); }
@@ -3768,7 +3782,7 @@
        The viewer is a dark room in both themes: the photographs sit on black, so its tokens are set dark here
        (the jump sheet and the failed-page empty state inside it read them). The gate is the shared sheet. */
     .garden-fullscreen { position:fixed; inset:0; z-index:100; background:#000; display:flex; flex-direction:column; color-scheme:dark;
-      --text-1:rgba(255,255,255,0.92); --text-2:rgba(255,255,255,0.62); --text-3:rgba(255,255,255,0.4);
+      --text-1:rgba(255,255,255,0.92); --text-2:rgba(255,255,255,0.62); --text-3:rgba(255,255,255,0.4); --accent:var(--ink-gold); --accent-ink:#1a1407;
       --surface-1:#1c1b18; --surface-2:#2a2824; --surface-3:#36332d; --hairline:rgba(255,255,255,0.08); }
     .garden-image-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; touch-action:none; }
     .garden-page-img { display:block; max-width:100%; max-height:100%; object-fit:contain; }
@@ -3827,15 +3841,6 @@
         background:transparent; border:none;
         color:var(--gold); cursor:pointer;
         transition:transform 0.2s ease;
-      }
-      /* Wave 0 — visible caption under the dice; matches the aria-label
-         (label-in-name). Styled after .home-rearrange-hint. Full --gold-dim, no fade: at opacity 0.8 the
-         10 px caption read 3.77:1 on light --bg (contrast-sweep once it counted opacity, sweep mw11). */
-      .surprise-fab-caption {
-        font-family:'Cinzel', serif;
-        font-size:var(--fs-10); letter-spacing:0.22em; text-transform:uppercase;
-        color:var(--gold-dim);
-        pointer-events:none;
       }
       .surprise-fab svg {
         width:34px; height:34px;
@@ -4377,7 +4382,7 @@
     .coverage-badge-detail { font-size:var(--fs-12); font-style:italic; color:var(--gold-dim); white-space:nowrap; }
     /* In a study card, and on a shelf row, the badge sits on its own line
        under the title rather than stretching the one-line ellipsis. */
-    .chapter-card-info .coverage-badge-wrap,
+    .chapter-card-info .coverage-badge-wrap { margin-left:0; margin-top:0.3rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* Estimated reading time — quiet, right-aligned, never wraps or
@@ -5691,14 +5696,6 @@
       font-family: var(--font-body);
       color: var(--cream-muted);
     }
-    .notes-empty-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-14);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-dim); margin-bottom: 0.5rem;
-    }
-    .notes-empty-hint {
-      font-style: italic; font-size: var(--fs-15); line-height: 1.5;
-    }
     /* n116: the how-to on the Notebooks tab sits above the notebook rows, so it is shorter. */
     .notes-empty-inline { padding: 1.2rem 1rem 1.4rem; }
     /* n118: the one primary button an empty list screen carries (Bookmarks, Links, History). */
@@ -6174,7 +6171,7 @@
     .settings-group-head.ui-row .settings-section-label { margin:0; font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:var(--fw-name); line-height:var(--lh-headline); letter-spacing:0; text-transform:none; color:var(--text-1); }
     .settings-group-head.ui-row .settings-group-sub { font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
     .ws1-tag.ui-row-mark { padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-size:var(--ts-label); }
-    .ws1-foot { margin:var(--sp-5) 0 0; text-align:center; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws1-foot { margin:var(--sp-5) 0 0; text-align:center; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws1-settings .settings-section.is-screen { margin:0; }
     .ws1-settings .settings-section.is-screen > .settings-group-body { margin:0; }
     .ws1-settings .settings-group-body > .ui-label:first-child { margin-top:var(--sp-2); }
@@ -6483,11 +6480,6 @@
     .bkm-popover-thought-edit { padding: 6px 0 8px; }
     /* Inline thought-edit inside the action sheet (long-press flow). */
     .bkm-action-thought-edit { padding: 12px 14px 8px; }
-    .bkm-action-thought-prompt {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold-dim); margin-bottom: 6px;
-    }
     .bkm-action-thought-actions {
       display: flex; gap: 0.5rem; margin-top: 4px;
     }
@@ -9281,7 +9273,7 @@ body.light .install-step-num { color: #fff; }
     .listen-coll-actions .ui-btn:only-child { grid-column: 1 / -1; }
     .listen-coll-sections { margin-bottom: var(--sp-4); }
     .listen-coll-sections .ui-chip .ui-i { color: var(--accent); }
-    .listen-rec-num { margin-right: .45em; color: var(--text-3); font-family: var(--font-ui); font-size: var(--ts-value); font-variant-numeric: tabular-nums; }
+    .listen-rec-num { margin-right: .45em; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-variant-numeric: tabular-nums; }
     .listen-rec.is-unavailable .ui-row-title { color: var(--text-2); }
     .listen-rec .ui-row-meta .coverage-badge { margin-left: var(--sp-2); }
     .ui-row-star { flex: none; display: flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: -6px -4px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }

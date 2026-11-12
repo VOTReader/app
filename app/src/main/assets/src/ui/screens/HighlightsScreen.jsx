@@ -102,16 +102,18 @@ export function HighlightRow(props) {
   var sourceLabel = props.source || ((typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : m.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
   var hex = _hlColorHex(m.color);
+  // A line and a swatch read the theme's palette token (light: the hue at 3:1 on parchment), the hex its fallback.
+  var line = _HL_COLOR_HEX[m.color] ? 'var(--hl-' + (m.color === 'cyan' ? 'teal' : m.color) + ', ' + hex + ')' : hex;
   var kind = m.kind === 'underline' || m.kind === 'squiggle' ? m.kind : 'highlight';
   /** @type {any} */
   var markStyle = kind === 'highlight'
     ? { background: _tint(hex, 0.24) }
-    : { textDecorationLine: 'underline', textDecorationStyle: kind === 'squiggle' ? 'wavy' : 'solid', textDecorationColor: hex };
+    : { textDecorationLine: 'underline', textDecorationStyle: kind === 'squiggle' ? 'wavy' : 'solid', textDecorationColor: line };
   var open = function() { if (props.onNavigate) props.onNavigate(m); };
   return (
     <button type="button" className={'hlx-row is-' + kind} onClick={open}
       aria-label={KIND_NAME[kind] + ': ' + (m.text || '') + ' · ' + sourceLabel}>
-      <span className="hlx-swatch" style={{ background: hex }} aria-hidden="true" />
+      <span className="hlx-swatch" style={{ background: line }} aria-hidden="true" />
       <span className="hlx-body">
         {m.text && <span className="hlx-text"><span className="hlx-mark" style={markStyle}>{m.text}</span></span>}
         <span className="hlx-meta">{[sourceLabel, date].filter(Boolean).join(' · ')}</span>
