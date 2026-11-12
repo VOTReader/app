@@ -24,6 +24,7 @@ import { prophecyCardsOf } from '../components/ProphecyGroup.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
 import { AddendumHeadLines } from '../components/AddendumHead.jsx';
 import { addendumHeadLines, closingMid } from '../../utils/closing-breaks.js';
+import { BgDrawContext } from '../components/bg-draw.js';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -71,7 +72,10 @@ function MarkReadRow({ read, onMark, onUndo }) {
 }
 
 export function LetterView(props) {
-  const { letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null } = props;
+  const { letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert: inertProp = false, restoreScroll = null, resolvePeek = null } = props;
+  // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
+  const bgDraw = React.useContext(BgDrawContext);
+  const inert = inertProp || !!bgDraw;
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo

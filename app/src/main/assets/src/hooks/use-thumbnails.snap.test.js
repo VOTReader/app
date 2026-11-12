@@ -70,16 +70,48 @@ describe('useThumbnails snapshots', () => {
     expect(result.current.tabThumbnails['key-a']).toBe(first);
   });
 
-  it('loads stored snapshots for the open tabs, keeps an old JPEG row only as a fallback, drops junk', async () => {
+  it('loads stored snapshots for the open tabs and drops junk', async () => {
     store.set('key-a', { snap: snap('<div>stored A</div>') });
-    store.set('key-b', { dark: 'data:image/jpeg;base64,' + 'x'.repeat(1200) });
     store.set('key-c', { snap: { v: 99 } });
-    const { result } = renderHook((p) => useThumbnails(p), { initialProps: props(tabsOf('a', 'b', 'c')) });
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: props(tabsOf('a', 'c')) });
     await flush();
     expect(result.current.tabThumbnails['key-a'].snap.html).toContain('stored A');
-    expect(result.current.tabThumbnails['key-b'].dark).toBeTruthy();
     expect(result.current.tabThumbnails['key-c']).toBeUndefined();
     expect(store.has('key-c')).toBe(false);
+  });
+
+  // TABS6: the rows an older build (main, before the overview pass) left on the phone: a JPEG per theme
+  // ({ dark, light }), one theme only, the `unknown` kind (no theme known), the interim { url, theme } and a bare data
+  // URL. None of them is ever shown again (the strip between bars, the inverted blue page); each is deleted when read.
+  it('an older build\'s JPEG rows are never shown and are deleted from the picture store', async () => {
+    const jpeg = (c) => 'data:image/jpeg;base64,/9j/' + c.repeat(1500);
+    store.set('key-both', { dark: jpeg('D'), light: jpeg('L') });
+    store.set('key-dark', { dark: jpeg('D') });
+    store.set('key-light', { light: jpeg('L') });
+    store.set('key-unk', { unknown: jpeg('U') });
+    store.set('key-url', { url: jpeg('I'), theme: 'dark' });
+    store.set('key-str', jpeg('S'));
+    store.set('key-new', { snap: snap('<div>kept</div>') });
+    const ids = ['both', 'dark', 'light', 'unk', 'url', 'str', 'new'];
+    for (const theme of ['dark', 'light']) {
+      const { result, unmount } = renderHook((p) => useThumbnails(p), { initialProps: props(tabsOf(...ids), { theme }) });
+      await flush();
+      for (const id of ids.slice(0, 6)) expect(result.current.tabThumbnails['key-' + id]).toBeUndefined();
+      expect(Object.keys(result.current.tabThumbnails)).toEqual(['key-new']);
+      unmount();
+    }
+    expect([...store.keys()]).toEqual(['key-new']);
+    expect(g.idbDelete).not.toHaveBeenCalledWith('key-new');
+  });
+
+  it('a picture drawn off screen (TabSnapDrawer) is shown and stored like a live one', async () => {
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: props(tabsOf('a', 'b')) });
+    await flush();
+    const drawn = snap('<div>drawn B</div>');
+    act(() => { result.current.storeTabSnap('key-b', drawn); });
+    expect(result.current.tabThumbnails['key-b']).toEqual({ snap: drawn });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    expect(store.get('key-b')).toEqual({ snap: drawn });
   });
 
   it('no picture for the Scripture Web (a WebGL canvas) or with tabs off', async () => {

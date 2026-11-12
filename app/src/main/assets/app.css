@@ -2468,14 +2468,6 @@
         --hl-base-a: 0.32; --hl-peak-a: 0.58; --hl-glow-a: 0.35;
       }
 
-      /* Theme-normalized tab thumbnails: a card whose screenshot was captured
-         under the OTHER theme renders through invert+hue-rotate — lightness
-         flips while hues survive the double rotation, so a dark capture reads
-         as light chrome (and vice versa) and a theme switch never shows a
-         mixed wall of dark+light cards. Applied by TabsOverview when the
-         entry's recorded capture theme ≠ the current theme; the tab's next
-         visit recaptures true pixels. Garden tabs are exempt (photos). */
-      .tab-card-thumb.thumb-theme-flip { filter: invert(1) hue-rotate(180deg); }
     /* ── LETTER META ── */
     .letter-meta { padding:0 0 0.25rem; margin-bottom:2.5rem; }
     .meta-from { font-style:italic; color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.2rem; }
@@ -4581,9 +4573,6 @@
     .tab-card:active { background:var(--surface-2); }
     .tab-card.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
     .tab-card-thumb-wrap { position:relative; height:150px; flex:none; overflow:hidden; background:var(--surface-2); }
-    .tab-card-thumb { display:block; width:100%; height:100%; object-fit:cover; object-position:center top; -webkit-user-drag:none; pointer-events:none; }
-    /* A capture whose geometry no longer matches the card: letterboxed intact until a fresh one (TabsOverview._fitThumb). */
-    .tab-card-thumb.thumb-ar-mismatch { object-fit:contain; object-position:center; background:var(--surface-2); }
     .tab-card-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--surface-2); }
     .tab-card-thumb-sigil { color:var(--text-3); font-size:var(--fs-24); }
     /* TABS1: a card's picture is the tab's own page (SnapBox, utils/tab-snap.js): the copy laid out at the live
@@ -4598,6 +4587,13 @@
        one screen, so it renders whole. */
     .tab-snap-page * { content-visibility:visible !important; }
     .tab-snap-page *, .tab-snap-page *::before, .tab-snap-page *::after { animation-duration:0s !important; animation-delay:0s !important; animation-iteration-count:1 !important; transition:none !important; }
+    /* TABS6: a tab whose picture is not drawn yet waits on its page colour, nothing else (an older build's JPEG is
+       never drawn). TabSnapDrawer draws it out of sight, under the Tabs screen, in the live column's box (no bar). */
+    .tab-snap-wait { background:var(--bg); }
+    .tab-bg-draw { position:fixed; left:0; top:0; z-index:-1; visibility:hidden; pointer-events:none; overflow:hidden; contain:strict; }
+    .tab-bg-draw .screen-layout { height:100%; }
+    .tab-bg-draw * { content-visibility:visible !important; }
+    .tab-bg-draw *, .tab-bg-draw *::before, .tab-bg-draw *::after { animation-duration:0s !important; animation-delay:0s !important; animation-iteration-count:1 !important; transition:none !important; }
     /* The card's keyboard / screen-reader control: above the picture (z 1), under the body (z 2) and buttons (z 3). */
     .tab-card-open { position:absolute; inset:0; z-index:1; margin:0; padding:0; border:0; background:transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
     .tab-card .tab-card-open:focus-visible { outline-offset:-2px; border-radius:var(--r-card); }

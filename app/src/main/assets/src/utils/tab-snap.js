@@ -107,11 +107,20 @@ export function liveReadingArea() {
  */
 export function snapLiveTab() {
   const area = liveReadingArea();
-  if (!area) return null;
-  const { layout, viewport, scroller, track } = area;
+  return area ? snapArea(area) : null;
+}
+
+/**
+ * Copy one reading area (the live one, or a tab drawn off screen by TabSnapDrawer, TABS6).
+ * The band kept runs from the scroller's top to at least one column width below it (TABS6): a card is wider than it
+ * is tall in landscape and on a tablet, and the page under the first screen is what fills its picture to the bottom.
+ * @param {{ layout: Element, viewport: Element | null, scroller: HTMLElement, track: Element | null }} area
+ * @returns {{ v: number, html: string, w: number, h: number, top: number, st: number, at: number }}
+ */
+export function snapArea({ layout, viewport, scroller, track }) {
   const sr = scroller.getBoundingClientRect();
   const bandTop = sr.top - BAND_PAD;
-  const bandBot = sr.top + scroller.clientHeight + BAND_PAD;
+  const bandBot = sr.top + Math.max(scroller.clientHeight, scroller.offsetWidth) + BAND_PAD;
   const anchor = { el: /** @type {Element | null} */ (null), top: 0 };
 
   // `frozen`: inside an absolute, fixed or sticky box (a stuck title bar): never the anchor, whose job is to say
@@ -206,7 +215,11 @@ export function readSnap(v) {
 /**
  * Draw a snapshot into a card's picture box: the copy at the live column's
  * width, scaled to the box, scrolled so its anchor sits where it sat live.
- * Synchronous (a layout effect calls it, so the first painted frame has it).
+ * It fills the box edge to edge (TABS6): the width by the scale, the height by
+ * letting the copy's column run on below the first screen as far as the box
+ * reaches (with room added at the end, so a page read to its bottom keeps the
+ * place it had on screen). Synchronous (a layout effect calls it, so the first
+ * painted frame has it).
  * @param {HTMLElement} box
  * @param {{ html: string, w: number, h: number, top: number, st: number }} snap
  * @returns {boolean} false when the box has no width yet
@@ -215,15 +228,22 @@ export function paintSnap(box, snap) {
   const bw = box.clientWidth;
   if (!bw) return false;
   const s = bw / snap.w;
+  const tall = Math.max(snap.h, Math.ceil(box.clientHeight / s));
   const page = document.createElement('div');
   page.className = 'tab-snap-page';
   page.style.width = snap.w + 'px';
-  page.style.setProperty('--snap-h', snap.h + 'px');
+  page.style.setProperty('--snap-h', tall + 'px');
   page.style.transform = `scale(${s})`;
   page.innerHTML = snap.html;
   box.replaceChildren(page);
   const sc = /** @type {HTMLElement | null} */ (page.querySelector('.screen-scroll'));
   if (!sc) return true;
+  if (tall > snap.h) {
+    const room = document.createElement('div');
+    room.className = 'tab-snap-room';
+    room.style.height = (tall - snap.h) + 'px';
+    sc.appendChild(room);
+  }
   const a = page.querySelector('[data-snap-anchor]');
   if (a) {
     const off = (a.getBoundingClientRect().top - sc.getBoundingClientRect().top) / s + sc.scrollTop;

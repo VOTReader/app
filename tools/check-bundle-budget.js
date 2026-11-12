@@ -111,7 +111,9 @@ const BUDGETS = [
   // progress strip), the baked-lengths reader and the row ... menu, plus the Answers stages since 10-22: 1,599,529 ->
   // 1,680,140, all of it feature code (no new import from node_modules in these landings).
   // Re-baselined UP by the same rule: 1,680,140 x 1.15 = 1,932,161 -> the hundred above.
-  { file: 'bundle-d.js', measured: 1680140, max: 1932200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
+  // 2026-11-12, TABS6: the overview pass grew it to 1,936,349 (TabSnapDrawer, the Tabs cards' off-screen draw, ~4 KB,
+  // on top of the redesign's screens; feature code, no node_modules). x 1.15 = 2,226,801 -> the hundred above.
+  { file: 'bundle-d.js', measured: 1936349, max: 2226900 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
   // 2026-11-04, search200 h8: a cold build runs on the worker too (MiniSearch and the tokenizer, ~24 KB): 7,967 ->

@@ -22,41 +22,9 @@
    "Tab actions" (Close others / to the right) live on the ⋮ button.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/**
- * True when a stored thumbnail's aspect no longer matches the card box it
- * must fill — a thumb captured under a different window geometry (resize,
- * phone→desktop, the pre-column capture era). Cover-cropping such a thumb
- * shows a blown-up top-corner crop (the PC "giant text" glitch); the
- * overview letterboxes it instead (object-fit:contain) until a fresh
- * capture at the current geometry replaces it. 12% tolerance: scrollbar
- * gutters and rounding never letterbox a same-geometry capture.
- *
- * @param {number} naturalW @param {number} naturalH
- * @param {number} boxW @param {number} boxH
- * @returns {boolean}
- */
 import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { SnapBox } from '../components/SnapBox.jsx';
-
-export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
-  if (!naturalW || !naturalH || !boxW || !boxH) return false;
-  const thumbAr = naturalW / naturalH;
-  const boxAr = boxW / boxH;
-  return Math.abs(thumbAr - boxAr) / boxAr > 0.12;
-}
-
-// Apply the aspect guard to a thumb <img>. Runs from BOTH the ref callback
-// (cached images are already complete before onLoad can fire) and onLoad
-// (fresh loads). Pure DOM class toggle — no React state, no re-render.
-function _fitThumb(img) {
-  if (!img || !img.complete || !img.parentElement) return;
-  const box = img.parentElement.getBoundingClientRect();
-  img.classList.toggle(
-    'thumb-ar-mismatch',
-    thumbAspectMismatch(img.naturalWidth, img.naturalHeight, box.width, box.height),
-  );
-}
 
 // Abnormal-path trace — mirrors the [thumb] pattern: console.warn for a
 // live devtools look + DiagnosticLog for the offline trail.
@@ -71,11 +39,6 @@ function _tabsDragTrace(msg) {
 
 export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onMenu, onReorder, onClearAll, onDedupe, MAX_TABS, thumbnails, clearAsk = false, onClearAsk = (/** @type {boolean} */ _v) => {} }) {
   const total = tabs.length;
-  // Current theme for thumbnail theme-normalization (see the map below).
-  // Read from the body class — the authoritative live-theme signal — so no
-  // new prop threads through AppShellOverlays; the overview remounts per
-  // open, and the theme can't change while it covers the screen.
-  const currentTheme = (typeof document !== 'undefined' && document.body.classList.contains('light')) ? 'light' : 'dark';
 
   /* ── Drag-to-reorder — v2, a pointer-events state machine ────────────────
      The LIFECYCLE (one gesture object, document-capture pointer listeners,
@@ -312,40 +275,18 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           const pctLive = saved == null ? 0 :
             typeof saved === 'object' && typeof saved.pct === 'number' ? saved.pct : 0;
           const isActive = i === activeTabIdx;
-          // Thumbnail entries are DUAL-THEME variant maps ({ dark?, light?,
-          // unknown? } — {@link useThumbnails}): prefer the variant matching
-          // the CURRENT theme (true pixels, instant on a theme switch). When
-          // only the other theme exists yet, render it through
-          // .thumb-theme-flip (invert+hue-rotate) as a transitional
-          // approximation; `unknown` legacy rows (awaiting the luminance
-          // probe) render as-is. Garden tabs never flip (photographs).
+          // TABS1: a card's picture is a snapshot of the tab's own page (useThumbnails), drawn in the CURRENT theme by
+          // the app's own stylesheet, filling the picture area. TABS6: an older build's stored JPEG is never drawn (it
+          // was a narrow strip between bars, and a dark one went through an invert filter in the light theme); a tab
+          // without a snapshot yet shows a quiet page-coloured placeholder until TabSnapDrawer draws it (or a visit
+          // does). The Scripture Web is a WebGL canvas no copy can carry: its card keeps the sigil.
           const thumbEntry = thumbnails ? thumbnails[tabContentKey(t)] : null;
-          // TABS1: a snapshot of the tab's own page (useThumbnails) - always in the current theme.
           const snap = thumbEntry && typeof thumbEntry === 'object' && thumbEntry.snap ? thumbEntry.snap : null;
-          let thumb = null;
-          let thumbFlip = false;
-          if (typeof thumbEntry === 'string') {
-            thumb = thumbEntry; // pre-migration transient — render as-is
-          } else if (thumbEntry) {
-            const other = currentTheme === 'light' ? thumbEntry.dark : thumbEntry.light;
-            if (thumbEntry[currentTheme]) {
-              thumb = thumbEntry[currentTheme];
-            } else if (thumbEntry.unknown) {
-              thumb = thumbEntry.unknown;
-            } else if (other) {
-              thumb = other;
-              thumbFlip = t.screen !== 'garden-view';
-            } else if (thumbEntry.url) {
-              // interim { url, theme } rows not yet migrated by the hook
-              thumb = thumbEntry.url;
-              thumbFlip = !!(thumbEntry.theme && thumbEntry.theme !== currentTheme && t.screen !== 'garden-view');
-            }
-          }
           return (
             <div
               key={i}
               ref={setCardRef(i)}
-              className={`tab-card${isActive ? ' active' : ''}${thumb || snap ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
+              className={`tab-card${isActive ? ' active' : ''}${snap ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
               onClick={(e) => { if (dragRef.current.suppressed()) { e.preventDefault(); e.stopPropagation(); return; } onSelect(i); }}
               onPointerDown={(e) => {
                 if (e.isPrimary === false) return; // a second finger never owns a gesture
@@ -368,21 +309,13 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 aria-haspopup="dialog"
               ><UiIcon name="more" size="sm" /></button>
               <div className="tab-card-thumb-wrap">
-                {/* draggable=false: a long-press/drag landing on the thumbnail
-                    IMAGE otherwise starts the browser's native image drag,
-                    which cancels the touch stream and killed the reorder
-                    gesture (desktop mouse drags too). */}
                 {snap
                   ? <SnapBox snap={snap} lazy={i >= 6} />
-                  : thumb
-                  ? <img
-                      className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`}
-                      src={thumb} alt="" draggable={false}
-                      ref={_fitThumb} onLoad={(e) => _fitThumb(e.target)}
-                    />
-                  : <div className="tab-card-thumb-placeholder">
+                  : t.screen === 'scripture-web'
+                  ? <div className="tab-card-thumb-placeholder">
                       <div className="tab-card-thumb-sigil" aria-hidden="true">{"✦"}</div>
                     </div>
+                  : <div className="tab-snap tab-snap-wait" aria-hidden="true" />
                 }
               </div>
               <div className="tab-card-body">

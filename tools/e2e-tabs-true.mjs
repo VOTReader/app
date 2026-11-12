@@ -17,6 +17,9 @@
  *       classes, text and boxes, the same scrollTop. A peek drawn with fewer props than the page (no mark-as-read, no
  *       Listen pill, no band) or put at another place fails here, first visits included.
  *
+ *   U1-U5 (TABS6) the upgrade case, tools/e2e-tabs-upgrade.mjs: old JPEG rows seeded, never drawn, cards drawn by
+ *       themselves (skip with --no-upgrade).
+ *
  * Run: node tools/e2e-tabs-true.mjs [--measure] [--shots DIR] [--json FILE]   (after npm run build; ~90 s)
  * --measure prints the numbers and exits 0; without it the limits below fail the run (exit 1).
  */
@@ -25,6 +28,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { runUpgrade } from './e2e-tabs-upgrade.mjs';
 
 const argv = process.argv.slice(2);
 const MEASURE = argv.includes('--measure');
@@ -746,6 +750,12 @@ async function main() {
     if (anaB) await anaB.close().catch(() => {});
     server.close();
     rmSync(profile, { recursive: true, force: true });
+  }
+  // TABS6: the upgrade case - a phone holding an older build's JPEG pictures (tools/e2e-tabs-upgrade.mjs)
+  if (!argv.includes('--no-upgrade')) {
+    const up = await runUpgrade({ shots: SHOTS, log: (m) => console.log('[upgrade] ' + m) });
+    out.upgrade = { rounds: Object.fromEntries(Object.entries(up.out.rounds).map(([k, r]) => [k, { drawMs: r.drawMs, firstFrame: r.firstFrame, same: r.same, other: r.other }])), fit: up.out.fit };
+    fails.push(...up.fails);
   }
   const summary = JSON.stringify(out, (k, v) => (k === 'keys' || k === 'sizes' ? undefined : v), 1);
   console.log(summary);

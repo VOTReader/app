@@ -18,12 +18,16 @@ import { translateVerse, loadTranslation, translationLabel, translationLang, hol
 import { recordingTranslationFor, textForRecording } from '../../utils/audio-text-edition.js';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
+import { BgDrawContext } from '../components/bg-draw.js';
 
 /** FIXC: the loaded recording (book:edition) over which the reader picked his own translation here; '' for none. */
 let pickedOver = '';
 
 export function BibleChapterView(props) {
-  const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null, bibleAudioFor = null } = props;
+  const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert: inertProp = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null, bibleAudioFor = null } = props;
+  // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
+  const bgDraw = React.useContext(BgDrawContext);
+  const inert = inertProp || !!bgDraw;
   const bodyRef = React.useRef(null);
   // The words on screen match the voice (critique 2026-10-05 #6): while this
   // book's recording is loaded, the chapter shows the recording's translation
