@@ -79,7 +79,7 @@ export function AnswersSaved({ entries, fontScale, onBack, onSearch, onHistory, 
                   return (
                     <div key={it.gid} className="ans-saved-row">
                       <button type="button" className="ans-hit" onClick={() => open(id, it)}>
-                        <span className="ans-hit-snip">{'“' + it.text + '”'}</span>
+                        <span className="ans-hit-snip">{'“' + it.text.replace(/^“|”$/g, '') + '”'}</span>
                         {it.note ? <span className="ans-hit-src ans-hit-note">{it.note}</span> : null}
                         {/* ODDS1 (a-saved): the source, then when it was marked */}
                         {src || it.created ? <span className="ans-hit-src">{[src, relativeDate(it.created)].filter(Boolean).join(' · ')}</span> : null}
