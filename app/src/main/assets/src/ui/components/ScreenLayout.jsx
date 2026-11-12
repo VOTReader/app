@@ -11,6 +11,7 @@ import { MoreMenuBtn } from './MoreMenu.jsx';
 import { NavGearHost } from './NavButtons.jsx';
 import { AutoScrollControl } from './AutoScrollControl.jsx';
 import { utilityNav } from './RootNav.jsx';
+import { BgDrawContext } from './bg-draw.js';
 
 /** The document's selected text; '' when nothing is selected or it cannot be read. */
 function selectionText() {
@@ -49,7 +50,11 @@ const _descKind = (d) => (d ? d.kind + ':' + (d.kind === 'boundary' ? d.title : 
  *   screen's own ⋯ (`menu`) only when it has one. No resume dot, no gear slot, no app-wide ⋯ menu. `navChildren` is
  *   ignored in this mode.
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, scrollKey = '', placeKey = '', landmarks = true, className = '', root = false, navEnd = null, utility = null }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert: inertProp = false, restoreScroll: restoreProp = null, scrollKey = '', placeKey = '', landmarks = true, className = '', root = false, navEnd = null, utility = null }) {
+  // TABS6: a tab drawn off screen for its Tabs card (TabSnapDrawer) is inert like a swipe neighbour, at its saved place.
+  const bgDraw = React.useContext(BgDrawContext);
+  const inert = inertProp || !!bgDraw;
+  const restoreScroll = restoreProp || (bgDraw ? bgDraw.restore : null);
   const scrollRef = React.useRef(null);
   const navRef = React.useRef(/** @type {any} */ (null));
   // The slot after Tabs where NavButtons draws the Settings gear (NavGearHost, NavButtons.jsx).
@@ -369,6 +374,12 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   // pager-viewport (a clone never nests its own peeks), no scroll-notch marker.
   // The `.pager-peek` parent (PagerPeek) is position:absolute with a fixed
   // height, so height:100% sizes this without a flex parent.
+  // TABS6: drawn off screen for a Tabs card, the column sits in the live screen's own boxes (no bar), so the copy
+  // tab-snap takes of it has the same shape and widths as one taken of the live page.
+  if (bgDraw) {
+    const col = <div className="screen-scroll" ref={inertScrollRef}>{bgDraw.pager ? <div className="pager-track">{children}</div> : children}</div>;
+    return <div className={className ? 'screen-layout ' + className : 'screen-layout'}>{bgDraw.pager ? <div className="pager-viewport">{col}</div> : col}</div>;
+  }
   if (inert) {
     // data-scroll-key: the pager re-places the peek from it as a drag begins (pager-preview placePeek).
     return <div className="screen-scroll" style={{ height: '100%' }} ref={inertScrollRef} data-scroll-key={scrollKey || undefined}>{children}</div>;

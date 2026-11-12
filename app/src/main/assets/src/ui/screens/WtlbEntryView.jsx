@@ -26,6 +26,7 @@ import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
 import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
+import { BgDrawContext } from '../components/bg-draw.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -36,7 +37,10 @@ function _prettyBookId(id) {
 }
 
 export function WtlbEntryView(props) {
-  const { entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, markAsReadEnabled, scripturesDict, footnotesMode, backHint, onBack, navBack = null, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null } = props;
+  const { entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, markAsReadEnabled, scripturesDict, footnotesMode, backHint, onBack, navBack = null, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert: inertProp = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null } = props;
+  // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
+  const bgDraw = React.useContext(BgDrawContext);
+  const inert = inertProp || !!bgDraw;
   // An Answers topic (AOGCG f07-f11) draws its own page (AnswersTopic.jsx) from its sidecar, plain
   // until ANSWERS_META lands: the body waits up to 300 ms for it, then paints plain and is decorated
   // in place when it arrives.

@@ -20,6 +20,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 import { buildScreenRoutes } from './ui/screen-routes.jsx';
 import { RouteSlot } from './components/RouteSlot.jsx';
+import { TabSnapDrawer } from './ui/components/TabSnapDrawer.jsx';
 import { resolveActiveContent } from './utils/active-content.js';
 
 const { useState, useEffect } = React;
@@ -304,7 +305,7 @@ function App() {
   const { readHistory, addToHistory, clearHistory } = useHistory(settings.historyEnabled);
   /* useThumbnails — tab card thumbnail capture + IDB persistence + GC.
      Extracted to src/hooks/use-thumbnails.js (P6d). */
-  const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
+  const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail, storeTabSnap } = useThumbnails({
     tabs, activeTabIdx, activeTab,
     tabsEnabled: settings.tabsEnabled,
     tabsOverviewOpen, theme,
@@ -743,6 +744,7 @@ function App() {
           E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
           no drift) so the app is always navigable. */}
       <ErrorBoundary key={screen}><RouteSlot route={ROUTES[screen] || ROUTES.home} /></ErrorBoundary>
+      {settings.tabsEnabled && tabsOverviewOpen ? <ErrorBoundary fallback={null}><TabSnapDrawer tabs={tabs} activeTabIdx={activeTabIdx} thumbnails={tabThumbnails} deps={_routeDeps} buildRoutes={buildScreenRoutes} onSnap={storeTabSnap} /></ErrorBoundary> : null}{/* TABS6: cards without a picture get theirs */}
       {/* Audio mini-player (null while idle): after the screen, so Tab and screen readers meet it last (W66). */}
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar hidden={screen === 'audio-library'} /></ErrorBoundary>
       {/* Read / Listen / Library (utils/app-sections.js decides where it shows): a tab opens its root, fresh. */}

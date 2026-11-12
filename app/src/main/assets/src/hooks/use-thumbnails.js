@@ -24,20 +24,22 @@
        once when the page is hidden, so a restart shows every card at once.
 
    OWNS:
-     - tabThumbnails state: { [contentKey]: { snap } } (older rows keep their
-       { dark?, light?, unknown? } JPEGs until the tab is next seen; the
-       overview draws those only where no snapshot exists yet)
+     - tabThumbnails state: { [contentKey]: { snap } } (an older build's JPEG
+       row is deleted when it is read, TABS6; the card waits on a page-coloured
+       placeholder until TabSnapDrawer or a visit draws the tab)
      - setTabThumbnails   (returned so App's closeAllTabs can clear it)
      - IDB load           (idbReadAll(liveKeys), tabsEnabled-gated, re-run when
-                           the set of open tabs changes; it deletes nothing)
+                           the set of open tabs changes; of the rows it read, it
+                           deletes only those that hold no snapshot)
      - GC effect          (debounced; sweeps the STORE's keys, only once
                            StateStore reports 'loaded')
      - captureActiveTabThumbnail(opts?)  synchronous; stable on [tabsEnabled]
+     - storeTabSnap(key, snap)  a picture TabSnapDrawer drew off screen (TABS6)
 
    DOES NOT OWN: tabContentKey / idbReadAll / idbPut / idbDelete / idbAllKeys
    (globals from the thumb store, reached as bare names via window).
 
-   RETURNS: { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail }
+   RETURNS: { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail, storeTabSnap }
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -59,9 +61,10 @@ function pageHidden() {
  * Card pictures for the Tabs screen.
  * @param {{ tabs: any[], activeTabIdx: number, activeTab: any, tabsEnabled: boolean, tabsOverviewOpen: boolean, theme?: string }} args
  * @returns {{
- *   tabThumbnails: Record<string, { snap?: any, dark?: string, light?: string, unknown?: string }>,
+ *   tabThumbnails: Record<string, { snap?: any }>,
  *   setTabThumbnails: (val: any) => void,
- *   captureActiveTabThumbnail: (opts?: { urgent?: boolean, force?: boolean }) => void
+ *   captureActiveTabThumbnail: (opts?: { urgent?: boolean, force?: boolean }) => void,
+ *   storeTabSnap: (key: string, snap: any) => void
  * }}
  */
 export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabsOverviewOpen }) {
@@ -76,27 +79,17 @@ export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabs
   React.useEffect(() => {
     if (!tabsEnabled) return undefined;
     let cancelled = false;
-    const ok = (/** @type {any} */ u) => typeof u === 'string' && u.length >= 1000;
     const liveKeys = liveKeySig ? liveKeySig.split('\n') : [];
     idbReadAll(liveKeys).then((rows) => {
       if (cancelled) return;
       const norm = {};
       for (const k of Object.keys(rows || {})) {
         const v = rows[k];
-        let entry = null;
-        if (v && typeof v === 'object' && v.snap) {
-          const snap = readSnap(v.snap);
-          if (snap) entry = { snap };
-        } else if (typeof v === 'string') {
-          if (ok(v)) entry = { unknown: v };
-        } else if (v && typeof v === 'object') {
-          // older JPEG rows ({ dark?, light?, unknown? } or the interim { url, theme })
-          const e = {};
-          if (typeof v.url === 'string' && ok(v.url)) e[v.theme === 'dark' || v.theme === 'light' ? v.theme : 'unknown'] = v.url;
-          for (const f of ['dark', 'light', 'unknown']) if (ok(v[f])) e[f] = v[f];
-          if (Object.keys(e).length) entry = e;
-        }
-        if (entry) norm[k] = entry; else idbDelete(k);
+        const snap = v && typeof v === 'object' && v.snap ? readSnap(v.snap) : null;
+        // TABS6: anything else is an older build's JPEG row ({ dark?, light?, unknown? }, the interim { url, theme },
+        // a bare data URL), 150-400 KB a picture: never drawn again (a strip between bars, or a dark one inverted to
+        // blue in the light theme), so it goes now. TabSnapDrawer draws the true picture in its place.
+        if (snap) norm[k] = { snap }; else idbDelete(k);
       }
       // A snapshot taken this session (goTabs before the read landed) outranks the stored row.
       const merged = { ...norm };
@@ -180,6 +173,17 @@ export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabs
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refs read via .current; flushPersist/schedulePersist are stable callbacks
   }, [tabsEnabled]);
 
+  // TABS6: a picture drawn off screen for a tab that is not on screen (TabSnapDrawer), kept as a live one is.
+  const storeTabSnap = React.useCallback(/** @param {string} key @param {any} snap */ (key, snap) => {
+    if (!tabsEnabled || !key || !snap) return;
+    const entry = { snap };
+    thumbnailsRef.current = { ...thumbnailsRef.current, [key]: entry };
+    setTabThumbnails((prev) => ({ ...prev, [key]: entry }));
+    pendingRef.current.set(key, entry);
+    if (pageHidden()) flushPersist(); else schedulePersist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flushPersist/schedulePersist are stable callbacks
+  }, [tabsEnabled]);
+
   // After a screen or tab change (scroll restore first).
   React.useEffect(() => {
     if (!tabsEnabled || tabsOverviewOpen) return undefined;
@@ -217,5 +221,5 @@ export function useThumbnails({ tabs, activeTabIdx, activeTab, tabsEnabled, tabs
   // Unmount: write what is pending.
   React.useEffect(() => () => flushPersist(), [flushPersist]);
 
-  return { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail };
+  return { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail, storeTabSnap };
 }

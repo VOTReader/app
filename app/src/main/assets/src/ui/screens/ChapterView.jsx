@@ -12,9 +12,13 @@ import { tapToggle } from '../../utils/tap-guard.js';
 import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse.js';
 import { studyHlKey } from '../../utils/hl-keys.js';
 import { BackHintPill } from '../components/BackHintPill.jsx';
+import { BgDrawContext } from '../components/bg-draw.js';
 
 export function ChapterView(props) {
-  const { book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, heroExtra = null, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true } = props;
+  const { book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, heroExtra = null, navBack = null, onNavigateToLink, inert: inertProp = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true } = props;
+  // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
+  const bgDraw = React.useContext(BgDrawContext);
+  const inert = inertProp || !!bgDraw;
   const bodyRef = React.useRef(null);
   /* The eyebrow ("Book · Chapter N") is what the narrator says before verse 1:
      the read-along's lead-in (ReadAlongHighlight, 2026-09-22). */
