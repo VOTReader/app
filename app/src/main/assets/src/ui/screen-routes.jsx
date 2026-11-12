@@ -44,8 +44,8 @@
 import { h } from './jsx-h.js';
 import { bookTitle, runName } from '../data/plan-catalog.js';
 import { runStatus } from '../data/plan-engine.js';
-import { beginPlanSession, setPlanSessionHost, refOf } from '../utils/plan-session.js';
-import { openPlanNav, keepPlanNav } from '../utils/plan-nav.js';
+import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace } from '../utils/plan-session.js';
+import { openPlanNav, keepPlanNav, planNavOnScreen } from '../utils/plan-nav.js';
 import { suppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { writePlanNote } from './screens/PlansHub.jsx';
 import { AudioPlayer } from '../utils/audio-player.js';
@@ -410,6 +410,12 @@ export function buildScreenRoutes({
       writePlanNote(store ? store.get(runId) : null, day, goJournalEditor);
     },
   });
+  // FIXB: the session hears what the screen shows, and ends once it shows none of the day's items (plan-session.js).
+  const _placeCol = screen === 'bible-ch' || screen === 'matthew-ch' || typeof COLLECTIONS === 'undefined' ? null
+    : COLLECTIONS.find((c) => c.letterScreen === screen) || null;
+  if (screen === 'bible-ch' || screen === 'matthew-ch') notePlanSessionPlace(screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum);
+  else notePlanSessionPlace(_placeCol ? _placeCol.readKey : null, letterId);
+  planNavOnScreen(screen === 'reading-plans' || screen === 'bible-ch' || screen === 'matthew-ch' || !!_placeCol);
   // The Read tab's plan row: Read starts a session on the plan's portion (Read ahead: the next day's), the text opens
   // the plan's own page.
   const readPlanRow = (/** @type {any} */ next, /** @type {string} */ planId) => {

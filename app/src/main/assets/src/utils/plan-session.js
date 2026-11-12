@@ -17,6 +17,13 @@
 
    The navigation lives in screen-routes, which registers it here each
    render (setPlanSessionHost): a module registry, not a window bridge.
+
+   FIXB: a session is one sitting. screen-routes tells it, each render,
+   what the screen shows (notePlanSessionPlace); once the reader has shown
+   one of the day's items, a screen that shows none of them (Back, the tab
+   bar, another app tab, any other screen or chapter) ends the session.
+   Without that it went on in every tab, and a later read of one of the
+   day's items on his own showed the strip and ticked the plan.
    Bundle-d only. The run store is bundle-b's ReadingPlanStore, read at
    call time.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -32,6 +39,11 @@ import { untickItem, dayItems, tickItem, todayKey } from '../data/plan-engine.js
 
 /** @type {PlanSession | null} */
 let _s = null;
+/** Whether the reader has shown an item of the session yet (a session starts before its first item opens). */
+let _shown = false;
+/** The item the screen showed last (its session key, or null: none of the session's). */
+let _placeKey = /** @type {string | null} */ (null);
+let _placeTimer = /** @type {any} */ (null);
 /** @type {PlanSessionHost | null} */
 let _host = null;
 let _version = 0;
@@ -62,11 +74,29 @@ export function beginPlanSession({ runId, day, name }) {
   const keys = dayItems(run, day).map((it) => it.k);
   if (!keys.length) return null;
   _s = { runId, day, keys, name, wrote: [], undone: [] };
+  _shown = false;
   _bump();
   return _s;
 }
 
-export function endPlanSession() { if (_s) { _s = null; _bump(); } }
+export function endPlanSession() { _shown = false; if (_s) { _s = null; _bump(); } }
+
+/**
+ * What the screen shows now (screen-routes, every render): the open reader item, or nothing (bid null) for any
+ * screen that is not a reader. A session whose item was shown ends once the screen shows none of its items; the end
+ * waits a tick, since this runs while the app renders.
+ * @param {string | null} bid @param {any} [cid]
+ */
+export function notePlanSessionPlace(bid, cid) {
+  if (!_s) return;
+  _placeKey = bid ? sessionKeyOf(bid, cid) : null;
+  if (_placeKey) { _shown = true; return; }
+  if (!_shown || _placeTimer) return;
+  _placeTimer = setTimeout(() => {
+    _placeTimer = null;
+    if (_s && _shown && !_placeKey) endPlanSession();
+  }, 0);
+}
 
 /** The open item's key in the session, or null when it is not part of it. @param {string} bid @param {any} cid */
 export function sessionKeyOf(bid, cid) {
@@ -137,4 +167,8 @@ export function usePlanSession() {
 }
 
 /** Tests. */
-export function _resetPlanSessionForTests() { _s = null; _host = null; _bump(); }
+export function _resetPlanSessionForTests() {
+  _s = null; _host = null; _shown = false; _placeKey = null;
+  if (_placeTimer) { clearTimeout(_placeTimer); _placeTimer = null; }
+  _bump();
+}
