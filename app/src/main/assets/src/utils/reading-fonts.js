@@ -40,7 +40,7 @@
 /** @type {ReadingFontDef[]} */
 export const READING_FONTS = [
   // Built-ins.
-  { id: 'classic', label: 'System Serif', family: null, css: null, sub: 'Your device’s own serif — the original look', faces: [] },
+  { id: 'classic', label: 'System Serif', family: null, css: null, sub: 'Your phone’s own serif, the original look', faces: [] },
   { id: 'modern', label: 'EB Garamond', family: 'EB Garamond', css: "'EB Garamond', serif", sub: 'The app’s classic garamond', faces: [] },
   // Scripture & classic book faces.
   { id: 'cormorant-garamond', label: 'Cormorant Garamond', family: 'Cormorant Garamond', css: "'Cormorant Garamond', serif", sub: 'Refined garamond, light and graceful', faces: ['cormorant-garamond-latin-400-normal.woff2', 'cormorant-garamond-latin-700-normal.woff2', 'cormorant-garamond-latin-400-italic.woff2'] },

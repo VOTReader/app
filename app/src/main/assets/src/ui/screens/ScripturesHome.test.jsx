@@ -6,7 +6,7 @@
    on 2026-07-30 makes that worse — it is a SECOND writer of `scriptureLayout`
    alongside the Settings SelectField, and the failure mode is silent (write
    an id that isn't in SCRIPTURE_LAYOUT_OPTIONS and the screen renders the
-   canonical fallthrough while Settings displays "Genre Grid").
+   canonical fallthrough while Settings displays "Genre grid").
 
    ScripturesHome takes no ES imports — every dependency is a classic-script
    free variable — so the harness installs them on globalThis. LibraryNav is
@@ -37,7 +37,7 @@ const GENRES = {
 // The real table from index.html:427-431 — order is load-bearing (it defines
 // the cycle) and so are the labels (the transient caption prints them).
 const LAYOUT_OPTIONS = [
-  { id: 'genre', label: 'Genre Grid', desc: '' },
+  { id: 'genre', label: 'Genre grid', desc: '' },
   { id: 'compact', label: 'Compact List', desc: '' },
   { id: 'grid', label: 'Book Grid', desc: '' },
   { id: 'canonical', label: 'Canonical Scroll', desc: '' },

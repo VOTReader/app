@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-cnWxA145DXxFV1O91UXLE1EkpvjPd1R/IqQfaPyNmv4=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-QWCKTbdMiz50BtYxxLLb0PpIbtIGc5YNYOtPnt7y4Kk=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -580,8 +580,8 @@ const TRANSLATION_OPTIONS = [
 { id: 'rvr', label: 'RVR1960', lang: 'es', desc: 'Reina-Valera 1960 (Español) — the Spanish Bible most Spanish-speaking churches read · book names, headings and menus stay in English' }];
 
 const SCRIPTURE_LAYOUT_OPTIONS = [
-{ id: 'genre', label: 'Genre Grid', desc: 'Books grouped by genre with collapsible sections (default)' },
-{ id: 'compact', label: 'Compact List', desc: 'Dense single-column list — fastest to scan' },
+{ id: 'genre', label: 'Genre grid', desc: 'Books grouped by genre with collapsible sections (default)' },
+{ id: 'compact', label: 'Compact List', desc: 'Dense single-column list, fastest to scan' },
 { id: 'grid', label: 'Book Grid', desc: 'Flat three-column grid of every book' },
 { id: 'canonical', label: 'Canonical Scroll', desc: 'One long scroll in canonical reading order' }];
 
