@@ -1103,8 +1103,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     ? String(readersById[readerCode]).replace(/^Read by /, '') : null;
   const gardenTier = typeof GARDEN_TIERS !== 'undefined'
     ? GARDEN_TIERS.find((t) => t.id === (settings.gardenTier || GARDEN_DEFAULT_TIER)) : null;
+  const translationOpt = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS)
+    ? TRANSLATION_OPTIONS.find((/** @type {any} */ o) => o && o.id === (settings.translation || 'nkjv')) : null;
   const glance = settingsGlance({
-    settings, theme, textPercent: textScalePercent, fontLabel: selectedFontLabel,
+    settings, theme, translationLabel: translationOpt ? translationOpt.label : null, textPercent: textScalePercent, fontLabel: selectedFontLabel,
     readerLabel, gardenLabel: gardenTier ? gardenTier.label + ' images' : null,
     lastBackupAt: _lastBackupAt(),
   });
