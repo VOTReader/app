@@ -1588,7 +1588,9 @@
       .np-sheet {
         position: fixed; z-index: 261; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); transform: translateX(-50%);
         width: min(620px, 100%); max-height: calc(88vh - var(--inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
-        padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + var(--dock-sys)); background: var(--surface-1); color: var(--text-1);
+        /* FIXC: the lift (bottom) already clears --inset-bottom, the APK's nav bar; the padding adds only what a
+           browser's own safe area asks beyond it (it added the whole inset again, a nav bar's blank band). */
+        padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + max(0px, env(safe-area-inset-bottom, 0px) - var(--inset-bottom, 0px))); background: var(--surface-1); color: var(--text-1);
         border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: var(--shadow-float, 0 -18px 42px rgba(0, 0, 0, 0.45));
         animation: np-sheet-rise 0.2s cubic-bezier(0.22, 0.8, 0.28, 1);
       }

@@ -66,3 +66,15 @@ describe('Settings controls drawn at 36 px still take a 44 px tap', () => {
     expect(36 + px(decl(after, 'top')) + px(decl(after, 'bottom'))).toBeGreaterThanOrEqual(44);
   });
 });
+
+/* REVIEW-css 5: the player's small sheets (speed, sleep, voice, up next) were lifted by --inset-bottom AND padded by
+   --dock-sys (max(safe area, --inset-bottom)): on the APK a nav bar's height of blank band under the last row. */
+describe('the player\'s small sheets count the nav bar once', () => {
+  it('.np-sheet is lifted by the inset, and its padding adds only a safe area beyond it', () => {
+    const b = blocks('.np-sheet')[0];
+    expect(decl(b, 'bottom')).toBe('max(var(--keyboard-height, 0px), var(--inset-bottom, 0px))');
+    const pad = decl(b, 'padding');
+    expect(pad).not.toMatch(/dock-sys/);
+    expect(pad).toContain('max(0px, env(safe-area-inset-bottom, 0px) - var(--inset-bottom, 0px))');
+  });
+});
