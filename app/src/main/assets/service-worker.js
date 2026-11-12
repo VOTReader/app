@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-32261bf83c';
+const CACHE_VERSION = 'v1.0.2-2943729564';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -83,9 +83,6 @@ const CORE_ASSETS = [
   // precaching them was pure double-caching + extra install-failure surface
   // (addAll is all-or-nothing). search-data.js is in the same position for the
   // same reason: it is bundled into bundle-d.js, never fetched on its own.
-  // html2canvas.min.js STAYS: U13 moved it OUT of bundle-a to a lazy <script>,
-  // so this precache is what keeps the first web screenshot instant + offline.
-  './html2canvas.min.js',
   './fonts/cinzel-latin-400-normal.woff2',
   './fonts/cinzel-latin-700-normal.woff2',
   './fonts/cinzel-decorative-latin-400-normal.woff2',
@@ -135,7 +132,7 @@ const CORE_ASSETS = [
 // P2pwa: the CRITICAL shell — the directory index, index.html, the minified
 // CSS, and the four eager bundles. A partial boot is useless, so these stay
 // all-or-nothing on install. Everything ELSE in CORE_ASSETS (fonts, icons,
-// images, offline page, html2canvas) caches best-effort: a single 404 there
+// images, offline page) caches best-effort: a single 404 there
 // must NOT abort the install, or the SW never reaches 'installed' → the
 // update-available prompt never fires → the client is silently pinned to the
 // old version. (Keep this subset of the CORE_ASSETS literal above.)
@@ -322,11 +319,10 @@ const ASSET_INTEGRITY = {
   './': 'bd7c67e4aaaebc598f121218bf2d23b093a53f416b0ae35bdd04b383bee6f647',
   './dist/app.min.css': '60725008eb0c5919032482ad4765201a5065f8fc67cb0bbb9dca000625c1e6df',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '5410997b5d1a55e2c71b64442a986a4e5fc4440216bea778d93e46db3d84002f',
+  './dist/bundle-b.js': '5690b2db1ad15c9ecfe03d34ae0d983e2e5600f137eca7c295a0a458d7f982b4',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': 'a41fa3f90bdeb5e9261b3dfc3f7ed8058d00f9176cb0c6aa9d32178b827a8d7b',
+  './dist/bundle-d.js': 'dfb044c344f50705f707769da5e6bc017e5e9faf6665ea1342f8feaf99c6eb9f',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
-  './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'bd7c67e4aaaebc598f121218bf2d23b093a53f416b0ae35bdd04b383bee6f647',
   './manifest.json': 'e1c7daf263bec90aeffc1236ebffe6374859459cb2674259053a4fbc12525d31',
   './offline.html': '6cd0eafda9add519132a5c0e4c21380a520fe002bdf5308d70a2d2cb56d9bc83',
@@ -617,15 +613,15 @@ async function installCore() {
   // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
   // a renamed asset) doesn't abort the install and silently pin the old SW.
   // NOTE: an integrity failure here does NOT fail the install — addVerified
-  // throws and allSettled turns it into the warning below. Deliberate: the fonts,
-  // html2canvas and offline.html are not needed to boot, so refusing a whole good update over
+  // throws and allSettled turns it into the warning below. Deliberate: the fonts
+  // and offline.html are not needed to boot, so refusing a whole good update over
   // one of them would trade a working new build for a broken screen.
   //
   // BE HONEST ABOUT THE COST, because it is not "no consequence": coreFirst is
   // cache-first with NO cache-on-use, so an asset skipped here stays uncached for
   // the ENTIRE life of this CACHE_VERSION. Online it is refetched from the network
   // every time (slower, but correct). OFFLINE it is simply unavailable, so a
-  // font falls back, a screenshot cannot load html2canvas and
+  // font falls back and
   // offline.html falls back to the 503 branch in coreFirst. The next deploy
   // re-attempts it. That is the right trade for a non-boot asset, but it is a real
   // degradation and not a silent no-op — which is why it is warned, loudly.

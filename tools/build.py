@@ -60,11 +60,6 @@ MINIFY_JS = os.path.join(_HERE, 'minify-bundle.mjs')
 # followed them into A_MATTHEW on 2026-09-03 (c43) — see the note there.
 # See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale.
 A = [
-    # html2canvas.min.js is NO LONGER concatenated here (U13) — it was ~198 KB
-    # parsed at EVERY boot but is only used by web tab-thumbnails (Android uses
-    # native PixelCopy). platform-bridge._ensureHtml2canvas() lazy-loads it via
-    # <script src="html2canvas.min.js"> on the first web screenshot; the file
-    # stays SW-precached (service-worker.js CORE_ASSETS) so it's instant/offline.
     # books-restored.js + matthew-plain.js moved to A_BIBLE (2026-08-02): every
     # consumer is typeof-guarded (BibleChapterView:12, ChapterIndex:17,
     # tabs.js:61) or runs inside __finishBibleInit (index.html:448), which only

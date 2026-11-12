@@ -93,7 +93,6 @@ class BridgeContractTest {
         // file: LISTED with "size": 0 and REFUSED by the reader, which is what lets JS
         // say "that memo is empty" instead of retrying a name forever.
         "nativeListRecordings" to 0,
-        "takeScreenshot" to 3,
         "openFilePicker" to 0,
         "saveToFile" to 2,
         // v3 streaming backup — native chunked bridge (BACKUP-STREAMING-PLAN P3).

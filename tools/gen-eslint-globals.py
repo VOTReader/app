@@ -58,7 +58,6 @@ OUT_HOOKS_ANY_DTS = ROOT / 'tools/hook-globals.any.generated.d.ts'
 
 VENDOR_GLOBALS = [
     'React', 'ReactDOM',
-    'html2canvas',
     'VotSearchData',
 ]
 

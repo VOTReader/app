@@ -1156,8 +1156,8 @@
       /* (The body.capturing-thumb hide block that lived here is RETIRED —
          it visibility-hid the floating chrome on the LIVE page during every
          thumbnail capture, blinking the dice/dot/arrows/pill for a split
-         second on every scroll-stop. Thumbnail chrome exclusion is now
-         clone-side only: SCREENSHOT_IGNORE_CLASSES in platform-bridge.js.) */
+         second on every scroll-stop. A tab picture now copies the reading
+         area only, never this chrome: utils/tab-snap.js.) */
       /* Floating — pinned to the viewport just under the top nav. Takes zero
          layout space, so the hero tucks flush under the nav bar with no gap.
          Top offset = inset-top + --bar-h (the 44px row + 2 x 6px padding, no
@@ -4416,7 +4416,7 @@
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav
        it overlaps nothing and is excluded from tab thumbnails for free (the
-       nav is cropped natively / ignored by html2canvas). 40px hit target. */
+       nav is not part of a tab picture). 40px hit target. */
     .reading-dot-nav { width:2.5rem; height:2.5rem; flex-shrink:0; border-radius:50%; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
     /* The marker glyph (text lines with a pointer at the one you were on; a bookmark
        ribbon for a day, until it was the Bookmark button's icon too) keeps the dot's

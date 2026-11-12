@@ -18,8 +18,7 @@
    W1.1: interface + Android passthrough + web placeholders.
    W1.2: call sites in use-settings, use-thumbnails, GardenView,
      JournalRecordingSheet and SettingsScreen migrated here, plus the real
-     web impls (webImpl, Category 3): Tier A screenshots (html2canvas),
-     Tier B.1 wake lock, Tier B.2 file I/O (openFilePicker + saveToFile via
+     web impls (webImpl, Category 3): Tier B.1 wake lock, Tier B.2 file I/O (openFilePicker + saveToFile via
      <input type="file"> / Blob URL; call them from a user-gesture callstack,
      since browsers block programmatic .click() outside one), Tier B.3
      fullscreen and zoom, Tier C recording (MediaRecorder + AnalyserNode,
@@ -63,8 +62,6 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => string} nativeListRecordings
  * @property {(name: string) => string | null} nativeReadRecording
  * @property {(name: string) => boolean} nativeDeleteRecording
- * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
- * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string | Blob) => void} saveToFile
  * @property {(suggestedName: string, opts?: { onSlow?: (escape: () => void) => void }) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
@@ -147,15 +144,6 @@ const androidImpl = {
   nativeListRecordings: () => /** @type {any} */ (window).AndroidBridge.nativeListRecordings(),
   nativeReadRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeReadRecording(name),
   nativeDeleteRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeDeleteRecording(name),
-  // Android takeScreenshot is sync (PixelCopy on a binder thread); wrap in
-  // Promise.resolve to give consumers a uniform Promise<string> shape on
-  // both platforms. Web returns html2canvas's genuine async Promise.
-  takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
-  // Themed (other-theme) screenshot is html2canvas on BOTH platforms: native
-  // PixelCopy can only shoot the pixels on screen — a hypothetical-theme
-  // capture must render from a DOM clone, and html2canvas runs fine inside
-  // the WebView (it's the same JS bundle; lazy-loaded on first use).
-  takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
@@ -664,274 +652,6 @@ function webPickImportFile() {
   });
 }
 
-// Web screenshot — html2canvas integration (W1.2 Tier A). Folded in from
-// use-thumbnails.js's old fallback path per [[consolidate-dont-duplicate]] +
-// [[guard-removal-includes-fallback]]. Bridge owns the implementation;
-// consumers (use-thumbnails) become pure callers of PlatformBridge.takeScreenshot.
-//
-// IGNORE_CLASSES is coupled to the app's UI structure — if a new chrome
-// element is added that shouldn't appear in tab thumbnails, update this list.
-// This ignoreElements list is THE chrome-exclusion mechanism, and it acts on
-// html2canvas's DOM CLONE only — the live page is never touched. (The old
-// body.capturing-thumb class visibility-hid this same chrome ON SCREEN for
-// the duration of every capture, which blinked the dice/dot/arrows/pill out
-// for a split second on every scroll-stop — owner-reported; retired 2026-07-14.
-// Content-tab thumbnails are clone renders on BOTH platforms now; Android's
-// native PixelCopy shot survives only for Garden, which carries none of this
-// chrome.) The resume-reading dot lives inside .top-nav, covered by that entry.
-const SCREENSHOT_IGNORE_CLASSES = [
-  'tabs-overview-layer', 'top-nav', 'back-hint-row',
-  'chapter-nav-sticky', 'surprise-fab',
-];
-
-/**
- * Resolve the LIVE app column to capture. `document.querySelector`'s naive
- * first-match burned in production: with the Tabs overview open, ITS OWN
- * `.screen-layout` (the overlay renders one) sits first in document order —
- * a capture then shoots the overview instead of the reading screen; and a
- * transient/zero-sized layout (mid-transition, an inert pager peek) yields
- * the "degenerate canvas 376x0" / "Unable to find element in cloned iframe"
- * failures in the owner's PC [thumb] traces. Pick the first CONNECTED,
- * visibly-sized `.screen-layout` that is not inside the overview overlay,
- * a pager peek, or any inert subtree; fall back to #root (keeps extension-
- * injected body junk out), then body.
- *
- * @returns {Element | null}
- */
-export function captureTargetEl() {
-  if (typeof document === 'undefined') return null;
-  const layouts = document.querySelectorAll('.screen-layout');
-  for (let i = 0; i < layouts.length; i++) {
-    const el = layouts[i];
-    if (!el.isConnected) continue;
-    if (el.closest('.tabs-overview-layer')) continue;
-    if (el.closest('.pager-peek')) continue;
-    if (el.closest('[inert]')) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width < 16 || r.height < 16) continue;
-    return el;
-  }
-  return document.getElementById('root') || document.body;
-}
-
-/**
- * Hide, in html2canvas's CLONE, every in-flow block that lies wholly off the
- * screen (pf1, 2026-10-22). A thumbnail shows one screen of a reader, but
- * html2canvas parses the whole cloned tree and measures every word (every
- * character, with the letter-spacing nudge below) before it paints; a long
- * letter's offscreen text was most of a capture: 1.19 s of a 1.2 s render on
- * the S22 for a 20k-character letter, 0.49 s with this, and the same picture.
- * html2canvas never descends into a visibility:hidden element, and hidden
- * keeps the layout box, so nothing moves and every scroll offset still holds.
- * Walks down only through elements that reach the screen; positioned
- * (absolute/fixed/sticky) elements are left alone.
- *
- * @param {Document} doc       - the cloned document (scroll already restored)
- * @param {number} [margin]    - CSS px kept beyond each screen edge
- * @returns {number} how many elements were hidden
- */
-export function hideOffscreenInClone(doc, margin = 200) {
-  const view = doc && doc.defaultView;
-  if (!view || !doc.body) return 0;
-  const vh = view.innerHeight || 0;
-  if (vh <= 0) return 0;
-  let hidden = 0;
-  /** @param {Element} el */
-  const walk = (el) => {
-    for (const child of Array.from(el.children)) {
-      const r = child.getBoundingClientRect();
-      if (r.height > 0 && (r.bottom < -margin || r.top > vh + margin)) {
-        const pos = view.getComputedStyle(child).position;
-        if (pos === 'static' || pos === 'relative') {
-          /** @type {HTMLElement} */ (child).style.visibility = 'hidden';
-          hidden++;
-          continue;
-        }
-      }
-      if (child.children.length) walk(child);
-    }
-  };
-  walk(doc.body);
-  return hidden;
-}
-
-/** @type {Promise<any> | null} */
-let _h2cPromise = null;
-/**
- * Lazy-load html2canvas.min.js on the FIRST web screenshot (U13). It was
- * concatenated into bundle-a — ~198 KB parsed at EVERY boot, but only web
- * thumbnails use it (Android screenshots via native PixelCopy), so it was pure
- * boot-path dead weight on Android. The file stays SW-precached, so this
- * resolves ~instantly (and offline). Resolves to the html2canvas function, or
- * null if it can't load (degrades to no thumbnail). The injected <script src>
- * is governed by CSP script-src 'self' — unaffected by the U10 inline hashes.
- * @returns {Promise<any>}
- */
-function _ensureHtml2canvas() {
-  const g = /** @type {any} */ (globalThis);
-  if (typeof g.html2canvas === 'function') return Promise.resolve(g.html2canvas);
-  if (_h2cPromise) return _h2cPromise;
-  if (typeof document === 'undefined') return Promise.resolve(null);
-  _h2cPromise = new Promise((resolve) => {
-    try {
-      const s = document.createElement('script');
-      s.src = 'html2canvas.min.js';
-      s.onload = () => resolve(typeof g.html2canvas === 'function' ? g.html2canvas : null);
-      s.onerror = () => { _h2cPromise = null; resolve(null); }; // allow a retry next time
-      document.head.appendChild(s);
-    } catch (_e) { _h2cPromise = null; resolve(null); }
-  });
-  return _h2cPromise;
-}
-
-/**
- * Web screenshot impl using html2canvas (lazy-loaded on demand — U13). Returns
- * a JPEG data URL string, or '' on failure / when html2canvas can't load.
- *
- * @param {number} _topCropDp  - ignored on web (chrome excluded clone-side
- *                                via the SCREENSHOT_IGNORE_CLASSES list)
- * @param {number} maxDim      - max width/height in CSS px; downscale if exceeded
- * @param {number} jpegQuality - 0-100 integer (matches Android contract);
- *                                converted to 0.0-1.0 for canvas.toDataURL
- * @param {string} [forceTheme] - 'dark' | 'light': render the capture under
- *                                this theme regardless of the live one.
- *                                html2canvas renders from a CLONED document,
- *                                so toggling the clone's body class re-resolves
- *                                every CSS var to the forced theme without the
- *                                user ever seeing a flash (dual-theme tab
- *                                thumbnails ride on this).
- * @returns {Promise<string>}
- */
-async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
-  const h2c = await _ensureHtml2canvas();
-  if (typeof h2c !== 'function') { _thumbFail('html2canvas not loaded'); return ''; }
-  const isLight = forceTheme
-    ? forceTheme === 'light'
-    : (typeof document !== 'undefined') && document.body.classList.contains('light');
-  const bg = isLight ? '#f7f2e8' : '#07070e';
-  try {
-    // Capture the app COLUMN (.screen-layout — max-width 760px centered on
-    // desktop, full-width on phones), NOT the whole window: a wide PC window
-    // is mostly empty flanks around the column, and capturing them made the
-    // tab cards look like a thin strip floating in blackness (owner-reported).
-    // The column IS the app's "device viewport", so cards now look like a
-    // mini device on every platform; on phones the column equals the window,
-    // so Android/mobile output is byte-identical. Target selection lives in
-    // captureTargetEl(): the LIVE column only — never the overview overlay's
-    // own layout, an inert pager peek, or a zero-sized transient node (the
-    // PC failure classes in the [thumb] traces).
-    const target = captureTargetEl();
-    if (!target) { _thumbFail('no capture target'); return ''; }
-    const canvas = await h2c(target, {
-      backgroundColor: bg,
-      onclone: (/** @type {Document} */ clonedDoc) => {
-        if (forceTheme && clonedDoc && clonedDoc.body) {
-          clonedDoc.body.classList.toggle('light', forceTheme === 'light');
-        }
-        // Word-spacing fix (owner-reported "weird spacing / punctuation" in
-        // tab thumbnails): html2canvas draws text whose letter-spacing is
-        // 'normal' WORD-BY-WORD — each word is painted into a slot measured
-        // in the clone, and when the canvas's drawn glyph run comes out wider
-        // than that slot, words visually fuse ("TheVolumesofTruth…"). Text
-        // with an explicit letter-spacing takes html2canvas's per-CHARACTER
-        // path, where every glyph lands at its own measured x — which is why
-        // the Cinzel headings (0.18em tracking) always rendered correctly
-        // while body prose crammed. Nudge everything onto the per-character
-        // path with a visually-nil letter-spacing. The bare `*` selector has
-        // ZERO specificity, so any element with an authored letter-spacing
-        // rule keeps its real tracking.
-        try {
-          if (clonedDoc && clonedDoc.head) {
-            const st = clonedDoc.createElement('style');
-            st.textContent = '* { letter-spacing: 0.0001px; }';
-            clonedDoc.head.appendChild(st);
-          }
-        } catch (_e) { /* style injection failed — render proceeds as before */ }
-        // Offscreen text is never painted into the card; skip its measuring.
-        try { hideOffscreenInClone(clonedDoc); } catch (_e) { /* render the full clone */ }
-        return undefined;
-      },
-      // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
-      // maxDim:1440 below regardless, so a DPR×2 capture of the WHOLE scrolled body (a
-      // long chapter is many thousands of px tall) just allocated a ~4× larger transient
-      // canvas (tens of MB) for zero visible gain — and this fires on every scroll-stop
-      // and after every nav. scale:1 keeps the spike bounded on a 2-3 GB device.
-      scale: 1,
-      useCORS: true,
-      logging: false,
-      allowTaint: false,
-      imageTimeout: 2000,
-      ignoreElements: (/** @type {Element} */ el) =>
-        el.classList && SCREENSHOT_IGNORE_CLASSES.some((c) => el.classList.contains(c)),
-    });
-    const w = canvas.width;
-    const h = canvas.height;
-    // html2canvas occasionally yields a ZERO/near-zero-sized canvas (seen at
-    // boot races); its toDataURL is the empty "data:," — which is TRUTHY, so
-    // it used to get stored and rendered as a permanently blank tab card
-    // (background tabs never recapture, so the blank stuck). Treat it as the
-    // failure it is: '' → the caller skips the store and the next
-    // nav/scroll-stop capture retries.
-    if (w < 16 || h < 16) { _thumbFail('degenerate canvas ' + w + 'x' + h); return ''; }
-    const scale = Math.min(maxDim / w, maxDim / h, 1);
-    let out = canvas;
-    if (scale < 1) {
-      const c2 = document.createElement('canvas');
-      c2.width = Math.round(w * scale);
-      c2.height = Math.round(h * scale);
-      const ctx = c2.getContext('2d');
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        /** @type {any} */ (ctx).imageSmoothingQuality = 'high';
-        ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
-      }
-      out = c2;
-    }
-    // Uniformity probe: a solid-color capture (all-white / all-background) is
-    // a FAILED render, not a screenshot — real app screens always carry text
-    // contrast. Storing one paints a blank card that background tabs can
-    // never heal. Probe errors are ignored (a tainted canvas would make
-    // toDataURL throw below anyway).
-    try {
-      const p = document.createElement('canvas');
-      p.width = 16; p.height = 16;
-      const pctx = p.getContext('2d');
-      if (pctx) {
-        pctx.drawImage(out, 0, 0, 16, 16);
-        const d = pctx.getImageData(0, 0, 16, 16).data;
-        let mn = 255, mx = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-          if (l < mn) mn = l;
-          if (l > mx) mx = l;
-        }
-        if (mx - mn < 6) { _thumbFail('uniform capture (blank render), range ' + Math.round(mx - mn)); return ''; }
-      }
-    } catch (_probeErr) { /* probe is best-effort */ }
-    const url = out.toDataURL('image/jpeg', Math.max(0, Math.min(100, jpegQuality)) / 100);
-    if (url.length <= 1000) { _thumbFail('degenerate encode, length ' + url.length); return ''; }
-    return url;
-  } catch (e) {
-    _thumbFail('html2canvas threw: ' + String(e).slice(0, 120));
-    return '';
-  }
-}
-
-/**
- * Thumbnail-capture failure trace — the ONLY visibility into a device where
- * every capture fails (owner's PC: cards stayed blank with no error anywhere).
- * console.warn for a live devtools look + DiagnosticLog for the offline trail.
- * @param {string} reason
- */
-function _thumbFail(reason) {
-  try { console.warn('[thumb] web capture failed: ' + reason); } catch (_e) { /* ignore */ }
-  try {
-    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
-      DiagnosticLog.error('thumb', reason);
-    }
-  } catch (_e) { /* ignore */ }
-}
-
 // Web audio recording — MediaRecorder + AnalyserNode (W1.2 Tier C).
 // Consolidates the existing inline MediaRecorder code from
 // JournalRecordingSheet.jsx:118-279 per [[consolidate-dont-duplicate]].
@@ -1239,8 +959,6 @@ const webImpl = {
   shareImage: () => false,
 
   // Category 3 — real web impls
-  takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
-  takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme), // dual-theme thumbnails
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
   openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)

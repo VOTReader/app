@@ -12,9 +12,7 @@
    screens — that drew over content AND had to be visibility-hidden on the
    live page during every tab-thumbnail capture, which blinked it out for a
    split second on every scroll-stop (owner-reported). Living in the nav
-   solves both: the nav is chrome (overlaps nothing), and the nav is already
-   excluded from thumbnails on every path (Android native crops it via
-   navHeightDp; html2canvas ignores `top-nav` via SCREENSHOT_IGNORE_CLASSES),
+   solves both: the nav is chrome (overlaps nothing), and a tab picture (utils/tab-snap.js) leaves the nav out,
    so the dot needs no capture-time hiding at all.
 
    ReadingDotContext is provided by App() with { screen, enabled, onGo, place }:
