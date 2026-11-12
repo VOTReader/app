@@ -23,7 +23,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runStatus, schedule, sections, streak, itemsLabel, itemsWords, minutesFor, itemKinds, dayItems, totalDays,
-  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, todayKey } from '../../data/plan-engine.js';
+  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate } from '../../data/plan-engine.js';
 import { planDef, bookTitle } from '../../data/plan-catalog.js';
 import { saveRun, stopRun, shortDate, itemRef, daysWord } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, isReminderTime, lastActive } from '../../utils/plan-reminder.js';
@@ -125,7 +125,7 @@ function PlanSettings({ run, now, tracksOf, onClose, onStopped }) {
               onChange={(id) => { const p = paces.find((x) => x.id === id); if (p) saveRun(changePace(run, { mode: p.mode, n: p.n }, new Date())); }} />
             <div className="plan-opt-line">
               <span className="plan-opt-text">Finish by</span>
-              <input type="date" className="plan-date" aria-label="Finish by" value={by} min={todayKey(now)} onChange={(e) => setBy(e.target.value)} />
+              <input type="date" className="plan-date" aria-label="Finish by" value={by} min={firstRecutDate(run, now)} onChange={(e) => setBy(e.target.value)} />
               <button type="button" className="plan-text-btn" disabled={!by} onClick={() => saveRun(changePace(run, { mode: 'by', date: by }, new Date()))}>Set</button>
             </div>
             <p className="plan-opt-note">{'Finishes ' + shortDate(st.projected) + ' · what you have read stays read'}</p>

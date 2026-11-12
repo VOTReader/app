@@ -36,6 +36,14 @@ export const planNavTop = () => _stack[_stack.length - 1];
 export function openPlanNav(views) { _stack = views.length ? views.slice() : [{ v: 'list' }]; _keep = true; _bump(); }
 /** Keep the stack for the next mount (the reader is leaving for a session or a note and comes back). */
 export function keepPlanNav() { _keep = true; }
+/**
+ * The screen the app shows now (screen-routes, every render; FIXB): a kept stack is for a trip out to a reader and
+ * Back. Any other screen (the tab bar, Home, Library) means the trip ended another way, so the next entry, from
+ * wherever, opens the list again instead of the old plan's page. A plan note's editor sets the keep again on its
+ * way back.
+ * @param {boolean} onTrip  Reading plans itself or a reader
+ */
+export function planNavOnScreen(onTrip) { if (!onTrip) _keep = false; }
 /** The screen mounts: an entry from outside starts at the list. */
 export function planNavMounted() {
   if (_keep) { _keep = false; return; }

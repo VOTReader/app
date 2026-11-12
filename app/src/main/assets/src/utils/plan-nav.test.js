@@ -1,7 +1,7 @@
 /* plan-nav (plans2): the Reading plans view stack. An entry from outside opens the list; a session or a note that
    leaves a plan page comes Back to that page (keepPlanNav), and a caller can open a plan page directly. */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { planNavStack, planNavTop, openPlanNav, keepPlanNav, planNavMounted, pushPlanView, replacePlanView, popPlanView, planNavToList, _resetPlanNavForTests } from './plan-nav.js';
+import { planNavStack, planNavTop, openPlanNav, keepPlanNav, planNavMounted, pushPlanView, replacePlanView, popPlanView, planNavToList, planNavOnScreen, _resetPlanNavForTests } from './plan-nav.js';
 
 beforeEach(() => _resetPlanNavForTests());
 
@@ -36,5 +36,22 @@ describe('plan-nav', () => {
     expect(planNavTop()).toEqual({ v: 'plan', id: 'r2' });
     planNavToList();
     expect(planNavStack()).toEqual([{ v: 'list' }]);
+  });
+
+  it('FIXB: a session left by the tab bar (no Back to the plans) does not reopen the old plan page later', () => {
+    pushPlanView({ v: 'plan', id: 'r1' });
+    keepPlanNav();
+    planNavOnScreen(true);                 // the reader
+    planNavOnScreen(false);                // the Read tab
+    planNavMounted();                      // later: Library > Reading plans
+    expect(planNavStack()).toEqual([{ v: 'list' }]);
+  });
+
+  it('FIXB: Back from the reader still comes back to the plan page', () => {
+    pushPlanView({ v: 'plan', id: 'r1' });
+    keepPlanNav();
+    planNavOnScreen(true);                 // the reader, then Back
+    planNavMounted();
+    expect(planNavTop()).toEqual({ v: 'plan', id: 'r1' });
   });
 });

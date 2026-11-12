@@ -20,7 +20,7 @@
 import { volumeSequence } from '../../data/reading-plans.js';
 import { usePlanRuns, runRow, saveRun } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
-import { dayNum, todayKey } from '../../data/plan-engine.js';
+import { dayNum, todayKey, finishUnseen } from '../../data/plan-engine.js';
 import { useListenMinutes } from './OfflineAudioControls.jsx';
 
 /** The Volumes in site order from the loaded corpus; [] until it is in. */
@@ -44,7 +44,7 @@ export function useTodayRows(readingPlans, isRead, onLegacyMoved) {
   const now = useNow();
   // plans2 3.7: a plan finished and not yet seen keeps a row ("You finished ...") until opened or dismissed.
   const store = /** @type {any} */ (globalThis).ReadingPlanStore;
-  const done = (store && typeof store.all === 'function' ? store.all() : []).filter((/** @type {any} */ r) => r.status === 'finished' && !r.seen);
+  const done = (store && typeof store.all === 'function' ? store.all() : []).filter(finishUnseen);
   return runs.map((r) => runRow(r, now)).concat(done.map((/** @type {any} */ r) => ({ ...runRow(r, now), finished: true, name: runName(r, null) })));
 }
 
