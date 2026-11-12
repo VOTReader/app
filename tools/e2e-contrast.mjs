@@ -43,7 +43,7 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 /* Left on purpose: [stop regex, selector regex, reason, kinds it covers (default: all)]. */
 const EXCEPTIONS = [
   [/^web/, /^(canvas|div\.sw-(stage|canvas))/, 'Scripture Web draws its scene on a black canvas in both themes by design (sw-chrome-light)'],
-  [/^web/, /sw-/, 'Scripture Web chrome floats over the black canvas and keeps the dark ink in both themes (sw-chrome-light.test.js)'],
+  [/^web/, /sw-/, 'Scripture Web chrome floats over the black canvas and keeps the dark ink in both themes (sw-chrome-light.test.js)', ['light ink', 'dark fill']],
   [/^web-guide/, /^span > b$/, 'the How-to-read card is Scripture Web chrome over the black canvas: light ink in both themes, like the sw- chrome above', ['light ink']],
   [/^garden-page/, /./, 'the Garden viewer is a dark room in both themes (photographs on black); its own tokens are set dark (.garden-fullscreen)', ['light ink', 'dark fill']],
 ];
