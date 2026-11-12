@@ -524,6 +524,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   const { setSheetOpen } = web;
   const closeFilters = React.useCallback(() => setSheetOpen(false), [setSheetOpen]);
+  // Filters and the docked panel share the right edge: a card, a chooser or the list that opens (or
+  // changes) while Filters is up takes its place, so the panel is never slid over a sheet still open
+  React.useEffect(() => {
+    if (listOpen || choices || detail) setSheetOpen(false);
+  }, [listOpen, choices, detail, setSheetOpen]);
 
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
@@ -538,10 +543,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // Your paths, open over the panel (web-panel.jsx): kept here so Escape and Back put it away first
   const [pathsOpen, setPathsOpen] = React.useState(false);
   const closePaths = React.useCallback(() => setPathsOpen(false), []);
+  // the empty-web card as seen: the list takes its place while open, so Back and Escape then close
+  // the list, not a card nobody can see (which was dismissed for good)
+  const emptyUp = emptyShown && !listOpen;
   const { onKeyDown } = useWebKeys({
     filtersOpen: web.canon && web.sheetOpen, closeFilters, returnShown: !!returnTo, returnBack, trailBack,
     pathsShown: pathsOpen && !!(detail || choices || listOpen), closePaths,
-    graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
+    graph, guideOpen: guideShown, emptyShown: emptyUp, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
     resetView, onBack, dropHover, setAnnounce, schedule, cancelFly: takeCamera, goTo, slackFor,
   });
@@ -732,10 +740,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ) : null}
       {/* the pill names what is on; with the sheet open the sheet's own count does */}
       {web.canon && graph && !web.sheetOpen ? <FilterPill web={web} /> : null}
-      {web.canon && graph && web.sheetOpen ? (
-        <FilterSheet web={web} graph={graph} density={density} chooseDensity={chooseDensity} total={stats ? stats.shown : 0} />
-      ) : null}
-      {emptyShown && !listOpen && <EmptyWebNotice onDismiss={dismissEmpty} onStart={onBack} />}
+      {emptyUp && <EmptyWebNotice onDismiss={dismissEmpty} onStart={onBack} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
           over the chooser over the open card, the precedence the state has */}
@@ -747,6 +752,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           lensOn={listOpen && mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
           onClose={closeCards} onChoose={commitFound} openPanel={openPanel} followThread={followThread}
           followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} />
+      ) : null}
+      {/* Filters shares the panel's place: after it here, so opened over a card it is the one seen
+          (and the first Back closes it); a card or the list opening puts it away (the effect above) */}
+      {web.canon && graph && web.sheetOpen ? (
+        <FilterSheet web={web} graph={graph} density={density} chooseDensity={chooseDensity} total={stats ? stats.shown : 0} />
       ) : null}
 
       {/* THE BOTTOM BAR (WA4, w-main): Go to, Filters (a count when any is on), List (was Nearby); the key
@@ -763,7 +773,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             </button>
           ) : null}
           <button type="button" className={'sw-btn sw-wlist' + (listOpen ? ' is-on' : '')}
-            onClick={() => { setListOpen(!listOpen); setChoices(null); }}
+            // under Filters the open list is not seen: List brings it back rather than closing it unseen
+            onClick={() => { if (listOpen && web.sheetOpen) closeFilters(); else { setListOpen(!listOpen); setChoices(null); } }}
             aria-expanded={listOpen} aria-haspopup="dialog"><UiIcon name="list" />List</button>
         </div>
         {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden */}

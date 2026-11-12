@@ -498,6 +498,18 @@ export function useWebRenderer({
     let renderer = null;
     let disposed = false;
     let lossTimer = 0;
+    // a context lost and not yet restored. The 3 s below run only while the page is in view: in the
+    // background Android gives no context back and the WebView's timers run on, so the reader came
+    // back to the list with the restore still to come, and nothing left for it to rebuild
+    let lossPending = false;
+    const waitForRestore = () => {
+      if (lossTimer) { window.clearTimeout(lossTimer); lossTimer = 0; }
+      if (!lossPending || disposed || document.visibilityState === 'hidden') return;
+      lossTimer = window.setTimeout(() => {
+        lossTimer = 0;
+        if (!disposed && lossPending) { lossPending = false; setGlLost(true); setNoWebGL(true); }
+      }, 3000);
+    };
     const build = () => createRenderer(glc, graph, {
       // After a GPU reset every GL object is dead. Rebuild the whole
       // renderer on the same (restored) context and repaint — this is what
@@ -506,6 +518,7 @@ export function useWebRenderer({
       // context) or gets no context lands the reader on the list
       // (WebFallbackList), never on a dead canvas with nothing to say (#1).
       onContextRestored: () => {
+        lossPending = false;
         if (lossTimer) { window.clearTimeout(lossTimer); lossTimer = 0; }
         if (disposed) return;
         const dead = renderer;
@@ -521,16 +534,13 @@ export function useWebRenderer({
       },
       // A loss Chrome never restores (it gives up after repeated resets)
       // otherwise leaves the instrument permanently dead with no report —
-      // draw() just returns silently forever. Give a restore ~3s, then
+      // draw() just returns silently forever. Give a restore ~3s in view, then
       // fall back to the list (WebFallbackList), the face the "unavailable"
       // path shows too, whose Try again rebuilds via glRetry.
       onContextLost: () => {
         if (disposed) return;
-        if (lossTimer) window.clearTimeout(lossTimer);
-        lossTimer = window.setTimeout(() => {
-          lossTimer = 0;
-          if (!disposed) { setGlLost(true); setNoWebGL(true); }
-        }, 3000);
+        lossPending = true;
+        waitForRestore();
       },
     });
     try {
@@ -603,12 +613,14 @@ export function useWebRenderer({
     if (!ro) window.addEventListener('resize', onWindowResize);
     const onRestored = () => schedule();
     glc.addEventListener('webglcontextrestored', onRestored);
+    document.addEventListener('visibilitychange', waitForRestore);
 
     return () => {
       disposed = true;
       if (lossTimer) window.clearTimeout(lossTimer);
       if (ro) ro.disconnect(); else window.removeEventListener('resize', onWindowResize);
       glc.removeEventListener('webglcontextrestored', onRestored);
+      document.removeEventListener('visibilitychange', waitForRestore);
       // null after a restore that could not rebuild (#1)
       if (renderer) renderer.dispose();
       renderer = null;
