@@ -379,3 +379,27 @@ describe('MoreMenuBtn — the screen\'s own items (utils/page-menu.js)', () => {
     expect(document.querySelector('.more-menu-page-item')).toBeNull();
   });
 });
+
+/* REVIEW-readers 9: the transport mounts only on a page with a pager (ScreenLayout), but the row showed on every
+   screen with the standard bar: a tap there closed the menu, did nothing, and left the setting quietly on. */
+describe('MoreMenuBtn — Auto-scroll is offered only where a page can scroll by itself', () => {
+  const mountIn = (withPager) => {
+    const value = { enabled: true, historyEnabled: true, theme: 'dark', fontScale: '1', onThemeChange: vi.fn(), onSettings: vi.fn(), onHistory: vi.fn(), onFontScale: vi.fn(), autoScroll: false, onAutoScroll: vi.fn() };
+    render(
+      <NavMenuContext.Provider value={value}>
+        <div className="screen-layout">
+          <nav className="top-nav"><MoreMenuBtn /></nav>
+          {withPager ? <div className="pager-viewport"><main className="screen-scroll" /></div> : <main className="screen-scroll" />}
+        </div>
+      </NavMenuContext.Provider>,
+    );
+    act(() => { fireEvent.click(document.querySelector('.nav-more-btn')); });
+    return [...document.querySelectorAll('.more-menu [role^="menuitem"]')].find((b) => b.textContent.indexOf('Auto-scroll') === 0);
+  };
+  it('a reading page (it has a pager): the row is there', () => {
+    expect(mountIn(true)).toBeTruthy();
+  });
+  it('a volume index or any other screen without one: no row', () => {
+    expect(mountIn(false)).toBeUndefined();
+  });
+});

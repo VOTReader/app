@@ -96,6 +96,9 @@ export function MoreMenuBtn() {
   // The screen's own items (utils/page-menu.js, id-datasafe 122), read as the menu opens.
   const [pageItems, setPageItems] = React.useState(/** @type {any[]|null} */ (null));
   const [pickOpen, setPickOpen] = React.useState(false);
+  // Whether this bar's screen is a page that can auto-scroll (ScreenLayout mounts the transport only with a pager,
+  // drawn as .pager-viewport), read as the menu opens: elsewhere the row would switch the setting on and do nothing.
+  const [canAutoScroll, setCanAutoScroll] = React.useState(false);
   const closePick = React.useCallback(() => setPickOpen(false), []);
   const btnRef = React.useRef(/** @type {HTMLButtonElement|null} */ (null));
   const menuRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
@@ -116,6 +119,8 @@ export function MoreMenuBtn() {
     try { here = pageSiteLink(); } catch (_e) { here = null; }   // a menu never breaks on a page it cannot name
     setPage(here);
     setPageItems(pageMenu());
+    const layout = btnRef.current.closest('.screen-layout');
+    setCanAutoScroll(!!(layout && layout.querySelector(':scope > .pager-viewport')));
   }, [open]);
 
   // Focus the first item once the menu exists: it mounts one commit after `open`
@@ -249,7 +254,7 @@ export function MoreMenuBtn() {
                 </span>
               </button>
             ) : null}
-            {typeof ctx.onAutoScroll === 'function' ? (
+            {canAutoScroll && typeof ctx.onAutoScroll === 'function' ? (
               <button type="button" role="menuitem" className="more-menu-item" onClick={() => { close(true); ctx.onAutoScroll(!ctx.autoScroll); }}>
                 <UiIcon name="scroll" />
                 <span className="more-menu-item-text">
