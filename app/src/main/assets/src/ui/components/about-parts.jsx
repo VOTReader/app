@@ -22,7 +22,8 @@ export function useBuildInfo() {
       // relative './service-worker.js' that fetchServerBuildVersion fetches resolves to the INSTALLED build's own
       // copy, so it lands in `running`, not `server`. WEB: deliberately not given that fallback: off Android an
       // uncontrolled page is a first visit, and the deployed file describes the server, not this page.
-      const installed = (PlatformBridge.isAndroid && typeof fetchServerBuildVersion === 'function')
+      const isAndroid = typeof PlatformBridge !== 'undefined' && !!PlatformBridge && !!PlatformBridge.isAndroid;
+      const installed = (isAndroid && typeof fetchServerBuildVersion === 'function')
         ? await fetchServerBuildVersion()
         : null;
       setBuildInfo(installed

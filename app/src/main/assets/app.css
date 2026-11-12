@@ -3772,8 +3772,8 @@
     .garden-image-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; touch-action:none; }
     .garden-page-img { display:block; max-width:100%; max-height:100%; object-fit:contain; }
     .garden-loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    .garden-loading .ui-empty { padding-top:0; margin-top:-18vh; }
-    .garden-loading .ui-empty .ui-btn { min-width:168px; }
+    .garden-loading .ui-empty { padding-top:0; margin-top:-21vh; }
+    .garden-loading .ui-empty .ui-btn { min-width:124px; }
     .garden-loading-text { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
     /* gap-garden-viewer-and-image-cache-7: the bars calc the injected insets in, like every other chrome surface. */
     .garden-top-bar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:var(--sp-2); min-height:var(--bar-h);
@@ -3792,7 +3792,7 @@
     .garden-unbare-btn { position:absolute; z-index:11; top:max(var(--sp-2), var(--inset-top, 0px)); right:var(--sp-2); width:var(--tap); height:var(--tap); display:flex; align-items:center; justify-content:center; border:0; border-radius:var(--r-pill); background:rgba(0,0,0,0.45); color:var(--text-1); opacity:0.7; cursor:pointer; }
     .garden-jump-row { display:flex; align-items:center; gap:var(--sp-3); }
     .garden-jump-field { flex:1; min-width:0; }
-    .garden-jump-go.ui-btn { flex:none; min-width:96px; }
+    .garden-jump-go.ui-btn { flex:none; min-width:72px; }
     .garden-jump-input { flex:1; min-width:0; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-headline); font-weight:600; -moz-appearance:textfield; appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
     .garden-jump-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
@@ -6328,7 +6328,7 @@
     .ws4-fr-kicker { margin:var(--sp-1) 0 0; color:var(--accent); }
     .ws4-fr-name { margin:var(--sp-2) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:calc(var(--ts-display) * 1.27); line-height:1.1; font-weight:600; }
     .ws4-fr-lead { margin:var(--sp-4) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-style:italic; }
-    .ws4-fr-points { margin:var(--sp-7) 0 auto; padding-bottom:var(--sp-6); }
+    .ws4-fr-points { margin:clamp(var(--sp-7), 9vh, 96px) 0 auto; padding-bottom:var(--sp-6); }
     .ws4-fr-point { display:flex; gap:14px; align-items:flex-start; padding:10px 0; }
     .ws4-fr-point p { flex:1; margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); line-height:1.45; }
     .ws4-fr-point b { color:var(--text-1); font-weight:600; }
