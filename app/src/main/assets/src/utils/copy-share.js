@@ -118,6 +118,28 @@ export function shareText(text) {
   );
 }
 
+/** What the reader calls each link (Settings > Sharing: "The website", "The app"). */
+export const LINK_NAME = { site: 'website', app: 'app' };
+const OTHER_LINK_TOAST = 'vot-toast-share-link';
+/** FEAT1 (st-share): after a plain Share, a note names the link it sent and offers "Use the other link" for
+    this one share (the share sheet itself is the phone's, so the offer sits under it, in the app). The
+    sentence is one of these fixed strings, never passage text (showToast's html is trusted markup only).
+    Used by the selection's Share and a note's Share (ODDS1).
+    @param {'app' | 'site'} which @param {string} outcome @param {() => void} useOther */
+export function offerOtherLink(which, outcome, useOther) {
+  if (typeof showToast !== 'function') return;
+  const sent = outcome === 'copied-instead' ? 'Copied with the ' + LINK_NAME[which] + ' link. Paste it where you want to share it.'
+    : outcome === 'cancelled' ? 'Not shared. Share sends the ' + LINK_NAME[which] + ' link.'
+      : 'Shared with the ' + LINK_NAME[which] + ' link.';
+  showToast({
+    id: OTHER_LINK_TOAST, className: 'vot-toast vot-toast-action', durationMs: 8000,
+    html: sent + ' <button type="button" class="vot-escape-btn">Use the other link</button>',
+  });
+  const el = typeof document !== 'undefined' ? document.getElementById(OTHER_LINK_TOAST) : null;
+  const btn = el && el.querySelector('button');
+  if (btn) btn.addEventListener('click', () => { if (typeof hideToast === 'function') hideToast(OTHER_LINK_TOAST); useOther(); }, { once: true });
+}
+
 /** @typedef {'shared' | 'cancelled' | 'saved' | 'failed'} ImageShareOutcome */
 
 /**

@@ -20,6 +20,7 @@ import { EmptyState } from '../components/UiParts.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
 import { copyText } from '../../utils/copy-share.js';
+import { relativeDate } from '../../utils/dates.js';
 import { ANSWERS_MAIN_PAGE_ID } from '../../utils/answers-shelves.js';
 import { LeadTitle, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 
@@ -78,9 +79,10 @@ export function AnswersSaved({ entries, fontScale, onBack, onSearch, onHistory, 
                   return (
                     <div key={it.gid} className="ans-saved-row">
                       <button type="button" className="ans-hit" onClick={() => open(id, it)}>
-                        <span className="ans-hit-snip">{it.text}</span>
+                        <span className="ans-hit-snip">{'“' + it.text.replace(/^“|”$/g, '') + '”'}</span>
                         {it.note ? <span className="ans-hit-src ans-hit-note">{it.note}</span> : null}
-                        {src ? <span className="ans-hit-src">{src}</span> : null}
+                        {/* ODDS1 (a-saved): the source, then when it was marked */}
+                        {src || it.created ? <span className="ans-hit-src">{[src, relativeDate(it.created)].filter(Boolean).join(' · ')}</span> : null}
                       </button>
                       <button type="button" className="ans-saved-menu" aria-haspopup="dialog" aria-label="Saved line options"
                         onClick={() => setMenu({ id, it, title: t.entry.title })}><UiIcon name="more" /></button>

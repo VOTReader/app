@@ -60,7 +60,7 @@ describe('Saved answers (O5)', () => {
     expect(NB(document.querySelector('.ans-saved-note').textContent)).toBe('3 highlights and notes in 2 topics, in the site’s order. They also sit with your other highlights in the Library.');
     expect([...document.querySelectorAll('.ans-sechead .ans-h2')].map((n) => n.textContent)).toEqual(['THERE IS NO OTHER', 'God Speaks About The Sabbath']);
     const hits = [...document.querySelectorAll('.ans-hit')];
-    expect(hits.map((h) => h.querySelector('.ans-hit-snip').textContent)).toEqual(['there is no other', '“Thus says The Lord', 'My Sabbaths']);
+    expect(hits.map((h) => h.querySelector('.ans-hit-snip').textContent)).toEqual(['“there is no other”', '“Thus says The Lord”', '“My Sabbaths”']);
     expect(hits[2].querySelector('.ans-hit-note').textContent).toBe('Read this again on the Sabbath.');
     expect(NB(hits[1].querySelector('.ans-hit-src:last-child').textContent)).toBe('“You Shall Not Desecrate the Sabbath” · Volume 3 · 3/29/06');
     expect(document.body.textContent).not.toContain('a letter, not Answers');

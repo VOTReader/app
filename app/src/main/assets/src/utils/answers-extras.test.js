@@ -49,7 +49,7 @@ describe('Saved answers (O5)', () => {
     };
     const s = answersSaved(A, all, (gid) => (gid === 'n1' ? '  Keep this one.  ' : ''));
     expect(s.topics.map((t) => t.entry.id)).toEqual(['there-is-no-other', 'god-speaks-about-the-sabbath']);
-    expect(s.topics[0].items).toEqual([{ gid: 'g3', kind: 'underline', index: 5, start: 0, text: 'first half second half', note: '' }]);
+    expect(s.topics[0].items).toEqual([{ gid: 'g3', kind: 'underline', index: 5, start: 0, text: 'first half second half', note: '', created: 0 }]);
     expect(s.topics[1].items.map((i) => [i.gid, i.index, i.text, i.note])).toEqual([
       ['g1', 2, 'Thus says', ''], ['n1', 2, 'keep My Sabbaths', 'Keep this one.'], ['g2', 9, 'Remember the Sabbath', ''],
     ]);

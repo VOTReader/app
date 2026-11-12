@@ -1517,7 +1517,8 @@
       .now-playing .np-cover-small { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 8px; }
       .np-lyrics-meta { margin: 2px 0 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
       .np-lyrics-head .np-title { font-size: var(--fs-24); }
-      .np-body .song-lyrics-card { width: 100%; max-width: 560px; margin: 0; text-align: left; }
+      .np-body .song-lyrics-card { width: 100%; max-width: 560px; margin: 0; text-align: left; border: 0; border-radius: var(--r-card); background: var(--surface-1); }
+      .np-body .song-lyrics-head > span { font-family: var(--font-ui); font-size: var(--ts-label); letter-spacing: var(--track-label); }   /* ODDS1 (au-lyrics): the mock's label */
       .np-body .song-lyrics-lines { max-height: none; }
       /* so-lyrbox (Corbin 10-24): with the lyrics open the card fills the body and its lines scroll themselves, so a
          finger scrolls them and Follow along keeps the sung line in view (with the body as the scroller the lines
@@ -1540,7 +1541,7 @@
       .audio-manager-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 0; border-radius: 50%; background: var(--gold); }
       .audio-manager-seek::-moz-range-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%)); }
       .audio-manager-seek::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--gold); }
-      .audio-manager-time { display: flex; justify-content: space-between; min-height: 1.4em; margin-top: 0.25rem; color: var(--cream-dim); font-size: var(--fs-15); font-variant-numeric: tabular-nums; }
+      .audio-manager-time { display: flex; justify-content: space-between; min-height: 1.4em; margin-top: 0.25rem; color: var(--cream-dim); font-family: var(--font-ui); font-size: var(--fs-15); font-variant-numeric: tabular-nums; }
       .audio-manager-transport { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 0 14px; }
       .audio-manager-round, .audio-manager-play {
         flex: 0 0 auto; width: 56px; height: 56px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
@@ -2062,7 +2063,7 @@
       }
       /* The song page's question: a centred line above the seek bar, not a transport control (07). */
       .song-vote-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 .35rem; margin: .35rem 0 .25rem; }
-      .song-vote-ask-q { color: var(--vote-taupe); font-size: var(--fs-16); font-style: italic; text-align: center; }
+      .song-vote-ask-q { color: var(--vote-taupe); font-family: var(--font-ui); font-size: var(--ts-meta); text-align: center; }
       .song-vote-pair.is-large .song-vote-svg { width: clamp(30px, 1.6rem, 36px); height: clamp(30px, 1.6rem, 36px); }
       /* sy4-3 shelves (pictures song-voting 01-04): All-time loved / New as three tiles each, See all = one
          page with two tabs (Popular removed, Corbin 10-30). Tiles carry no vote UI and no numbers; a family with versions says "3 versions". */
@@ -6184,7 +6185,7 @@
     /* MERGE2b (mock .set .u): inside a group every row's name is the UI face 500, a setting and a door alike
        (the serif 400 here and the serif 18 of the shared rows read as two families in one card). */
     .ws1-settings .settings-row-label, .ws1-settings .settings-section.is-screen .ui-row-title, .ws2-found .ui-row-title, .ws2-also .ui-row-title,
-    .ws3-about .ui-row-title, .ws3-new-empty .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-body); font-weight:500; line-height:1.375; letter-spacing:0; color:var(--text-1); }
+    .ws3-about .ui-row-title, .ws3-new-empty .ui-row-title, .srch-direct-also .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-body); font-weight:500; line-height:1.375; letter-spacing:0; color:var(--text-1); }
     .ws1-settings .settings-row-desc { padding:0; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); font-style:normal; color:var(--text-2); }
     .ws1-settings .settings-row-value { font-family:var(--font-ui); font-size:var(--ts-value); font-style:normal; color:var(--text-1); }
     .ws1-note { margin:0 var(--sp-1) var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
