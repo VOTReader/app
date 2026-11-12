@@ -70,7 +70,9 @@ export function TabBar({ screen, overviewOpen = false, onOpen }) {
   useVersion(tour);
   useVersion(about);
   const keyboardUp = useRootClass('kb-up');
-  const tourOn = !!(tour && tour.getState().active);
+  // FSET2 (tr-welcome): the welcome card (stop 0) points at nothing and floats mid-screen, so the bar stays, dimmed.
+  const tourSt = tour ? tour.getState() : null;
+  const tourOn = !!(tourSt && tourSt.active && tourSt.index !== 0);
   const firstRunAbout = screen === 'about' && !!about && typeof about.is === 'function' && !about.is();
   const shown = barShown({ screen, firstRunAbout, overviewOpen, tourOn, keyboardUp });
   const tabbed = sectionOf(screen).bar;

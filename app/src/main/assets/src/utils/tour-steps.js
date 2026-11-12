@@ -71,6 +71,7 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
  * @property {string} text
  * @property {string} [tip]
  * @property {string} [after]      what the card says once the ringed control has been pressed (Listen stops)
+ * @property {string} [afterTitle] the card's title once it has been pressed (tr-after: "Hear it?")
  * @property {{selector:string,text?:string}} [afterTarget]  the control ringed once pressed, where the press
  *                                 opened something (the player stop rings the voice row inside the sheet)
  * @property {boolean} [listening] the tour's playback is up on this stop by construction: entering keeps it,
@@ -115,7 +116,7 @@ const STOPS = [
     eyebrow: 'Show me around',
     title: 'Welcome to VOTReader',
     // The sentence is finished below, once the array knows how long it is.
-    text: 'This is a short tour: {stops} stops, about {minutes} minutes. You can leave at any time with Skip, and see it again from Settings.',
+    text: 'This is a short tour: {stops} stops, about {minutes} minutes. It points at the real buttons. You can leave at any time, and see it again from Settings.',
     primary: 'Start',
   },
   {
@@ -131,9 +132,10 @@ const STOPS = [
     target: { selector: '.hero-play-pill' }, act: 'press', seekKey: 'one:chosen-by-god',
     label: 'Listen',
     title: 'Hear it read aloud',
+    afterTitle: 'Hear it?',
     text: 'Press Listen. The words light up as they are read, and the page follows along.',
     tip: 'Tap it now, or press Next and I will do it for you.',
-    after: 'Hear it? The words light up as they are read, and the page follows along. Press Next when you are ready.',
+    after: 'The words light up as they are read, and the page follows along.',
     primary: 'Next',
   },
   /* HIGHLIGHTING GETS A STOP (Corbin, 2026-09-10). It used to be a clause in the closing

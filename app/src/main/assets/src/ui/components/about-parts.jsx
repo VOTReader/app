@@ -22,7 +22,8 @@ export function useBuildInfo() {
       // relative './service-worker.js' that fetchServerBuildVersion fetches resolves to the INSTALLED build's own
       // copy, so it lands in `running`, not `server`. WEB: deliberately not given that fallback: off Android an
       // uncontrolled page is a first visit, and the deployed file describes the server, not this page.
-      const installed = (PlatformBridge.isAndroid && typeof fetchServerBuildVersion === 'function')
+      const isAndroid = typeof PlatformBridge !== 'undefined' && !!PlatformBridge && !!PlatformBridge.isAndroid;
+      const installed = (isAndroid && typeof fetchServerBuildVersion === 'function')
         ? await fetchServerBuildVersion()
         : null;
       setBuildInfo(installed
@@ -69,6 +70,21 @@ export function LinkRow({ href, icon, title, meta }) {
       </a>
     </div>
   );
+}
+
+/** FSET (ab-new): "Thirteen stops, about three minutes", the tour's length on its own. */
+export function tourLength() {
+  const t = typeof TourController !== 'undefined' ? TourController : null;
+  if (!(t && typeof t.stopsWord === 'function' && typeof t.minutesWord === 'function')) return 'A short tour of the app';
+  const w = String(t.stopsWord());
+  return w.charAt(0).toUpperCase() + w.slice(1) + ' stops, about ' + t.minutesWord() + ' minutes';
+}
+
+/** FSET (ab-new): the small "Version 1.0.2" over a sheet's title; nothing until the build is known. */
+export function VersionKicker() {
+  const [b] = useBuildInfo();
+  const v = versionWords(b);
+  return v.title !== 'Version' ? <p className="ui-label ws3-new-kicker">{v.title}</p> : null;
 }
 
 /** The tour's length in words, as the Settings root says it. */

@@ -42,7 +42,9 @@ export function settingsGlance(o) {
     ['Search', s.searchEnabled !== false],
     ['tabs', !!s.tabsEnabled],
     ['history', s.historyEnabled !== false],
+    ['bookmark', s.showBookmarkNav !== false],
   ];
+  const names = (/** @type {string[]} */ list) => list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
   const offs = feats.filter(([, on]) => !on).map(([n]) => n);
   return {
     appearance: [
@@ -53,7 +55,7 @@ export function settingsGlance(o) {
     reading: [
       String(s.translation || 'nkjv').toUpperCase(),
       'Headings ' + onOff(s.showSectionHeadings !== false),
-      'Restored names ' + onOff(s.restoredNames !== false),
+      'Auto-scroll ' + onOff(!!s.autoScroll),
     ].join(' · '),
     share: 'Links point to the ' + (s.shareLink === 'app' ? 'app' : 'website') + ' · Highlight ' + onOff(!!s.linkHighlight),
     listening: [
@@ -62,8 +64,8 @@ export function settingsGlance(o) {
     ].join(' · '),
     autoscroll: s.autoScroll ? 'On · ' + lpm + ' lines a minute' : 'Off',
     topnav: 'Bookmark on reading pages ' + onOff(s.showBookmarkNav !== false),
-    features: offs.length === 0 ? 'Search, tabs and history on'
-      : offs.length === feats.length ? 'Search, tabs and history off'
+    features: offs.length === 0 ? names(feats.map(([n]) => String(n))) + ' on'
+      : offs.length === feats.length ? names(feats.map(([n]) => String(n))) + ' off'
         : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · '),
     garden: (o && o.gardenLabel) || 'Image quality',
     progress: s.markAsRead ? 'Marking chapters as read' : 'Off',

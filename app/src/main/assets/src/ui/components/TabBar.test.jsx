@@ -77,6 +77,11 @@ describe('TabBar', () => {
     render(<TabBar screen="home" onOpen={vi.fn()} />);
     expect(document.querySelector('.tabbar')).toBeNull();
     cleanup();
+    // The welcome card (stop 0) floats mid-screen with the bar left in view under the dim.
+    globalThis.TourController = { getState: () => ({ active: true, index: 0 }), subscribe: () => () => {}, getVersion: () => 0 };
+    render(<TabBar screen="home" onOpen={vi.fn()} />);
+    expect(document.querySelector('.tabbar')).not.toBeNull();
+    cleanup();
     delete globalThis.TourController;
 
     render(<TabBar screen="search" onOpen={vi.fn()} />);

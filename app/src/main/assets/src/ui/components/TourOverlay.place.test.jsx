@@ -9,10 +9,11 @@ const base = { vh: 800, ring: null, top0: 0, docked: false, afterPressed: false,
 const ring = (top, height = 50) => ({ left: 20, top, width: 100, height });
 
 describe('placeTourCard', () => {
-  it('no ring, not docked: the card sits 16 px off the bottom', () => {
+  it('no ring, not docked: the card floats mid-screen (tr-welcome), the tab bar in view', () => {
     const p = placeTourCard(base);
     expect(p.docked).toBe(false);
-    expect(p.cardStyle).toEqual({ bottom: '16px' });
+    expect(p.cardTop).toBe(300);
+    expect(p.cardStyle.top).toBe('300px');
     expect(p.clear).toBe(false);
   });
 

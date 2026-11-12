@@ -92,6 +92,29 @@ function _endShowing(id) {
  *                                     the next showToast of the same id
  * @returns {void}
  */
+/* FSET (sy-notices): two toasts up at once stack instead of the newer covering the older's words. Each showing
+   toast is pushed off its anchor edge by the toasts shown before it (oldest nearest the edge), 8 px apart. */
+const _shownAt = new Map();
+let _showSeq = 0;
+function _restack() {
+  if (typeof document === 'undefined') return;
+  const live = [];
+  _shownAt.forEach(function (seq, tid) {
+    const t = document.getElementById(tid);
+    if (t && t.classList.contains('show')) live.push([seq, t]); else _shownAt.delete(tid);
+  });
+  live.sort(function (a, b) { return a[0] - b[0]; });
+  let off = 0;
+  live.forEach(function (pair) {
+    const t = pair[1];
+    let topAnchored = false;
+    try { topAnchored = getComputedStyle(t).getPropertyValue('--dock-toast-top').trim() !== 'auto' && getComputedStyle(t).getPropertyValue('--dock-toast-top').trim() !== ''; } catch (_e) { /* no CSSOM */ }
+    t.style.marginBottom = !topAnchored && off ? off + 'px' : '';
+    t.style.marginTop = topAnchored && off ? off + 'px' : '';
+    off += (t.offsetHeight || 0) + 8;
+  });
+}
+
 export function showToast(opts) {
   if (typeof document === 'undefined') return;
   const id = opts && opts.id;
@@ -135,6 +158,8 @@ export function showToast(opts) {
   }
   void el.offsetHeight;
   el.classList.add('show');
+  _shownAt.set(id, ++_showSeq);
+  _restack();
 
   // Cancel any pending auto-hide for this id; re-arm if requested.
   const prev = _hideTimers.get(id);
@@ -169,6 +194,8 @@ export function hideToast(id) {
     // next showing brings fresh buttons.
     el.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
   }
+  _shownAt.delete(id);
+  _restack();
   _endShowing(id);
   const prev = _hideTimers.get(id);
   if (prev != null) {
@@ -215,6 +242,7 @@ export function _resetToasts() {
   }
   _hideTimers.clear();
   _onHide.clear();
+  _shownAt.clear();
   if (typeof document === 'undefined') return;
   // Remove every toast element matching `[id^="vot-toast"]`. Cheaper than
   // tracking all ids.

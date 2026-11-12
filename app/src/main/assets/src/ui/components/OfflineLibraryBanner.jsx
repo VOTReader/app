@@ -66,10 +66,17 @@ export function OfflineLibraryStatus() {
   const retry = phase === 'incomplete' || phase === 'still' || phase === 'dismissed';
   return (
     <span className="offline-library-status">
-      {offlineLibraryWords(phase, missing)}
+      {phase === 'complete' || phase === 'fixed' ? 'Every book opens without a connection.' : offlineLibraryWords(phase, missing)}
       {retry ? <>{' '}<button type="button" className="settings-clear-btn" onClick={() => { OfflineLibrary.retry(); }}>Retry</button></> : null}
     </span>
   );
+}
+
+/** FSET (st-data2): "Ready" as a pill at the Settings row's right, once every book is kept. */
+export function OfflineLibraryReady() {
+  React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
+  const { phase } = OfflineLibrary.getState();
+  return phase === 'complete' || phase === 'fixed' ? <span className="ws3-pill is-ready">Ready</span> : null;
 }
 
 export function OfflineLibraryBanner() {

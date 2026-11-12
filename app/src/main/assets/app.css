@@ -3773,7 +3773,8 @@
     .garden-image-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; touch-action:none; }
     .garden-page-img { display:block; max-width:100%; max-height:100%; object-fit:contain; }
     .garden-loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    .garden-loading .ui-empty { padding-top:0; }
+    .garden-loading .ui-empty { padding-top:0; margin-top:-21vh; }
+    .garden-loading .ui-empty .ui-btn { min-width:124px; }
     .garden-loading-text { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
     /* gap-garden-viewer-and-image-cache-7: the bars calc the injected insets in, like every other chrome surface. */
     .garden-top-bar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:var(--sp-2); min-height:var(--bar-h);
@@ -3792,6 +3793,7 @@
     .garden-unbare-btn { position:absolute; z-index:11; top:max(var(--sp-2), var(--inset-top, 0px)); right:var(--sp-2); width:var(--tap); height:var(--tap); display:flex; align-items:center; justify-content:center; border:0; border-radius:var(--r-pill); background:rgba(0,0,0,0.45); color:var(--text-1); opacity:0.7; cursor:pointer; }
     .garden-jump-row { display:flex; align-items:center; gap:var(--sp-3); }
     .garden-jump-field { flex:1; min-width:0; }
+    .garden-jump-go.ui-btn { flex:none; min-width:72px; }
     .garden-jump-input { flex:1; min-width:0; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-headline); font-weight:600; -moz-appearance:textfield; appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
     .garden-jump-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
@@ -3917,8 +3919,9 @@
     .settings-step { display:inline-flex; align-items:center; gap:0.4rem; }
     .settings-step-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:var(--gold-faint); color:var(--gold); font-size:var(--fs-18); line-height:1; cursor:pointer; font-family:inherit; }
     .settings-step-btn:disabled { opacity:0.4; cursor:default; }
-    .settings-step-input { width:3.4em; min-height:44px; text-align:center; font-family:inherit; font-size:var(--fs-15); color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0 0.2rem; }
-    .settings-step-unit { font-size:var(--fs-13); color:var(--gold); font-style:italic; margin-left:-0.15rem; }
+    .settings-step-input { width:2.2em; min-height:44px; text-align:right; font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; color:var(--text-1); background:transparent; border:0; border-radius:6px; padding:0; -moz-appearance:textfield; appearance:textfield; }
+    .settings-step-input::-webkit-inner-spin-button, .settings-step-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+    .settings-step-unit { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; color:var(--text-1); margin:0 0.3em 0 0.25em; }
     /* Top-Nav button chips */
     /* A09.5 (mockup B-topbar A): one two-way choice, Compact | Icons, in place of the nested switch. */
     .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
@@ -6217,7 +6220,9 @@
     .ws2-radio .settings-row-text { flex:1; min-width:0; }
     .ws2-radio-dot { flex:none; width:22px; height:22px; border:2px solid var(--text-3); border-radius:50%; }
     .ws2-radio-dot.is-on { border-color:var(--accent); background:var(--accent); box-shadow:inset 0 0 0 4px var(--surface-1); }
-    .ws2-text-btn.ui-btn, .ws2-pill-btn.ui-btn { flex:none; color:var(--accent); }
+    /* FSET (st-read, st-tools, st-data2, st-quality, ab-about): a button inside a card is a grey pill (mock .btn.in). */
+    .ws2-text-btn.ui-btn, .ws2-pill-btn.ui-btn, .ws3-danger-btn.ui-btn, .ws2-garden-door.ui-btn { flex:none; background:var(--surface-2); color:var(--text-1); }
+    .ws2-text-btn.ui-btn.is-danger, .ws3-danger-btn.ui-btn.is-danger { color:var(--tone-danger); }
     .ws2-share-preview { padding:var(--card-pad); }
     .ws2-share-preview p { margin:0; }
     .ws2-share-quote { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); font-style:italic; }
@@ -6250,6 +6255,7 @@
     .ws3-data-row .settings-row-head { align-items:center; gap:var(--sp-3); }
     .ws3-data-row .settings-row-text { flex:1; min-width:0; }
     .ws3-data-row .settings-row-value { flex:none; max-width:40%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ws3-pill.is-ready { background:var(--accent-soft); color:var(--accent); }
     .ws3-pill { flex:none; padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); white-space:nowrap; }
     .ws3-meter { padding:var(--card-pad); }
     .ws3-meter-head { display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-3); }
@@ -6257,7 +6263,6 @@
     .ws3-meter-used.is-text { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:400; }
     .ws3-meter-of { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws3-meter .settings-row-desc { display:block; margin-top:var(--sp-3); }
-    .ws3-danger-btn.ui-btn { flex:none; }
     .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter); }
     .note-sheet.ws3-dialog { width:100%; max-width:420px; border-radius:var(--r-sheet); padding:var(--sp-6) var(--gutter) var(--gutter); background:var(--surface-1); }
     .ws3-dialog-title { margin:0 0 var(--sp-3); color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; }
@@ -6300,6 +6305,8 @@
     .ws3-check-row:last-child { border-bottom:0; }
     .ws3-check-row > svg { flex:none; margin-top:2px; color:var(--text-2); }
     .ws3-new-head { padding-top:0; }
+    .ws3-new-heading { flex:1; min-width:0; }
+    .ws3-new-kicker { margin:0 0 2px; color:var(--accent); }
     /* MERGE2b (mock ab-new .sh): What's new is an fn-sheet, whose own x the footnote head replaces; this one has none. */
     .fn-sheet.whats-new-sheet .sheet-handle-back { display:flex; }
     .ws3-new-empty { padding:0 var(--gutter) var(--sp-5); }
@@ -6336,9 +6343,9 @@
     .ws4-fr-top { margin-top:auto; padding-top:var(--sp-8); text-align:center; }
     .ws4-fr-orn { color:var(--accent); font-size:var(--ts-label); }
     .ws4-fr-kicker { margin:var(--sp-1) 0 0; color:var(--accent); }
-    .ws4-fr-name { margin:var(--sp-2) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-display); line-height:1.15; font-weight:600; }
+    .ws4-fr-name { margin:var(--sp-2) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:calc(var(--ts-display) * 1.27); line-height:1.1; font-weight:600; }
     .ws4-fr-lead { margin:var(--sp-4) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-style:italic; }
-    .ws4-fr-points { margin:var(--sp-8) 0 var(--sp-6); }
+    .ws4-fr-points { margin:clamp(var(--sp-7), 9vh, 96px) 0 auto; padding-bottom:var(--sp-6); }
     .ws4-fr-point { display:flex; gap:14px; align-items:flex-start; padding:10px 0; }
     .ws4-fr-point p { flex:1; margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); line-height:1.45; }
     .ws4-fr-point b { color:var(--text-1); font-weight:600; }

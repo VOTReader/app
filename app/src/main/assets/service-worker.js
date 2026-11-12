@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-8a0cf81c59';
+const CACHE_VERSION = 'v1.0.2-e762c88fd6';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,11 +316,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': '6b484ddc2f88cf81b22582c43cc6435c260713278049b68778ffd525f7d74d23',
-  './dist/app.min.css': 'b3eeb05231700b98671bf2040d0120b6b95020adc7f40e709eecff777469c748',
+  './dist/app.min.css': 'd2584087319aa573bf56c2340bc846b87d707e1d27edc30dc216bd64912eebde',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '8c7a06d20148166dcc38b961640a05c16ecc668bba025f78bbecdb6f73d156d1',
+  './dist/bundle-b.js': '20d12650da1d39dc6201d270a1704d83aedf7f20d86631ff5f40d8ab769900f8',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': '5b10d358808d236540b69ca7e340d727132d73d0d7d9de748541a2ab9719c2b4',
+  './dist/bundle-d.js': '10da787392b8feadfc7db42d383b46a8f48f12c2b58765bac143758341dda1d4',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': '6b484ddc2f88cf81b22582c43cc6435c260713278049b68778ffd525f7d74d23',
