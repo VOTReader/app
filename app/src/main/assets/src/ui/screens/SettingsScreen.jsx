@@ -906,7 +906,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   const startTour = () => { if (typeof TourController !== 'undefined') TourController.start('settings'); };
   const _tourGroup = _tour ?(() => { const t = _tour.getState(); return t.active && t.step && t.step.settingsGroup; })() : null;
   React.useEffect(() => {
-    if (_tourGroup) setOpenGroups((prev) => (prev.has(_tourGroup) ? prev : new Set([...prev, _tourGroup])));
+    // One screen at a time: the stop's group replaces the one showing (PL-SETTINGS 1).
+    if (_tourGroup) setOpenGroups((prev) => (prev.has(_tourGroup) ? prev : new Set([_tourGroup])));
   }, [_tourGroup]);
   // id-datasafe2 171: "Open Your Data" (the write-failure toast) lands here with the group
   // open and in view, whether Settings mounts for it or was already on screen.
@@ -914,7 +915,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     const take = () => {
       if (!takeYourDataAsk()) return;
       setSettingsQuery('');
-      setOpenGroups((prev) => (prev.has('data') ? prev : new Set([...prev, 'data'])));
+      setOpenGroups((prev) => (prev.has('data') ? prev : new Set(['data'])));
       setTimeout(() => {
         const el = document.querySelector('[data-settings-group="data"]');
         if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
@@ -1175,8 +1176,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     ? String(readersById[readerCode]).replace(/^Read by /, '') : null;
   const gardenTier = typeof GARDEN_TIERS !== 'undefined'
     ? GARDEN_TIERS.find((t) => t.id === (settings.gardenTier || GARDEN_DEFAULT_TIER)) : null;
+  const translationOpt = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS)
+    ? TRANSLATION_OPTIONS.find((/** @type {any} */ o) => o && o.id === (settings.translation || 'nkjv')) : null;
   const glance = settingsGlance({
-    settings, theme, textPercent: textScalePercent, fontLabel: selectedFontLabel,
+    settings, theme, translationLabel: translationOpt ? translationOpt.label : null, textPercent: textScalePercent, fontLabel: selectedFontLabel,
     readerLabel, gardenLabel: gardenTier ? gardenTier.label + ' images' : null,
     lastBackupAt: _lastBackupAt(),
   });

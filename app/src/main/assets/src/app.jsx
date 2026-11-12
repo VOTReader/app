@@ -714,7 +714,7 @@ function App() {
         lastTabCloseStrikesRef={lastTabCloseStrikes}
         disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
         gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}
-        setScreen={setScreen}
+        setScreen={setScreen} goSettings={goSettings}
         screen={screen}
       />
 

@@ -19,6 +19,7 @@
  *   textPercent?: number,          // the clamped Text Size, in percent
  *   fontLabel?: string,            // the reading font's name
  *   readerLabel?: string | null,   // the letter voice ("Benjamin"), null for the default
+ *   translationLabel?: string | null, // the Bible translation's own name ("NKJV-R"), not its id
  *   gardenLabel?: string | null,   // the Garden image tier's name
  *   lastBackupAt?: number,         // when this device last finished an export, 0 for never
  *   now?: number,                  // the clock (tests)
@@ -53,16 +54,17 @@ export function settingsGlance(o) {
       (o && o.fontLabel) || 'System Serif',
     ].join(' · '),
     reading: [
-      String(s.translation || 'nkjv').toUpperCase(),
+      (o && o.translationLabel) || String(s.translation || 'nkjv').toUpperCase(),
       'Headings ' + onOff(s.showSectionHeadings !== false),
-      'Auto-scroll ' + onOff(!!s.autoScroll),
+      // The switch is the pill on reading pages; auto-scroll itself always starts from a reader's menu.
+      'Auto-scroll pill ' + onOff(!!s.autoScroll),
     ].join(' · '),
     share: 'Links point to the ' + (s.shareLink === 'app' ? 'app' : 'website') + ' · Highlight ' + onOff(!!s.linkHighlight),
     listening: [
       (o && o.readerLabel) || 'Default voice',
       'Read-along ' + onOff(s.readAlongHighlight !== false),
     ].join(' · '),
-    autoscroll: s.autoScroll ? 'On · ' + lpm + ' lines a minute' : 'Off',
+    autoscroll: lpm + ' lines a minute · Pill ' + onOff(!!s.autoScroll),
     topnav: 'Bookmark on reading pages ' + onOff(s.showBookmarkNav !== false),
     features: offs.length === 0 ? names(feats.map(([n]) => String(n))) + ' on'
       : offs.length === feats.length ? names(feats.map(([n]) => String(n))) + ' off'

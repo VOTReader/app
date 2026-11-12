@@ -191,6 +191,14 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
     expect(spy).toHaveBeenCalledOnce();
   });
 
+  it('Back up now asks for Your data, where the backup button is (PL-SETTINGS 2)', () => {
+    delete (/** @type {any} */ (window)).__votOpenYourData;
+    const { container } = renderBanner({ tier: StorageHealth.TIER.CRITICAL, remaining: 1e6 });
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn')).click();
+    expect(/** @type {any} */ (window).__votOpenYourData).toBe(true);
+    delete (/** @type {any} */ (window)).__votOpenYourData;
+  });
+
   it('takes room under the nav while it shows, so Back and Home stay tappable (cz3)', () => {
     // jsdom has no layout: give the banner the 52 px it measured at 360 px (hub overlay audit s9).
     const rect = HTMLElement.prototype.getBoundingClientRect;

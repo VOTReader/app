@@ -690,6 +690,8 @@
         body:has(.find-pill) .ascroll-dwell-row { display: none; }
         body.autoscroll-on:has(.ascroll-pill.is-expanded):has(.find-pill) { --dock-transport: 60px; }
       }
+      /* While the tour card is up a toast sits beside it, never over its Back (TourOverlay sets the two lengths). */
+      body.tour-open { --dock-toast-bottom: var(--tour-toast-bottom, var(--dock-message)); --dock-toast-top: var(--tour-toast-top, auto); }
 
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
@@ -4566,7 +4568,8 @@
     .tabs-overview { max-width:55rem; margin:0 auto; padding:calc(var(--sp-1) + var(--inset-top, 0px)) var(--gutter) calc(5rem + var(--inset-bottom, 0px)); }
     .tabs-overview-line { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:32px; margin:0 0 var(--sp-3); }
     .tabs-overview-meta { margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
-    .tabs-overview .confirm-strip { margin:0 0 var(--sp-3); }
+    /* Close all asks where he is looking: the question stays at the top of the scrolled list (PL-SETTINGS 4). */
+    .tabs-overview > .ann-chip-confirm { position:sticky; top:0; z-index:3; margin:0 0 var(--sp-3); background:var(--bg); }
     .tabs-overview-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:var(--grid-gap); width:100%; }
     @media (min-width:780px) { .tabs-overview-grid { grid-template-columns:repeat(3, 1fr); } }
     .tab-card {

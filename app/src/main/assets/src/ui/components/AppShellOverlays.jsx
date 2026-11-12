@@ -44,7 +44,7 @@ export function AppShellOverlays({
   disableTabsPromptOpen, setDisableTabsPromptOpen,
   // Garden warning
   gardenWarningOpen, setGardenWarningOpen,
-  setScreen,
+  setScreen, goSettings = null,
   // "Show me around" (review-tutorial): the Home strip needs the screen; the overlay needs nothing.
   screen,
 }) {
@@ -78,9 +78,12 @@ export function AppShellOverlays({
   // [13] focus traps — Tab stays inside the open dialog (Escape already
   // routes through the registry above). Refs land on each dialog's root.
   const disableTabsTrapRef = useFocusTrap(!!disableTabsPromptOpen);
+  // Going to Settings from a banner or a toast keeps the way back (goSettings saves where he was).
+  const toSettingsRef = React.useRef(() => {});
+  toSettingsRef.current = () => { if (screen === 'settings') return; if (goSettings) goSettings(); else setScreen('settings'); };
   // id-datasafe2 171: a toast's "Open Your Data" goes to Settings; Settings opens the group.
   React.useEffect(() => {
-    const go = () => setScreen('settings');
+    const go = () => toSettingsRef.current();
     window.addEventListener(OPEN_YOUR_DATA_EVENT, go);
     return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, go);
   }, [setScreen]);
@@ -96,7 +99,7 @@ export function AppShellOverlays({
     // warning away until a restart.
     <ErrorBoundary fallback={null} resetKey={[screen, !!tabsOverviewOpen, tabActionIdx, !!disableTabsPromptOpen, !!gardenWarningOpen].join('|')}>
     <>
-      <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
+      <StorageHealthBanner onNavigateSettings={() => toSettingsRef.current()} />
       <Safari7DayModal />
       <IosPwaWelcomeCard onNavigateSettings={() => setScreen('settings')} />
       {/* The audio mini-player is app.jsx's, after the screen: here, before it, Tab and a screen reader met its
