@@ -317,6 +317,31 @@ describe('NoteSheet Share outcome (A15)', () => {
     expect(sent[1].text.endsWith('\n\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1')).toBe(true);
   });
 
+  /* ODDS1: a note's Share gets the selection's "Use the other link" note (FEAT1), with the note's own text. */
+  it('a note on a letter: the note after the share offers the other link, in the same words', async () => {
+    const g = /** @type {any} */ (globalThis);
+    const sent = /** @type {any[]} */ ([]);
+    setNav('share', (d) => { sent.push(d); return Promise.resolve(); });
+    g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
+    g.showToast = vi.fn((o) => { const el = document.createElement('div'); el.id = o.id; el.innerHTML = o.html || o.text; document.body.appendChild(el); });
+    g.hideToast = vi.fn();
+    try {
+      g.StateStore = { get: () => ({ settings: {} }) };
+      setupStores({ body: 'Saved note' });
+      window.AnnotationStore.getByGroup = () => [{ key: 'letter:the-wide-path:1', ann: { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'anchor' } }];
+      render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+      fireEvent.click(screen.getByText('Share'));
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+      expect(g.showToast.mock.calls[0][0].html).toMatch(/^Shared with the website link\. .*Use the other link/);
+      const btn = /** @type {HTMLElement} */ (document.querySelector('#vot-toast-share-link button'));
+      btn.click();
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+    } finally { delete g.findEntryContext; delete g.StateStore; delete g.hideToast; document.getElementById('vot-toast-share-link')?.remove(); }
+    expect(sent.length).toBe(2);
+    expect(sent[0].text).toBe('“anchor”\n\nMy note: Saved note\n\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
+    expect(sent[1].text).toBe('“anchor”\n\nMy note: Saved note\n\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+  });
+
   it('a share the reader cancels stays quiet', async () => {
     setNav('share', () => Promise.reject(Object.assign(new Error('Share canceled'), { name: 'AbortError' })));
     await shareFromMenu();

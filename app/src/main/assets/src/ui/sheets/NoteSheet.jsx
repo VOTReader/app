@@ -5,7 +5,7 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { shareText, shareLinkSetting } from '../../utils/copy-share.js';
+import { shareText, shareLinkSetting, LINK_NAME, offerOtherLink } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
 import { siteLinkForKey } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
@@ -228,14 +228,26 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // share-fn (Corbin 2026-10-25): the link is the website's where the passage has a
     // page there, as the selection's Share sends, unless Share Includes says App Link.
     const key = segs[0] && segs[0].key;
-    const link = key ? (shareLinkSetting() === 'site' && siteLinkForKey(key)) || passageLinkFor(key) : null;
-    const text = link
+    // ODDS1: with both links, the note after the share names the one sent and offers the other (FEAT1's).
+    const site = key ? siteLinkForKey(key) : null;
+    const which = site && shareLinkSetting() === 'site' ? 'site' : 'app';
+    const textWith = (/** @type {string | null} */ link) => (link
       // share-link (Corbin 2026-11-11): the link stands in for the reference ("Append only the link itself").
       ? '\u201C' + anchor + '\u201D'
         + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link
-      : anchor + (note.body ? '\n\n' + note.body : '');
+      : anchor + (note.body ? '\n\n' + note.body : ''));
+    const linkOf = (/** @type {'app' | 'site'} */ w) => (key ? (w === 'site' && site) || passageLinkFor(key) : null);
+    const text = textWith(linkOf(which));
+    const other = site ? (which === 'site' ? 'app' : 'site') : null;
+    const otherText = other ? textWith(linkOf(other)) : '';
     shareText(text).then((outcome) => {
       if (typeof showToast !== 'function') return;
+      if (other && outcome !== 'failed') {
+        offerOtherLink(which, outcome, () => shareText(otherText).then((again) => {
+          if (again === 'copied-instead') showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: 'Copied with the ' + LINK_NAME[other] + ' link. Paste it where you want to share it.' });
+        }));
+        return;
+      }
       if (outcome === 'copied-instead') {
         showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: 'Copied instead. Paste the note where you want to share it.' });
       } else if (outcome === 'failed') {

@@ -4,7 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
-import { copyText as copyToClipboard, shareText, shareLinkSetting } from '../../utils/copy-share.js';
+import { copyText as copyToClipboard, shareText, shareLinkSetting, LINK_NAME, offerOtherLink } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
 import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils/answers-extras.js';
@@ -154,25 +154,6 @@ function ShareLinkChoice({ onApp, onSite, onCancel }) {
   );
 }
 
-/** What the reader calls each link (Settings > Sharing: "The website", "The app"). */
-const LINK_NAME = { site: 'website', app: 'app' };
-const OTHER_LINK_TOAST = 'vot-toast-share-link';
-/** FEAT1 (st-share): after a plain Share, a note names the link it sent and offers "Use the other link" for
-    this one share (the share sheet itself is the phone's, so the offer sits under it, in the app). The
-    sentence is one of these fixed strings, never passage text (showToast's html is trusted markup only).
-    @param {'app' | 'site'} which @param {string} outcome @param {() => void} useOther */
-function offerOtherLink(which, outcome, useOther) {
-  const sent = outcome === 'copied-instead' ? 'Copied with the ' + LINK_NAME[which] + ' link. Paste it where you want to share it.'
-    : outcome === 'cancelled' ? 'Not shared. Share sends the ' + LINK_NAME[which] + ' link.'
-      : 'Shared with the ' + LINK_NAME[which] + ' link.';
-  showToast({
-    id: OTHER_LINK_TOAST, className: 'vot-toast vot-toast-action', durationMs: 8000,
-    html: sent + ' <button type="button" class="vot-escape-btn">Use the other link</button>',
-  });
-  const el = typeof document !== 'undefined' ? document.getElementById(OTHER_LINK_TOAST) : null;
-  const btn = el && el.querySelector('button');
-  if (btn) btn.addEventListener('click', () => { if (typeof hideToast === 'function') hideToast(OTHER_LINK_TOAST); useOther(); }, { once: true });
-}
 
 /** The recolour step of applyHighlight: what happens to the groups whose range
     exactly matches the new selection. A recolour never deletes a note (sr14,
