@@ -121,7 +121,7 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen, 
   const key = (Array.isArray(refs) ? refs : []).map((r) => (r ? r.bid + ':' + r.cid : '')).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the refs' text: a new array each render must not rebuild
   const tracks = React.useMemo(() => (tracksOf && key ? tracksOf(refs) || [] : []), [key, tracksOf]);
-  const minutes = useListenMinutes(tracks);
+  const minutes = useListenMinutes(tracks, true);
   const name = label + (minutes ? ', about ' + minutes + ' min' : '');
   if (pill) {
     return (
