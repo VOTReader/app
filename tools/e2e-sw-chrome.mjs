@@ -96,6 +96,9 @@ async function boot(page, url) {
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
   await sleep(600);
+  // the first visit opens "How to read this web" over the canvas: a reader closes it before
+  // panning (a drag or wheel on the card is the card's, not the web's: WEB2)
+  await clickIfPresent(page, 'Got it'); await sleep(300);
   return true;
 }
 
@@ -187,6 +190,8 @@ async function brightestGround(page, boxes, dpr) {
   }, b64, boxes, dpr);
 }
 
+/** The canon camera (window.__swCam, ScriptureWebScreen) as a string, or null without the bridge. */
+const readCam = (page) => page.evaluate(() => { const k = typeof window.__swCam === 'function' ? window.__swCam() : null; return k ? `${k.x} ${k.y || 0} ${k.ppv}` : null; });
 const readPpv = (page) => page.evaluate(() => { const w = document.querySelector('.sw-root'); return w ? Number(w.getAttribute('data-ppv-css')) : NaN; });
 async function zoom3(page, tag) {
   const p0 = await readPpv(page);
@@ -208,8 +213,15 @@ async function worstGround(page, pills, dpr, worst, state, tag, steps) {
     if (k > 0) {
       const ang = (k / PAN_STEPS) * Math.PI * 2, amp = Math.min(c.w, c.h) * 0.3;
       await page.mouse.move(c.x, c.y); await page.mouse.down();
+      // the witness that the pan took is the camera itself, read under the finger before it
+      // lifts (so a fling after the lift does not count): the centre pixels it once used are a
+      // single flat colour wherever the camera has risen into the sparse sky, panned or not (WEB2)
+      const before = await readCam(page);
       for (let s = 1; s <= 8; s++) await page.mouse.move(c.x + Math.cos(ang) * amp * s / 8, c.y + Math.sin(ang) * amp * s / 8);
+      const atLift = await readCam(page);
       await page.mouse.up(); await sleep(350);
+      if (before && atLift && before === atLift) worst.stillPans = (worst.stillPans || 0) + 1;
+      if (before) worst.camWitness = true;
     }
     // the ground is only the web's if the web is what sits under the pointer: a
     // sheet or chooser over the canvas (a clamped drag reads as a tap) is a fault
@@ -223,7 +235,8 @@ async function worstGround(page, pills, dpr, worst, state, tag, steps) {
       continue;
     }
     const { grounds: g, sum } = await brightestGround(page, pills.map((p) => p.box), dpr);
-    if (k > 0 && sum === worst.lastSum) worst.stillPans = (worst.stillPans || 0) + 1;
+    // no camera bridge (an old tree): the centre pixels are the witness
+    if (k > 0 && !worst.camWitness && sum === worst.lastSum) worst.stillPans = (worst.stillPans || 0) + 1;
     worst.lastSum = sum;
     pills.forEach((p, i) => {
       if (!g[i]) return;
@@ -262,7 +275,7 @@ async function walk(page, url, fname) {
   await worstGround(page, resting, f.dpr, worst, 'overview', tag, 0);
   if (await zoom3(page, tag)) await worstGround(page, resting, f.dpr, worst, '3 zoom steps', tag, PAN_STEPS);
   if (worst.taps) note(`${tag} F3w ${worst.taps} of ${PAN_STEPS} drags read as taps (the camera clamped), dismissed and not counted`);
-  if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS} drags left the web's centre pixels unchanged: the pan did not take, the grounds are not the worst`);
+  if (worst.stillPans) fails.push(`${tag} F3w ${worst.stillPans} of ${PAN_STEPS} drags left ${worst.camWitness ? 'the camera where it was under the finger' : "the web's centre pixels unchanged"}: the pan did not take, the grounds are not the worst`);
   for (const p of resting) {
     const w = worst.get(p.name);
     if (!w) { note(`${tag} F3w ${p.name}: no ground read`); continue; }

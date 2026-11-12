@@ -88,7 +88,7 @@ describe('the ink table', () => {
     expect(INK.lit).toEqual({ hex: '#E8BE6E', alpha: 0.85, width: 2.5, widthCompact: 2 });
     expect(INK.roots).toEqual({ hex: '#C4A469', alpha: 0.25 });
     expect(INK.myWebReader).toEqual({ hex: '#E0B25A', alpha: 0.95, width: 1.5 });
-    expect(INK.panel).toEqual({ hex: '#1C2527', alpha: 1 });
+    expect(INK.panel).toEqual({ hex: '#131312', alpha: 1 });
     expect(INK.bookLabel.hex).toBe('#B7BFC1');
     expect(INK.bookLabelMajor.hex).toBe('#E0E6E7');
     expect(INK.gold.hex).toBe('#C4A469');
@@ -219,7 +219,7 @@ describe('the helpers', () => {
   });
 
   it('rgba01 gives straight-alpha floats for GLSL, scaled and clamped', () => {
-    expect(rgba01('panel')).toEqual([28 / 255, 37 / 255, 39 / 255, 1]);
+    expect(rgba01('panel')).toEqual([19 / 255, 19 / 255, 18 / 255, 1]);
     expect(rgba01('cited')).toEqual([196 / 255, 164 / 255, 105 / 255, 0.70]);
     expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.60, 10);
     expect(rgba01('gold', 3)[3]).toBe(1);
@@ -228,7 +228,7 @@ describe('the helpers', () => {
 
   it('css gives an rgba() string for Canvas2D with the same numbers', () => {
     expect(css('cited')).toBe('rgba(196,164,105,0.7)');
-    expect(css('panel')).toBe('rgba(28,37,39,1)');
+    expect(css('panel')).toBe('rgba(19,19,18,1)');
     expect(css('chipFill')).toBe('rgba(28,37,39,0.92)');
     expect(css('scrim')).toBe('rgba(0,0,0,0.65)');
     expect(css('chosenHalo', 0.5)).toBe('rgba(224,168,78,0.11)');

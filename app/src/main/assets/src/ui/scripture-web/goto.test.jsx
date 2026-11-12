@@ -147,8 +147,12 @@ describe('the go-to box (spec 4.5)', () => {
     const sel = () => Array.from(container.querySelectorAll('.sw-goto-row')).findIndex((r) => r.classList.contains('is-sel'));
     expect(sel()).toBe(0);
     expect(input(container).getAttribute('aria-activedescendant')).toBe('sw-goto-opt-0');
+    // WEB3 (w-goto): Enter's pick from the start, but the rows stay plain until the arrows choose
+    const list = () => container.querySelector('.sw-goto-list');
+    expect(list().classList.contains('is-moved')).toBe(false);
     fireEvent.keyDown(input(container), { key: 'ArrowDown' });
     expect(sel()).toBe(1);
+    expect(list().classList.contains('is-moved'), 'the arrows chose: the row is filled').toBe(true);
     fireEvent.keyDown(input(container), { key: 'ArrowUp' });
     fireEvent.keyDown(input(container), { key: 'ArrowUp' });
     expect(sel(), 'up from the first is the last').toBe(rows.length - 1);
@@ -156,9 +160,10 @@ describe('the go-to box (spec 4.5)', () => {
 
   /* w4 (the phone stream): on the phone in landscape the soft keyboard takes about half of the
      411 px root, and the box with three rows, a hairline and the hint ran 27 px under it (the
-     stand-in shot s07k). The hint is there to say what to type, so on the phone it says it until
-     there is something to choose; then the rows have the room. PC keeps both (spec 4.5). */
-  it('compact: the hint shows until rows come, then the rows have the room; PC keeps the hint under them', () => {
+     stand-in shot s07k). WEB3 (w-goto, the mock keeps the hint under the rows): the rows and the
+     hint now scroll as one (.sw-goto-scroll, goto CSS), so the hint is always there and a keyboard
+     scrolls it away instead of taking a row. PC keeps both (spec 4.5). */
+  it('compact: the hint stays under the rows, in the one scroll with them; PC keeps the hint under them', () => {
     const phone = { W: Math.round(891 * 2.625), H: Math.round(411 * 2.625), DPR: 2.625 };
     const { container, get } = mountWeb({ frame: phone });
     act(() => { get().goTo.open(); });
@@ -166,7 +171,10 @@ describe('the go-to box (spec 4.5)', () => {
     expect(container.querySelector('.sw-goto-hint'), 'nothing typed: the hint says what to type').toBeTruthy();
     fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
     expect(rowTexts(container).length, 'the phone takes three rows').toBe(3);
-    expect(container.querySelector('.sw-goto-hint'), 'rows to choose: the hint gives them its room').toBeNull();
+    const hint = container.querySelector('.sw-goto-hint');
+    expect(hint, 'rows to choose: the hint still under them').toBeTruthy();
+    expect(hint.parentElement.classList.contains('sw-goto-scroll'), 'in the scroll with the rows').toBe(true);
+    expect(hint.previousElementSibling.classList.contains('sw-goto-list')).toBe(true);
     fireEvent.change(input(container), { target: { value: 'Zzyzx' } });
     expect(rowTexts(container)).toEqual([]);
     expect(container.querySelector('.sw-goto-hint'), 'nothing it can name: the hint again').toBeTruthy();
