@@ -534,8 +534,9 @@ export function createBackupFlow(ctx) {
     // via openExportSink + writeContainer; Android via the native chunked bridge.
     // (The v2 buildExportPayload stays exported: rollback, and the tests make legacy
     // backups with it for the v2 import path. Its store read is shared with v3.)
-    if (PlatformBridge.isAndroid) await _exportV3Android();
-    else await _exportV3Web();
+    // true once the backup file is written; false when it was cancelled or failed (the wipe dialog says which).
+    const saved = PlatformBridge.isAndroid ? await _exportV3Android() : await _exportV3Web();
+    return saved === true;
   };
 
   const importPersonalData = async () => {
