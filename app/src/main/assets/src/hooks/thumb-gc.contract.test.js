@@ -16,20 +16,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-vi.mock('../utils/platform-bridge.js', () => ({
-  PlatformBridge: {
-    takeScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
-    takeThemedScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
-  },
-  captureTargetEl: () => (typeof document !== 'undefined' ? document.querySelector('.screen-layout') : null),
-}));
 import { useThumbnails } from './use-thumbnails.js';
 // use-thumbnails imports StateStore (bridge-imports, v15-code-health-04); this
 // contract ran with no StateStore global, which the GC reads as "state is real".
 vi.mock('../stores/state-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StateStore() { return /** @type {any} */ (globalThis).StateStore; } }; });
 
 const g = /** @type {any} */ (globalThis);
-const U = (tag) => 'data:image/jpeg;base64,' + tag + 'x'.repeat(1200);
+// Rows as this build writes them: { snap } (utils/tab-snap.js). They were an older build's JPEG rows ({ dark: url })
+// until TABS6 made the load delete those on first read, which emptied the store for a reason outside this contract.
+const U = (tag) => ({ snap: { v: 1, html: '<div class="screen-layout">' + tag + '</div>', w: 412, h: 800, top: 0, st: 0, at: 1 } });
 
 /** A fake IDB thumbs store that honours the real idbReadAll(liveKeys) contract
     as the follow-up defines it: filter on read, delete nothing. */
@@ -68,9 +63,9 @@ const advance = async (ms) => { await act(async () => { vi.advanceTimersByTime(m
 describe('VERIFIER — dead thumbnail rows are still collected (boot-performance-5 follow-up)', () => {
   it('a row for a tab closed in a PREVIOUS session is eventually deleted', async () => {
     // One open tab, plus two rows left behind by tabs closed before this boot.
-    store.set('key-a', { dark: U('a') });
-    store.set('key-ghost1', { dark: U('g1') });
-    store.set('key-ghost2', { dark: U('g2') });
+    store.set('key-a', U('a'));
+    store.set('key-ghost1', U('g1'));
+    store.set('key-ghost2', U('g2'));
 
     renderHook((p) => useThumbnails(p), { initialProps: props([mk('a')]) });
     await flush();
@@ -81,8 +76,8 @@ describe('VERIFIER — dead thumbnail rows are still collected (boot-performance
 
   it('the degraded-boot shape recovers its thumbnails once the real tabs hydrate', async () => {
     // vot-state hydration timed out → one synthetic tab renders (storage-backup-3).
-    store.set('key-a', { dark: U('a') });
-    store.set('key-b', { dark: U('b') });
+    store.set('key-a', U('a'));
+    store.set('key-b', U('b'));
 
     const { result, rerender } = renderHook((p) => useThumbnails(p), {
       initialProps: props([mk('default-tab')]),

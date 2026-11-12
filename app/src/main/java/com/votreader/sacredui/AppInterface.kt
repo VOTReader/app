@@ -472,10 +472,6 @@ class AppInterface(
     @JavascriptInterface
     fun getZoomScale(): Float = vm.currentScale
 
-    @JavascriptInterface
-    fun takeScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String =
-        host.captureScreenshot(topCropDp, maxDim, jpegQuality)
-
     /** Open the system JSON file picker. When the user picks a file (or
      *  cancels), the file content is base64-encoded and delivered back to
      *  JS as window.__onImportFile(b64) — or null on cancel/error. */

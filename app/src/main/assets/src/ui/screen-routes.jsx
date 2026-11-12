@@ -225,6 +225,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {(volKey: string, entry: any) => any} boundaryConfig
  * @property {import('../hooks/use-tabs.js').Tab['gardenPage']} gardenPage
  * @property {import('../hooks/use-tabs.js').TabSetter<'gardenPage'>} setGardenPage
+ * @property {boolean} [bgDraw] true when the routes are built to draw another tab off screen (TabSnapDrawer)
  */
 
 /** @param {ScreenRouteDeps} deps */
@@ -296,6 +297,8 @@ export function buildScreenRoutes({
   boundaryConfig,
   // ── Garden ──
   gardenPage, setGardenPage,
+  // ── A build for another tab's card picture (TabSnapDrawer): it must change nothing in the app ──
+  bgDraw,
 }) {
   // F3: App() resolves the active letter/entry ONCE (by screen->volKey) and
   // passes it as activeLetter + activeVolKey. actL(k) returns it only for the
@@ -397,7 +400,9 @@ export function buildScreenRoutes({
     if (typeof retargetTop === 'function') retargetTop(dest);
   };
   const _openPlansAt = (/** @type {any[]} */ views) => { openPlanNav(views); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); };
-  setPlanSessionHost({
+  // A build for an off-screen draw (bgDraw) tells the plan session and the plan pages nothing: it is not the
+  // screen the reader is on (a drawn Home tab ended a running session), and its actions are no-ops.
+  if (!bgDraw) setPlanSessionHost({
     move: _movePlanItem,
     back: () => { if (typeof window.handleAndroidBack === 'function') window.handleAndroidBack(); else goNavOrigin(); },
     markRead: (bid, cid) => markRead(bid, cid),
@@ -413,9 +418,9 @@ export function buildScreenRoutes({
   // FIXB: the session hears what the screen shows, and ends once it shows none of the day's items (plan-session.js).
   const _placeCol = screen === 'bible-ch' || screen === 'matthew-ch' || typeof COLLECTIONS === 'undefined' ? null
     : COLLECTIONS.find((c) => c.letterScreen === screen) || null;
-  if (screen === 'bible-ch' || screen === 'matthew-ch') notePlanSessionPlace(screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum);
+  if (bgDraw) { /* not the screen on show */ } else if (screen === 'bible-ch' || screen === 'matthew-ch') notePlanSessionPlace(screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum);
   else notePlanSessionPlace(_placeCol ? _placeCol.readKey : null, letterId);
-  planNavOnScreen(screen === 'reading-plans' || screen === 'bible-ch' || screen === 'matthew-ch' || !!_placeCol);
+  if (!bgDraw) planNavOnScreen(screen === 'reading-plans' || screen === 'bible-ch' || screen === 'matthew-ch' || !!_placeCol);
   // The Read tab's plan row: Read starts a session on the plan's portion (Read ahead: the next day's), the text opens
   // the plan's own page.
   const readPlanRow = (/** @type {any} */ next, /** @type {string} */ planId) => {

@@ -83,9 +83,6 @@ const CORE_ASSETS = [
   // precaching them was pure double-caching + extra install-failure surface
   // (addAll is all-or-nothing). search-data.js is in the same position for the
   // same reason: it is bundled into bundle-d.js, never fetched on its own.
-  // html2canvas.min.js STAYS: U13 moved it OUT of bundle-a to a lazy <script>,
-  // so this precache is what keeps the first web screenshot instant + offline.
-  './html2canvas.min.js',
   './fonts/cinzel-latin-400-normal.woff2',
   './fonts/cinzel-latin-700-normal.woff2',
   './fonts/cinzel-decorative-latin-400-normal.woff2',
@@ -135,7 +132,7 @@ const CORE_ASSETS = [
 // P2pwa: the CRITICAL shell — the directory index, index.html, the minified
 // CSS, and the four eager bundles. A partial boot is useless, so these stay
 // all-or-nothing on install. Everything ELSE in CORE_ASSETS (fonts, icons,
-// images, offline page, html2canvas) caches best-effort: a single 404 there
+// images, offline page) caches best-effort: a single 404 there
 // must NOT abort the install, or the SW never reaches 'installed' → the
 // update-available prompt never fires → the client is silently pinned to the
 // old version. (Keep this subset of the CORE_ASSETS literal above.)
@@ -326,7 +323,6 @@ const ASSET_INTEGRITY = {
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
   './dist/bundle-d.js': '0b865c00e0a1d362f58e2a5100e0d78de59041206d496e154ba991144b6dd3f8',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
-  './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'bd7c67e4aaaebc598f121218bf2d23b093a53f416b0ae35bdd04b383bee6f647',
   './manifest.json': 'e1c7daf263bec90aeffc1236ebffe6374859459cb2674259053a4fbc12525d31',
   './offline.html': '6cd0eafda9add519132a5c0e4c21380a520fe002bdf5308d70a2d2cb56d9bc83',
@@ -617,15 +613,15 @@ async function installCore() {
   // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
   // a renamed asset) doesn't abort the install and silently pin the old SW.
   // NOTE: an integrity failure here does NOT fail the install — addVerified
-  // throws and allSettled turns it into the warning below. Deliberate: the fonts,
-  // html2canvas and offline.html are not needed to boot, so refusing a whole good update over
+  // throws and allSettled turns it into the warning below. Deliberate: the fonts
+  // and offline.html are not needed to boot, so refusing a whole good update over
   // one of them would trade a working new build for a broken screen.
   //
   // BE HONEST ABOUT THE COST, because it is not "no consequence": coreFirst is
   // cache-first with NO cache-on-use, so an asset skipped here stays uncached for
   // the ENTIRE life of this CACHE_VERSION. Online it is refetched from the network
   // every time (slower, but correct). OFFLINE it is simply unavailable, so a
-  // font falls back, a screenshot cannot load html2canvas and
+  // font falls back and
   // offline.html falls back to the 503 branch in coreFirst. The next deploy
   // re-attempts it. That is the right trade for a non-boot asset, but it is a real
   // degradation and not a silent no-op — which is why it is warned, loudly.

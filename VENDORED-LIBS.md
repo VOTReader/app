@@ -23,14 +23,13 @@ Blobs play one of two roles today (verified 2026-07-22):
 Re-verify after any change to a vendored file:
 
 ```sh
-cd app/src/main/assets && sha256sum react.min.js react-dom.min.js html2canvas.min.js src/search/vendor/minisearch.js
+cd app/src/main/assets && sha256sum react.min.js react-dom.min.js src/search/vendor/minisearch.js
 ```
 
 | File | Version (self-reported) | Bytes | Role | sha256 |
 |------|-------------------------|-------|------|--------|
 | `react.min.js` | 18.2.0 | 10737 | build input → `dist/bundle-a.js` | `4b4969fa4ef3594324da2c6d78ce8766fbbc2fd121fff395aedf997db0a99a06` |
 | `react-dom.min.js` | 18.2.0-next-9e3b772b8-20220608 | 131882 | build input → `dist/bundle-a.js` | `21758ed084cd0e37e735722ee4f3957ea960628a29dfa6c3ce1a1d47a2d6e4f7` |
-| `html2canvas.min.js` | 1.4.1 | 198689 | **shipped standalone** — lazy `<script>` load | `e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb` |
 | `src/search/vendor/minisearch.js` | 7.2.0 | 65444 | build input → esbuild into `dist/bundle-d.js` | `aa85ecc7032cfb5f8cd9b3af3efdc1de09b3f60fe8af4b01946eeb11c6f9cbd9` |
 
 Versions are self-reported by each blob (the `version="…"` / header string
@@ -39,12 +38,6 @@ each library embeds). Notes per blob:
 - **react / react-dom** stay RAW in the bundle-a concat (`tools/build.py`
   `A` list) — they are UMD builds that read top-level `this`, so they are
   exempt from the PF2 per-file minify.
-- **html2canvas** is no longer concatenated into bundle-a (U13): it was
-  ~198 KB parsed at every boot but is only used by web tab-thumbnails
-  (Android uses native PixelCopy). `platform-bridge._ensureHtml2canvas()`
-  lazy-loads it via `<script src="html2canvas.min.js">` on the first web
-  screenshot; the file stays SW-precached (`service-worker.js`
-  `CORE_ASSETS`) so it's instant/offline.
 - **minisearch** is vendored from npm (MIT © Luca Ongaro) as a generated ES
   bundle — do not hand-edit; regenerate per the header comment
   (`npx esbuild node_modules/minisearch/dist/es/index.js --bundle --format=esm`).

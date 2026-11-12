@@ -317,15 +317,15 @@ describe('service-worker install (P1pwa / P2pwa)', () => {
   });
 
   it('does NOT fail the whole install when a NON-critical asset fails integrity', async () => {
-    // html2canvas, the fonts and offline.html are not needed to boot, so refusing the entire
+    // the fonts and offline.html are not needed to boot, so refusing the entire
     // update over one of them would trade a working new build for a broken feature.
     // (lz1, 2026-10-13: these tests used the lazy screen bundles e-h, now folded into
     // bundle-d and CRITICAL, as their best-effort example.)
-    const sw = bootSW({ corrupt: ['./html2canvas.min.js'] });
+    const sw = bootSW({ corrupt: ['./dist/bundle-w.js'] });
     await expect(install(sw)).resolves.toBeUndefined();
     const core = await coreCache(sw);
     expect(await core.match('./dist/bundle-a.js')).toBeTruthy();   // shell still cached
-    expect(await core.match('./html2canvas.min.js')).toBeFalsy();    // suspect bytes not pinned
+    expect(await core.match('./dist/bundle-w.js')).toBeFalsy();    // suspect bytes not pinned
   });
 
   it('verifies against the REAL generated hashes — a clean install passes them', async () => {
@@ -655,7 +655,7 @@ describe('service-worker — an incomplete install keeps the previous library (v
     const oldCorpus = await sw.caches.open('vot-corpus-OLD');
     await oldCorpus.put(BIBLE_URL, bytesResp(otherBuildBytes(BIBLE)));
     const oldCore = await sw.caches.open('vot-core-OLD');
-    await oldCore.put('https://app.test/html2canvas.min.js', { body: 'old-e' });
+    await oldCore.put('https://app.test/dist/bundle-w.js', { body: 'old-e' });
     return { oldCorpus, oldCore };
   }
 
@@ -740,24 +740,24 @@ describe('service-worker — an incomplete install keeps the previous library (v
 
   it('offline, an older build\'s CODE is never served next to the new one; its pictures are', async () => {
     let offline = false;
-    const sw = bootSW({ fail: ['./html2canvas.min.js', './study-cover-lamb.jpg'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
+    const sw = bootSW({ fail: ['./dist/bundle-w.js', './study-cover-lamb.jpg'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
     const oldCore = await sw.caches.open('vot-core-OLD');
-    await oldCore.put('https://app.test/html2canvas.min.js', { body: 'old-g' });
+    await oldCore.put('https://app.test/dist/bundle-w.js', { body: 'old-g' });
     await oldCore.put('https://app.test/study-cover-lamb.jpg', { body: 'old-jpg' });
     await install(sw);
     await activate(sw);
     expect(await sw.caches.keys()).toContain('vot-core-OLD');
     offline = true;
-    const g = await fetchEvent(sw, getReq('https://app.test/html2canvas.min.js'));
+    const g = await fetchEvent(sw, getReq('https://app.test/dist/bundle-w.js'));
     expect(g.status, 'a 503 the caller handles, not old code').toBe(503);
     const jpg = await fetchEvent(sw, getReq('https://app.test/study-cover-lamb.jpg'));
     expect(jpg.body).toBe('old-jpg');
   });
 
   it('an older core bucket is not kept only for code it may never serve', async () => {
-    const sw = bootSW({ fail: ['./html2canvas.min.js'], resolveKeys: true });
+    const sw = bootSW({ fail: ['./dist/bundle-w.js'], resolveKeys: true });
     const oldCore = await sw.caches.open('vot-core-OLD');
-    await oldCore.put('./html2canvas.min.js', { body: 'old-g' });
+    await oldCore.put('./dist/bundle-w.js', { body: 'old-g' });
     await install(sw);
     await activate(sw);
     expect(await sw.caches.keys()).not.toContain('vot-core-OLD');
@@ -765,7 +765,7 @@ describe('service-worker — an incomplete install keeps the previous library (v
 
   it('offline, a deep link boots THIS build\'s shell even with an older core bucket kept', async () => {
     let offline = false;
-    const sw = bootSW({ fail: ['./html2canvas.min.js'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
+    const sw = bootSW({ fail: ['./dist/bundle-w.js'], resolveKeys: true, fetchImpl: async (r, inst) => { if (offline) throw new Error('offline'); return inst(r); } });
     const oldCore = await sw.caches.open('vot-core-OLD');
     await oldCore.put('./index.html', { body: 'OLD-shell' });
     await install(sw);
@@ -814,11 +814,11 @@ describe('service-worker — copy unchanged files forward (v06-02/04)', () => {
     const sw = bootSW({ resolveKeys: true });
     const old = await sw.caches.open('vot-core-OLD');
     await old.put('./study-cover-lamb.jpg', realResp('./study-cover-lamb.jpg'));
-    await old.put('./html2canvas.min.js', realResp('./html2canvas.min.js'));
+    await old.put('./dist/bundle-w.js', realResp('./dist/bundle-w.js'));
     await install(sw);
     expect(sw.attempts.get('./study-cover-lamb.jpg') || 0).toBe(0);
-    expect(sw.attempts.get('./html2canvas.min.js') || 0).toBe(0);
-    expect(await (await sw.caches.open(CURRENT_CORE)).match('./html2canvas.min.js')).toBeTruthy();
+    expect(sw.attempts.get('./dist/bundle-w.js') || 0).toBe(0);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match('./dist/bundle-w.js')).toBeTruthy();
   });
 
   it('an alternate translation the reader had opened comes along, unchanged, without a download', async () => {
@@ -875,7 +875,7 @@ describe('service-worker — an older worker never prunes a newer one\'s buckets
       resolveKeys: true,
       fetchImpl: async (r, inst) => {
         const url = typeof r === 'string' ? r : r.url;
-        if (!struck && url === './html2canvas.min.js') { struck = true; await swRef.caches.delete(CURRENT_CORE); }
+        if (!struck && url === './dist/bundle-w.js') { struck = true; await swRef.caches.delete(CURRENT_CORE); }
         return inst(r);
       },
     });
@@ -1288,7 +1288,7 @@ describe('service-worker offline library — status and repair (B5)', () => {
   });
 
   it('counts a best-effort CORE asset the install skipped as missing too', async () => {
-    const skipped = './html2canvas.min.js';
+    const skipped = './dist/bundle-w.js';
     const sw = bootSW({ fail: [skipped] });
     await install(sw);
     const status = await ask(sw, 'CHECK_OFFLINE');
@@ -1296,7 +1296,7 @@ describe('service-worker offline library — status and repair (B5)', () => {
   });
 
   it('REPAIR_OFFLINE refetches only the missing files, then reports complete', async () => {
-    const fail = ['./dist/bundle-a-bible.js', './html2canvas.min.js'];
+    const fail = ['./dist/bundle-a-bible.js', './dist/bundle-w.js'];
     const sw = bootSW({ fail });
     await install(sw);
     const before = new Map(sw.attempts);
@@ -1305,7 +1305,7 @@ describe('service-worker offline library — status and repair (B5)', () => {
     expect(status.complete).toBe(true);
     expect(status.missing).toEqual([]);
     const refetched = [...sw.attempts].filter(([url, n]) => n !== (before.get(url) || 0)).map(([url]) => url).sort();
-    expect(refetched).toEqual(['./dist/bundle-a-bible.js', './html2canvas.min.js']);
+    expect(refetched).toEqual(['./dist/bundle-a-bible.js', './dist/bundle-w.js']);
   });
 
   it('two repairs at once share one download (refuter LOW, 2026-09-22): each missing file is fetched once', async () => {
@@ -1363,8 +1363,8 @@ describe('service-worker offline library — status and repair (B5)', () => {
    Every file the build names a hash for (ASSET_INTEGRITY, ASSET_REVISIONS) is served from the network only when
    its bytes are this build's; a mismatch is never kept, and the worker looks for its update at once. */
 describe('service-worker — this build\'s code and timings only (W27)', () => {
-  const H2C = './html2canvas.min.js';
-  const H2C_URL = 'https://app.test/html2canvas.min.js';
+  const BW = './dist/bundle-w.js';
+  const BW_URL = 'https://app.test/dist/bundle-w.js';
   const TIMINGS = './src/data/audio-sync.js';
   const TIMINGS_URL = 'https://app.test/src/data/audio-sync.js';
   const KJV = './src/data/bible-kjv.js';
@@ -1373,24 +1373,24 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
 
   it('a code file this build lacks: another build\'s bytes from the network answer 503, are never kept, and the worker looks for its update', async () => {
     const registration = updates();
-    const sw = bootSW({ fail: [H2C], resolveKeys: true, registration, fetchImpl: async (r, inst) => (r.url === H2C_URL ? bytesResp(otherBuildBytes(H2C)) : inst(r)) });
+    const sw = bootSW({ fail: [BW], resolveKeys: true, registration, fetchImpl: async (r, inst) => (r.url === BW_URL ? bytesResp(otherBuildBytes(BW)) : inst(r)) });
     await install(sw);
     await activate(sw);
-    const res = await fetchEvent(sw, getReq(H2C_URL));
+    const res = await fetchEvent(sw, getReq(BW_URL));
     expect(res.status).toBe(503);
-    expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeFalsy();
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(BW)).toBeFalsy();
     expect(registration.count).toBe(1);
     await new Promise((r) => setTimeout(r, 0));
     expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'the pages are told (up1)').toBe(1);
   });
 
   it('a code file this build lacks: its own bytes from the network are served and kept', async () => {
-    const net = bytesResp(realBytes(H2C));
-    const sw = bootSW({ fail: [H2C], resolveKeys: true, fetchImpl: async (r, inst) => (r.url === H2C_URL ? net : inst(r)) });
+    const net = bytesResp(realBytes(BW));
+    const sw = bootSW({ fail: [BW], resolveKeys: true, fetchImpl: async (r, inst) => (r.url === BW_URL ? net : inst(r)) });
     await install(sw);
-    const res = await fetchEvent(sw, getReq(H2C_URL));
+    const res = await fetchEvent(sw, getReq(BW_URL));
     expect(res).toBe(net);
-    expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeTruthy();
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(BW)).toBeTruthy();
   });
 
   /* h1104-19: a picture, icon or UI font the install's best-effort pass missed (the signal dropped) was fetched from

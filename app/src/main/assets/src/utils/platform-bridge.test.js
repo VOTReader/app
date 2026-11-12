@@ -38,8 +38,6 @@ const METHODS = [
   'setZoomEnabled',
   'resetZoom',
   'getZoomScale',
-  'takeScreenshot',
-  'takeThemedScreenshot',
   'openFilePicker',
   'saveToFile',
   'openExportSink',
@@ -90,7 +88,6 @@ function mockAndroidBridge() {
     setZoomEnabled: vi.fn(),
     resetZoom: vi.fn(),
     getZoomScale: vi.fn(() => 1.5),
-    takeScreenshot: vi.fn(() => 'data:image/jpeg;base64,abc'),
     openFilePicker: vi.fn(),
     saveToFile: vi.fn(),
     // v3 chunked bridge — defaults match the native return contracts.
@@ -205,10 +202,6 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeReadRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], 'YWJj'],
     ['nativeDeleteRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], true],
     ['getZoomScale', [], 1.5],
-    // takeScreenshot is the one async method on the bridge — Android wraps
-    // its sync native call in Promise.resolve to give consumers a uniform
-    // Promise<string> shape (web returns html2canvas's genuine Promise).
-    ['takeScreenshot', [0, 1024, 80], 'data:image/jpeg;base64,abc'],
     // getCrashLog is NO LONGER a pure passthrough — W7.4 merges the native
     // BoundedLogTree with the JS DiagnosticLog. See its own describe below.
     // v3 chunked bridge — synchronous value passthroughs (forward args, return native result).
@@ -227,7 +220,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);
-    // Unwrap Promise if the method is async (currently only takeScreenshot)
+    // Unwrap Promise if the method is async
     if (result && typeof result.then === 'function') result = await result;
     expect(result).toBe(expected);
     expect(mockAB[name]).toHaveBeenCalledTimes(1);
@@ -320,32 +313,10 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     expect(bridge.nativeReadRecording('b1b0e3a2-0000-4000-8000-000000000000.m4a')).toBeNull();
     expect(bridge.nativeDeleteRecording('b1b0e3a2-0000-4000-8000-000000000000.m4a')).toBe(false);
   });
-  it('takeScreenshot returns empty string when html2canvas cannot load', async () => {
-    // U13: html2canvas is lazy-loaded via <script> on first web screenshot. In
-    // jsdom the script never fetches, so simulate the load FAILING (onerror) →
-    // the bridge degrades to ''. (The success path is covered by the
-    // html2canvas-integration block below, which pre-sets globalThis.html2canvas
-    // so the lazy-loader short-circuits without injecting.)
-    delete (/** @type {any} */ (globalThis)).html2canvas;
-    const origAppend = document.head.appendChild.bind(document.head);
-    const spy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      if (node && /** @type {any} */ (node).tagName === 'SCRIPT') {
-        setTimeout(() => { const n = /** @type {any} */ (node); if (n.onerror) n.onerror(new Event('error')); }, 0);
-        return node;
-      }
-      return origAppend(/** @type {any} */ (node));
-    });
-    try {
-      expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
   // Category 3 — notYetImplemented warns but doesn't throw
   // (Most methods now have real impls in their own describe blocks below:
   //   setKeepScreenOn (Tier B.1), openFilePicker + saveToFile (Tier B.2),
-  //   takeScreenshot (Tier A), setImmersiveMode + setZoomEnabled + resetZoom
+  //   setImmersiveMode + setZoomEnabled + resetZoom
   //   (Tier B.3), recording methods (Tier C). Only haptic remains — its JS
   //   wiring is post-W1; see [[haptic-bridge-ready]].)
   it.each([
@@ -955,185 +926,6 @@ describe('PlatformBridge — Web setKeepScreenOn (WakeLock)', () => {
     expect(() => bridge.setKeepScreenOn(true)).not.toThrow();
     expect(() => bridge.setKeepScreenOn(false)).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────
-// Web takeScreenshot with html2canvas mocked (W1.2 Tier A integration)
-// ─────────────────────────────────────────────────────────────────────
-
-describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () => {
-  /** @type {any} */ let bridge;
-
-  beforeEach(async () => {
-    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
-    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
-  });
-
-  afterEach(() => {
-    delete (/** @type {any} */ (globalThis)).html2canvas;
-  });
-
-  // Realistic-length stub URLs — the degenerate-capture guard floors real
-  // results at >1000 chars ("data:," from a zero-sized canvas painted
-  // permanently blank tab cards before it existed).
-  const FULLSIZE_URL = 'data:image/jpeg;base64,FULLSIZE' + 'x'.repeat(1200);
-  const DOWNSCALED_URL = 'data:image/jpeg;base64,DOWNSCALED' + 'x'.repeat(1200);
-
-  it('returns html2canvas data URL when canvas dims fit within maxDim', async () => {
-    const stubCanvas = {
-      width: 800,
-      height: 600,
-      toDataURL: vi.fn(() => FULLSIZE_URL),
-    };
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
-    bridge = await importBridge();
-
-    const result = await bridge.takeScreenshot(0, 1024, 80);
-    expect(result).toBe(FULLSIZE_URL);
-    // jpegQuality 80 (int 0-100) converts to 0.8 for canvas.toDataURL
-    expect(stubCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.8);
-    expect(/** @type {any} */ (globalThis).html2canvas).toHaveBeenCalledTimes(1);
-  });
-
-  it('downscales when canvas exceeds maxDim', async () => {
-    const stubCanvas = {
-      width: 4000,
-      height: 3000,
-      toDataURL: vi.fn(() => FULLSIZE_URL),
-    };
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
-    bridge = await importBridge();
-
-    // Stub createElement('canvas') to return a controllable downscale target
-    const downscaleCanvas = {
-      width: 0,
-      height: 0,
-      getContext: vi.fn(() => ({
-        imageSmoothingEnabled: false,
-        drawImage: vi.fn(),
-      })),
-      toDataURL: vi.fn(() => DOWNSCALED_URL),
-    };
-    // The FIRST created canvas is the downscale target; the SECOND is the
-    // uniformity-probe canvas (getContext null → probe skips, like jsdom).
-    const probeCanvas = { width: 0, height: 0, getContext: vi.fn(() => null) };
-    let canvasCalls = 0;
-    const realCreate = document.createElement.bind(document);
-    const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'canvas') return /** @type {any} */ (canvasCalls++ === 0 ? downscaleCanvas : probeCanvas);
-      return realCreate(tag);
-    });
-
-    const result = await bridge.takeScreenshot(0, 1024, 90);
-    expect(result).toBe(DOWNSCALED_URL);
-    // 4000x3000 scaled by min(1024/4000, 1024/3000, 1) = 0.256 → 1024 x 768
-    expect(downscaleCanvas.width).toBe(1024);
-    expect(downscaleCanvas.height).toBe(768);
-    expect(downscaleCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9);
-
-    spy.mockRestore();
-  });
-
-  it('onclone nudges the clone onto the per-character text path (thumbnail word-spacing fix)', async () => {
-    // Owner-reported: thumbnail text rendered with words FUSED
-    // ("TheVolumesofTruth…") — html2canvas draws letter-spacing:'normal' text
-    // word-by-word into measured slots, and wider-than-measured glyph runs
-    // visually cram. The onclone hook must inject a zero-specificity
-    // letter-spacing nudge so every glyph is individually positioned, and
-    // must still toggle the forced theme class for dual-theme variants.
-    const stubCanvas = { width: 800, height: 600, toDataURL: vi.fn(() => FULLSIZE_URL) };
-    const h2c = /** @type {any} */ (vi.fn(async () => stubCanvas));
-    /** @type {any} */ (globalThis).html2canvas = h2c;
-    bridge = await importBridge();
-
-    // (theme, maxDim, quality), as use-thumbnails calls it. A stray 0 here once made maxDim 0, so the capture
-    // failed after onclone ran ('degenerate' downscale) and the test still passed on the onclone half alone.
-    expect(await bridge.takeThemedScreenshot('light', 1024, 80)).toBe(FULLSIZE_URL);
-    const opts = h2c.mock.calls[0][1];
-    expect(typeof opts.onclone).toBe('function');
-
-    const clonedDoc = document.implementation.createHTMLDocument('clone');
-    opts.onclone(clonedDoc);
-    // forced theme class lands on the clone body
-    expect(clonedDoc.body.classList.contains('light')).toBe(true);
-    // the per-character nudge style is injected with ZERO specificity (`*`),
-    // so authored letter-spacing (the Cinzel headings) still wins
-    const styles = [...clonedDoc.head.querySelectorAll('style')].map((s) => s.textContent).join('\n');
-    expect(styles).toContain('letter-spacing: 0.0001px');
-    expect(styles).toContain('*');
-  });
-
-  it('captures the app COLUMN (.screen-layout) when present — not the whole window', async () => {
-    const stubCanvas = { width: 760, height: 900, toDataURL: vi.fn(() => FULLSIZE_URL) };
-    const h2c = /** @type {any} */ (vi.fn(async () => stubCanvas));
-    /** @type {any} */ (globalThis).html2canvas = h2c;
-    const col = document.createElement('div');
-    col.className = 'screen-layout';
-    // captureTargetEl skips zero-sized layouts (jsdom's default rect) — a
-    // real column always has size, so stub one.
-    col.getBoundingClientRect = () => /** @type {any} */ ({ width: 760, height: 900 });
-    document.body.appendChild(col);
-    try {
-      bridge = await importBridge();
-      await bridge.takeScreenshot(0, 1024, 80);
-      // A wide desktop window is empty flanks around the centered column —
-      // capturing the column makes every card a mini of the app viewport.
-      expect(h2c.mock.calls[0][0]).toBe(col);
-    } finally {
-      col.remove();
-    }
-  });
-
-  it('rejects a UNIFORM capture (blank render — e.g. canvas-blocked PCs) with an empty string', async () => {
-    const stubCanvas = { width: 800, height: 600, toDataURL: vi.fn(() => FULLSIZE_URL) };
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
-    // Probe canvas whose 2d context reads back uniform white — a failed
-    // render, not a screenshot (real app screens always carry text contrast).
-    const uniform = new Uint8ClampedArray(16 * 16 * 4).fill(255);
-    const probeCanvas = {
-      width: 0, height: 0,
-      getContext: vi.fn(() => ({ drawImage: vi.fn(), getImageData: vi.fn(() => ({ data: uniform })) })),
-    };
-    const realCreate = document.createElement.bind(document);
-    const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) =>
-      tag === 'canvas' ? /** @type {any} */ (probeCanvas) : realCreate(tag));
-    bridge = await importBridge();
-    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
-    expect(stubCanvas.toDataURL).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it('rejects a zero-sized canvas (the "data:," poison) with an empty string', async () => {
-    const stubCanvas = { width: 0, height: 0, toDataURL: vi.fn(() => 'data:,') };
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
-    bridge = await importBridge();
-    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
-    expect(stubCanvas.toDataURL).not.toHaveBeenCalled();
-  });
-
-  it('returns empty string when html2canvas throws', async () => {
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => {
-      throw new Error('canvas fail');
-    });
-    bridge = await importBridge();
-
-    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
-  });
-
-  it('topCropDp is accepted but unused on web (chrome hidden via classes)', async () => {
-    const stubCanvas = {
-      width: 800, height: 600,
-      toDataURL: vi.fn(() => FULLSIZE_URL),
-    };
-    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
-    bridge = await importBridge();
-
-    // Multiple topCropDp values yield identical results — the param is web no-op
-    const r1 = await bridge.takeScreenshot(0, 1024, 80);
-    const r2 = await bridge.takeScreenshot(200, 1024, 80);
-    expect(r1).toBe(FULLSIZE_URL);
-    expect(r1).toBe(r2);
   });
 });
 
@@ -1874,67 +1666,6 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
     const orig = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((/** @type {any} */ tag) => (tag === 'input' ? fakeInput : orig(tag)));
     expect(await bridge.pickImportFile()).toBe(file);
-  });
-});
-
-/* ── captureTargetEl — robust thumbnail capture-target selection ──────────
-   The naive first-.screen-layout read burned in production: with the Tabs
-   overview open its OWN layout sits first in document order (captures shot
-   the overview), and transient zero-sized / inert-peek layouts produced the
-   "degenerate canvas 376x0" + "Unable to find element in cloned iframe"
-   PC failures. */
-describe('captureTargetEl', () => {
-  /** @type {any} */ let mod;
-  beforeEach(async () => {
-    vi.resetModules();
-    delete (/** @type {any} */ (window).AndroidBridge);
-    mod = await import('./platform-bridge.js');
-    document.body.innerHTML = '';
-  });
-  afterEach(() => { document.body.innerHTML = ''; });
-
-  const mkLayout = (parent, w, h) => {
-    const el = document.createElement('div');
-    el.className = 'screen-layout';
-    el.getBoundingClientRect = () => /** @type {any} */ ({ width: w, height: h });
-    parent.appendChild(el);
-    return el;
-  };
-
-  it('skips the tabs-overview overlay layout and returns the live column', () => {
-    const overlay = document.createElement('div');
-    overlay.className = 'tabs-overview-layer';
-    document.body.appendChild(overlay);
-    mkLayout(overlay, 600, 800);           // the overview's own screen — first in order
-    const live = mkLayout(document.body, 600, 800);
-    expect(mod.captureTargetEl()).toBe(live);
-  });
-
-  it('skips zero-sized transient layouts', () => {
-    mkLayout(document.body, 376, 0);       // the "degenerate canvas 376x0" node
-    const live = mkLayout(document.body, 760, 800);
-    expect(mod.captureTargetEl()).toBe(live);
-  });
-
-  it('skips layouts inside a pager peek or any inert subtree', () => {
-    const peek = document.createElement('div');
-    peek.className = 'pager-peek';
-    document.body.appendChild(peek);
-    mkLayout(peek, 760, 800);
-    const inertWrap = document.createElement('div');
-    inertWrap.setAttribute('inert', '');
-    document.body.appendChild(inertWrap);
-    mkLayout(inertWrap, 760, 800);
-    const live = mkLayout(document.body, 760, 800);
-    expect(mod.captureTargetEl()).toBe(live);
-  });
-
-  it('falls back to #root when no live layout qualifies', () => {
-    const root = document.createElement('div');
-    root.id = 'root';
-    document.body.appendChild(root);
-    mkLayout(document.body, 0, 0);
-    expect(mod.captureTargetEl()).toBe(root);
   });
 });
 

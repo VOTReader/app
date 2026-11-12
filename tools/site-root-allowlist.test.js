@@ -25,7 +25,7 @@ describe('the published site root', () => {
   });
 
   it('allows what the app actually loads from the root', () => {
-    for (const name of ['index.html', 'manifest.json', 'offline.html', 'html2canvas.min.js', 'study-cover-lamb.jpg']) {
+    for (const name of ['index.html', 'manifest.json', 'offline.html', 'study-cover-lamb.jpg']) {
       expect(allowed.has(name), `${name} should be publishable`).toBe(true);
     }
     // The worker cannot appear in its own CORE_ASSETS, so it is added by hand.

@@ -78,6 +78,9 @@ export function bgRouteDeps(deps, tab) {
   const c = resolveActiveContent({ screen: out.screen, bookId: tab.bookId || null, chapterNum: tab.chapterNum ?? null, letterId: tab.letterId || null });
   out.book = c.book; out.chapter = c.chapter; out.activeLetter = c.activeLetter; out.activeVolKey = c.activeVolKey;
   out.backHint = null; out.backActive = false;
+  // The route build skips what it would tell the app about the screen on show (screen-routes: the plan session's
+  // place and host, the plan pages' kept place).
+  out.bgDraw = true;
   out.fromMatthewChRef = { current: tab.fromMatthewCh || null };
   out.bcvPrevBook = null; out.bcvNextBook = null; out.bcvPrevBoundaryTitle = null; out.bcvNextBoundaryTitle = null;
   return out;

@@ -722,7 +722,7 @@ class AppInterfaceTest {
         verify { vm.pendingV3ImportUri = null }
     }
 
-    // ─── Zoom + screenshot ────────────────────────────────────────────
+    // ─── Zoom ────────────────────────────────────────────
 
     @Test
     fun `getZoomScale reads from vm`() {
@@ -730,18 +730,6 @@ class AppInterfaceTest {
         every { vm.currentScale } returns 1.75f
         val (app, _, _) = newSubject(vm = vm)
         assertEquals(1.75f, app.getZoomScale())
-    }
-
-    @Test
-    fun `takeScreenshot delegates to host with same args`() {
-        val host = FakeBridgeHost().apply { captureScreenshotResult = "data:image/jpeg;base64,XYZ" }
-        val (app, _, _) = newSubject(host = host)
-
-        val result = app.takeScreenshot(48, 1024, 85)
-
-        assertEquals("data:image/jpeg;base64,XYZ", result)
-        assertEquals(1, host.captureScreenshotCalls.size)
-        assertEquals(Triple(48, 1024, 85), host.captureScreenshotCalls[0])
     }
 
     // ─── File picker + crash log ──────────────────────────────────────
