@@ -42,6 +42,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const out = { cards: {}, firstFrame: {}, theme: {}, storage: {}, restart: {}, swipes: [] };
 const fails = [];
 const need = (ok, msg) => { if (!ok) fails.push(msg); };
+// A real recording for A1 (TABS4): `sec` seconds of a soft 220 Hz tone, 8 kHz mono 16-bit WAV.
+const makeWav = (sec) => {
+  const sr = 8000, n = sr * sec, b = Buffer.alloc(44 + n * 2);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12); b.writeUInt32LE(16, 16);
+  b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(sr, 24); b.writeUInt32LE(sr * 2, 28); b.writeUInt16LE(2, 32);
+  b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(1500 * Math.sin(2 * Math.PI * 220 * i / sr)), 44 + i * 2);
+  return b;
+};
 
 /* ── analysis page: decode images and compare them in a canvas (no image library in node_modules) ── */
 const ANALYSIS = () => {
@@ -51,9 +60,19 @@ const ANALYSIS = () => {
     const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     return { c, d: g.getImageData(0, 0, w, h).data };
   };
-  const cmp = (a, b) => { let s = 0, n = 0, big = 0; for (let i = 0; i < a.length; i += 4) { const m = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); s += (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 3; n++; if (m > 48) big++; } return { mad: +(s / n).toFixed(2), pct: +(100 * big / n).toFixed(2) }; };
+  // TABS4: a pixel painted MASK (the fixed overlays the page slides under: mini player, voice pill, toast) in either
+  // picture is left out of the comparison.
+  const masked = (d, i) => d[i] > 200 && d[i + 1] < 70 && d[i + 2] > 200;
+  const cmp = (a, b) => { let s = 0, n = 0, big = 0; for (let i = 0; i < a.length; i += 4) { if (masked(a, i) || masked(b, i)) continue; const m = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); s += (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 3; n++; if (m > 48) big++; } return { mad: n ? +(s / n).toFixed(2) : 0, pct: n ? +(100 * big / n).toFixed(2) : 0 }; };
+  const maskImg = (img, masks) => {
+    if (!masks || !masks.length) return img;
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0); g.fillStyle = '#ff00ff';
+    for (const m of masks) g.fillRect(Math.floor(m.x), Math.floor(m.y), Math.ceil(m.w) + 1, Math.ceil(m.h) + 1);
+    return c;
+  };
   const luma = (d) => { let s = 0; for (let i = 0; i < d.length; i += 4) s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; return +(s / (d.length / 4)).toFixed(1); };
-  const ink = (d, bg) => { let k = 0; for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) > 90) k++; return k / (d.length / 4); };
+  const ink = (d, bg) => { let k = 0; for (let i = 0; i < d.length; i += 4) if (!masked(d, i) && Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) > 90) k++; return k / (d.length / 4); };
   window.__ana = {
     // card picture (an element shot) against the tab's reading area shot, scaled to the card's width, top-aligned
     async card(refUrl, cardUrl) {
@@ -68,8 +87,8 @@ const ANALYSIS = () => {
     },
     async luma(url) { const i = await load(url); return luma(px(i, 64, 64).d); },
     // swipe frames (CSS-px sized screencast jpegs): rect = the scroller's box
-    async swipe(frames, rect, dx, tRel, settleMs) {
-      const imgs = await Promise.all(frames.map((f) => load(f.url)));
+    async swipe(frames, rect, dx, tRel, settleMs, masks) {
+      const imgs = (await Promise.all(frames.map((f) => load(f.url)))).map((i) => maskImg(i, masks));
       const R = (img, x, w) => px(img, Math.max(1, Math.round(w)), Math.round(rect.h), x, rect.y, w, rect.h).d;
       const fin = imgs[imgs.length - 1];
       const bgd = px(fin, 1, 1, rect.x + 2, rect.y + rect.h - 3, 1, 1).d; const bg = [bgd[0], bgd[1], bgd[2]];
@@ -108,15 +127,18 @@ const ANALYSIS = () => {
     // TABS3: the bars outside the reading area. Top bar: frames from release on against the settled frame (the
     // drag itself does not touch it). Bottom (mini player, tab bar): every frame against the first, the mini
     // player's moving progress line aside (a mad, not a pixel count, so a 1-px line stays far under 1).
-    async bars(frames, rect, tRel) {
+    async bars(frames, rect, tRel, barY) {
       const imgs = await Promise.all(frames.map((f) => load(f.url)));
       const fin = imgs[imgs.length - 1];
-      const W0 = fin.width; const top = Math.max(1, Math.round(rect.y)); const by = Math.round(rect.y + rect.h); const bh = Math.max(1, fin.height - by);
+      const W0 = fin.width; const top = Math.max(1, Math.round(rect.y)); const by = Math.round(barY || (rect.y + rect.h)); const bh = Math.max(1, fin.height - by);
       const T = (img) => px(img, W0, top, 0, 0, W0, top).d; const B = (img) => px(img, W0, bh, 0, by, W0, bh).d;
       let t = 0, ta = null, b = 0, ba = null;
       for (let i = 0; i < imgs.length; i++) {
         if (frames[i].t >= tRel + 0.36) { const c = cmp(T(imgs[i]), T(fin)).mad; if (c > t) { t = c; ta = Math.round((frames[i].t - tRel) * 1000); } }
-        const d = cmp(B(imgs[i]), B(imgs[0])).mad; if (d > b) { b = d; ba = Math.round((frames[i].t - tRel) * 1000); }
+        // TABS4: with a recording playing, the player's clock and progress line move on by themselves; a frame is still
+        // if it is the first picture or the settled one (a bar that moves or flashes is neither)
+        const bi = B(imgs[i]);
+        const d = Math.min(cmp(bi, B(imgs[0])).mad, cmp(bi, B(fin)).mad); if (d > b) { b = d; ba = Math.round((frames[i].t - tRel) * 1000); }
       }
       return { top: +t.toFixed(2), topAt: ta, bottom: +b.toFixed(2), bottomAt: ba };
     },
@@ -127,7 +149,7 @@ async function main() {
   const { server, url } = await serveOwnTree();
   const profile = join(tmpdir(), 'vot-tabs1-' + process.pid);
   rmSync(profile, { recursive: true, force: true });
-  const launch = () => puppeteer.launch({ headless: true, userDataDir: profile, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+  const launch = () => puppeteer.launch({ headless: true, userDataDir: profile, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
   let browser = await launch();
   let page, cdp;
   const anaBrowser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
@@ -140,6 +162,14 @@ async function main() {
     page.setDefaultTimeout(30000);
     await page.setViewport({ width: W, height: H, deviceScaleFactor: DPR, isMobile: true, hasTouch: true });
     cdp = await page.createCDPSession();
+    // A1 (TABS4): every media element the page makes, in or out of the DOM, so the walk can read the one that plays
+    await page.evaluateOnNewDocument(() => {
+      window.__medias = [];
+      const A = window.Audio;
+      if (typeof A === 'function') { const W = function (src) { const m = new A(src); window.__medias.push(m); return m; }; W.prototype = A.prototype; window.Audio = W; }
+      const ce = Document.prototype.createElement;
+      Document.prototype.createElement = function (t, o) { const el = ce.call(this, t, o); if (/^(audio|video)$/i.test(String(t))) window.__medias.push(el); return el; };
+    });
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
     await page.evaluate(async () => {
@@ -267,9 +297,28 @@ async function main() {
   };
 
   /* ── a swipe: CDP touch drag on the reading area, screencast frames, then the numbers ── */
-  const swipe = async (label, dir, throttle, bars = false) => {
+  /* TABS4: what is drawn over the reading area and does not slide with the page (the mini player, the voice pill, a
+     toast): fixed elements outside the screen. S1-S3 leave them out (they are not the page); A1 holds the mini player
+     still in every frame. A fixed box over half the reading area is a layer, not an overlay, and is not taken. */
+  const overlays = (rc) => page.evaluate((r) => {
+    const out = [];
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (n) => (n.classList.contains('screen-layout') || n.classList.contains('tabs-overview-layer') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    for (let el = tw.nextNode(); el; el = tw.nextNode()) {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) continue;
+      const b = el.getBoundingClientRect();
+      if (b.width < 2 || b.height < 2 || b.bottom <= r.y || b.top >= r.y + r.h || b.right <= r.x || b.left >= r.x + r.w) continue;
+      if (b.width * b.height > 0.5 * r.w * r.h) continue;
+      out.push({ x: b.left, y: b.top, w: b.width, h: b.height, c: (el.className && String(el.className).split(' ')[0]) || el.tagName });
+    }
+    return out;
+  }, rc);
+  const swipe = async (label, dir, throttle, bars = false, pre = null) => {
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     const rect = await scrollerRect();
+    const ov0 = await overlays(rect);
     const frames = [];
     const onFrame = async (f) => {
       frames.push({ t: f.metadata.timestamp, url: 'data:image/png;base64,' + f.data });
@@ -283,7 +332,13 @@ async function main() {
     const log = [];
     const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
     const wall = () => Date.now() / 1000;
+    // TABS4: `pre` acts right before the finger comes down (an arrow tap: a drag that starts before the neighbours
+    // are drawn). Were they in the DOM at that moment, and how long did the touchstart take (they are drawn in it)?
+    if (pre) await pre();
+    const peeksAtTouch = await page.evaluate(() => document.querySelectorAll('.screen-layout > .pager-viewport > .pager-peek').length);
+    const t0 = Date.now();
     await touch('touchStart', x0); log.push({ t: wall(), dx: 0 });
+    const touchStartMs = Date.now() - t0;
     for (let i = 1; i <= 24; i++) { const d = Math.round(dx * i / 24); await touch('touchMove', x0 + d); log.push({ t: wall(), dx: d }); await sleep(16); }
     await sleep(250);   // hold still: the last frames before release show the finished drag
     const peekSig = await pageSig(`.screen-layout > .pager-viewport > .pager-peek-${dir} > .screen-scroll`);
@@ -294,15 +349,24 @@ async function main() {
     cdp.off('Page.screencastFrame', onFrame);
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     const liveSig = await pageSig('.screen-layout > .pager-viewport > .screen-scroll > .pager-track');
+    const ov = [...ov0, ...(await overlays(rect))];
     const domDiff = sigDiff(peekSig, liveSig);
     if (domDiff && SHOTS) for (const [k, v] of [['peek', peekSig], ['page', liveSig]]) writeFileSync(join(SHOTS, `tabs2-dom-${label}-x${throttle}-${k}.txt`), v ? v.top + '\n' + v.lines.join('\n') : '-');
     // each frame's finger offset: the last move dispatched before it
     for (const f of frames) { let d = null; for (const l of log) if (l.t <= f.t) d = l.dx; f.dx = d; }
-    const r = await ana.evaluate((fr, rc, d, t, s) => window.__ana.swipe(fr, rc, d, t, s), frames, rect, dx, tRel, 0.36);
+    const r = await ana.evaluate((fr, rc, d, t, s, m) => window.__ana.swipe(fr, rc, d, t, s, m), frames, rect, dx, tRel, 0.36, ov);
     r.label = label; r.throttle = throttle; r.dom = domDiff || 'same'; r.top = liveSig && liveSig.top;
+    r.peeksAtTouch = peeksAtTouch; r.touchStartMs = touchStartMs;
+    if (ov.length) r.overlays = [...new Set(ov.map((o) => o.c))];
     // TABS3: the top bar (its hairline included) and, with sound, the mini player and tab bar: every frame against the
-    // settled one (A1 / T1). The top bar's line is drawn as the new page has it from the frame of release.
-    r.bars = await ana.evaluate((fr, rc, t) => window.__ana.bars(fr, rc, t), frames, rect, tRel);
+    // settled one (A1 / T1). The top bar's line is drawn as the new page has it from the frame of release. TABS4: the
+    // bottom strip starts at the mini player's top when it is drawn over the reading area.
+    // The mini player can show the page through it as the page slides under it, so it is held by its box: the same
+    // before the finger comes down and after the settle; the tab bar below the reading area by its pixels.
+    const bar = (l) => l.filter((o) => o.c === 'audio-bar').map((o) => [o.x, o.y, o.w, o.h].map(Math.round).join(','))[0] || null;
+    r.miniBox = [bar(ov0), bar(ov.slice(ov0.length))];
+    r.bars = await ana.evaluate((fr, rc, t) => window.__ana.bars(fr, rc, t, null), frames, rect, tRel);
+    if (bars) need(r.miniBox[0] === r.miniBox[1], `A1 ${label}: the mini player moved (${r.miniBox[0]} -> ${r.miniBox[1]})`);
     need(r.bars.top <= LIMITS.settleJump, `T1 ${label} x${throttle}: the top bar changed after release (mad ${r.bars.top} at +${r.bars.topAt} ms)`);
     if (bars) need(r.bars.bottom <= LIMITS.settleJump, `A1 ${label}: the mini player / tab bar moved during the swipe (mad ${r.bars.bottom} at +${r.bars.bottomAt} ms)`);
     out.swipes.push(r);
@@ -378,6 +442,9 @@ async function main() {
     await page.evaluate(() => { const b = document.querySelector('.top-nav button[aria-label="Next chapter"]'); if (b) b.click(); });
     await sleep(1200);
     await swipe('genesis-arrow-back', 'prev', 1);    // Genesis 3, left by the arrow (no swipe), back at its place
+    // TABS4: the finger comes down the moment an arrow tap has turned the page (4x CPU), before the neighbours are drawn
+    await swipe('arrow-then-drag', 'next', 4, false, () => page.evaluate(() => { const b = document.querySelector('.top-nav button[aria-label="Next chapter"]'); if (b) b.click(); }));
+    need(out.swipes[out.swipes.length - 1].peeksAtTouch === 0, `S5 arrow-then-drag: the neighbours were already drawn when the finger came down (${out.swipes[out.swipes.length - 1].peeksAtTouch}); the case did not test a drag before them`);
     await openTabs(); await pickTab(0);
     await swipe('letter-next', 'next', 1);           // a letter never opened
     await swipe('letter-back', 'prev', 4);
@@ -494,19 +561,47 @@ async function main() {
       } catch (e) { fails.push(`walk: ${label}: ${(e && e.message) || e}`); }
     }
 
+    // P1 (TABS4): a reading-plan chapter. With Mark as read off, a chapter a running plan holds keeps its Mark as read
+    // (plans2); Genesis 6, which no plan holds, has none, and the neighbour drawn for it must not carry Genesis 5's.
+    try {
+      // the setting goes in before the app boots (the running app saves its own state as the page unloads)
+      await page.evaluateOnNewDocument(() => {
+        try {
+          const s = JSON.parse(localStorage.getItem('vot-state') || 'null');
+          if (s && s.settings && s.settings.markAsRead !== false) { s.settings.markAsRead = false; localStorage.setItem('vot-state', JSON.stringify(s)); }
+        } catch (_e) { /* the case reports itself unarmed */ }
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0 && typeof ReadingPlanStore !== 'undefined'; });
+      const held = await page.evaluate(() => {
+        ReadingPlanStore.put({ id: 'e2e-tabs4', plan: 'e2e', start: '2026-11-11', status: 'running', segs: [], tracks: [{ items: [{ k: 'genesis:5' }] }] });
+        return ReadingPlanStore.holds('genesis', 5) && !ReadingPlanStore.holds('genesis', 6);
+      });
+      if (!held) throw new Error('the plan run was not stored');
+      await viaDesk('bible', ['genesis', 5], false);
+      const mar = () => page.evaluate(() => { const el = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track'); return el ? /Mark as read/i.test(el.textContent || '') : null; });
+      const armed = await mar();
+      out.more.plan = { markAsReadOnPlanPage: armed };
+      need(armed === true, `P1 the plan chapter (Genesis 5) shows no Mark as read with the setting off (${armed}): the case is not armed`);
+      await swipe('plan-chapter-next', 'next', 1);
+      out.more.plan.markAsReadOnNext = await mar();
+      need(out.more.plan.markAsReadOnNext === false, 'P1 Genesis 6 (no plan holds it) shows Mark as read');
+      await swipe('plan-chapter-back', 'prev', 1);
+    } catch (e) { fails.push(`walk: plan chapter: ${(e && e.message) || e}`); }
+
     // a search landing: the "Back to results" pill and the look's mark-as-read are that page's, not its neighbour's
     try {
       const title = ids.v1 && ids.v1.title;
       await page.evaluate(() => window.__goSearch && window.__goSearch()); await sleep(900);
       const inp = await page.waitForSelector('input[type="search"], input[type="text"]', { timeout: 8000 });
-      await inp.type(title, { delay: 10 }); await sleep(2500);
-      const hit = await page.evaluate((t) => {
-        const el = [...document.querySelectorAll('button, [role="button"], a, li')].find((b) => b.getClientRects().length && b.tagName !== 'INPUT'
-          && (b.textContent || '').includes(t) && !b.closest('form'));
-        if (!el) return false; el.click(); return true;
-      }, title);
-      if (!hit) throw new Error('no hit for ' + title);
-      await sleep(1800);
+      await inp.type(title, { delay: 10 });
+      // TABS4: tap the letter's own result card (TABS3 tapped the first element holding the title, which could be
+      // something else on the results screen, and once landed on a page with no pager: "missing neighbour")
+      await page.waitForFunction((t) => [...document.querySelectorAll('.srch-card')].some((c) => c.getClientRects().length && (c.textContent || '').includes(t)), { timeout: 20000 }, title);
+      await page.evaluate((t) => { [...document.querySelectorAll('.srch-card')].find((c) => c.getClientRects().length && (c.textContent || '').includes(t)).click(); }, title);
+      await page.waitForFunction((t) => { const tr = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track'); return !!tr && (tr.textContent || '').includes(t); }, { timeout: 10000 }, title);
+      // no settling time: the drag may start before the landing's neighbours are drawn (the race TABS3 hit once)
+      await sleep(100);
       out.more.searchPill = await page.evaluate(() => /results/i.test((document.querySelector('.screen-layout') || document.body).textContent || ''));
       await swipe('search-landing-next', 'next', 1);
       await swipe('search-landing-back', 'prev', 1);
@@ -514,28 +609,63 @@ async function main() {
 
     // A1: Genesis 2 playing; swipe to 3 and back. The sound runs on (same track, time only rises, no pause), the bars
     // above and below the reading area hold still in every frame, and the page that plays still has read-along on it.
+    // TABS4: a real recording, served to the page (a 4-minute WAV in place of every release mp3, ranges honoured), so
+    // the sound plays, the player is "playing" and read-along follows it; no network needed.
+    const wav = makeWav(240);
+    const served = [];
+    const onReq = (rq) => {
+      const u = rq.url();
+      if (!/votreader-assets\/releases\/download\/|audio\.votreader\.workers\.dev/.test(u)) { rq.continue().catch(() => {}); return; }
+      served.push(u.slice(-48));
+      const m = /bytes=(\d+)-(\d*)/.exec(rq.headers().range || '');
+      const hd = { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' };
+      if (!m) { rq.respond({ status: 200, headers: hd, body: wav }).catch(() => {}); return; }
+      const a = Math.min(+m[1], wav.length - 1); const b = m[2] ? Math.min(+m[2], wav.length - 1) : wav.length - 1;
+      rq.respond({ status: 206, headers: { ...hd, 'Content-Range': `bytes ${a}-${b}/${wav.length}` }, body: wav.subarray(a, b + 1) }).catch(() => {});
+    };
     try {
+      await page.setBypassServiceWorker(true);
+      await page.setRequestInterception(true);
+      page.on('request', onReq);
       await viaDesk('bible', ['genesis', 2], true);
-      await page.waitForFunction('AudioPlayer.getState().duration > 0', { timeout: 25000 });
+      await page.waitForFunction("AudioPlayer.getState().status === 'playing' && AudioPlayer.getState().time > 1", { timeout: 25000 });
       await sleep(1500);
-      const aud = () => page.evaluate(() => { const s = AudioPlayer.getState(); const t = s.queue[s.qi]; const m = [...document.querySelectorAll('audio')].find((x) => x.currentSrc) || null; return { key: t && (t.key || t.id || JSON.stringify(t).slice(0, 80)), src: m && m.currentSrc.slice(-60), paused: m ? m.paused : null, time: m && !m.paused ? +m.currentTime.toFixed(2) : null }; });
+      // the sound (player state + the media element that plays), and where read-along's wash (::highlight(vot-reading)) is
+      const aud = () => page.evaluate(() => {
+        const s = AudioPlayer.getState(); const t = s.queue[s.qi];
+        const m = (window.__medias || []).find((x) => x.currentSrc && !x.paused) || null;
+        const hl = window.CSS && CSS.highlights ? CSS.highlights.get('vot-reading') : null;
+        const r = hl ? [...hl][0] : null;
+        const track = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track');
+        const sc = track && track.closest('.screen-scroll');
+        const blk = r && r.startContainer && (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement);
+        const kEl = blk && blk.closest('[data-hl-key]');
+        const box = r && r.getBoundingClientRect(); const sb = sc && sc.getBoundingClientRect();
+        return { key: t && (t.key || t.id || JSON.stringify(t).slice(0, 80)), status: s.status, time: +(+s.time).toFixed(2), media: m ? +m.currentTime.toFixed(2) : null,
+          lit: kEl ? kEl.getAttribute('data-hl-key') : null, litLive: !!(r && track && track.contains(r.startContainer)),
+          litOnScreen: !!(box && sb && box.height > 0 && box.bottom > sb.top && box.top < sb.bottom) };
+      });
       const a0 = await aud();
-      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0 }; for (const m of document.querySelectorAll('audio')) { m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); } });
+      await page.evaluate(() => { window.__a1 = { pauses: 0, seeks: 0, plays: 0 }; for (const m of (window.__medias || [])) { m.addEventListener('pause', () => window.__a1.pauses++); m.addEventListener('seeking', () => window.__a1.seeks++); m.addEventListener('play', () => window.__a1.plays++); } });
       await swipe('audio-next', 'next', 1, true);
       const a1 = await aud();
       await swipe('audio-back', 'prev', 1, true);
       const a2 = await aud();
-      const ra = await page.evaluate(() => !!document.querySelector('.screen-layout > .pager-viewport > .screen-scroll .reading-along'));
       const ev = await page.evaluate(() => window.__a1);
-      out.more.audio = { a0, a1, a2, readAlongOnPlayingPage: ra, events: ev };
+      out.more.audio = { a0, a1, a2, events: ev, served: served.length };
+      need(served.length > 0 && a0.status === 'playing' && a0.media != null, `A1 the served recording is not playing (${served.length} requests, ${JSON.stringify(a0)})`);
       need(a1.key === a0.key && a2.key === a0.key, `A1 the track changed during a swipe (${a0.key} -> ${a1.key} -> ${a2.key})`);
-      need(a0.src === a1.src && a1.src === a2.src, `A1 the recording changed during a swipe (${a0.src} -> ${a1.src} -> ${a2.src})`);
-      need(a0.time == null || (a1.time > a0.time && a2.time > a1.time), `A1 the sound did not run on through the swipes (${a0.time}, ${a1.time}, ${a2.time})`);
-      need(ev.pauses === 0 && ev.seeks === 0, `A1 the audio paused or seeked during the swipes (${JSON.stringify(ev)})`);
-      // read-along follows sound; with no recording loaded (headless, no network) there is none to follow
-      need(ra || a0.time == null, 'A1 back on the playing page, read-along is not on it');
+      need(a1.status === 'playing' && a2.status === 'playing' && a1.time > a0.time && a2.time > a1.time && a1.media > a0.media && a2.media > a1.media,
+        `A1 the sound did not run on through the swipes (${a0.time}/${a0.media}, ${a1.time}/${a1.media}, ${a2.time}/${a2.media})`);
+      need(ev.pauses === 0 && ev.seeks === 0 && ev.plays === 0, `A1 the audio paused, seeked or restarted during the swipes (${JSON.stringify(ev)})`);
+      need(a0.lit && a0.litLive && a2.litLive && a2.litOnScreen, `A1 read-along's line is not on the playing page after the swipes (${JSON.stringify({ a0: [a0.lit, a0.litLive], a2: [a2.lit, a2.litLive, a2.litOnScreen] })})`);
       await page.evaluate(() => AudioPlayer.stop());
-    } catch (e) { fails.push(`walk: audio: ${(e && e.message) || e}`); }
+    } catch (e) { fails.push(`walk: audio: ${(e && e.message) || e}`); } finally {
+      page.off('request', onReq);
+      await page.setRequestInterception(false).catch(() => {});
+      await page.setBypassServiceWorker(false).catch(() => {});
+    }
+
   } catch (e) {
     fails.push(`walk: ${(e && e.stack) || e}`);
   } finally {

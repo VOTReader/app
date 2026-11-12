@@ -1013,6 +1013,23 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // loader's version, for the loop reason above.
   }, [needLetterSync, key, playerVersion]);
 
+  // TABS4: the wash on a swipe neighbour. While the recording plays the chapter next to this one (the reader swiped
+  // off it), its verse is washed in that chapter's pager peek too, so the page that slides in under the thumb already
+  // has the wash the turn would paint (measured: the wash arriving at release was the last difference, mad 1.8).
+  // Drawing only: no follow, no hold, no pill; the peek is the same markup, so the same block key.
+  const nearCh = chapter && loaded && readAlongOn && track && track.key ? AudioPlayer.bibleChapterOfTrack(track) : 0;
+  const nearRows = nearCh && nearCh !== chapter && Math.abs(nearCh - chapter) === 1 ? _bibleRowsFor(letterId, nearCh, paintVolKey) : null;
+  const nearAt = nearRows ? fragmentAt(nearRows, st.time) : -1;
+  React.useEffect(() => {
+    if (!nearRows || nearAt < 0 || typeof document === 'undefined') return;
+    const H = /** @type {any} */ (globalThis).Highlight;
+    const reg = typeof CSS !== 'undefined' ? /** @type {any} */ (CSS).highlights : null;
+    const el = document.querySelector('.screen-layout > .pager-viewport > .pager-peek [data-hl-key="bible:' + letterId + ':' + nearCh + ':' + nearRows[nearAt][1] + '"]');
+    if (!el || typeof H !== 'function' || !reg) return;
+    const r = document.createRange();
+    try { r.selectNodeContents(el); } catch (_e) { return; }
+    reg.set(HL_NAME, new H(r));
+  }, [nearRows, nearAt, nearCh, letterId, st.time]);
   const rows = (loaded && readAlongOn) ? _syncFor(key, track, chapter, paintVolKey, sectionKey) : null;
   // An alternate rendition's rows are keyed by ASSET, so they describe exactly
   // one recording and are always part 0 — the queue-position part index means
@@ -1122,7 +1139,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
     if (!supported) return undefined;
     if (!frags || !mainRef.current) {
-      /** @type {any} */ (CSS).highlights.delete(HL_NAME);
+      // the wash a swipe neighbour holds (TABS4, above) is not this pane's to clear
+      if (!(nearRows && nearAt >= 0)) /** @type {any} */ (CSS).highlights.delete(HL_NAME);
       lastFrag.current = -1;
       return undefined;
     }
@@ -1131,7 +1149,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     if (i === lastFrag.current) return undefined;
     owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn, hold.current);
     return undefined;
-  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey]);
+  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey, nearRows, nearAt]);
 
   // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
   // decoration with no box and no events — so the tap is resolved from the

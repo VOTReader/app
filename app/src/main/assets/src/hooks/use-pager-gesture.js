@@ -195,6 +195,12 @@ const SWIPE_WATCHDOG_MS = 3000;
 export function commitReadingNav(go) {
   if (typeof ReactDOM !== 'undefined' && ReactDOM.flushSync) ReactDOM.flushSync(go);
   else go();
+  paintAnnotations();
+}
+
+/** The document-wide annotation pass (highlights, links, bookmarks, note icons): after a reading page or a swipe
+ *  neighbour (ScreenLayout, TABS4) is put in the DOM outside the screen's own render. */
+export function paintAnnotations() {
   try { if (typeof applyDOMHighlights === 'function') applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
   try { if (typeof applyDOMLinks === 'function') applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
   try { if (typeof applyDOMBookmarks === 'function') applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
@@ -514,14 +520,18 @@ export function createPagerGesture(io) {
  *   onPrev: () => void,
  *   onNext: () => void
  * } | null | undefined} pager
+ * @param {(() => void) | null} [ensurePeeks] TABS4: called as one finger comes down (not while a settle runs), before
+ *   the controller sees it: ScreenLayout puts the neighbours in the DOM now if they are not drawn yet.
  * @returns {{ trackRef: {current:any}, peekPrevRef: {current:any}, peekNextRef: {current:any} }}
  */
-export function usePagerGesture(scrollRef, pager) {
+export function usePagerGesture(scrollRef, pager, ensurePeeks = null) {
   const trackRef = React.useRef(null);
   const peekPrevRef = React.useRef(null);
   const peekNextRef = React.useRef(null);
   const pagerRef = React.useRef(pager);
   pagerRef.current = pager;
+  const ensureRef = React.useRef(ensurePeeks);
+  ensureRef.current = ensurePeeks;
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -559,7 +569,12 @@ export function usePagerGesture(scrollRef, pager) {
         } catch (_e) { /* ignore */ }
       },
     });
-    const onStart = (e) => ctrl.start(e);
+    const onStart = (e) => {
+      if (ensureRef.current && !ctrl.isSettling() && e.touches && e.touches.length === 1) {
+        try { ensureRef.current(); } catch (_e) { /* a neighbour that cannot be drawn is never worth a failed swipe */ }
+      }
+      ctrl.start(e);
+    };
     const onMove = (e) => ctrl.move(e);
     const onEnd = (e) => ctrl.end(e);
     const onCancel = (e) => ctrl.cancel(e);

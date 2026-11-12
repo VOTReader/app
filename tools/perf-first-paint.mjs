@@ -6,8 +6,12 @@
  *   fcp     first-contentful-paint
  *   text    the reading page's own text is in the live column (.pager-track holds 200+ characters)
  *   tti     the end of the last long task before 2 s with none (from navigation start; text at least)
- * Run: node tools/perf-first-paint.mjs [--tree DIR] [--runs 3] [--json FILE]
+ *   peeks   (TABS4) both swipe neighbours are in the DOM
+ * Run: node tools/perf-first-paint.mjs [--tree DIR] [--runs 3] [--modes idle,eager,off] [--json FILE]
  *   --tree  another checkout's root (an older commit extracted with `git archive`); default this one.
+ *   --modes when the neighbours are drawn (window.__votPeeks, ScreenLayout.jsx): idle (the app), eager (in the page's
+ *           own render, as before TABS4), off (none). The same build; the modes take turns run by run, so a busy
+ *           machine slows them alike.
  */
 import puppeteer from 'puppeteer';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -29,16 +33,23 @@ rmSync(profile, { recursive: true, force: true });
 const browser = await puppeteer.launch({ headless: true, userDataDir: profile, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const out = { tree: TREE, runs: RUNS, pages: {} };
 
-const PROBE = () => {
-  window.__perf = { text: null, long: [] };
+const MODES = String(opt('--modes', 'idle')).split(',').filter(Boolean);
+const PROBE = (mode) => {
+  window.__votPeeks = mode;
+  window.__perf = { text: null, peeks: null, long: [] };
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__perf.long.push([e.startTime, e.startTime + e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch (_e) { /* none */ }
   const tick = () => {
-    const t = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track, .screen-layout > .screen-scroll');
-    if (t && (t.textContent || '').length > 200) { window.__perf.text = performance.now(); return; }
-    requestAnimationFrame(tick);
+    const p = window.__perf;
+    if (p.text == null) {
+      const t = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll > .pager-track, .screen-layout > .screen-scroll');
+      if (t && (t.textContent || '').length > 200) p.text = performance.now();
+    }
+    if (p.peeks == null && document.querySelectorAll('.screen-layout > .pager-viewport > .pager-peek').length >= 2) p.peeks = performance.now();
+    if (p.text == null || (p.peeks == null && performance.now() < 30000)) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 };
+const spread = (a) => { const v = a.filter((x) => x != null); return v.length ? { med: med(v), min: Math.min(...v), max: Math.max(...v) } : null; };
 
 const clickText = async (page, re) => {
   for (let i = 0; i < 20; i++) {
@@ -79,12 +90,12 @@ async function seed(how, arg) {
   await page.close();
 }
 
-async function measure() {
+async function measure(mode) {
   const page = await browser.newPage();
   await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const cdp = await page.createCDPSession();
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-  await page.evaluateOnNewDocument(PROBE);
+  await page.evaluateOnNewDocument(PROBE, mode);
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__perf && window.__perf.text != null, { timeout: 60000 });
   // quiet: 2 s with no long task
@@ -100,7 +111,8 @@ async function measure() {
     const fcp = performance.getEntriesByName('first-contentful-paint')[0];
     const text = window.__perf.text;
     const lastLong = Math.max(0, ...window.__perf.long.map((x) => x[1]));
-    return { fcp: fcp ? Math.round(fcp.startTime) : null, text: Math.round(text), tti: Math.round(Math.max(text, lastLong)), longTasks: window.__perf.long.length };
+    const pk = window.__perf.peeks;
+    return { fcp: fcp ? Math.round(fcp.startTime) : null, text: Math.round(text), peeks: pk == null ? null : Math.round(pk), tti: Math.round(Math.max(text, lastLong)), longTasks: window.__perf.long.length };
   });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   await page.close();
@@ -110,10 +122,15 @@ async function measure() {
 try {
   for (const [name, how, arg] of [['letter', 'letter', ['one', 'LETTERS_V1', 2]], ['bible', 'bible', ['genesis', 2]]]) {
     await seed(how, arg);
-    const runs = [];
-    for (let i = 0; i < RUNS; i++) runs.push(await measure());
-    out.pages[name] = { runs, median: { fcp: med(runs.map((x) => x.fcp)), text: med(runs.map((x) => x.text)), tti: med(runs.map((x) => x.tti)) } };
-    console.log(name, JSON.stringify(out.pages[name].median), JSON.stringify(runs));
+    const runs = Object.fromEntries(MODES.map((m) => [m, []]));
+    for (let i = 0; i < RUNS; i++) for (const m of (i % 2 ? [...MODES].reverse() : MODES)) runs[m].push(await measure(m));
+    out.pages[name] = {};
+    for (const m of MODES) {
+      const r = runs[m];
+      out.pages[name][m] = { runs: r, fcp: spread(r.map((x) => x.fcp)), text: spread(r.map((x) => x.text)), peeks: spread(r.map((x) => x.peeks)), tti: spread(r.map((x) => x.tti)) };
+      const o = out.pages[name][m];
+      console.log(name, m, 'fcp', JSON.stringify(o.fcp), 'text', JSON.stringify(o.text), 'peeks', JSON.stringify(o.peeks), 'tti', JSON.stringify(o.tti));
+    }
   }
 } finally {
   await browser.close().catch(() => {});

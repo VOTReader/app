@@ -276,6 +276,10 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 - **Mutator:** an inline `addEventListener('error', ...)` that pushes failed `<script>` / `<link>` / `<img>` URLs into the array
 - **Consumer:** `tools/smoke.js` reads it during the harness run (`report.resourceErrors.total`)
 
+### `__votPeeks`
+- **Setter:** `tools/perf-first-paint.mjs` only (`evaluateOnNewDocument`, before the bundles load): `'off'` or `'eager'`; the app never sets it
+- **Consumer:** `src/ui/components/ScreenLayout.jsx` `PEEKS_MODE`, read once at bundle load: when the swipe neighbours are drawn (unset: after the page has painted and gone idle, or when a finger comes down first; `'eager'`: in the page's own render, as before TABS4; `'off'`: never), so first paint can be measured with and without them on one build
+
 ### `__homeAnimShown`
 - **Setter:** `src/ui/screens/HomeScreen.js:281` — set to `true` on first HomeScreen mount
 - **Cleanup:** none — one-shot flag for the page lifetime
