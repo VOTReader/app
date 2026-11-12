@@ -180,42 +180,6 @@ export function snapLiveTab() {
   };
 }
 
-/* ── Page snapshots for the swipe ───────────────────────────────────────
-   A page left by a swipe is kept as a snapshot (the last PAGE_SNAP_MAX, in
-   memory only), keyed by its ScreenLayout placeKey. When the reader swipes
-   back to it, the neighbour that slides in under the finger is that page as
-   it really stood (its own scroll place, sticky header, end cards and
-   annotation icons), not a fresh inert render that differs from what the
-   commit then shows. A snapshot taken at another width or text size is not
-   used (the inert render is). */
-export const PAGE_SNAP_MAX = 8;
-/** @type {Map<string, any>} */
-const _pageSnaps = new Map();
-
-/** What a snapshot's layout depends on besides its own markup. */
-export function snapSig() {
-  if (typeof document === 'undefined') return '';
-  const r = document.documentElement;
-  return (window.innerWidth || 0) + '|' + getComputedStyle(r).fontSize + '|' + (r.getAttribute('style') || '').length;
-}
-
-/** @param {string} key @param {any} snap */
-export function rememberPageSnap(key, snap) {
-  if (!key || !snap) return;
-  _pageSnaps.delete(key);
-  _pageSnaps.set(key, { ...snap, sig: snapSig() });
-  while (_pageSnaps.size > PAGE_SNAP_MAX) _pageSnaps.delete(/** @type {string} */ (_pageSnaps.keys().next().value));
-}
-
-/** The page snapshot for `key` when it still fits the screen, else null. @param {string} key */
-export function pageSnapFor(key) {
-  const s = key ? _pageSnaps.get(key) : null;
-  return s && s.sig === snapSig() ? s : null;
-}
-
-/** Tests only. */
-export function _clearPageSnapsForTests() { _pageSnaps.clear(); }
-
 /**
  * A stored value read back: a well-formed snapshot (its markup scrubbed again), else null.
  * @param {any} v

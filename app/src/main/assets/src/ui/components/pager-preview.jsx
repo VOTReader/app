@@ -35,8 +35,7 @@
    wiring (ScreenLayout.jsx).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { pageSnapFor } from '../../utils/tab-snap.js';
-import { SnapBox } from './SnapBox.jsx';
+import { placeTarget, announcePlaced } from '../../utils/scroll-place.js';
 
 // ── Neighbor resolution (Letter / WTLB) ─────────────────────────────────────
 // Bible/Matthew screens already hold full neighbor chapter objects; only the
@@ -55,25 +54,6 @@ import { SnapBox } from './SnapBox.jsx';
  */
 export function holyDaysLetter(entry) {
   return entry ? { ...entry, prevLetter: entry.prevEntry || null, nextLetter: entry.nextEntry || null } : entry;
-}
-
-/**
- * The placeKey the neighbour's live ScreenLayout will carry (the screens' own formulas: LetterView and WtlbEntryView
- * `volKey:id`, BibleChapterView `book-ch-translation[-r]`, ChapterView `book-ch`), read off the inert element's
- * props. A key that does not match finds no snapshot and the inert render is used, so a mismatch is safe.
- * @param {any} el
- * @returns {string}
- */
-export function peekPlaceKey(el) {
-  const p = el && el.props;
-  if (!p) return '';
-  if (p.letter) return (p.volKey || '') + ':' + p.letter.id;
-  if (p.entry) return (p.volKey || '') + ':' + p.entry.id;
-  if (p.book && p.chapter) {
-    const base = p.book.id + '-' + p.chapter.num;
-    return 'translation' in p ? base + '-' + (p.translation || 'nkjv') + (p.restoredNames ? '-r' : '') : base;
-  }
-  return '';
 }
 
 export function resolveNeighborLetter(volKey, neighborId) {
@@ -109,6 +89,21 @@ export function letterScrollKey(volKey, neighborId) {
   return pfx + '-' + neighborId;
 }
 
+/**
+ * Put a parked neighbour at its page's saved place NOW (TABS2). A peek is built when the page it hangs from renders,
+ * which is in the same task as the turn that saves the place of the page just left, so a peek of that page could carry
+ * its place from before (or none). The pager calls this as a drag begins: the place saved by then is the one the turn
+ * will restore, and the band and the rest of the peek follow it in the same frame (`vot:placed`).
+ * @param {any} peek the `.pager-peek` element
+ */
+export function placePeek(peek) {
+  const sc = peek && peek.querySelector ? peek.querySelector('.screen-scroll[data-scroll-key]') : null;
+  if (!sc) return;
+  const y = placeTarget(sc, savedScrollFor(sc.getAttribute('data-scroll-key'))).y;
+  if (Math.abs(sc.scrollTop - y) >= 1) sc.scrollTop = y;
+  announcePlaced(sc);
+}
+
 /* PagerPeek — the absolutely-positioned neighbor page that slides in during a
    swipe. ScreenLayout mounts ONE per side (the controller drives its transform
    via peekRef). `desc` is whatever the screen's pager.peek(side) returned:
@@ -141,16 +136,6 @@ export function PagerPeek({ side, desc, peekRef }) {
             <div className="bottom-nav-title">{desc.title}</div>
           </div>
         </div>
-      </div>
-    );
-  }
-  // A neighbour this reader swiped away from keeps its snapshot (TABS1): that page as it really stood, which is
-  // exactly what the commit lands on (its scroll place, sticky header, end cards, annotation icons).
-  const snap = pageSnapFor(peekPlaceKey(desc.el));
-  if (snap) {
-    return (
-      <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={attach}>
-        <SnapBox snap={snap} className="tab-snap tab-snap-peek" />
       </div>
     );
   }

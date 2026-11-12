@@ -1,7 +1,7 @@
-/* tab-snap (TABS1, 2026-11-11): a Tabs card / swipe neighbour is a trimmed copy of the page's own markup.
+/* tab-snap (TABS1, 2026-11-11): a Tabs card is a trimmed copy of the page's own markup.
    jsdom has no layout, so each test gives the elements it builds their boxes. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { snapLiveTab, readSnap, rememberPageSnap, pageSnapFor, PAGE_SNAP_MAX, _clearPageSnapsForTests, SNAP_VERSION } from './tab-snap.js';
+import { snapLiveTab, readSnap, SNAP_VERSION } from './tab-snap.js';
 
 /** Give an element a box (viewport coords) and the scroller its client size. */
 const boxes = new Map();
@@ -13,7 +13,6 @@ beforeEach(() => {
     return /** @type {any} */ ({ top: b.top, bottom: b.top + b.height, height: b.height, left: 0, right: 412, width: 412, x: 0, y: b.top });
   };
   document.body.innerHTML = '';
-  _clearPageSnapsForTests();
 });
 afterEach(() => { Element.prototype.getBoundingClientRect = realRect; document.body.innerHTML = ''; });
 
@@ -83,20 +82,5 @@ describe('readSnap', () => {
     expect(readSnap({ v: 99, html: '<div></div>', w: 1, h: 1 })).toBeNull();
     expect(readSnap({ v: SNAP_VERSION, html: '', w: 412, h: 800 })).toBeNull();
     expect(readSnap({ v: SNAP_VERSION, html: '<div></div>', w: 0, h: 800 })).toBeNull();
-  });
-});
-
-describe('page snapshots (the swipe neighbour)', () => {
-  it('keeps the last PAGE_SNAP_MAX pages', () => {
-    for (let i = 0; i <= PAGE_SNAP_MAX; i++) rememberPageSnap('p' + i, { html: '<div></div>', w: 412, h: 800 });
-    expect(pageSnapFor('p0')).toBeNull();
-    expect(pageSnapFor('p' + PAGE_SNAP_MAX)).toBeTruthy();
-  });
-  it('is not used once the width or text size changed', () => {
-    rememberPageSnap('a', { html: '<div></div>', w: 412, h: 800 });
-    expect(pageSnapFor('a')).toBeTruthy();
-    document.documentElement.style.fontSize = '130%';
-    expect(pageSnapFor('a')).toBeNull();
-    document.documentElement.style.fontSize = '';
   });
 });

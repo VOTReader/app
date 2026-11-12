@@ -89,7 +89,7 @@ describe('BibleChapterView — the sticky mini title (U04.7)', () => {
     expect(document.querySelectorAll('.mini-title')).toHaveLength(1);
   });
 
-  it('a swipe peek draws no band, and the next chapter starts hidden', () => {
+  it('a swipe peek draws its band hidden at the top, and the next chapter starts hidden', () => {
     const { rerender } = render(at(3));
     act(() => liveIO().fire(false, 40));
     expect(band().classList.contains('shown')).toBe(true);
@@ -98,7 +98,8 @@ describe('BibleChapterView — the sticky mini title (U04.7)', () => {
     expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('John \xB7 Chapter 4');
     cleanup();
     render(at(3, { inert: true }));
-    expect(band()).toBeNull();
+    expect(band()).not.toBeNull();   // TABS2: a peek draws the band as the page it becomes will, hidden at the top
+    expect(band().classList.contains('shown')).toBe(false);
   });
 });
 

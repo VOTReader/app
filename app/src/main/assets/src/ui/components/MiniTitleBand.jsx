@@ -29,11 +29,38 @@
 export function MiniTitleBand({ heroRef, eyebrow = '', title = '', pageKey = '' }) {
   const bandRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [shown, setShown] = React.useState(false);
+  /* TABS2: a page drawn at its place (a page turn, a restore, a swipe peek) has its band in that very frame. The
+     observer reports a frame or more late, and the band then faded in over the page that had just slid in. So the
+     band is worked out from the hero's box now, with no fade, when the page changes and whenever a restorer puts the
+     column at a place (the `vot:placed` event, sent at once after the scrollTop write). The observer below still
+     carries the reader's own scrolling, with its fade. */
+  React.useLayoutEffect(() => {
+    const band = bandRef.current;
+    const root = band && band.closest('.screen-scroll');
+    if (!band || !root) return undefined;
+    const place = () => {
+      const hero = heroRef && heroRef.current;
+      const hr = hero ? hero.getBoundingClientRect() : null;
+      const host = band.parentElement;
+      const over = (host ? host.getBoundingClientRect().height : 0) + band.getBoundingClientRect().height;
+      // gone above, not below; a hero with no box yet is not one read past
+      const next = !!hr && hr.height > 0 && hr.bottom <= root.getBoundingClientRect().top + Math.round(over) + 1;
+      if (band.classList.contains('shown') !== next) {
+        band.style.transition = 'none';
+        band.classList.toggle('shown', next);
+        void band.offsetWidth;
+        band.style.transition = '';
+      }
+      setShown(next);
+    };
+    place();
+    root.addEventListener('vot:placed', place);
+    return () => root.removeEventListener('vot:placed', place);
+  }, [heroRef, pageKey]);
   React.useEffect(() => {
     const band = bandRef.current;
     const hero = heroRef && heroRef.current;
     const IO = /** @type {any} */ (globalThis).IntersectionObserver;
-    setShown(false);
     if (!band || !hero || typeof IO !== 'function') return undefined;
     const root = band.closest('.screen-scroll');
     const host = band.parentElement;

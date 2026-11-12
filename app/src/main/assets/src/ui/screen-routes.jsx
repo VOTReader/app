@@ -459,6 +459,8 @@ export function buildScreenRoutes({
     const rk = COL_BY_KEY.get(volKey).readKey;
     return {
       volKey, // lets the reading view resolve neighbor content for the swipe peek
+      // TABS2: a neighbour's own reading-chain edges (its end cards), for the swipe peek drawn as that page will be
+      boundaryFor: boundaryConfig,
       onMarkRead: (payload) => markRead(rk, letterId, payload),
       // Same key markRead's stats record uses — the tracker's frontier
       // reports and the completion's frontier-clear must share one space.
@@ -1788,6 +1790,7 @@ export function buildScreenRoutes({
         onTranslation={(/** @type {string} */ v) => updateSetting('translation', v)}
         book={book} chapter={chapter}
         bibleAudio={bibleAudioFor(book.id)}
+        bibleAudioFor={bibleAudioFor}
         onIndex={_fromSearchIndex ? _backToIndex(goBibleIdx) : book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}

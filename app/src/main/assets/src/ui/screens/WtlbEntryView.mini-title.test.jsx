@@ -85,11 +85,12 @@ describe('WtlbEntryView — the sticky mini title (B10 item 1)', () => {
     expect(band()).toBeNull();
   });
 
-  it('hangs under the "Back to" row when there is one; an inert peek draws none', () => {
+  it('hangs under the "Back to" row when there is one; an inert peek draws it too, hidden at the top (TABS2)', () => {
     renderEntry({ backHint: { title: 'results' }, onBack: () => {} });
     expect(band().parentElement.classList.contains('back-hint-row')).toBe(true);
     cleanup();
     renderEntry({ inert: true });
-    expect(band()).toBeNull();
+    expect(band()).not.toBeNull();
+    expect(band().classList.contains('shown')).toBe(false);
   });
 });

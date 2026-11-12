@@ -54,7 +54,7 @@
        DiagnosticLog) so a failing device names itself.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { snapLiveTab, rememberPageSnap } from '../utils/tab-snap.js';
+import { placePeek } from '../ui/components/pager-preview.jsx';
 
 // Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
 const SLOP = 8;
@@ -148,6 +148,7 @@ export function velocityFromSamples(samples) {
  *   getWidth: () => number,
  *   getTrack: () => any,
  *   getPeek: (dir: 'prev'|'next') => any,
+ *   prepare?: (peek: any) => void,
  *   peekFor: (side: 'prev'|'next') => any,
  *   commit: (side: 'prev'|'next') => void,
  *   reducedMotion: () => boolean,
@@ -292,6 +293,8 @@ export function createPagerGesture(io) {
     st.desc = st.pinned ? null : (io.peekFor(dir) || null);
     const trk = io.getTrack();
     const pk = st.desc ? io.getPeek(dir) : null;
+    // TABS2: the neighbour goes to its page's saved place before its first drag frame: the place the turn restores.
+    if (pk && io.prepare) { try { io.prepare(pk); } catch (_e) { /* a misplaced peek is never worth a failed swipe */ } }
     if (trk && trk.style) trk.style.willChange = 'transform';
     if (pk && pk.style) pk.style.willChange = 'transform';
   }
@@ -513,14 +516,12 @@ export function createPagerGesture(io) {
  * } | null | undefined} pager
  * @returns {{ trackRef: {current:any}, peekPrevRef: {current:any}, peekNextRef: {current:any} }}
  */
-export function usePagerGesture(scrollRef, pager, placeKey = '') {
+export function usePagerGesture(scrollRef, pager) {
   const trackRef = React.useRef(null);
   const peekPrevRef = React.useRef(null);
   const peekNextRef = React.useRef(null);
   const pagerRef = React.useRef(pager);
   pagerRef.current = pager;
-  const placeKeyRef = React.useRef(placeKey);
-  placeKeyRef.current = placeKey;
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -530,6 +531,7 @@ export function usePagerGesture(scrollRef, pager, placeKey = '') {
       getWidth: () => el.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 0) || 0,
       getTrack: () => trackRef.current,
       getPeek: (dir) => dir === 'prev' ? peekPrevRef.current : peekNextRef.current,
+      prepare: placePeek,
       peekFor: (side) => { const p = pagerRef.current; return p && typeof p.peek === 'function' ? p.peek(side) : null; },
       commit: (side) => {
         const p = pagerRef.current;
@@ -537,8 +539,6 @@ export function usePagerGesture(scrollRef, pager, placeKey = '') {
         const go = () => {
           if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
         };
-        // TABS1: the page being left, as it stands, is the neighbour a swipe back slides in (pager-preview).
-        try { if (placeKeyRef.current) rememberPageSnap(placeKeyRef.current, snapLiveTab()); } catch (_e) { /* a picture is never worth a failed turn */ }
         // ATOMIC REVEAL — the controller parks the covering peek the moment
         // this returns, so the destination must be committed AND painted with
         // its annotation layers before then. See commitReadingNav.

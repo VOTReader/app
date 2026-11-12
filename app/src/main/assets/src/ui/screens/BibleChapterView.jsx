@@ -19,7 +19,8 @@ import { recordingTranslationFor, textForRecording } from '../../utils/audio-tex
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null }) {
+export function BibleChapterView(props) {
+  const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null, bibleAudioFor = null } = props;
   const bodyRef = React.useRef(null);
   // The words on screen match the voice (critique 2026-10-05 #6): while this
   // book's recording is loaded, the chapter shows the recording's translation
@@ -167,27 +168,24 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // the resolved KJV of Genesis's recording, a peek into Exodus stayed KJV and
   // switched to NKJV the moment the swipe settled; a same-book peek still
   // resolves to the recording's edition, "to match the recording" line and all.
-  const _versesPeek = (bk, ch) => ({
-    kind: 'screen',
-    el: (
-      // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onIndex/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
-      <BibleChapterView
-        book={bk}
-        chapter={ch}
-        translation={readerTranslation}
-        restoredNames={restoredNames}
-        showChapterTitle={showChapterTitle}
-        showSectionHeadings={showSectionHeadings}
-        titleFocusHidden={titleFocusHidden}
-        headingsFocusHidden={headingsFocusHidden}
-        theme={theme}
-        markAsReadEnabled={false}
-        inert={true}
-        restoreScroll={savedScrollFor(bk.id + '-' + ch.num)}
-        onStudyNotes={bk.id === book.id ? onStudyNotes : null}
-      />
-    ),
-  });
+  // TABS2: this page's own props with only the chapter swapped (see LetterView's _letterPeek), so the page under the
+  // finger is drawn as the page it becomes: its Listen pill, translation pill, mark-as-read and end cards. A chapter of
+  // another book gets that book's own recording and edges (BIBLE_BOOK_LIST order; the far edge is not drawn this deep).
+  const _versesPeek = (bk, ch) => {
+    const same = bk.id === book.id;
+    const list = typeof BIBLE_BOOK_LIST !== 'undefined' ? BIBLE_BOOK_LIST : [];
+    const at = same ? -1 : list.findIndex((b) => b.id === bk.id);
+    const other = same ? null : {
+      bibleAudio: bibleAudioFor ? bibleAudioFor(bk.id) : null,
+      prevBook: at > 0 ? list[at - 1] : null, nextBook: at >= 0 && at < list.length - 1 ? list[at + 1] : null,
+      prevBoundaryTitle: null, nextBoundaryTitle: null,
+    };
+    return {
+      kind: 'screen',
+      el: <BibleChapterView {...props} {...other} book={bk} chapter={ch} surpriseAnchor={null} inert={true}
+        restoreScroll={savedScrollFor(bk.id + '-' + ch.num)} scrollKey={bk.id + '-' + ch.num} onStudyNotes={same ? onStudyNotes : null} />,
+    };
+  };
   // A BOOK boundary peeks the REAL neighbor book's first/last chapter
   // (2026-07-19, owner-directed "native feel") — prevBook/nextBook are full
   // BIBLE_BOOK_LIST book objects from the same loaded corpus, so the peek is
@@ -213,7 +211,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
      the top bar once the hero has scrolled away, in the hero's own words ("John · Chapter 3" over its title). */
   const heroRef = React.useRef(null);
   const heroTitle = showChapterTitle && !titleFocusHidden && displayChapterTitle ? displayChapterTitle : book.subtitle;
-  const miniTitle = inert ? null : (
+  const miniTitle = (
     <MiniTitleBand heroRef={heroRef} pageKey={chapterKey} eyebrow={book.title + ' · Chapter ' + chapter.num} title={heroTitle || ''} />
   );
 
@@ -224,6 +222,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     <ScreenLayout
       inert={inert}
       restoreScroll={restoreScroll}
+      scrollKey={props.scrollKey}
       pager={inert ? undefined : pager}
       /* placeKey is the VISIT identity: useReadTracker resets its whole
          measurement on a change, and AutoScrollControl re-measures
@@ -318,7 +317,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
                   <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
                 )}
-                <TranslationPill translation={shownTranslation} short onTranslation={!inert && typeof onTranslation === 'function' ? onTranslation : null} />
+                <TranslationPill translation={shownTranslation} short onTranslation={typeof onTranslation === 'function' ? onTranslation : null} />
               </div>
               {/* A02.2: plain Matthew and the Matthew Study Bible did not know about each other. The plain chapter
                   opens the same chapter with its study notes (a peek keeps the line, inert, as it keeps Listen). */}

@@ -35,7 +35,8 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, markAsReadEnabled, scripturesDict, footnotesMode, backHint, onBack, navBack = null, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null }) {
+export function WtlbEntryView(props) {
+  const { entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, markAsReadEnabled, scripturesDict, footnotesMode, backHint, onBack, navBack = null, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null } = props;
   // An Answers topic (AOGCG f07-f11) draws its own page (AnswersTopic.jsx) from its sidecar, plain
   // until ANSWERS_META lands: the body waits up to 300 ms for it, then paints plain and is decorated
   // in place when it arrives.
@@ -89,7 +90,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // (An Answers topic names itself in its running head instead.)
   // s23.7: the hero and the band name the entry in the same words (an entry with no number keeps no dangling " · ")
   const eyebrow = [partLabel, entry.num].filter((x) => x != null && x !== '').join(' · ');
-  const miniTitle = inert || isAns ? null : (
+  const miniTitle = isAns ? null : (
     <MiniTitleBand heroRef={heroRef} pageKey={entry.id} title={entry.title}
       eyebrow={eyebrow} />
   );
@@ -303,22 +304,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     // boundary card instead — which is what a cross-format neighbor showed
     // before real screen peeks existed.
     if (!full || !full.paragraphs) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    // TABS2: this page's own props with only the entry swapped (see LetterView's _letterPeek): drawn as it will be.
+    const sk = letterScrollKey(volKey, full.id);
     return {
       kind: 'screen',
-      el: (
-        // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onHome/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
-        <WtlbEntryView
-          entry={full}
-          volKey={volKey}
-          partLabel={partLabel}
-          scripturesDict={scripturesDict}
-          footnotesMode={footnotesMode}
-          theme={theme}
-          markAsReadEnabled={false}
-          inert={true}
-          restoreScroll={savedScrollFor(letterScrollKey(volKey, full.id))}
-        />
-      ),
+      el: <WtlbEntryView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} entry={full} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   // Cross-COLLECTION neighbor along the reading chain (2026-07-19): when the
@@ -334,22 +324,10 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     if (!destCol || !_isWtlbFamily(destCol) || !b.letterId) return card;
     const full = resolveNeighborLetter(b.volKey, b.letterId);
     if (!full || !full.paragraphs) return card; // format gate — see _entryPeek
+    const sk = letterScrollKey(b.volKey, full.id);
     return {
       kind: 'screen',
-      el: (
-        // @ts-expect-error -- inert clone: only render-affecting props are passed (see _entryPeek)
-        <WtlbEntryView
-          entry={full}
-          volKey={b.volKey}
-          partLabel={WTLB_PART_LABELS[b.volKey] || partLabel}
-          scripturesDict={scripturesDict}
-          footnotesMode={footnotesMode}
-          theme={theme}
-          markAsReadEnabled={false}
-          inert={true}
-          restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
-        />
-      ),
+      el: <WtlbEntryView {...props} entry={full} volKey={b.volKey} partLabel={WTLB_PART_LABELS[b.volKey] || partLabel} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   const pager = {
@@ -528,6 +506,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       className={isAns ? answersLayoutClass(fontScale, true) : undefined}
       inert={inert}
       restoreScroll={restoreScroll}
+      scrollKey={props.scrollKey}
       pager={inert ? undefined : pager}
       placeKey={(volKey || '') + ':' + (entry && entry.id)}
       stickyNav={<StickyChapterNav

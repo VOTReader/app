@@ -12,7 +12,10 @@
  *   C5  after a restart (same profile), every restored card is there in the first frame and still true;
  *   S1  a swipe (CDP touch drag + screencast): the neighbour under the finger at release is the page it becomes;
  *   S2  nothing changes once the settle ends (no flash, no late element);
- *   S3  no drag frame shows a blank or half-built neighbour; S1-S3 again with the CPU slowed 4x.
+ *   S3  no drag frame shows a blank or half-built neighbour; S1-S3 again with the CPU slowed 4x;
+ *   S4  (TABS2) the neighbour's markup and scroll place at release ARE the page's after the turn: the same elements,
+ *       classes, text and boxes, the same scrollTop. A peek drawn with fewer props than the page (no mark-as-read, no
+ *       Listen pill, no band) or put at another place fails here, first visits included.
  *
  * Run: node tools/e2e-tabs-true.mjs [--measure] [--shots DIR] [--json FILE]   (after npm run build; ~90 s)
  * --measure prints the numbers and exits 0; without it the limits below fail the run (exit 1).
@@ -31,7 +34,8 @@ const JSON_OUT = opt('--json') ? resolve(opt('--json')) : null;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 // Limits: TABS1 measured cards 1.4-4.8, swipes 0.7-4.5, settle 0.8 at most; the html2canvas cards were 19-137.
-export const LIMITS = { cardMad: 8, dragMad: 8, settleJump: 2, inkRatio: 0.6, lightLuma: 150, darkLuma: 90 };
+// TABS2: the neighbour is drawn as the page it becomes, so release vs settled is held under 1 (PNG frames).
+export const LIMITS = { cardMad: 8, dragMad: 1, settleJump: 1, inkRatio: 0.6, lightLuma: 150, darkLuma: 90 };
 
 const W = 412, H = 915, DPR = 3;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -219,17 +223,45 @@ async function main() {
     };
   }));
 
+  /* S4: a page's markup as seen by the eye: every element's tag, classes, visibility, box height and leaf text, and
+     the column's scrollTop. The neighbour at release (.pager-peek-<dir>'s column) against the live page after. */
+  const pageSig = (sel) => page.evaluate((s) => {
+    const root = document.querySelector(s);
+    if (!root) return null;
+    const out = [];
+    const walk = (el, d) => {
+      for (const c of el.children) {
+        if (c.classList.contains('pager-peek')) continue;
+        const cs = getComputedStyle(c);
+        const vis = cs.display === 'none' ? '-' : cs.visibility === 'hidden' ? 'h' : '';
+        const t = c.children.length ? '' : (c.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+        out.push(d + ' ' + c.tagName + '.' + [...c.classList].sort().join('.') + vis + ' ' + Math.round(c.getBoundingClientRect().height) + ' ' + t);
+        walk(c, d + 1);
+      }
+    };
+    walk(root, 0);
+    const sc = root.closest('.screen-scroll') || root;
+    return { lines: out, top: Math.round(sc.scrollTop) };
+  }, sel);
+  const sigDiff = (a, b) => {
+    if (!a || !b) return 'missing ' + (!a ? 'neighbour' : 'page');
+    if (Math.abs(a.top - b.top) > 1) return `scrollTop ${a.top} vs ${b.top}`;
+    const n = Math.max(a.lines.length, b.lines.length);
+    for (let i = 0; i < n; i++) if (a.lines[i] !== b.lines[i]) return `line ${i}: "${a.lines[i] || ''}" vs "${b.lines[i] || ''}"`;
+    return null;
+  };
+
   /* ── a swipe: CDP touch drag on the reading area, screencast frames, then the numbers ── */
   const swipe = async (label, dir, throttle) => {
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
     const rect = await scrollerRect();
     const frames = [];
     const onFrame = async (f) => {
-      frames.push({ t: f.metadata.timestamp, url: 'data:image/jpeg;base64,' + f.data });
+      frames.push({ t: f.metadata.timestamp, url: 'data:image/png;base64,' + f.data });
       try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* stopped */ }
     };
     cdp.on('Page.screencastFrame', onFrame);
-    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
+    await cdp.send('Page.startScreencast', { format: 'png', maxWidth: W, maxHeight: H, everyNthFrame: 1 });
     await sleep(300);
     const y = Math.round(rect.y + rect.h * 0.55);
     const x0 = dir === 'next' ? 360 : 52; const dx = dir === 'next' ? -290 : 290;
@@ -239,24 +271,29 @@ async function main() {
     await touch('touchStart', x0); log.push({ t: wall(), dx: 0 });
     for (let i = 1; i <= 24; i++) { const d = Math.round(dx * i / 24); await touch('touchMove', x0 + d); log.push({ t: wall(), dx: d }); await sleep(16); }
     await sleep(250);   // hold still: the last frames before release show the finished drag
+    const peekSig = await pageSig(`.screen-layout > .pager-viewport > .pager-peek-${dir} > .screen-scroll`);
     const tRel = wall();
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
     await cdp.send('Page.stopScreencast');
     cdp.off('Page.screencastFrame', onFrame);
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const liveSig = await pageSig('.screen-layout > .pager-viewport > .screen-scroll > .pager-track');
+    const domDiff = sigDiff(peekSig, liveSig);
+    if (domDiff && SHOTS) for (const [k, v] of [['peek', peekSig], ['page', liveSig]]) writeFileSync(join(SHOTS, `tabs2-dom-${label}-x${throttle}-${k}.txt`), v ? v.top + '\n' + v.lines.join('\n') : '-');
     // each frame's finger offset: the last move dispatched before it
     for (const f of frames) { let d = null; for (const l of log) if (l.t <= f.t) d = l.dx; f.dx = d; }
     const r = await ana.evaluate((fr, rc, d, t, s) => window.__ana.swipe(fr, rc, d, t, s), frames, rect, dx, tRel, 0.36);
-    r.label = label; r.throttle = throttle;
+    r.label = label; r.throttle = throttle; r.dom = domDiff || 'same'; r.top = liveSig && liveSig.top;
     out.swipes.push(r);
     if (SHOTS && r.release >= 0) {
-      savePair(`tabs1-swipe-${label}-x${throttle}-release.jpg`, frames[r.release].url);
-      savePair(`tabs1-swipe-${label}-x${throttle}-settled.jpg`, frames[frames.length - 1].url);
+      savePair(`tabs2-swipe-${label}-x${throttle}-release.png`, frames[r.release].url);
+      savePair(`tabs2-swipe-${label}-x${throttle}-settled.png`, frames[frames.length - 1].url);
     }
     need(r.release >= 0 && r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
     need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms)`);
     need(r.inkRatio == null || r.inkRatio >= LIMITS.inkRatio, `S3 ${label} x${throttle}: a drag frame showed a blank or half-built neighbour (ink ratio ${r.inkRatio})`);
+    need(!domDiff, `S4 ${label} x${throttle}: the neighbour at release is not the page it becomes (${domDiff})`);
     await sleep(600);
   };
 
@@ -312,13 +349,20 @@ async function main() {
 
     // swipes on Genesis (Bible chapter) and the letter, at 1x and 4x
     await pickTab(1);
-    await swipe('genesis-next', 'next', 1);
+    await swipe('genesis-next', 'next', 1);          // Genesis 2, never opened: a first visit
     await scrollTo(700);
-    await swipe('genesis-back', 'prev', 1);   // Genesis 1 again, at its saved place
+    await swipe('genesis-back', 'prev', 1);          // Genesis 1 again, at its saved place
     await swipe('genesis-next', 'next', 4);
+    await swipe('genesis-first-next', 'next', 4);    // Genesis 3, a first visit with the CPU slowed
+    await scrollTo(1200);
+    await page.evaluate(() => { const b = document.querySelector('.top-nav button[aria-label="Next chapter"]'); if (b) b.click(); });
+    await sleep(1200);
+    await swipe('genesis-arrow-back', 'prev', 1);    // Genesis 3, left by the arrow (no swipe), back at its place
     await openTabs(); await pickTab(0);
-    await swipe('letter-next', 'next', 1);
+    await swipe('letter-next', 'next', 1);           // a letter never opened
     await swipe('letter-back', 'prev', 4);
+    await swipe('letter-again-next', 'next', 1);     // the letter swiped to first, again
+    await swipe('letter-first-next', 'next', 4);     // the one after it: a first visit with the CPU slowed
 
     // C4: storage per tab, and closing a tab frees its row
     await openTabs(); await sleep(300);

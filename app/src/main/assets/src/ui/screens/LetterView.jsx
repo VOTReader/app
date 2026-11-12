@@ -70,7 +70,8 @@ function MarkReadRow({ read, onMark, onUndo }) {
   );
 }
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView(props) {
+  const { letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null } = props;
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
@@ -87,13 +88,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const mainRef = React.useRef(null);
   /* search200 UX B10 (1): a landing mid-letter names the letter in a band pinned under
      the top bar once this hero has scrolled away (MiniTitleBand). Its eyebrow is the
-     hero's own; an inert peek draws none. */
+     hero's own; an inert peek draws it too (TABS2), so a peek landed mid-page shows it as the page it becomes. */
   const heroRef = React.useRef(null);
   /* A02.10: a study names its units as the Studies list does ("6 Parts · Bible Study"; a study grouped in parts
      calls its units chapters): the shim's unitWord. The footers, the hero and the band all say it. */
   const unit = studyMode ? (letter.unitWord || 'Chapter') : 'Letter';
   const position = letter.num === 0 ? "Preface" : `${unit} ${letter.num}`;
-  const miniTitle = inert ? null : (
+  const miniTitle = (
     <MiniTitleBand heroRef={heroRef} eyebrow={(volumeLabel ? volumeLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
   );
   /* The title is what the reader says before the body's first timed row
@@ -128,21 +129,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // threw on arrival. Peek the boundary card instead. (Study-chapter shims
     // from `resolvePeek` are letter-shaped by construction and pass.)
     if (!full || !full.blocks) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    // TABS2: the neighbour gets THIS page's own props (the route's, which it keeps after the turn: mark-as-read, the
+    // footnote links, the related cards, the back pill) with only the letter swapped, so the page under the finger is
+    // drawn exactly as the page it becomes. A peek is inert, so the callbacks only decide what is drawn.
+    const sk = custom ? custom.scrollKey : letterScrollKey(volKey, full.id);
     return {
       kind: 'screen',
-      el: (
-        // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onHome/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
-        <LetterView
-          letter={full}
-          volKey={volKey}
-          volumeLabel={volumeLabel}
-          studyMode={studyMode}
-          theme={theme}
-          markAsReadEnabled={false}
-          inert={true}
-          restoreScroll={savedScrollFor(custom ? custom.scrollKey : letterScrollKey(volKey, full.id))}
-        />
-      ),
+      el: <LetterView {...props} {...(props.boundaryFor ? props.boundaryFor(volKey, full) : null)} letter={full} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   // Cross-VOLUME neighbor along the reading chain (2026-07-19, owner-directed
@@ -160,21 +153,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     if (!destCol || destCol.kind !== 'letter' || !b.letterId) return card;
     const full = resolveNeighborLetter(b.volKey, b.letterId);
     if (!full || !full.blocks) return card; // format gate — see _letterPeek
+    // Another volume: its own key, label and edges.
+    const sk = letterScrollKey(b.volKey, full.id);
     return {
       kind: 'screen',
-      el: (
-        // @ts-expect-error -- inert clone: only render-affecting props are passed (see _letterPeek)
-        <LetterView
-          letter={full}
-          volKey={b.volKey}
-          volumeLabel={destCol.label}
-          studyMode={studyMode}
-          theme={theme}
-          markAsReadEnabled={false}
-          inert={true}
-          restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
-        />
-      ),
+      el: <LetterView {...props} letter={full} volKey={b.volKey} volumeLabel={destCol.label} {...(props.boundaryFor ? props.boundaryFor(b.volKey, full) : { prevBoundary: null, nextBoundary: null })} surpriseAnchor={null} resolvePeek={null} inert={true} restoreScroll={savedScrollFor(sk)} scrollKey={sk} />,
     };
   };
   const pager = {
@@ -352,6 +335,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     <ScreenLayout
       inert={inert}
       restoreScroll={restoreScroll}
+      scrollKey={props.scrollKey}
       pager={inert ? undefined : pager}
       placeKey={(volKey || '') + ':' + (letter && letter.id)}
       stickyNav={<StickyChapterNav
@@ -604,7 +588,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               <div className="ornament-divider-line" />
             </div>
 
-            {!studyMode && !inert && markAsReadEnabled && onMarkRead && isRead ? (
+            {!studyMode && markAsReadEnabled && onMarkRead && isRead ? (
               <MarkReadRow read={isRead(letter.id)} onMark={() => onMarkRead()} onUndo={onUnmark} />
             ) : null}
             {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? (

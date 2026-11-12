@@ -988,7 +988,9 @@
       .pager-track .section-block,
       .pager-peek .letter-para,
       .pager-peek .letter-poetry,
-      .pager-peek .section-block { content-visibility: visible; }
+      .pager-peek .section-block,
+      .pager-track .songs-list > .songs-row,
+      .pager-peek .songs-list > .songs-row { content-visibility: visible; }
 
       .scroll-notch-marker {
         position: absolute; right: 0; width: 10px; height: 3px;
@@ -4579,8 +4581,7 @@
     .tab-card-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--surface-2); }
     .tab-card-thumb-sigil { color:var(--text-3); font-size:var(--fs-24); }
     /* TABS1: a card's picture is the tab's own page (SnapBox, utils/tab-snap.js): the copy laid out at the live
-       column's width by this stylesheet (so in the current theme and text size), scaled to the card. The same box
-       draws a swiped-away page as the neighbour that slides back in (.tab-snap-peek, scale 1). */
+       column's width by this stylesheet (so in the current theme and text size), scaled to the card. */
     .tab-snap { position:absolute; inset:0; overflow:hidden; pointer-events:none; background:var(--bg); contain:strict; }
     .tab-snap-page { position:absolute; left:0; top:0; transform-origin:0 0; }
     .tab-snap-page .screen-layout { height:auto; min-height:0; max-width:none; margin:0; border:0; overflow:visible; }
