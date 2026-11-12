@@ -403,6 +403,10 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     fireEvent.click(getByRole('tab', { name: 'Choose' }));
     expect(container.textContent).toMatch(/Didn’t download yet/);
     expect(container.textContent).toMatch(/Letter cThe server had a problem \(503\) · tries again in 12 min/);
+    // PL-LISTEN 4: one the store stopped trying by itself says so, not a time.
+    s.later = () => [{ url: U('c'), key: 'one:c', title: 'Letter c', reason: 'server', status: 404, tries: 6, at: 0, stopped: true }];
+    act(() => s.bump());
+    expect(container.textContent).toMatch(/Letter cThe server answered 404 \(not found\) · stopped trying/);
   });
 
   // W3b (au-dlrun): while a set downloads, its card takes the storage card's place and its row says how much is here.

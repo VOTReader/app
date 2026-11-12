@@ -159,7 +159,7 @@ export function DownloadQueue({ off, only = 'all' }) {
                   <span className="dl-queue-mark"><AlertIcon /></span>
                   <span className="dl-queue-copy">
                     <strong>{nameOf(t)}</strong>
-                    <small>{why + (l ? ' · tries again ' + nextTryWords(l.at, now) : '')}</small>
+                    <small>{why + (l ? (l.stopped ? ' · stopped trying' : ' · tries again ' + nextTryWords(l.at, now)) : '')}</small>
                   </span>
                   <button type="button" className="dl-link" onClick={() => retry([t])} aria-label={'Retry ' + nameOf(t)}>Retry</button>
                 </li>

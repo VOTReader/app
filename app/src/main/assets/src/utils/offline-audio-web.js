@@ -73,7 +73,7 @@ let _timing = { retry: RETRY_MS, later: LATER_MS, space: SPACE_RECHECK_MS, offli
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
 /**
  * @typedef {{ url: string, key: string, title: string, bytes: number, pri: number, wifi?: boolean, tries?: number,
- *   at?: number, reason?: string, status?: number, later?: boolean, b?: number, counted?: boolean, failedIn?: number,
+ *   at?: number, reason?: string, status?: number, later?: boolean, stopped?: boolean, b?: number, counted?: boolean, failedIn?: number,
  *   noRoom?: boolean, seq?: number }} QueueItem
  *   bytes 0 = not known; wifi: an automatic download (dl-d5), started only on Wi-Fi; tries: failed tries so far; at: not
  *   before this time (a retry's wait); reason/status: why the last try failed; later: on the "will try again" list;
@@ -277,7 +277,7 @@ function _state() {
     closedRuns: false,
     // What each one on its way was asked as, so the In line rows have titles after a reload.
     queue: actives.map((j) => _brief(j.it)).concat(waiting.map(_brief)),
-    later: _queue.filter((t) => t.later).map((t) => ({ ..._brief(t), reason: t.reason || 'network', status: t.status || 0, tries: t.tries || 0, at: t.at || 0 })),
+    later: _queue.filter((t) => t.later).map((t) => ({ ..._brief(t), reason: t.reason || 'network', status: t.status || 0, tries: t.tries || 0, at: t.at || 0, ...(t.stopped ? { stopped: true } : {}) })),
   };
 }
 
@@ -346,7 +346,7 @@ function _persistQueue() {
       v: 2,
       items: q.map((t) => ({
         url: t.url, key: t.key, title: t.title, bytes: t.bytes, pri: t.pri,
-        ...(t.wifi ? { wifi: true } : {}), ...(t.later ? { later: true, tries: t.tries || 0 } : {}),
+        ...(t.wifi ? { wifi: true } : {}), ...(t.later ? { later: true, tries: t.tries || 0 } : {}), ...(t.stopped ? { stopped: true } : {}),
         ...(t.reason ? { reason: t.reason } : {}), ...(t.status ? { status: t.status } : {}),
       })),
       paused: _paused,
@@ -381,6 +381,7 @@ function _restoreQueue() {
       url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0,
       pri: _priOf(t), ...(t.wifi === true ? { wifi: true } : {}),
       ...(t.later === true ? { later: true, tries: Math.max(0, Number(t.tries) || 0), reason: String(t.reason || 'network'), status: Number(t.status) || 0, failedIn: _batchId } : {}),
+      ...(t.later === true && t.stopped === true ? { stopped: true } : {}),
       at: 0, b: _batchId, counted: true, seq: ++_seq,
     });
   }
@@ -437,6 +438,7 @@ function _pump() {
     const room = _free >= 0 ? _free - _reserved() : Infinity;
     blockedWifi = false; blockedSpace = false; blockedRetry = false;
     for (const t of _ordered()) {
+      if (t.stopped) continue;
       if (t.at && t.at > now) {
         soonest = Math.min(soonest, t.at);
         if (t.noRoom) blockedSpace = true; else if (!t.later) blockedRetry = true;
@@ -537,8 +539,19 @@ class Failed extends Error {
   constructor(reason, status) { super(reason); this.reason = reason; this.status = status || 0; }
 }
 
+/** Tries from the "will try again" list before it stops trying by itself: a refusal that will not change, anything else. */
+const STOP_AFTER = { refused: 3, other: 20 };
+
 /**
- * Put a failed one back: a quick retry, or onto the "will try again" list with growing gaps. Never dropped.
+ * The server's answer will not change by waiting (not found, gone, no size): not a busy server or a lost signal.
+ * @param {string} reason @param {number} status
+ */
+const _refused = (reason, status) => reason === 'nosize' || (reason === 'server' && status >= 400 && status < 500 && status !== 408 && status !== 429);
+
+/**
+ * Put a failed one back: a quick retry, or onto the "will try again" list with growing gaps. Never dropped; after
+ * STOP_AFTER tries from that list it stays there but is no longer tried by itself (a link gone for good was fetched
+ * at every open and every 30 min for ever): Retry, or asking for it again, starts it over.
  * @param {QueueItem} it @param {string} reason @param {number} status
  */
 function _failed(it, reason, status) {
@@ -558,10 +571,12 @@ function _failed(it, reason, status) {
   const first = !it.later;
   it.later = true;
   const gaps = _timing.later;
-  it.at = now + gaps[Math.min(tries - quick.length - 1, gaps.length - 1)];
+  const fromList = tries - quick.length;
+  if (fromList >= (_refused(reason, status) ? STOP_AFTER.refused : STOP_AFTER.other)) { it.stopped = true; it.at = 0; }
+  else it.at = now + gaps[Math.min(fromList - 1, gaps.length - 1)];
   _queue.push(it);
   if (first) { _batch.failed++; it.failedIn = _batchId; }
-  _emit({ type: 'failed', url: it.url, reason, ...(status ? { status } : {}) });
+  _emit({ type: 'failed', url: it.url, reason, ...(status ? { status } : {}), ...(it.stopped ? { stopped: true } : {}) });
 }
 
 /** One download, start to end. @param {QueueItem} it */
@@ -744,7 +759,7 @@ export const WebOfflineAudio = {
         had.pri = Math.min(had.pri, pri);
         had.at = 0;
         had.noRoom = false;
-        if (had.later) { had.later = false; had.tries = 0; _unfail(had); }
+        if (had.later) { had.later = false; had.stopped = false; had.tries = 0; _unfail(had); }
         moved = true;
         continue;
       }
@@ -782,7 +797,7 @@ export const WebOfflineAudio = {
   },
   /** Retry now: every one on the "will try again" list (and every wait) is tried at once. */
   offlineAudioRetry() {
-    for (const t of _queue) { t.at = 0; t.noRoom = false; if (t.later) { t.later = false; t.tries = 0; _unfail(t); } }
+    for (const t of _queue) { t.at = 0; t.noRoom = false; if (t.later) { t.later = false; t.stopped = false; t.tries = 0; _unfail(t); } }
     _persistQueue();
     _pump();
     _emit({ type: 'checked' });

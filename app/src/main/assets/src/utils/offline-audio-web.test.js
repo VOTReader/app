@@ -655,6 +655,41 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('y1'))).toBe(true));
   });
 
+  // PL-LISTEN 4 (REVIEW-offline 3): a link gone for good was fetched every 30 min and at every open, for ever.
+  it('a recording the server keeps refusing stops being tried by itself, stays on the list, and Retry tries it', async () => {
+    await ready();
+    WebOfflineAudio._setTiming({ retry: [1, 1, 1], later: [1] });
+    fetchMock.mockImplementation(async () => relayResponse(0, 0, 404));
+    OfflineAudio.download([{ url: URL_OF('g1'), key: 'one:g1', title: 'Gone' }]);
+    await vi.waitFor(() => expect(OfflineAudio.later()[0]).toEqual(expect.objectContaining({ stopped: true, status: 404 })));
+    expect(gets()).toHaveLength(6);   // the first, 3 quick retries, then 3 from the list
+    await new Promise((r) => setTimeout(r, 60));
+    expect(gets()).toHaveLength(6);
+    expect(OfflineAudio.statusOf(URL_OF('g1'))).toBe('failed');
+    expect(JSON.parse(localStorage.getItem('vot.offlineAudioQueue')).items[0]).toEqual(expect.objectContaining({ later: true, stopped: true }));
+    WebOfflineAudio._reset();   // the page closes; the next open does not fetch it
+    OfflineAudio._reset();
+    fetchMock.mockClear();
+    await ready();
+    await vi.waitFor(() => expect(OfflineAudio.later()[0]).toEqual(expect.objectContaining({ stopped: true, title: 'Gone' })));
+    window.dispatchEvent(new Event('online'));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(gets()).toEqual([]);
+    fetchMock.mockImplementation(async () => relayResponse(5000));
+    OfflineAudio.retryAll();
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('g1'))).toBe(true));
+  });
+
+  it('a queue saved before there was a stop (no stopped field) comes back as it was and is tried at the open', async () => {
+    localStorage.setItem('vot.offlineAudioQueue', JSON.stringify({ v: 2, paused: false, batch: { done: 0, total: 1, failed: 1, bytes: 0, doneBytes: 0 },
+      items: [{ url: URL_OF('o1'), key: 'one:o1', title: 'Old', bytes: 0, pri: 1, later: true, tries: 9, reason: 'server', status: 404 }] }));
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    await ready();
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('o1'))).toBe(true));
+    expect(OfflineAudio.items()[0].title).toBe('Old');
+  });
+
   // dl-rework D (defect 14): a connection that stopped without an error held the browser's queue for good.
   it('a transfer with no bytes for the stall time is aborted and tried again', async () => {
     await ready();
