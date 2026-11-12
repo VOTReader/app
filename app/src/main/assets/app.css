@@ -6167,7 +6167,7 @@
     /* MERGE2b (mock .set .u): inside a group every row's name is the UI face 500, a setting and a door alike
        (the serif 400 here and the serif 18 of the shared rows read as two families in one card). */
     .ws1-settings .settings-row-label, .ws1-settings .settings-section.is-screen .ui-row-title, .ws2-found .ui-row-title, .ws2-also .ui-row-title,
-    .ws3-about .ui-row-title, .ws3-new-empty .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-body); font-weight:500; line-height:1.375; letter-spacing:0; color:var(--text-1); }
+    .ws3-about .ui-row-title, .ws3-new-empty .ui-row-title, .srch-direct-also .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-body); font-weight:500; line-height:1.375; letter-spacing:0; color:var(--text-1); }
     .ws1-settings .settings-row-desc { padding:0; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); font-style:normal; color:var(--text-2); }
     .ws1-settings .settings-row-value { font-family:var(--font-ui); font-size:var(--ts-value); font-style:normal; color:var(--text-1); }
     .ws1-note { margin:0 var(--sp-1) var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
