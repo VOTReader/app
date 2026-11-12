@@ -7,6 +7,7 @@
    bundle-d fills — one copy of each law, and no second module state. */
 import { composeNotesExport, notesExportFilename, shareNotesExport } from '../../utils/notes-export.js';
 import { clearNoteDraft } from '../../utils/note-draft.js';
+import { snapshotGroups, offerUndoRemoved } from '../../utils/annotation-undo.js';
 import { countOf } from '../../utils/download-tree.js';
 import { relativeDate } from '../../utils/dates.js';
 import { BarMenu } from '../components/RootNav.jsx';
@@ -239,9 +240,12 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
   };
   /** @param {any} note */
   const deleteNote = (note) => {
+    // The reader's own Remove offers Undo (AnnotationActionChip); so does this one: the note and its mark come back as they were.
+    const snaps = typeof AnnotationStore !== 'undefined' ? snapshotGroups([note.groupId]) : [];
     clearNoteDraft(note.groupId);
     if (typeof AnnotationStore !== 'undefined') AnnotationStore.removeGroup(note.groupId);
     NoteStore.remove(note.groupId);
+    offerUndoRemoved(snaps, 'Note deleted');
   };
 
   // "Share as text" — compose the visible list as a markdown document and

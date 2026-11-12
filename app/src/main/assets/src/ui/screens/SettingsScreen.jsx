@@ -994,6 +994,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
+  // What the dialog's own "Back up first" came to: null (not pressed, or running), 'saved', or 'none' (cancelled or failed).
+  const [wipeBackup, setWipeBackup] = React.useState(/** @type {null | 'saved' | 'none'} */ (null));
   // Verify-a-Backup result — { message, level:'ok'|'warn' } | null. Rendered
   // as a row under the Verify button; screen-local (clears on nav away).
   const [verifyReport, setVerifyReport] = React.useState(
@@ -1764,7 +1766,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               desc={'Every note, highlight, journal entry, bookmark, link, reading mark and tab, and the automatic copies'
                 + (weekly && weekly.supported ? ' (the weekly copies in Downloads/VOTReader too)' : '') + '. Settings go back to their defaults.'}>
               <UiButton small danger className="ws3-danger-btn" ariaLabel="Delete all my data" disabled={backupBusy}
-                onClick={() => { setWipeText(''); setWipeConfirm(true); }}>Delete</UiButton>
+                onClick={() => { setWipeText(''); setWipeBackup(null); setWipeConfirm(true); }}>Delete</UiButton>
             </DataRow>
           </SettingsSection>
         </SettingsGroup>
@@ -1782,7 +1784,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                 This removes every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record and saved tab, the search cache and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}. Settings go back to their defaults. This cannot be undone.
               </p>
               {/* WS3 settings (st-wipe): Back up first, inside the dialog; the dialog stays open while it runs. */}
-              <UiButton wide icon="dl" className="ws3-dialog-backup" disabled={backupBusy} onClick={() => { _runLockedBackupOperation(exportPersonalData); }}>Back up first</UiButton>
+              <UiButton wide icon="dl" className="ws3-dialog-backup" disabled={backupBusy}
+                onClick={() => { setWipeBackup(null); _runLockedBackupOperation(async () => { setWipeBackup((await exportPersonalData()) ? 'saved' : 'none'); }); }}>Back up first</UiButton>
+              {/* The dialog says what became of that backup: the toast sits behind it, and Delete waits while it runs. */}
+              {backupBusy || wipeBackup ? (
+                <p className="ws3-dialog-text" role="status">
+                  {backupBusy ? 'Saving the backup…' : wipeBackup === 'saved' ? 'Backup saved.' : 'No backup was made. Your data has not been backed up.'}
+                </p>
+              ) : null}
               <input
                 className="ws3-dialog-field"
                 type="text"
@@ -1795,12 +1804,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                 placeholder="Type DELETE to confirm"
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setWipeText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk && !backupBusy) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
               />
               <div className="ui-btn-row">
                 <UiButton onClick={() => { closeWipe(); }}>Cancel</UiButton>
-                <UiButton danger disabled={!wipeOk}
-                  onClick={() => { if (!wipeOk) return; closeWipe(); _runLockedBackupOperation(clearAllPersonalData); }}>Delete everything</UiButton>
+                <UiButton danger disabled={!wipeOk || backupBusy}
+                  onClick={() => { if (!wipeOk || backupBusy) return; closeWipe(); _runLockedBackupOperation(clearAllPersonalData); }}>Delete everything</UiButton>
               </div>
             </div>
           </div>

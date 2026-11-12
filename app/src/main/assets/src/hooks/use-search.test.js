@@ -259,6 +259,21 @@ describe('useSearch — goSearch', () => {
     });
   });
 
+  /* PL-SEARCH 7 (review 8): an index screen keeps the tab's last letter or chapter, so "Find … in this letter"
+     offered a letter he was not reading. Where he was reading is carried only from a reading screen. */
+  it('carries where he was reading from a chapter, not from the chapter list', () => {
+    let tabField = makeTabField();
+    let s = setup({ tabField, screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    act(() => { s.result.current.goSearch(); });
+    expect(tabField('searchContext')[1]).toHaveBeenCalledWith(expect.objectContaining({ bookId: 'john', at: { letterId: null, bookId: 'john', chapterNum: 3 } }));
+    tabField = makeTabField();
+    s = setup({ tabField, screen: 'bible-idx', bookId: 'john', chapterNum: 3 });
+    act(() => { s.result.current.goSearch(); });
+    const ctx = tabField('searchContext')[1].mock.calls[0][0];
+    expect(ctx).toMatchObject({ kind: 'book', bookId: 'john' });
+    expect(ctx.at).toBeUndefined();
+  });
+
   it('builds a volume-context when on a letter screen registered in COL_BY_LETTER_SC', () => {
     const tabField = makeTabField();
     const { result } = setup({ tabField, screen: 'vol-two-letter' });

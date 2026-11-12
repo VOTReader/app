@@ -1013,6 +1013,56 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
   });
 });
 
+/* PL-SEARCH 6 (REVIEW-data 5): "Back up first" runs inside the dialog. A Delete tap while it ran closed the
+   dialog and deleted nothing (the busy lock dropped it without a word), and the dialog never said whether the
+   backup was made, so a cancelled or failed one could be followed by a wipe. */
+describe('wipe dialog — Back up first (PL-SEARCH 6)', () => {
+  const okBuilt = { ok: true, manifest: { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] }, manifestBytes: 2048, mediaEntries: [], problems: [] };
+  const openWith = (openExportSink) => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildV3Manifest: vi.fn(async () => okBuilt),
+      showToast: vi.fn(),
+      PlatformBridge: {
+        isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink,
+        pickImportFile: () => null, clearGardenCache: () => {}, getCrashLog: () => '[]',
+      },
+    });
+    renderSettings();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+  };
+  const del = () => screen.getByText('Delete everything').closest('button');
+  const said = () => (document.querySelector('.ws3-dialog [role="status"]') || { textContent: '' }).textContent;
+
+  it('Delete waits while the backup runs, and the dialog says when it is saved', async () => {
+    let settle;
+    openWith(vi.fn(() => new Promise((res) => { settle = res; })));
+    expect(del().disabled).toBe(false);
+    expect(said()).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Back up first' }));
+    await vi.waitFor(() => expect(typeof settle).toBe('function'));
+    expect(del().disabled).toBe(true);
+    expect(said()).toMatch(/Saving the backup/);
+    // a tap (or Enter) meanwhile neither closes the dialog nor is lost
+    fireEvent.click(del());
+    fireEvent.keyDown(screen.getByLabelText('Type DELETE to confirm'), { key: 'Enter' });
+    expect(screen.getByText('Delete all your data?')).toBeTruthy();
+    await act(async () => { settle({ write: vi.fn(), close: vi.fn() }); });
+    await vi.waitFor(() => expect(said()).toMatch(/^Backup saved/));
+    expect(del().disabled).toBe(false);
+    expect(screen.getByText('Delete all your data?')).toBeTruthy();
+  });
+
+  it('says so when no backup was made (the save was cancelled)', async () => {
+    openWith(vi.fn(async () => null));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up first' }));
+    await vi.waitFor(() => expect(said()).toMatch(/^No backup was made/));
+    expect(del().disabled).toBe(false);
+  });
+});
+
 describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)', () => {
   beforeEach(() => modalRegistry._reset());
 

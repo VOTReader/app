@@ -482,6 +482,61 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* PL-SEARCH 7 (review 10): the order sheet sat inside the results summary, which shows only while a search is
+     done; a search starting again under the open sheet (a typed change landing, a setting) took the sheet away. */
+  it('the order sheet stays open while a search runs again under it', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    const found = {
+      parsed: null,
+      results: [
+        { score: 3, doc: { kind: 'verse', ref: 'Ps 23:1', text: 't', g: 'bible' } },
+        { score: 2, doc: { kind: 'verse', ref: 'Ps 23:2', text: 't', g: 'bible' } },
+        { score: 1, doc: { kind: 'letter', title: 'A', text: 't', g: 'v2' } },
+      ],
+      parsedTerms: [],
+    };
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve(found));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="shepherd" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(document.querySelector('.srch-sort-pick'));
+    expect(document.querySelectorAll('.select-sheet-option').length).toBe(2);
+    // the next search never settles: the screen is "searching", and the summary is gone
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => new Promise(() => {}));
+    rerender(<SearchScreen {...props} query="shepherds" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelector('.srch-results-summary')).toBeNull();
+    expect(document.querySelectorAll('.select-sheet-option').length).toBe(2);
+    vi.useRealTimers();
+  });
+
+  /* PL-SEARCH 7 (review 9): the row is the last finished search's result, so it names that search's words, not
+     the box's (which run ahead of it through the debounce and the search). */
+  it('the find-here row names the words its result was found for, not newer ones in the box', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: null,
+      results: [{ score: 3, doc: { kind: 'letter', letterId: 'the-wide-path', title: 'The Wide Path', text: 'grace', g: 'v2' } }],
+      parsedTerms: [],
+    }));
+    const props = { ...baseProps(), searchContext: { kind: 'volume', label: 'Volume Two', at: { letterId: 'the-wide-path', bookId: null, chapterNum: null } } };
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="grace" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const row = () => document.querySelector('.srch-find-here .srch-row-t');
+    expect(row().textContent).toBe('Find “grace” in this letter');
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => new Promise(() => {}));
+    rerender(<SearchScreen {...props} query="grace and peace" />);
+    expect(row().textContent).toBe('Find “grace” in this letter');
+    vi.useRealTimers();
+  });
+
   it("the groups render in the site's order, closed under Best Matches, in the Volumes corpus too", async () => {
     vi.useFakeTimers();
     /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;

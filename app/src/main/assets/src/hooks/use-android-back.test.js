@@ -6,6 +6,7 @@
    values are what it sees. Free globals the handler touches are stubbed.
 */
 
+import { setAnswersFromSearch } from '../utils/answers-from-search.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAndroidBack } from './use-android-back.js';
@@ -544,6 +545,17 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
     expect(window.handleAndroidBack()).toBe('true');
     expect(props.goHome).toHaveBeenCalledTimes(1);
     expect(props.goVolumesHome).not.toHaveBeenCalled();
+  });
+
+  it('the landing opened from the Or ask row of Search backs to Search, not Home (PL-SEARCH 2)', () => {
+    setAnswersFromSearch('why is the sky');
+    try {
+      const props = baseProps({ screen: 'answers-home' });
+      renderHook(() => useAndroidBack(props));
+      expect(window.handleAndroidBack()).toBe('true');
+      expect(props.setScreen).toHaveBeenCalledWith('search');
+      expect(props.goHome).not.toHaveBeenCalled();
+    } finally { setAnswersFromSearch(null); }
   });
 
   it.each(['answers-group', 'answers-media', 'answers-saved'])('%s steps back to the landing', (screen) => {

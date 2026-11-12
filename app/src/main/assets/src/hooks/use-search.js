@@ -338,7 +338,9 @@ export function useSearch({
       if (_scCol && _scCol.indexed !== false) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
     }
     // Where the reader was (WA3, s-inpage): a letter or a chapter, for Search's "Find … in this letter" row.
-    if (ctx && (letterId || chapterNum)) ctx = { ...ctx, at: { letterId: letterId || null, bookId: bookId || null, chapterNum: chapterNum || null } };
+    // Only from a reading screen: an index keeps the tab's last letter or chapter, which he is not reading.
+    const reading = screen === 'matthew-ch' || screen === 'bible-ch' || COL_BY_LETTER_SC.has(screen);
+    if (ctx && reading && (letterId || chapterNum)) ctx = { ...ctx, at: { letterId: letterId || null, bookId: bookId || null, chapterNum: chapterNum || null } };
     setSearchContext(ctx);
     setSearchScope(null);
     // If a pending query was stashed by the SelectionToolbar's Search
