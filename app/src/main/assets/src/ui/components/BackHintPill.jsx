@@ -6,12 +6,10 @@
    tap-through's source letter, or the search results (screen-routes'
    _readerBackHint, search200 UX B1).
 
-   TWO CASES, ONE LABEL (Track D). The lead ("‹ Back to") is Cinzel capitals;
-   a place's TITLE sits after it in its own case, italic, since it is a real
-   name ("Volume Two · The Last Trump"). A destination named by a word rather
-   than a title (`plain`: the results) is no name to set apart: it reads whole
-   in the lead's case, "‹ BACK TO RESULTS", like the app's other pills. In the
-   title slot it read "BACK TO results".
+   TWO CASES, ONE LABEL (Track D). Since FINAL1 (2026-11-11) the pill is a
+   plain row in sentence case ("‹ Back to Matthew 1"); a place's TITLE keeps
+   its own span so it can ellipsize, and a destination named by a word
+   (`plain`: the results) reads whole in the lead.
 
    CHILDREN ride in the row after the pill: the reading views hang their
    MiniTitleBand there, so the band pins under the "Back to" row (B10 item 1).

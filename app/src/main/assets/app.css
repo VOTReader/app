@@ -2771,8 +2771,8 @@
          opaque ghost text in the fade zone — the owner's "weird fuzzing".
          Never re-add the blur.) A gold hairline gives a crisp bottom edge. */
       position: sticky; top: 0; z-index: 5;
-      display: flex; justify-content: center;
-      padding: 0.5rem 1rem;
+      display: flex;
+      padding: 0 1rem;
       background: var(--bg);
       border-bottom: 1px solid var(--gold-border);
       pointer-events: none;
@@ -2830,41 +2830,19 @@
     }
     .mini-title-name { font-family: var(--font-garamond); font-size: var(--fsc-16); line-height: 1.25; color: var(--cream); }
     @media (prefers-reduced-motion: reduce) { .mini-title, .mini-title.shown { transition: none; transform: none; } }
+    /* FINAL1 (r-study): a plain row in the page's own type, sentence case, no pill */
     .back-hint-pill {
-      display:inline-flex; align-items:center; gap:0.35rem;
-      max-width:100%;
-      padding:0.32rem 0.75rem;
-      background:rgba(200,164,86,0.08);
-      border:1px solid var(--gold-border);
-      border-radius:999px;
-      color:var(--gold-dim);
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
-      text-transform:uppercase;
-      cursor:pointer;
-      transition:all 0.18s ease;
-      -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation;
-      /* "‹ Back to" (.back-hint-lead) never wraps. The title, capped at 60vw,
-         ellipsizes beside it; when a Text Size leaves no room for both on one
-         line (300 % on a phone) it drops to a second line instead of shrinking
-         to nothing. */
-      white-space:nowrap;
-      flex-wrap:wrap;
-      row-gap:0.1rem;
-      position:relative;
+      display:inline-flex; align-items:center; gap:0.35rem; max-width:100%; min-height:44px; padding:0;
+      background:none; border:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--fs-14);
+      cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+      /* "Back to" never wraps; the title ellipsizes beside it, or takes a second line at a large Text Size */
+      white-space:nowrap; flex-wrap:wrap; row-gap:0.1rem;
     }
-    /* The pill stays slim; its hit area is 44 px tall. */
-    .back-hint-pill::after { content:''; position:absolute; left:0; right:0; top:50%; height:44px; transform:translateY(-50%); }
-    .back-hint-pill:active { background:rgba(200,164,86,0.18); transform:scale(0.98); }
-    @media (hover: hover) { .back-hint-pill:hover { color:var(--gold); border-color:var(--gold-dim); } }
-    .back-hint-pill .back-hint-arrow { color:var(--gold); font-size:var(--fs-14); margin-right:0.1rem; }
+    .back-hint-pill:active { opacity:0.7; }
+    @media (hover: hover) { .back-hint-pill:hover { color:var(--text-1); } }
+    .back-hint-pill .back-hint-arrow { color:var(--gold); font-size:var(--fs-18); line-height:1; margin-right:0.1rem; }
     .back-hint-pill .back-hint-lead { display:inline-flex; align-items:center; gap:0.35rem; flex:0 0 auto; }
-    .back-hint-pill .back-hint-title {
-      color:var(--cream-dim); text-transform:none; font-size:var(--fs-12);
-      letter-spacing:0; font-style:italic;
-      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-      max-width:60vw;
-    }
+    .back-hint-pill .back-hint-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60vw; }
 
     /* ── Tap-through highlight ── two quick pulses, 5s rest, forever.
        The browser's default <mark> style sets color:marktext (dark text). We
