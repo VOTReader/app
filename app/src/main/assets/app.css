@@ -4230,7 +4230,8 @@
     .card-direct .srch-card-top { margin-top:5px; }
     .card-direct .srch-card-ref { font-size:var(--ts-title); line-height:1.25; font-weight:700; }
     .card-direct .srch-card-snippet { color:var(--text-1); font-size:var(--ts-headline); }
-    .srch-direct-open { margin-top:14px; }
+    /* FINAL1 (s-ref): two equal 44 px pills, Open (primary) and Listen on the raised fill, as the mock */
+    .srch-direct-acts { display:flex; gap:10px; margin-top:14px; } .srch-direct-acts > .ui-btn { flex:1 1 0; min-height:44px; } .srch-direct-acts > .srch-direct-listen { background:var(--surface-2); }
     .srch-card-wrap > .srch-card { padding-bottom:8px; }
     .srch-places-toggle, .srch-also-toggle { width:calc(100% - 2 * var(--card-pad)); margin:0 var(--card-pad); border-top-color:var(--hairline); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
     .srch-also-item { font-family:var(--font-ui); letter-spacing:0; text-transform:none; }
