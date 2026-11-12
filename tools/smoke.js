@@ -626,7 +626,7 @@
       // this step go with it without equivalent credit somewhere the reader sees.
       await goHome();
       // About lives in Settings > Help since the three tabs (2026-11-10).
-      openSettings(); await sleep(400);
+      await openSettings(); await sleep(400);
       var help = document.querySelector('[data-settings-group="help"] button');
       if (help && !document.querySelector('[data-settings-group="help"].open')) { help.click(); await sleep(200); }
       if (!clickByText(/About VOTReader/)) return false;
