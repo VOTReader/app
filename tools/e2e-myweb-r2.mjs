@@ -62,13 +62,13 @@
  *      full sits between two ticks <= 50 ms apart (the Verifier's bite, fade
  *      removed: 0 fading frames, both frames, 4-5 ms cadence), UNRESOLVED when
  *      the tick gap there is longer (neither passes).
- *      Launch classification, printed on every launch: release frames drawn
- *      as main-thread long tasks >= 50 ms mean the 2D canvas is in software
- *      raster for that browser (measured on the RTX 5080 D3D11 string: 330-502
- *      ms a frame on desktop, 73-105 ms on the phone frame, against 5-8 ms
- *      accelerated; a new page in the same browser inherits it), so that
- *      launch is not a number: the browser is relaunched, up to three, and
- *      three software launches FAIL as "not a number". NO pixel read-back in
+ *      Launch classification, printed on every launch, by what the frames
+ *      show (WEB3): release ticks whose median gap is over 250 / 3 ms cannot
+ *      show a 250 ms fade as three frames, so that launch is not a number
+ *      (software raster: 330-502 ms a frame on desktop, 73-105 ms on the phone
+ *      frame, against 5-8 ms accelerated and 51-66 ms accelerated on a loaded
+ *      machine; long tasks are printed as information): the browser is
+ *      relaunched, up to three, and three coarse launches FAIL as "not a number". NO pixel read-back in
  *      this arm and it runs FIRST on a fresh page: two getImageData reads on
  *      the ui canvas, even before the notch, demote it the same way; the
  *      luminance instrument at 56133fd4 measured the defect it created (on a
@@ -157,6 +157,15 @@ const BAND_FILL = 0.6;
 // a software-raster one in 73-105 ms (phone) / 330-502 ms (desktop). 50 sits
 // between the two populations with a factor of >= 1.4 to the nearer one.
 const SOFT_MS = 50;
+// WEB3: the classifier reads what the frames show, not how long they took. A loaded machine (other
+// gate suites beside the walk) stretches an accelerated release frame to 51-66 ms of main-thread long
+// task, which SOFT_MS called software raster, so three launches "not a number" on a working fade. What
+// the gate needs is a trace fine enough to see a fade: a 250 ms fade (the app's) shows at least three
+// fading frames when the ticks through the release are <= 250 / 3 ms apart, at any machine load. A
+// coarser trace (software raster: 73-105 ms phone, 330-502 desktop) cannot tell a fade from a pop and is
+// not a number. Long tasks are still printed, as information.
+const FADE_MS = 250;
+const RESOLVE_MS = Math.floor(FADE_MS / 3);
 // diagnosis only (e.g. --disable-features=SkiaGraphite); a run with args is
 // not the frame the reader gets and is printed as such
 const CHROME_ARGS = (process.env.MYWEB_CHROME_ARGS || '').split(' ').filter(Boolean);       // a rail "zoomed to a book": the book spans >= 60 % of the width
@@ -504,7 +513,13 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const gaps = after.slice(1).map((x, i) => x.t - after[i].t);
   const maxGap = gaps.length ? Math.max(...gaps) : 0;
   const cadence = after.length > 1 ? Math.round((after[after.length - 1].t - after[0].t) / (after.length - 1)) : 0;
-  const soft = longs.filter((l) => l.ms >= SOFT_MS);
+  // the trace's resolution through the release: the median tick gap from the last live frame to full
+  // (the whole window when the release is not bounded), which is what the frames could show
+  const span = (firstFull ? after.slice(0, after.indexOf(firstFull) + 1) : after);
+  const relGaps = (span.length > 1 ? span : all).slice(1).map((x, i) => x.t - (span.length > 1 ? span : all)[i].t).sort((a, b) => a - b);
+  const medGap = relGaps.length ? relGaps[Math.floor(relGaps.length / 2)] : Infinity;
+  const soft = medGap > RESOLVE_MS ? [{ t: 0, ms: medGap }] : [];
+  note(`${tag} R (launch ${attempt}): release ticks median ${medGap} ms apart (resolves a ${FADE_MS} ms fade into >= 3 frames when <= ${RESOLVE_MS}); long tasks >= ${SOFT_MS} ms: ${longs.filter((l) => l.ms >= SOFT_MS).length} (information)`);
   note(`${tag} R (launch ${attempt}): cap-fraction trace after the notch: ${shots.length} frames over ${shots[shots.length - 1].t - shots[0].t} ms (cadence ${cadence} ms, largest gap ${maxGap} ms): live ${live.length} frames (${lastLive ? 'to t+' + lastLive.t : 'none'}), fading ${fading.length} frames over ${fadeSpan} ms, falls ${falls}, full from t+${firstFull ? firstFull.t : '-'}; main-thread long tasks in the window: ${longs.length ? longs.map((l) => `${l.ms} ms at t+${l.t}`).join(', ') : 'none'}`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R-launch${attempt}.json`), JSON.stringify({ shots: all, longs }, null, 1));
   // headless Chrome lands the 2D canvas in software raster on some launches
@@ -517,11 +532,11 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const starved = !soft.length && (all.length < 3 || Math.max(...all.slice(1).map((x, i) => x.t - all[i].t)) >= 200);
   if (starved) soft.push({ t: 0, ms: 0 });
   if (soft.length) {
-    if (attempt < 3) { note(`${tag} R: launch ${attempt} ${starved ? `starved the page (${all.length} ticks, largest hole ${Math.max(...all.slice(1).map((x, i) => x.t - all[i].t))} ms, no long task)` : `drew the release as long tasks (${soft.map((l) => l.ms + ' ms').join(', ')}): software-raster canvas`}, not a number; relaunching the browser`); return 'software'; }
-    fails.push(`${tag} R: three browser launches drew the release as main-thread long tasks (last: ${soft.map((l) => l.ms + ' ms').join(', ')}): no accelerated canvas to judge the fade on; not a number`);
+    if (attempt < 3) { note(`${tag} R: launch ${attempt} ${starved ? `starved the page (${all.length} ticks, largest hole ${Math.max(...all.slice(1).map((x, i) => x.t - all[i].t))} ms)` : `drew the release ${medGap} ms a frame (median): too coarse to see a ${FADE_MS} ms fade (software-raster canvas)`}, not a number; relaunching the browser`); return 'software'; }
+    fails.push(`${tag} R: three browser launches drew the release too coarsely to see a fade (last: median ${medGap} ms a frame, over ${RESOLVE_MS}): no canvas to judge the fade on; not a number`);
     return 'software';
   }
-  note(`${tag} R: launch ${attempt} classified accelerated (no long task >= ${SOFT_MS} ms in the release window)${attempt > 1 ? ' after ' + (attempt - 1) + ' software launch(es)' : ' first try'}`);
+  note(`${tag} R: launch ${attempt} resolves the fade (release ticks median ${medGap} ms <= ${RESOLVE_MS})${attempt > 1 ? ' after ' + (attempt - 1) + ' coarse launch(es)' : ' first try'}`);
   // the jump: the tick gap into the first full frame. Too few fading frames is
   // a POP only when the sampler saw the jump between two close ticks; a long
   // gap there is UNRESOLVED (the instrument did not see it; neither passes)
