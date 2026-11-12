@@ -61,6 +61,12 @@ export function CollectionDownload({ label, unitsFor, readers, onOpenDownloads }
   const some = units.length - todo.length;
   const go = () => { downloadWhenOnline(off, tracks); setOpen(false); };
   const ask = () => { off.refresh(); off.requestSizes(urls); setOpen(true); };
+  // Another voice is other files: their sizes are asked for too (the size on the button, the room check).
+  const pick = (/** @type {string} */ v) => {
+    setVoice(v);
+    const theirs = unitsFor(v).flatMap((x) => x.tracks.map((t) => t.url));
+    if (theirs.length) off.requestSizes(theirs);
+  };
   const runsClosed = typeof off.runsClosed === 'function' && off.runsClosed();
   return (
     <>
@@ -83,7 +89,7 @@ export function CollectionDownload({ label, unitsFor, readers, onOpenDownloads }
         </div>
       </ActionSheet>
       <SelectSheet open={picking} onClose={() => { setPicking(false); setOpen(true); }} title="Voice to download" value={voice}
-        options={options} onChange={setVoice} />
+        options={options} onChange={pick} />
     </>
   );
 }

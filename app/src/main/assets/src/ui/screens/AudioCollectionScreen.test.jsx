@@ -325,6 +325,9 @@ describe('a recordings screen in the phone app: downloads', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Voice/ }));
     fireEvent.click(screen.getByRole('radio', { name: /Text-to-speech/ }));
     expect(screen.getByRole('dialog', { name: 'Download Volume One' }).textContent).toContain('Text-to-speech');
+    // PL-LISTEN (REVIEW-listen 9): sizes were asked only for the voice the sheet opened with, so another voice's
+    // files had none: no size on the button and no room check.
+    expect(store.requestSizes).toHaveBeenLastCalledWith([URL_OF('idA'), URL_OF('idC1v'), URL_OF('idC2v')]);
     fireEvent.click(screen.getByRole('button', { name: 'Download 15 MB' }));
     expect(store.download.mock.calls[0][0].map((t) => t.url)).toEqual([URL_OF('idA'), URL_OF('idC1v'), URL_OF('idC2v')]);
     fireEvent.click(screen.getByRole('button', { name: 'Download Volume One' }));
