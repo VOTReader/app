@@ -72,6 +72,20 @@ describe('Reading plans: the list (3.1)', () => {
   });
 });
 
+describe('Reading plans: a later start with its first days already counted (L3)', () => {
+  it('the Starts card shows the first day not yet counted, not a Day 1 that is ticked', () => {
+    let run = { ...startCatalogPlan('bible-year', null, new Date()), start: tomorrowKey() };
+    for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(2)), 1);
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    openRow();
+    const card = document.querySelector('.plan-today');
+    expect(card.querySelector('.root-eyebrow').textContent).toMatch(/^Starts /);
+    expect(card.querySelector('.plan-today-title').textContent).toBe('Genesis 4-7');
+    expect(card.querySelector('.plan-today-sub').textContent).toMatch(/^Day 2 · about /);
+  });
+});
+
 describe('Reading plans: the preview (3.2)', () => {
   it('says the facts and the first week, and START PLAN starts it and opens its page', () => {
     render(<PlansHub {...base()} />);
