@@ -532,7 +532,8 @@ async function main() {
       need(a0.src === a1.src && a1.src === a2.src, `A1 the recording changed during a swipe (${a0.src} -> ${a1.src} -> ${a2.src})`);
       need(a0.time == null || (a1.time > a0.time && a2.time > a1.time), `A1 the sound did not run on through the swipes (${a0.time}, ${a1.time}, ${a2.time})`);
       need(ev.pauses === 0 && ev.seeks === 0, `A1 the audio paused or seeked during the swipes (${JSON.stringify(ev)})`);
-      need(ra, 'A1 back on the playing page, read-along is not on it');
+      // read-along follows sound; with no recording loaded (headless, no network) there is none to follow
+      need(ra || a0.time == null, 'A1 back on the playing page, read-along is not on it');
       await page.evaluate(() => AudioPlayer.stop());
     } catch (e) { fails.push(`walk: audio: ${(e && e.message) || e}`); }
   } catch (e) {
