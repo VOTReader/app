@@ -8276,6 +8276,16 @@
     .sw-empty-go { pointer-events: auto; position: relative; min-height: 40px; padding: 0 18px; border: 0; border-radius: 20px; background: var(--sw-gold); color: #1a1608; font: 600 var(--fsc-15) var(--font-ui); cursor: pointer; }
     .sw-empty-go::after { content: ''; position: absolute; left: 0; right: 0; top: -2px; bottom: -2px; }
     .sw-empty-go:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 3px; }
+    /* A short landscape screen (a phone on its side, 360 px tall): the card took 0.79 of the web's rows
+       (e2e-myweb R3, limit 0.45). There it is one band: no mark, the first sentence only, Start reading at its right. */
+    @media (orientation: landscape) and (max-height: 480px) {
+      .sw-root:not(.sw-narrow) .sw-empty { display: flex; align-items: center; gap: 14px; width: min(640px, calc(100% - 48px)); padding: 10px 44px 10px 16px; }
+      .sw-root:not(.sw-narrow) .sw-empty-in { flex: 1 1 auto; min-width: 0; }
+      .sw-root:not(.sw-narrow) .sw-empty-mark, .sw-root:not(.sw-narrow) .sw-empty-more { display: none; }
+      .sw-root:not(.sw-narrow) .sw-empty-title { margin: 0 0 2px; font-size: var(--fsc-16); }
+      .sw-root:not(.sw-narrow) .sw-empty-body { font-size: var(--fsc-13); line-height: 1.35; }
+      .sw-root:not(.sw-narrow) .sw-empty-foot { flex: none; margin-top: 0; }
+    }
     /* My Web's list: "Links" and its line, Yours | Timothy's notes, then one card of rows */
     .sw-root .sw-list-tabs { margin-top: 12px; }
     .sw-list-tabs + .sw-choice-list { margin-top: 10px; }

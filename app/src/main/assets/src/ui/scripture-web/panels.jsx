@@ -208,7 +208,8 @@ export function EmptyWebNotice({ onDismiss, onStart }) {
           {/* the faint threads behind the card are Timothy's notes: it stays small and inert but for its buttons */}
           <div className="sw-empty-body">
             Select text anywhere in the app, tap Link, and pick where it goes. It shows here as a gold thread.
-            The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
+            {/* a short landscape screen leaves this second sentence out (app.css, landscape and max-height 480px) */}
+            <span className="sw-empty-more"> The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.</span>
           </div>
         </div>
       </div>
