@@ -143,6 +143,19 @@ describe('LetterView — a study names its parts (A02.10)', () => {
     expect(labels).toEqual(['Previous part', 'Next part']);
   });
 
+  it('a long study title: the hero holds it to one cut line before an always-shown position; the band names it short', () => {
+    const LONG = 'YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study)';
+    globalThis.studyShortTitle = (t) => t.slice(0, t.indexOf(':'));
+    try {
+      renderLetter({ studyMode: true, volumeLabel: LONG }, { ...LETTER, num: 1, unitWord: 'Chapter' });
+      const eb = document.querySelector('.hero-eyebrow');
+      expect(eb.classList.contains('has-col')).toBe(true);
+      expect(eb.querySelector('.hero-eyebrow-col').textContent).toBe(LONG);
+      expect(eb.querySelector('.hero-eyebrow-pos').textContent).toBe(' \xA0\xB7\xA0 Chapter 1');
+      expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('YAHUSHUA More Than a Man \xB7 Chapter 1');
+    } finally { delete globalThis.studyShortTitle; }
+  });
+
   it('a letter still says Letter', () => {
     renderLetter();
     const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);

@@ -47,3 +47,16 @@ describe('ProphecyCard — W44: the expand/collapse-all signal', () => {
     expect(expanded()).toBe('true');
   });
 });
+
+describe('ProphecyCard — the new card language (studies pass 2026-11-12)', () => {
+  it('its chevron is the Collapse-all control icon, hidden from a screen reader, turned when closed', () => {
+    const statesRef = { current: { 'L2:3:ot': false } };
+    render(card({ statesRef }));
+    const chev = document.querySelector('.prophecy-card-chevron');
+    expect(chev.getAttribute('aria-hidden')).toBe('true');
+    expect(chev.querySelector('svg polyline').getAttribute('points')).toBe('6 9 12 15 18 9');
+    expect(chev.textContent).toBe('');
+    expect(chev.classList.contains('collapsed')).toBe(true);
+    expect(document.querySelector('.prophecy-card').className).toBe('prophecy-card pc-ot');
+  });
+});

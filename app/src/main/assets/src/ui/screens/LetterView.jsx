@@ -98,8 +98,10 @@ export function LetterView(props) {
      calls its units chapters): the shim's unitWord. The footers, the hero and the band all say it. */
   const unit = studyMode ? (letter.unitWord || 'Chapter') : 'Letter';
   const position = letter.num === 0 ? "Preface" : `${unit} ${letter.num}`;
+  // The band's one line cut a long study title before its position: a study names itself short there.
+  const bandLabel = volumeLabel && studyMode && typeof studyShortTitle === 'function' ? studyShortTitle(volumeLabel) : volumeLabel;
   const miniTitle = (
-    <MiniTitleBand heroRef={heroRef} eyebrow={(volumeLabel ? volumeLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
+    <MiniTitleBand heroRef={heroRef} eyebrow={(bandLabel ? bandLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
   );
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
@@ -385,7 +387,9 @@ export function LetterView(props) {
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is
               OMITTED (and its separator with it) rather than asserting
               "Volume Two". The position label alone is honest. */}
-          <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{position}</div>
+          {/* A long collection name (a study's 108-character title) holds one line with an
+              ellipsis; the position after it always shows (studies pass, 2026-11-12). */}
+          <div className={'hero-eyebrow' + (volumeLabel ? ' has-col' : '')}>{volumeLabel ? <><span className="hero-eyebrow-col">{volumeLabel}</span><span className="hero-eyebrow-pos">{" \xA0\xB7\xA0 "}{position}</span></> : position}</div>
           <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           {/* Streaming audio letter (2026-08-05). Presence + reader come from

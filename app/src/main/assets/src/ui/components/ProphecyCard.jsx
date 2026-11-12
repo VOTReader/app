@@ -65,7 +65,10 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
     <div className={cls}>
       <button type="button" className="prophecy-card-header" aria-label={tag} aria-expanded={expanded} onClick={() => setExpanded(e => !e)}>
         <span className="prophecy-card-tag">{tag}</span>
-        <span className={`prophecy-card-chevron${expanded ? "" : " collapsed"}`}>{"▼"}</span>
+        {/* The chevron the "Collapse all cards" control draws (studies pass, 2026-11-12). */}
+        <span className={`prophecy-card-chevron${expanded ? "" : " collapsed"}`} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="6 9 12 15 18 9" /></svg>
+        </span>
       </button>
       <div className={`prophecy-card-body${expanded ? "" : " collapsed"}`}>
         {label && <div className="prophecy-card-sublabel">{label}</div>}

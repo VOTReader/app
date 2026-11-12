@@ -2504,13 +2504,14 @@
        optimization changes no geometry. */
     body.scroll-restoring .letter-para, body.scroll-restoring .section-block, body.scroll-restoring .songs-list > .songs-row { content-visibility: visible; }
     .letter-intro { font-size:var(--fs-18); line-height:1.85; color:var(--cream); margin-bottom:1.8rem; }
-    .study-heading { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
-    .study-heading-l3 { font-size:var(--fs-13); color:var(--gold-dim); letter-spacing:0.18em; margin:2rem 0 0.85rem; }
+    /* A study's headings: centred, set as the UI pass sets a section label (UI face, 600, caps, --track-label, accent). */
+    .study-heading { font-family:var(--font-ui); font-size:var(--fs-15); font-weight:600; letter-spacing:var(--track-label); color:var(--accent); text-transform:uppercase; text-align:center; margin:2.4rem 0 1rem; line-height:var(--lh-label); text-wrap:balance; }
+    .study-heading-l3 { font-size:var(--fs-13); margin:2rem 0 0.85rem; }
 
     /* ── PROPHECY GROUP (collapsible stacked cards) ── */
     /* ── STUDY COVER IMAGE (inline in preface) ── */
     .study-cover-inline { text-align:center; margin:0 -1.5rem 2rem; }
-    .study-cover-inline img { width:100%; max-width:420px; border-radius:6px; box-shadow:0 6px 30px rgba(0,0,0,0.5); }
+    .study-cover-inline img { width:100%; max-width:420px; border-radius:var(--r-card); box-shadow:0 6px 30px rgba(0,0,0,0.5); }
 
     /* ── STUDY INLINE IMAGE (figures, charts, diagrams) ── */
     .study-image-block { margin:1.5rem -1.5rem; overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -2518,57 +2519,41 @@
        like the Part-One section title are ~1227px wide and otherwise overflow).
        Genuinely-wide diagrams (the chronology chart) opt back into natural width
        + horizontal scroll, where the extra width is needed to stay legible. */
-    .study-image-block img { display:block; max-width:100%; height:auto; border-radius:4px; }
+    .study-image-block img { display:block; max-width:100%; height:auto; border-radius:var(--r-card); }
+    .study-image-block img[src*="study-title-"] { border-radius:4px; }
     .study-image-block img[src*="chart"] { max-width:none; }
+    /* The three part-title plates are dark type on white: in the dark theme they turn
+       light on dark, and lighten lets the page show through their black, so no edge. */
+    body:not(.light) .study-image-block img[src*="study-title-"] { filter:invert(1); mix-blend-mode:lighten; }
     .study-image-caption { padding:0.5rem 1.5rem 0; font-size:var(--fs-12); color:var(--cream-dim); font-style:italic; }
 
     .section-intro-quote { padding:1.5rem 1.5rem 0; text-align:center; }
     .section-intro-text { font-family:var(--font-body); font-size:var(--fs-18); line-height:1.85; color:var(--cream); font-style:italic; margin-bottom:1rem; }
     .section-intro-text .letter-link-ref { font-style:italic; }
     .prophecy-group { margin:2rem 0 2.5rem; }
-    .prophecy-group-label { font-family:'Cinzel',serif; font-size:var(--fs-15); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; text-align:center; margin-bottom:1.2rem; line-height:1.4; }
-    .prophecy-card { border:1px solid var(--gold-border); border-radius:0.6rem; margin-bottom:0.8rem; overflow:hidden; transition:border-color 0.2s; }
-    .prophecy-card-header { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0.75rem 1rem; background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; user-select:none; -webkit-user-select:none; }
-    .prophecy-card-header:active { opacity:0.7; }
-    .prophecy-card-tag { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.16em; text-transform:uppercase; font-weight:600; }
-    .prophecy-card-chevron { font-size:var(--fs-11); transition:transform 0.25s ease; color:var(--cream-dim); }
+    .prophecy-group-label { font-family:var(--font-ui); font-size:var(--fs-15); font-weight:600; letter-spacing:var(--track-label); color:var(--accent); text-transform:uppercase; text-align:center; margin-bottom:1rem; line-height:var(--lh-label); text-wrap:balance; }
+    /* The cards in the Answers card language (studies pass 2026-11-12): a surface, the card
+       radius, a hairline. The kind keeps its meaning in the tag's colour and a faint tint:
+       Old Testament warm, New Testament gold, Volumes of Truth blue, the introduction neutral. */
+    .prophecy-card { --pc-ink:var(--text-1); --pc-sub:var(--text-2); --pc-tint:transparent; background:linear-gradient(var(--pc-tint), var(--pc-tint)), var(--surface-1); border:1px solid var(--hairline); border-radius:var(--r-card); margin-bottom:0.75rem; overflow:hidden; }
+    .prophecy-card.pc-ot { --pc-ink:#ffb478; --pc-sub:rgba(255,180,120,0.8); --pc-tint:rgba(255,170,110,0.055); }
+    .prophecy-card.pc-nt { --pc-ink:var(--gold); --pc-sub:var(--gold-dim); --pc-tint:rgba(214,179,95,0.055); }
+    .prophecy-card.pc-vot { --pc-ink:#a0c3ff; --pc-sub:rgba(160,195,255,0.8); --pc-tint:rgba(140,180,255,0.055); }
+    body.light .prophecy-card.pc-intro { --pc-ink:#5a554b; }
+    body.light .prophecy-card.pc-ot { --pc-ink:#8a4f1f; --pc-sub:#93582a; --pc-tint:rgba(160,100,50,0.05); }
+    body.light .prophecy-card.pc-nt { --pc-ink:#7a5c10; --pc-sub:#806418; --pc-tint:rgba(160,130,40,0.05); }
+    body.light .prophecy-card.pc-vot { --pc-ink:#1e3c8c; --pc-sub:#3c5a9e; --pc-tint:rgba(30,60,140,0.04); }
+    .prophecy-card-header { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); width:100%; min-height:var(--tap); padding:10px var(--card-pad); background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; user-select:none; -webkit-user-select:none; }
+    .prophecy-card-header:active { background:var(--surface-2); }
+    .prophecy-card-tag { font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); line-height:var(--lh-label); text-transform:uppercase; color:var(--pc-ink); }
+    .prophecy-card-chevron { flex:none; display:inline-flex; color:var(--text-2); transition:transform 0.2s ease; }
+    .prophecy-card-chevron svg { width:var(--icon-sm); height:var(--icon-sm); }
     .prophecy-card-chevron.collapsed { transform:rotate(-90deg); }
-    .prophecy-card-body { padding:0 1rem 1rem; }
+    .prophecy-card-body { padding:0 var(--card-pad) var(--card-pad); }
     .prophecy-card-body.collapsed { display:none; }
-    .prophecy-card-sublabel { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.8rem; opacity:0.8; }
+    .prophecy-card-sublabel { font-family:var(--font-ui); font-size:var(--ts-meta); font-weight:500; line-height:var(--lh-meta); color:var(--pc-sub); margin:-2px 0 0.8rem; }
     .prophecy-card-body .letter-para { font-size:var(--fs-16); line-height:1.75; margin-bottom:1.2rem; }
     .prophecy-card-body .letter-para:last-child { margin-bottom:0; }
-
-    /* card type colors — dark theme */
-    /* intro: white-ish neutral */
-    .prophecy-card.pc-intro { border-color:rgba(255,255,255,0.30); background:rgba(255,255,255,0.04); }
-    .prophecy-card.pc-intro .prophecy-card-tag { color:rgba(255,255,255,0.95); }
-    .prophecy-card.pc-intro .prophecy-card-sublabel { color:rgba(255,255,255,0.75); }
-    /* OT: copper/bronze */
-    .prophecy-card.pc-ot { border-color:rgba(255,170,110,0.45); background:rgba(255,170,110,0.06); }
-    .prophecy-card.pc-ot .prophecy-card-tag { color:rgba(255,180,120,1); }
-    .prophecy-card.pc-ot .prophecy-card-sublabel { color:rgba(255,180,120,0.8); }
-    /* NT: gold (matches scripture hero #211700) */
-    .prophecy-card.pc-nt { border-color:rgba(214,179,95,0.4); background:rgba(214,179,95,0.06); }
-    .prophecy-card.pc-nt .prophecy-card-tag { color:var(--gold); }
-    .prophecy-card.pc-nt .prophecy-card-sublabel { color:var(--gold-dim); }
-    /* VOT: deep blue (matches volume hero #09122e) */
-    .prophecy-card.pc-vot { border-color:rgba(140,180,255,0.45); background:rgba(140,180,255,0.06); }
-    .prophecy-card.pc-vot .prophecy-card-tag { color:rgba(160,195,255,1); }
-    .prophecy-card.pc-vot .prophecy-card-sublabel { color:rgba(160,195,255,0.8); }
-
-    /* light theme overrides */
-    body.light .prophecy-card.pc-intro { border-color:rgba(130,125,115,0.18); background:rgba(130,125,115,0.025); }
-    body.light .prophecy-card.pc-intro .prophecy-card-tag { color:#5a554b; }  /* n200: opaque, 6.6:1 on --bg (was 3.3:1) */
-    body.light .prophecy-card.pc-ot { border-color:rgba(160,100,50,0.25); background:rgba(160,100,50,0.05); }
-    body.light .prophecy-card.pc-ot .prophecy-card-tag { color:#8a4f1f; }
-    body.light .prophecy-card.pc-ot .prophecy-card-sublabel { color:#93582a; }
-    body.light .prophecy-card.pc-nt { border-color:rgba(160,130,40,0.3); background:rgba(160,130,40,0.05); }
-    body.light .prophecy-card.pc-nt .prophecy-card-tag { color:#7a5c10; }
-    body.light .prophecy-card.pc-nt .prophecy-card-sublabel { color:#806418; }
-    body.light .prophecy-card.pc-vot { border-color:rgba(30,60,140,0.2); background:rgba(30,60,140,0.04); }
-    body.light .prophecy-card.pc-vot .prophecy-card-tag { color:#1e3c8c; }
-    body.light .prophecy-card.pc-vot .prophecy-card-sublabel { color:#3c5a9e; }
 
     /* A block shrunk to its lines (width:fit-content) and centred by its auto
        margins. Never display:table (nor flex or grid): Chromium and the Android
@@ -3035,6 +3020,9 @@
        The letter's own text keeps its typography. ═══ */
     .hero { position: relative; overflow: hidden; text-align: center; padding: var(--sp-2) min(1.8rem, max(var(--gutter), 7vw)) 18px; }
     .hero-eyebrow { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin-bottom: 5px; overflow-wrap: break-word; }
+    .hero-eyebrow.has-col { display: flex; justify-content: center; white-space: nowrap; }   /* the collection ellipsizes; the position always shows */
+    .hero-eyebrow-col { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .hero-eyebrow-pos { flex: none; white-space: pre; }
     .hero-title { font-family: var(--font-serif); font-weight: 600; font-size: min(var(--ts-display), 9vw); line-height: 1.17; color: var(--text-1); margin: 0; overflow-wrap: break-word; hyphens: auto; }
     .hero .hero-play-row { margin-top: 14px; }
     .hero .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
