@@ -1780,6 +1780,20 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
+  /* REVIEW-web 2: with List open the card is not on screen, but Back and Escape still dismissed it,
+     for good (the setting), and left the list open */
+  it('with List open over an empty My Web, Back closes the list and the card comes back, undismissed', async () => {
+    const updateSetting = vi.fn();
+    await openMyWeb({ updateSetting });
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(screen.queryByText('Your web is still being woven'), 'PRECONDITION: the list hides the card').toBeNull();
+    expect(document.querySelector('.sw-panel'), 'PRECONDITION: the list is open').toBeTruthy();
+    act(() => { modalRegistry.peek().dismiss('back'); });
+    expect(document.querySelector('.sw-panel'), 'Back closes what is seen: the list').toBeNull();
+    expect(updateSetting).not.toHaveBeenCalledWith('swEmptyDismissed', true);
+    expect(screen.getByText('Your web is still being woven')).toBeTruthy();
+  });
+
   it('returns focus to the My Web segment button, not to the body', async () => {
     // The notice is the only thing that was focused; without this the next
     // Tab starts from the top of the document and a keyboard reader is
@@ -1845,6 +1859,35 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     await wait(30);
     expect(root.getAttribute('data-panel')).toBeNull();
     expect(root.classList.contains('sw-collapse')).toBe(true);
+  });
+
+  /* REVIEW-web 3: Filters and the panel share the right edge. A card or the list opened with Filters
+     up slid over it, and Back closed the sheet nobody could see */
+  it('a panel opening puts Filters away; Filters opened over a panel is the top layer, and Back closes it first', async () => {
+    const { root } = await mountAt(1600, 900);
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(root.querySelector('.sw-filter-sheet'), 'PRECONDITION: Filters open').toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    await wait(30);
+    expect(root.querySelector('.sw-panel'), 'the list opens').toBeTruthy();
+    expect(root.querySelector('.sw-filter-sheet'), 'and Filters gives way to it').toBeNull();
+    // Filters over the open list: drawn after it (the same box, so on top), and the first Back is its own
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    await wait(30);
+    const sheet = root.querySelector('.sw-filter-sheet'), panel = root.querySelector('.sw-panel');
+    expect(sheet && panel, 'both up').toBeTruthy();
+    expect(panel.compareDocumentPosition(sheet) & Node.DOCUMENT_POSITION_FOLLOWING, 'the sheet is over the panel').toBeTruthy();
+    // List, lit under the sheet, brings the list back into view rather than closing it unseen
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    await wait(30);
+    expect(root.querySelector('.sw-filter-sheet')).toBeNull();
+    expect(root.querySelector('.sw-panel')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    await wait(30);
+    act(() => { modalRegistry.peek().dismiss('back'); });
+    await wait(30);
+    expect(root.querySelector('.sw-filter-sheet'), 'Back closes the sheet on top').toBeNull();
+    expect(root.querySelector('.sw-panel'), 'and the list under it shows').toBeTruthy();
   });
 
   /* w4 (interaction hunt): at 768x1024 the collapsed strip sat over the title ("Web" under the
