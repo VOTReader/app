@@ -1577,7 +1577,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               value={settings.shareLink === 'app' ? 'app' : 'site'} options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)} />
           </SettingsSection>
-          <p className="ws1-note">Share sends the words you picked, then this link alone under them. Hold Share, or right-click it on a computer, to send the other one for a single share. Copy ends the same way with the website link wherever the passage has a page there, and with its name where it has none.</p>
+          <p className="ws1-note">Share sends the words you picked, then this link alone under them. After a share, the note at the bottom of the screen has “Use the other link” to send the other one for that share; holding Share, or right-clicking it on a computer, offers both first. Copy ends the same way with the website link wherever the passage has a page there, and with its name where it has none.</p>
           <SettingsSection label="Website links">
             <SettingsRow
               label="Highlight the passage"
