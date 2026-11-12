@@ -6218,6 +6218,9 @@
     .ws2-step-value { min-width:3.2em; text-align:center; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
     .ws1-settings .settings-step-btn { width:36px; height:36px; border:0; background:var(--surface-2); color:var(--text-1); }
     .ws1-settings .settings-step-btn:disabled { opacity:.4; }
+    /* FIXC: drawn at 36 (st mocks), tapped at 44: a − and a + a thumb can tell apart (REVIEW-css 2). */
+    .ws1-settings .settings-step-btn { position:relative; }
+    .ws1-settings .settings-step-btn::after { content:''; position:absolute; inset:-4px; }
     .ws2-speed .txtsize-controls { gap:var(--sp-3); padding:0 var(--card-pad) var(--sp-3); }
     .ws2-speed .txtsize-reset { min-height:var(--tap); border:0; background:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws2-radio { display:flex; flex-direction:row; align-items:center; gap:var(--sp-3); width:100%; min-height:var(--row-h); padding:var(--sp-3) var(--card-pad); border:0; border-bottom:1px solid var(--hairline); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
@@ -6291,6 +6294,9 @@
     .ws3-prog .ws3-clear.settings-clear-btn { flex:none; min-height:36px; padding:0 var(--sp-3); border:0; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
     .ws3-prog .ws3-clear.is-text { background:none; color:var(--text-2); }
     .ws3-prog .ws3-clear:disabled { opacity:.45; }
+    /* FIXC: the Clear pill is drawn 36 tall and tapped 44 (REVIEW-css 3). */
+    .ws3-prog .ws3-clear.settings-clear-btn { position:relative; }
+    .ws3-prog .ws3-clear.settings-clear-btn::after { content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px; }
     .ws3-prog-books { margin:0 var(--sp-3) var(--sp-2); border-radius:var(--r-chip); background:var(--surface-2); }
     .ws3-prog-genre { padding:var(--sp-3) var(--sp-3) var(--sp-1); }
     .ws3-prog .progress-row.is-sub { padding:var(--sp-1) var(--sp-3); border-bottom:0; }

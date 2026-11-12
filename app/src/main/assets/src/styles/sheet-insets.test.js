@@ -46,3 +46,23 @@ describe('the "Delete all your data?" dialog stays above the keyboard', () => {
     expect(decl(b, 'padding')).toMatch(/max\(var\(--gutter\), var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)$/);
   });
 });
+
+/* REVIEW-css 2 and 3: the redesign draws the Settings − / + steppers and the reading-progress Clear pills 36 px tall,
+   under the 44 px the rest holds to. They keep the drawn size and tap at 44 through an expander. */
+describe('Settings controls drawn at 36 px still take a 44 px tap', () => {
+  const px = (v) => parseFloat(String(v).replace('-', '')) || 0;
+  it('the steppers: 36 drawn, 4 px of expander on every side', () => {
+    expect(decl(blocks('.ws1-settings .settings-step-btn')[0], 'height')).toBe('36px');
+    expect(blocks('.ws1-settings .settings-step-btn').some((b) => decl(b, 'position') === 'relative')).toBe(true);
+    const [after] = blocks('.ws1-settings .settings-step-btn::after');
+    expect(decl(after, 'inset')).toBe('-4px');
+    expect(36 + 2 * px(decl(after, 'inset'))).toBeGreaterThanOrEqual(44);
+  });
+  it('the Clear pills: 36 drawn, 4 px above and below', () => {
+    const sel = '.ws3-prog .ws3-clear.settings-clear-btn';
+    expect(decl(blocks(sel)[0], 'min-height')).toBe('36px');
+    expect(blocks(sel).some((b) => decl(b, 'position') === 'relative')).toBe(true);
+    const [after] = blocks(sel + '::after');
+    expect(36 + px(decl(after, 'top')) + px(decl(after, 'bottom'))).toBeGreaterThanOrEqual(44);
+  });
+});
