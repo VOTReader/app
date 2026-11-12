@@ -375,7 +375,7 @@ describe('NotesIndexScreen empty states', () => {
     const onStartReading = vi.fn();
     const { container, getByRole } = render(<NotesIndexScreen {...props} onStartReading={onStartReading} />);
     expect(container.querySelector('.ui-empty-title').textContent).toBe('No notes yet');
-    expect(container.querySelector('.ui-empty-text').textContent).toBe('Select some words while you read and tap Note; every note you write collects here.');
+    expect(container.querySelector('.ui-empty-text').textContent).toBe('Select some words while you read and tap Note. Every note you write collects here.');
     expect(container.querySelector('input[type="search"]')).toBeNull();
     fireEvent.click(getByRole('button', { name: 'Start reading' }));
     expect(onStartReading).toHaveBeenCalledTimes(1);

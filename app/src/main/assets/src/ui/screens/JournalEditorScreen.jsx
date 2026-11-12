@@ -1462,7 +1462,7 @@ export function JournalEditorScreen(props) {
   };
 
   return (
-    <ScreenLayout utility={utility}>
+    <ScreenLayout hideTabsBtn utility={utility}>
       <div className="jrn-editor">
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChosen} />
         <div className="jrn-editor-meta">

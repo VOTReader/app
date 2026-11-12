@@ -270,7 +270,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
     onSelect: () => { setMenuOpen(false); setClearing(true); } }] : [];
 
   return (
-    <ScreenLayout utility={{ title: 'History', onBack, backLabel,
+    <ScreenLayout hideTabsBtn utility={{ title: 'History', onBack, backLabel,
       menu: history.length > 0 && menuActions.length ? <BarMenu label="History options" onClick={() => setMenuOpen(true)} /> : null }}>
       <div className="history-screen lib-screen">
         {/* The same search pill as Notes / Bookmarks / Links. Absent while there is nothing to search. */}
