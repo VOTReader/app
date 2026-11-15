@@ -650,6 +650,8 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
     '.hero-play-pill',
+    // The kit's eyebrow (contents-page heroes, the Next card; replaced .vol-index-eyebrow and .chapter-card-label).
+    '.root-eyebrow',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   const blocksOf = (sel) => {
@@ -659,15 +661,24 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     while ((m = re.exec(bare))) if (m[1].trim().split(/\s+/).join(' ') === sel) out.push(m[2]);
     return out;
   };
+  // A kit role token (--ts-label, --track-label) is read through to its value, so a label sized by role is checked too.
+  const token = (name) => { const m = new RegExp('--' + name + ':\\s*([^;]+);').exec(bare); return m ? m[1].replace(/\/\*.*$/, '').trim() : null; };
+  const through = (v) => { let m; while (v && (m = /^var\(--((?:ts|track)-[\w-]+)\)$/.exec(v.trim()))) v = token(m[1]); return v; };
   it.each(LABELS)('%s', (sel) => {
     const blocks = blocksOf(sel);
     expect(blocks.length, 'rule present').toBeGreaterThan(0);
     for (const b of blocks) {
-      const fs = /font-size:\s*var\(--fs-(\d+)\)/.exec(b);
+      const fsv = through((/font-size:\s*([^;]+)/.exec(b) || [])[1]);
+      const fs = /^var\(--fs-(\d+)\)$/.exec((fsv || '').trim());
       if (fs) expect(Number(fs[1])).toBeGreaterThanOrEqual(12);
-      const ls = /letter-spacing:\s*([\d.]+)em/.exec(b);
+      const ls = /^([\d.]+)em$/.exec((through((/letter-spacing:\s*([^;]+)/.exec(b) || [])[1]) || '').trim());
       if (ls) expect(Number(ls[1])).toBeLessThanOrEqual(0.18);
     }
+  });
+  it('.root-eyebrow resolves to 12 px or more and .09em', () => {
+    const b = blocksOf('.root-eyebrow')[0];
+    expect(through(/font-size:\s*([^;]+)/.exec(b)[1])).toBe('var(--fs-12)');
+    expect(through(/letter-spacing:\s*([^;]+)/.exec(b)[1])).toBe('0.09em');
   });
   // Below 334 px, 3.6vw alone fell under the 12 px floor for spaced capitals (the Browse review, 10-22).
   // The floor is the FIXED 12 px (--fsc-12): --fs-12 follows Text Size, so at Text Size 3 it made every

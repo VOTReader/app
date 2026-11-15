@@ -104,8 +104,11 @@ describe('ChapterIndex — current-chapter marker', () => {
     expect(rows[3].querySelector('.ui-row-meta')).toBeNull();
   });
 
-  it('says where to go next: the chapter the reader is in, else the first unread', () => {
+  it('says where to go next only once there is progress: none at zero, Continue, Up next', () => {
     setupGlobals();
+    renderIndex({ markAsReadEnabled: true, isRead: () => false });
+    expect(document.querySelector('.sty-next')).toBeNull();
+    cleanup();
     renderIndex({ currentChapter: 2 });
     expect(document.querySelector('.sty-next .root-eyebrow').textContent).toBe('Continue');
     expect(document.querySelector('.sty-next .ui-row-title').textContent).toBe('The Reign of the Anointed');
