@@ -4337,6 +4337,7 @@
     .sty .ui-row-title, .sty .ui-row-meta { white-space: normal; overflow-wrap: break-word; }
     .sty-sub { display: block; margin-top: 1px; color: var(--text-2); font-size: var(--fs-15); font-weight: 400; font-style: italic; }
     .sty-row[aria-current=true] { box-shadow: inset 3px 0 0 var(--accent); }
+    .sty-row.is-locked { opacity: 0.45; }   /* a collection that loaded empty: dimmed, no button (VolumesHome) */
     .sty-note { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); padding: var(--sp-6) 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-control); text-align: center; }
     .root-sublist .ui-row { padding-left: 26px; }
     .root-sublist .ui-row + .ui-row::before { left: 26px; }

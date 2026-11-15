@@ -5,7 +5,7 @@
    centred hero the Studies list has, then three grouped lists, The Seven
    Volumes, the Collections, and A Return to The Garden. A row is the name
    in the serif and its facts in the sans; a collection with nothing in it
-   yet says "Coming soon" and opens nothing. Before, two columns of bordered
+   is dimmed and opens nothing (hub 11-15: no new words on it). Before, two columns of bordered
    tiles under an ornament, all one weight. */
 
 import { GARDEN_TOTAL } from '../../utils/garden.js';
@@ -33,7 +33,7 @@ export function VolumesHome({ onSelect, onBack, onSearch }) {
   // Q8.3: while corpus is still loading, NO tile is locked (we know they all
   // exist — clicking lands on a "Loading…" route until data arrives).
   // Once loaded, `locked` reflects actual content state (a collection with 0
-  // letters is "Coming Soon").
+  // letters is locked: dimmed, no button).
   const _locked = (k) => _votReady && _cnt(k) === 0;
   /** Its facts: how many it holds, then what it is; before the corpus lands, only what it is. */
   const facts = (k, noun, what) => [_cnt(k) > 0 ? countOf(_cnt(k), noun) : '', what].filter(Boolean).join(' · ');
@@ -53,9 +53,9 @@ export function VolumesHome({ onSelect, onBack, onSearch }) {
     return { id: 'volume-' + k, k, title: 'Volume ' + n, sub: facts(k, 'letter', VOLUME_YEARS[k]) };
   });
 
-  /** One row; a locked one says so and opens nothing. */
+  /** One row; a locked one is dimmed and opens nothing. */
   const row = (v) => (
-    <ListRow key={v.id} noLead className={'sty-row' + (_locked(v.k) ? ' is-locked' : '')} title={v.title} meta={_locked(v.k) ? [v.sub, 'Coming soon'].filter(Boolean).join(' · ') : v.sub}
+    <ListRow key={v.id} noLead className={'sty-row' + (_locked(v.k) ? ' is-locked' : '')} title={v.title} meta={v.sub}
       onClick={_locked(v.k) ? undefined : () => onSelect(v.id)} />
   );
 
