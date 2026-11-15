@@ -260,7 +260,7 @@ describe('createPagerGesture controller', () => {
     // "black screen with a card" flash was the SETTLE_MS card animation).
     const scheduled = [];
     const { io, calls, track, nextPeek } = makeIO({
-      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next Book', title: 'Exodus 1' }),
+      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next book', title: 'Exodus 1' }),
       schedule: (fn, ms) => { scheduled.push(ms || 'raf'); fn(); return 0; },
     });
     const g = createPagerGesture(io);
@@ -279,7 +279,7 @@ describe('createPagerGesture controller', () => {
 
   it('a below-threshold BOUNDARY drag still springs back (no navigate)', () => {
     const { io, calls, nextPeek } = makeIO({
-      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next Book', title: 'Exodus 1' }),
+      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next book', title: 'Exodus 1' }),
     });
     const g = createPagerGesture(io);
     g.start(startEv(300, 100));

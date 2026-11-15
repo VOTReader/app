@@ -300,7 +300,7 @@ describe('dwell control during the countdown', () => {
    swipe does. A swipe commits a boundary card (use-pager-gesture: instantCommit), so auto-next turns it too, and
    when the page it turns to is another screen the run goes on there. */
 describe('auto-next across a book or volume edge', () => {
-  const BOUNDARY = { kind: 'boundary', eyebrow: 'Next Book', title: 'Volume One' };
+  const BOUNDARY = { kind: 'boundary', eyebrow: 'Next book', title: 'Volume One' };
 
   it('counts down to the next page at a boundary card, as a swipe would turn it', async () => {
     const pager = { peek: () => BOUNDARY, onNext: vi.fn(), onPrev: vi.fn() };

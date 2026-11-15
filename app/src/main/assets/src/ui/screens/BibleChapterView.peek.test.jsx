@@ -101,7 +101,7 @@ describe('BibleChapterView pager.peek at a BOOK boundary', () => {
   it('the Revelation → Volume One pseudo-book (no id) keeps the boundary card', () => {
     renderCh({ nextBook: PSEUDO_V1, nextBoundaryTitle: 'Volume One · Letter 1' });
     const desc = capturedPager.peek('next');
-    expect(desc).toEqual({ kind: 'boundary', eyebrow: 'Next Book', title: 'Volume One · Letter 1' });
+    expect(desc).toEqual({ kind: 'boundary', eyebrow: 'Next book', title: 'Volume One · Letter 1' });
   });
 
   it('a true dead end (no neighbor book) peeks nothing (rubber-band)', () => {
