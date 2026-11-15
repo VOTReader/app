@@ -99,7 +99,7 @@ export function ChapterView(props) {
     kind: 'screen',
     el: <ChapterView {...props} {...(props.pagePropsFor ? props.pagePropsFor(ch) : null)} chapter={ch} surpriseAnchor={null} inert={true} restoreScroll={savedScrollFor(book.id + '-' + ch.num)} scrollKey={book.id + '-' + ch.num} />,
   });
-  const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next Book' : 'Previous Book'), title: b.title } : null;
+  const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next book' : 'Previous book'), title: b.title } : null;
   const pager = {
     onPrev: goPrevCh,
     onNext: goNextCh,
@@ -267,10 +267,10 @@ export function ChapterView(props) {
           )}
 
           <EndNav
-            prev={prevCh ? { label: 'Previous', title: chapterRef(prevCh.num), onClick: () => onNavigate(prevCh.num) }
-              : prevBoundary ? { label: 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
-            next={nextCh ? { label: 'Next', title: chapterRef(nextCh.num), onClick: () => onNavigate(nextCh.num) }
-              : nextBoundary ? { label: 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
+            prev={prevCh ? { label: 'Previous chapter', title: chapterRef(prevCh.num), onClick: () => onNavigate(prevCh.num) }
+              : prevBoundary ? { label: prevBoundary.short ? `Previous · ${prevBoundary.short}` : 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
+            next={nextCh ? { label: 'Next chapter', title: chapterRef(nextCh.num), onClick: () => onNavigate(nextCh.num) }
+              : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
         </div>
       </div>
 

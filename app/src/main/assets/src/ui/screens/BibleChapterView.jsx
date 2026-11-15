@@ -224,10 +224,10 @@ export function BibleChapterView(props) {
     peek: (side) => side === 'next'
       ? (nextCh ? _versesPeek(book, nextCh)
         : (nextBook && nextBook.id) ? _versesPeek(nextBook, nextBook.chapters[0])
-          : nextBook ? { kind: 'boundary', eyebrow: 'Next Book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
+          : nextBook ? { kind: 'boundary', eyebrow: 'Next book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
       : (prevCh ? _versesPeek(book, prevCh)
         : (prevBook && prevBook.id) ? _versesPeek(prevBook, prevBook.chapters[prevBook.chapters.length - 1])
-          : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
+          : prevBook ? { kind: 'boundary', eyebrow: 'Previous book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
   };
 
   /* U04.7 / U07.3: a chapter landed on mid-way (a shared verse link, a search hit) named nothing once its hero had
@@ -439,10 +439,10 @@ export function BibleChapterView(props) {
           </div>
           <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
           <EndNav
-            prev={prevCh ? { label: '‹ Previous', title: `${book.title} ${prevCh.num}`, onClick: () => onNavigate(prevCh.num) }
-              : prevBook ? { label: '‹ Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}`, onClick: onPrevBook } : null}
-            next={nextCh ? { label: 'Next ›', title: `${book.title} ${nextCh.num}`, onClick: () => onNavigate(nextCh.num) }
-              : nextBook ? { label: 'Next Book ›', title: nextBoundaryTitle || `${nextBook.title} 1`, onClick: onNextBook } : null} />
+            prev={prevCh ? { label: 'Previous chapter', title: `${book.title} ${prevCh.num}`, onClick: () => onNavigate(prevCh.num) }
+              : prevBook ? { label: 'Previous book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}`, onClick: onPrevBook } : null}
+            next={nextCh ? { label: 'Next chapter', title: `${book.title} ${nextCh.num}`, onClick: () => onNavigate(nextCh.num) }
+              : nextBook ? { label: 'Next book', title: nextBoundaryTitle || `${nextBook.title} 1`, onClick: onNextBook } : null} />
           {/* U01.3: the install offer is one line under Previous/Next, so the chapter ends on Next. */}
           <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>

@@ -617,10 +617,10 @@ export function WtlbEntryView(props) {
             {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
 
             <EndNav
-              prev={prevEntry ? { label: '‹ Previous', title: prevEntry.title, onClick: () => onNavigate(prevEntry.id) }
-                : prevBoundary ? { label: prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : '‹ Previous', title: prevBoundary.title, onClick: onPrevBoundary } : null}
-              next={nextEntry ? { label: 'Next ›', title: nextEntry.title, onClick: () => onNavigate(nextEntry.id) }
-                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short} ›` : 'Next ›', title: nextBoundary.title, onClick: onNextBoundary } : null} />
+              prev={prevEntry ? { label: 'Previous entry', title: prevEntry.title, onClick: () => onNavigate(prevEntry.id) }
+                : prevBoundary ? { label: prevBoundary.short ? `Previous · ${prevBoundary.short}` : 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
+              next={nextEntry ? { label: 'Next entry', title: nextEntry.title, onClick: () => onNavigate(nextEntry.id) }
+                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
 
             {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry. */}
             <div className="related-section">
