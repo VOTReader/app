@@ -3739,7 +3739,7 @@
       }
     /* ── SETTINGS SCREEN ── */
     .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(1.25rem,3vw,2rem) clamp(1rem,4vw,3rem) 5rem; }
-    .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
+    .settings-groups { width:100%; margin:0 auto; }
     .settings-section { width:100%; margin-bottom:0.75rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
@@ -3774,49 +3774,31 @@
        font via the bundled 'p-<id>' preview subsets (name glyphs only —
        see @font-face block near :root). The download progress line sits
        under the row while a confirmed fetch runs. */
-    /* ── Compact card layout (Settings redesign — Option B) ───────────────
-       Each section's controls live in ONE bordered card; rows are separated
-       by thin dividers, and each row's long description is hidden by default
-       and revealed on demand by the ⓘ button. Far denser than the old
-       one-bordered-box-per-row layout. */
-    .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
-    .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(214,179,95,0.13); }
+    /* Settings rows (vot-ui 11-15): the look is the WS1-WS4 rules (.ws1-settings ...); these keep only what they do not set. */
+    .settings-card { overflow:hidden; }
+    .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; }
     .settings-card > .settings-row:last-child { border-bottom:none; }
-    /* flex-wrap: at Text Size 300% (cap raised 2026-08-02) a long Cinzel
-       label otherwise shoves the right-aligned toggle off-screen on a 375px
-       phone — the control wraps to its own line instead (same pattern the
-       danger-zone rows already used). Inert at normal sizes. */
-    .settings-row-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; padding:0.62rem 0.95rem; min-height:46px; row-gap:8px; }
+    .settings-row-head { display:flex; align-items:center; row-gap:8px; }
     .settings-row-grow { flex:1 1 auto; min-width:0.5rem; }
     .settings-row-text { flex:1; min-width:0; }
-    .settings-row-label { font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.05em; color:var(--cream); }
-    .settings-row-value { font-size:var(--fs-13); color:var(--gold); font-style:italic; text-align:right; }
-    .settings-row-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; line-height:1.45; padding:0 0.95rem 0.72rem; }
+    .settings-row-value { text-align:right; }
     /* Structured ⓘ content (the Bible Translation explainer passes a node,
        not a string): default p/ul margins are too chunky at this size. */
     .settings-row-desc p { margin:0.6em 0 0; }
     .settings-row-desc ul { margin:0.5em 0 0; padding-left:1.15em; }
     .settings-row-desc li { margin-top:0.35em; }
     .settings-row-desc li::marker { color:var(--gold-dim); }
-    /* Hit area is not paint: the target stays 44 px, the visible ⓘ is a 29 px hairline ring drawn
-       inside it (a 44 px bordered square stood taller than the 26 px Export button beside it). */
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
-    .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; min-height:44px; background:var(--gold-faint); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; padding:0.35rem 0.55rem; font-family:inherit; max-width:60%; }
+    .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; cursor:pointer; font-family:inherit; }
     .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     @media (hover:hover){ .settings-select-trigger:hover .settings-row-value{ color:var(--gold-bright); } }
     /* Skip Buttons (player-1025): − [10] s + */
     .settings-step { display:inline-flex; align-items:center; gap:0.4rem; }
-    .settings-step-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:var(--gold-faint); color:var(--gold); font-size:var(--fs-18); line-height:1; cursor:pointer; font-family:inherit; }
-    .settings-step-btn:disabled { opacity:0.4; cursor:default; }
+    .settings-step-btn { border-radius:50%; font-size:var(--fs-18); line-height:1; cursor:pointer; font-family:inherit; }
+    .settings-step-btn:disabled { cursor:default; }
     .settings-step-input { width:2.2em; min-height:44px; text-align:right; font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; color:var(--text-1); background:transparent; border:0; border-radius:6px; padding:0; -moz-appearance:textfield; appearance:textfield; }
     .settings-step-input::-webkit-inner-spin-button, .settings-step-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
     .settings-step-unit { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; color:var(--text-1); margin:0 0.3em 0 0.25em; }
-    /* Top-Nav button chips */
-    /* A09.5 (mockup B-topbar A): one two-way choice, Compact | Icons, in place of the nested switch. */
-    .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
-    .settings-seg > button { flex:1; min-height:44px; border:0; border-radius:8px; background:transparent; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-15); cursor:pointer; }
-    .settings-seg > button[aria-checked="true"] { background:var(--gold); color:var(--bg); }
-    .vot-large-text .settings-seg { margin-left:12px; margin-right:12px; }
     /* max-width + shrinkable label: 300%-cap spill fix (chip must never run
        off-screen; the mini toggle stays, the label wraps). */
     /* Disabled (dependent) row state — kept visible but clearly inactive */
