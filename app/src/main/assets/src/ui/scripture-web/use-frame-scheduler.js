@@ -26,6 +26,8 @@
 // r2 (Orchestrator's ruling, 2026-09-11): see live() below.
 const LIVE_HOLD_MS = 150;
 const FADE_MS = 250;
+/** The most fade time one drawn frame may cover (myweb-pop): a third of the fade, so it always shows in >= 3 frames. */
+const FADE_STEP_MS = FADE_MS / 3;
 
 /**
  * One frame of a motion: ms since its last frame (16 on its first). Return false when it has
@@ -119,6 +121,8 @@ export function useFrameScheduler() {
   // re-laid-out or re-bucketed, the cap is the one knob.
   const liveUntilRef = React.useRef(0);
   const releaseAtRef = React.useRef(0);
+  // the fade's last drawn fraction and when it was drawn (capFractionNow)
+  const fadeRef = React.useRef({ f: 0, at: 0 });
   const live = React.useCallback(() => {
     liveUntilRef.current = performance.now() + LIVE_HOLD_MS;
     releaseAtRef.current = 0;
@@ -131,8 +135,15 @@ export function useFrameScheduler() {
     // it ends even when the last gesture event drew the last frame
     if (now < liveUntilRef.current) { schedule(); return 0; }
     if (!liveUntilRef.current) return 1;
-    if (!releaseAtRef.current) releaseAtRef.current = now;
-    const f = Math.min(1, (now - releaseAtRef.current) / FADE_MS);
+    if (!releaseAtRef.current) { releaseAtRef.current = now; fadeRef.current = { f: 0, at: now }; }
+    // myweb-pop (vot-ui 11-15): the fade advances from the LAST drawn fraction by at most FADE_STEP_MS of time a
+    // frame. On desktop about half the releases hit one 94-124 ms frame (the first full-layer draws); on the pure
+    // clock the next frame landed at ~0.47 and the reader saw the rails jump halfway, then a ~60 ms ramp. Capped,
+    // a stall delays the fade instead of skipping it; at a normal 16-40 ms cadence this is the clock exactly. A
+    // second call in the same frame has dt ~0 and does not move it.
+    const last = fadeRef.current;
+    const f = Math.min(1, last.f + Math.min(now - last.at, FADE_STEP_MS) / FADE_MS);
+    fadeRef.current = { f, at: now };
     if (f >= 1) { liveUntilRef.current = 0; releaseAtRef.current = 0; return 1; }
     schedule();
     return f;
