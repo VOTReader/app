@@ -75,7 +75,7 @@ export function SettingsNavRow({ label, desc = null, value = null, onClick, find
         {icon ? <span className="ws2-opt-lead" aria-hidden="true"><UiIcon name={icon} size="sm" /></span> : null}
         <SetRowText place={f.place} label={label} desc={desc} />
         {value ? <span className="settings-row-value">{value}</span> : null}
-        <span className="settings-select-chev" aria-hidden="true">{"›"}</span>
+        <UiIcon name="chev" className="ui-row-chev" />
       </button>
     </div>
   );

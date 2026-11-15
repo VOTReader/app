@@ -8,34 +8,55 @@
 
 import { UiIcon } from './UiIcon.jsx';
 
-/** The running build and the published one, asked once per mount. @returns {[any, () => Promise<void>]} */
+/** The running build and the published one, asked once per mount and again on refresh(true) (Check for updates). @returns {[any, (byHand?: boolean) => Promise<void>]} */
 export function useBuildInfo() {
   const [buildInfo, setBuildInfo] = React.useState(/** @type {any} */ ({ state: 'loading', running: null, server: null }));
-  const refresh = React.useCallback(async () => {
+  // byHand: the reader pressed Check for updates (hub 11-15: the tap changed nothing a reader could see). The answer
+  // waits CHECK_HOLD_MS so "Checking…" is seen, and carries checkedAt so the line says it is fresh.
+  const refresh = React.useCallback(async (byHand = false) => {
+    const t0 = Date.now();
     setBuildInfo((/** @type {any} */ b) => ({ ...b, state: 'loading' }));
-    // typeof guards: these three live in bundle-b and reach bundle-d as ambient globals, so they are absent in any
-    // host that renders without the stores bundle (the vitest harness does exactly that).
-    const running = (typeof getBuildVersion === 'function') ? await getBuildVersion() : null;
-    if (!running) {
-      // No service worker to ask: the Android WebView (assets ship inside the APK) or a first visit before the SW
-      // has taken control. ANDROID: the APK ships its own assets/service-worker.js, and under WebViewAssetLoader the
-      // relative './service-worker.js' that fetchServerBuildVersion fetches resolves to the INSTALLED build's own
-      // copy, so it lands in `running`, not `server`. WEB: deliberately not given that fallback: off Android an
-      // uncontrolled page is a first visit, and the deployed file describes the server, not this page.
-      const isAndroid = typeof PlatformBridge !== 'undefined' && !!PlatformBridge && !!PlatformBridge.isAndroid;
-      const installed = (isAndroid && typeof fetchServerBuildVersion === 'function')
-        ? await fetchServerBuildVersion()
-        : null;
-      setBuildInfo(installed
-        ? { state: 'installed', running: installed, server: null }
-        : { state: 'no-sw', running: null, server: null });
-      return;
+    const next = await readBuildInfo();
+    if (byHand) {
+      const rest = CHECK_HOLD_MS - (Date.now() - t0);
+      if (rest > 0) await new Promise((r) => setTimeout(r, rest));
+      next.checkedAt = Date.now();
     }
-    const server = (typeof fetchServerBuildVersion === 'function') ? await fetchServerBuildVersion() : null;
-    setBuildInfo({ state: 'ok', running, server });
+    setBuildInfo(next);
   }, []);
   React.useEffect(() => { void refresh(); }, [refresh]);
   return [buildInfo, refresh];
+}
+
+const CHECK_HOLD_MS = 600;
+
+/** What this page runs, what the server publishes, and whether a new worker already waits (read only: nothing here
+    asks for, installs or applies an update; sw-register's update path decides that). */
+async function readBuildInfo() {
+  // typeof guards: these three live in bundle-b and reach bundle-d as ambient globals, so they are absent in any
+  // host that renders without the stores bundle (the vitest harness does exactly that).
+  const running = (typeof getBuildVersion === 'function') ? await getBuildVersion() : null;
+  if (!running) {
+    // No service worker to ask: the Android WebView (assets ship inside the APK) or a first visit before the SW
+    // has taken control. ANDROID: the APK ships its own assets/service-worker.js, and under WebViewAssetLoader the
+    // relative './service-worker.js' that fetchServerBuildVersion fetches resolves to the INSTALLED build's own
+    // copy, so it lands in `running`, not `server`. WEB: deliberately not given that fallback: off Android an
+    // uncontrolled page is a first visit, and the deployed file describes the server, not this page.
+    const isAndroid = typeof PlatformBridge !== 'undefined' && !!PlatformBridge && !!PlatformBridge.isAndroid;
+    const installed = (isAndroid && typeof fetchServerBuildVersion === 'function')
+      ? await fetchServerBuildVersion()
+      : null;
+    return installed
+      ? { state: 'installed', running: installed, server: null }
+      : { state: 'no-sw', running: null, server: null };
+  }
+  const server = (typeof fetchServerBuildVersion === 'function') ? await fetchServerBuildVersion() : null;
+  let waiting = false;
+  try {
+    const reg = (typeof navigator !== 'undefined' && navigator.serviceWorker) ? await navigator.serviceWorker.getRegistration() : null;
+    waiting = !!(reg && reg.waiting);
+  } catch (_e) { /* no registration to read: no waiting worker to report */ }
+  return { state: 'ok', running, server, waiting };
 }
 
 /** About's words for a build: "Version 1.0.2", one line of verdict, "Build fceb645278 · corpus c77". @param {any} b */
@@ -50,9 +71,12 @@ export function versionWords(b) {
   const title = 'Version ' + (m ? m[1] : String(b.running.cacheVersion || 'unknown'));
   const build = [m ? 'Build ' + m[2] : '', b.running.corpusVersion ? 'corpus ' + b.running.corpusVersion : ''].filter(Boolean).join(' · ');
   let line;
-  if (b.state === 'installed') line = 'Installed on this phone. New versions arrive by installing an update.';
-  else if (!b.server) line = 'Could not reach the server to compare';
-  else if (b.server.cacheVersion === b.running.cacheVersion) line = 'Up to date with the published version';
+  // 'Up to date' only when the server answered this time (fetchServerBuildVersion: no-store, null on any failure).
+  const fresh = b.checkedAt ? ' · checked just now' : '';
+  if (b.state === 'installed') line = 'Installed on this phone. New versions arrive by installing an update.' + (b.checkedAt ? ' Checked just now.' : '');
+  else if (b.waiting) line = 'An update is ready. Reopen the app to apply it.';
+  else if (!b.server) line = 'Could not reach the server to compare' + (b.checkedAt ? ' · tried just now' : '');
+  else if (b.server.cacheVersion === b.running.cacheVersion) line = 'Up to date with the published version' + fresh;
   else line = 'An update is available. Reopen the app to apply it.';
   return { title, line, build };
 }

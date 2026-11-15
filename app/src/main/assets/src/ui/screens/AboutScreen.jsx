@@ -132,7 +132,7 @@ function AboutHome({ onBack, onYourData }) {
                   <span className="ui-row-title">{v.title}</span>
                   <span className="ui-row-meta" role="status">{v.line}</span>
                 </span>
-                <UiButton small className="ws2-pill-btn" disabled={buildInfo.state === 'loading'} onClick={() => { void refresh(); }}>Check for updates</UiButton>
+                <UiButton small className="ws2-pill-btn" disabled={buildInfo.state === 'loading'} onClick={() => { void refresh(true); }}>Check for updates</UiButton>
               </div>
               <ListRow noLead title="What’s new" onClick={() => { void openWhatsNew(); }} />
               <ListRow noLead title="What you can do" onClick={() => setPage('features')} />

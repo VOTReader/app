@@ -386,7 +386,7 @@ function SongsKeptRow() {
         <span className="settings-row-grow" />
         <button type="button" className="settings-select-trigger" aria-label={'Songs kept on this phone: ' + value + '. Manage'} onClick={(e) => { e.stopPropagation(); manage(); }}>
           <span className="settings-row-value">{value + ' · Manage'}</span>
-          <span className="settings-select-chev">{"›"}</span>
+          <UiIcon name="chev" className="ui-row-chev" />
         </button>
       </div>
     </div>
@@ -1862,7 +1862,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {typeof onAbout === 'function' ? (
               <button type="button" className="settings-help-about" onClick={onAbout}>
                 <span>About VOTReader</span>
-                <span className="settings-select-chev" aria-hidden="true">{"›"}</span>
+                <UiIcon name="chev" className="ui-row-chev" />
               </button>
             ) : null}
           </div>

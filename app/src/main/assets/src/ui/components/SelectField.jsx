@@ -5,6 +5,7 @@
 import { ListRow, UiButton } from './UiParts.jsx';
 import { useSettingsFind } from './settings-find.jsx';
 import { SetRowText } from './SettingsRow.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 /* Options are { id, label, desc? } plus optional presentation fields
    added for the Reading Font picker (2026-07-31), ignored elsewhere:
@@ -41,7 +42,7 @@ export function SelectField({ eyebrow, title, label, desc, line = null, value, o
         <button type="button" className="settings-select-trigger" aria-label={label + ': ' + shown} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? sheetId : undefined}
           aria-describedby={desc && (!long || line) ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{shown}</span>
-          <span className="settings-select-chev">{"›"}</span>
+          <UiIcon name="chev" className="ui-row-chev" />
         </button>
       </div>
       {long && more && !moreTitle ? <div className="settings-row-desc ws1-more-body">{desc}</div> : null}

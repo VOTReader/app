@@ -3790,7 +3790,6 @@
     .settings-row-desc li::marker { color:var(--gold-dim); }
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
     .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; cursor:pointer; font-family:inherit; }
-    .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     @media (hover:hover){ .settings-select-trigger:hover .settings-row-value{ color:var(--gold-bright); } }
     /* Skip Buttons (player-1025): − [10] s + */
     .settings-step { display:inline-flex; align-items:center; gap:0.4rem; }
@@ -5979,7 +5978,7 @@
     .ws1-a.is-small { font-size:var(--ts-label); }
     .ws1-a.is-large { font-size:var(--ts-title); color:var(--text-1); }
     .ws1-txtsize-foot { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--card-pad) var(--sp-3); }
-    .ws1-txtsize-foot .txtsize-value { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:700; color:var(--text-1); }
+    .ws1-txtsize-foot .txtsize-value { font-family:var(--font-ui); font-size:var(--ts-value); letter-spacing:0; color:var(--text-1); }
     .ws1-txtsize-foot .txtsize-reset.txtsize-reset-full { min-height:var(--tap); border:0; background:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws1-door { margin:0 0 var(--sp-3); }
     .ws1-more { align-self:flex-start; min-height:var(--tap); padding:0; border:0; background:none; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); }
@@ -5997,7 +5996,6 @@
     .ws2-nav .settings-row-text { flex:1; min-width:0; }
     .ws2-nav .settings-row-value { white-space:nowrap; }
     .ws1-settings .settings-select-trigger { flex:none; max-width:52%; min-height:var(--tap); padding:0 0 0 var(--sp-2); border:0; border-radius:0; background:none; box-shadow:none; color:var(--text-1); text-align:right; }
-    .ws1-settings .settings-select-trigger .settings-select-chev, .ws2-nav .settings-select-chev { color:var(--text-3); }
     .select-sheet-option.has-lead { position:relative; padding-left:calc(var(--icon-chip) + var(--sp-4) + var(--sp-3)); }
     .select-sheet-option.has-lead .ws2-opt-lead { position:absolute; left:var(--sp-4); top:50%; margin:0; transform:translateY(-50%); }
     .ws2-stepper { display:flex; align-items:center; gap:var(--sp-2); flex:none; }
