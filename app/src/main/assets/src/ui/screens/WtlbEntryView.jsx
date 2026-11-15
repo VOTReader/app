@@ -13,6 +13,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
+import { EndNav } from '../components/EndNav.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { wtlbHlKey, wtlbHlPrefix } from '../../utils/hl-keys.js';
@@ -615,41 +616,11 @@ export function WtlbEntryView(props) {
             </div>
             {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
 
-            <div className="bottom-nav">
-              {prevEntry ? (
-                <button className="bottom-nav-card" onClick={() => onNavigate(prevEntry.id)}>
-                  <div className="bottom-nav-label">‹ Previous</div>
-                  <div className="bottom-nav-title">{prevEntry.title}</div>
-                </button>
-              ) : prevBoundary ? (
-                <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                  <div className="bottom-nav-label">{prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : "‹ Previous"}</div>
-                  <div className="bottom-nav-title">{prevBoundary.title}</div>
-                </button>
-              ) : (
-                <div className="bottom-nav-card placeholder">
-                  <div className="bottom-nav-label">‹ Previous</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-
-              {nextEntry ? (
-                <button className="bottom-nav-card next" onClick={() => onNavigate(nextEntry.id)}>
-                  <div className="bottom-nav-label">Next ›</div>
-                  <div className="bottom-nav-title">{nextEntry.title}</div>
-                </button>
-              ) : nextBoundary ? (
-                <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short} ›` : "Next ›"}</div>
-                  <div className="bottom-nav-title">{nextBoundary.title}</div>
-                </button>
-              ) : (
-                <div className="bottom-nav-card next placeholder">
-                  <div className="bottom-nav-label">Next ›</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-            </div>
+            <EndNav
+              prev={prevEntry ? { label: '‹ Previous', title: prevEntry.title, onClick: () => onNavigate(prevEntry.id) }
+                : prevBoundary ? { label: prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : '‹ Previous', title: prevBoundary.title, onClick: onPrevBoundary } : null}
+              next={nextEntry ? { label: 'Next ›', title: nextEntry.title, onClick: () => onNavigate(nextEntry.id) }
+                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short} ›` : 'Next ›', title: nextBoundary.title, onClick: onNextBoundary } : null} />
 
             {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry. */}
             <div className="related-section">

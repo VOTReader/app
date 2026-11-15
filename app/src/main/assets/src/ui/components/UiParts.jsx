@@ -124,6 +124,28 @@ export function ListRow({ icon, lead, over, title, meta, value, valueNone = fals
   return <div className={rowCls} aria-current={aria}>{body}</div>;
 }
 
+/**
+ * A row that goes somewhere, its name wrapping rather than cut: in the app (`onClick`, a chevron) or out to a web page
+ * (`href`, the out arrow, opened in the browser). Which one follows the real target, never the label.
+ * @param {{ icon?: string, title: any, meta?: any, href?: string, onClick?: () => void, className?: string }} props
+ */
+export function ListLink({ icon, title, meta, href, onClick, className = '' }) {
+  const out = !onClick;
+  const cls = cx('ui-row', 'ui-row-press', 'is-link', !icon && 'no-lead', className);
+  const body = (
+    <>
+      {icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null}
+      <span className="ui-row-text">
+        <span className="ui-row-title">{title}</span>
+        {meta ? <span className="ui-row-meta">{meta}</span> : null}
+      </span>
+      <UiIcon name={out ? 'out' : 'chev'} className="ui-row-chev" />
+    </>
+  );
+  if (out) return <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>;
+  return <button type="button" className={cls} onClick={onClick}>{body}</button>;
+}
+
 /** A row's round play button, for `lead` (it is the row's one button besides its menu).
  * @param {{ label: string, onClick: () => void, playing?: boolean }} props */
 export function RowPlay({ label, onClick, playing = false }) {

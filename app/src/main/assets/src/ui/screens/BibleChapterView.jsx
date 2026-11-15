@@ -11,6 +11,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { EndNav } from '../components/EndNav.jsx';
 import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
@@ -437,41 +438,11 @@ export function BibleChapterView(props) {
             <div className="ornament-divider-line" />
           </div>
           <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
-          <div className="bottom-nav">
-            {prevCh ? (
-              <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
-                <div className="bottom-nav-label">‹ Previous</div>
-                <div className="bottom-nav-title">{book.title} {prevCh.num}</div>
-              </button>
-            ) : prevBook ? (
-              <button className="bottom-nav-card" onClick={onPrevBook}>
-                <div className="bottom-nav-label">‹ Previous Book</div>
-                <div className="bottom-nav-title">{prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}`}</div>
-              </button>
-            ) : (
-              <div className="bottom-nav-card placeholder">
-                <div className="bottom-nav-label">‹ Previous</div>
-                <div className="bottom-nav-title">—</div>
-              </div>
-            )}
-
-            {nextCh ? (
-              <button className="bottom-nav-card next" onClick={() => onNavigate(nextCh.num)}>
-                <div className="bottom-nav-label">Next ›</div>
-                <div className="bottom-nav-title">{book.title} {nextCh.num}</div>
-              </button>
-            ) : nextBook ? (
-              <button className="bottom-nav-card next" onClick={onNextBook}>
-                <div className="bottom-nav-label">Next Book ›</div>
-                <div className="bottom-nav-title">{nextBoundaryTitle || `${nextBook.title} 1`}</div>
-              </button>
-            ) : (
-              <div className="bottom-nav-card next placeholder">
-                <div className="bottom-nav-label">Next ›</div>
-                <div className="bottom-nav-title">—</div>
-              </div>
-            )}
-          </div>
+          <EndNav
+            prev={prevCh ? { label: '‹ Previous', title: `${book.title} ${prevCh.num}`, onClick: () => onNavigate(prevCh.num) }
+              : prevBook ? { label: '‹ Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}`, onClick: onPrevBook } : null}
+            next={nextCh ? { label: 'Next ›', title: `${book.title} ${nextCh.num}`, onClick: () => onNavigate(nextCh.num) }
+              : nextBook ? { label: 'Next Book ›', title: nextBoundaryTitle || `${nextBook.title} 1`, onClick: onNextBook } : null} />
           {/* U01.3: the install offer is one line under Previous/Next, so the chapter ends on Next. */}
           <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>

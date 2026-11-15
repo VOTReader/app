@@ -8,14 +8,15 @@ import { answersEndpointForUrl, answersLinkForUrl, openAnswersLink } from '../..
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { blockReadText } from '../../utils/segment-dom-text.js';
-import { LetterListenRow, LetterSongsCard, LetterAudioLinks } from '../components/LetterSongs.jsx';
-import { UiIcon } from '../components/UiIcon.jsx';
+import { LetterListenRow, LetterSongsCard, LetterWebLinks } from '../components/LetterSongs.jsx';
+import { ListGroup, ListLink, UiButton } from '../components/UiParts.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { EndNav } from '../components/EndNav.jsx';
 import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
@@ -62,10 +63,10 @@ function MarkReadRow({ read, onMark, onUndo }) {
       {read ? (
         <>
           <span className="mark-read-done"><span aria-hidden="true">✓ </span>Read</span>
-          {onUndo ? <button type="button" className="mark-read-undo" onClick={onUndo} aria-label="Undo: mark as not read">Undo</button> : null}
+          {onUndo ? <button type="button" className="ui-link mark-read-undo" onClick={onUndo} aria-label="Undo: mark as not read">Undo</button> : null}
         </>
       ) : (
-        <button type="button" className="mark-read-btn" onClick={onMark}>Mark as read</button>
+        <UiButton small icon="check" className="mark-read-btn" onClick={onMark}>Mark as read</UiButton>
       )}
     </div>
   );
@@ -605,23 +606,19 @@ export function LetterView(props) {
 
             {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
 
+            {/* vot-ui 11-15: the related groups are kit list groups. A row that stays in the app ends on a chevron; one that
+                opens the website ends on the out arrow; which one follows the row's real target (the branches below). */}
             <div className="related-section">
-              {letter.addendum && (
-                <div className="related-card">
-                  <div className="related-card-title" role="heading" aria-level={2}>Also Read</div>
-                  {letter.addendumLink && wrappedInAppLink ? (
-                    <a className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(letter.addendumLink); }}>{letter.addendum}</a>
-                  ) : letter.addendumInternal ? (
-                    <a className="related-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate(letter.addendumInternal); }}>{letter.addendum}</a>
-                  ) : (
-                    <a className="related-link" href={letter.addendumUrl} target="_blank" rel="noopener noreferrer">{letter.addendum}</a>
-                  )}
-                </div>
-              )}
+              {letter.addendum ? (
+                <ListGroup label="Also Read">
+                  {letter.addendumLink && wrappedInAppLink ? <ListLink title={letter.addendum} className="related-link" onClick={() => wrappedInAppLink(letter.addendumLink)} />
+                    : letter.addendumInternal ? <ListLink title={letter.addendum} className="related-link" onClick={() => onNavigate(letter.addendumInternal)} />
+                    : <ListLink title={letter.addendum} className="related-link" href={letter.addendumUrl} />}
+                </ListGroup>
+              ) : null}
 
-              {letter.relatedTopics?.length > 0 && (
-                <div className="related-card">
-                  <div className="related-card-title" role="heading" aria-level={2}>Related Topics</div>
+              {letter.relatedTopics?.length > 0 ? (
+                <ListGroup label="Related Topics">
                   {letter.relatedTopics.map((t, i) => {
                     // An answersonlygodcangive.com row opens the vendored topic
                     // in-app at once — the answers-entry route shows Loading…
@@ -632,110 +629,45 @@ export function LetterView(props) {
                     const openAnswers = answersAt && onNavigateToLink
                       ? () => onNavigateToLink(answersAt, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null })
                       : answersAt && wrappedInAppLink ? () => openAnswersLink(answersLinkForUrl(t.url), wrappedInAppLink) : null;
-                    return t.link && wrappedInAppLink ? (
-                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(t.link); }}>{t.label}</a>
-                    ) : openAnswers ? (
-                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); openAnswers(); }}>{t.label}</a>
-                    ) : t.internalStudy && onStudyNavigate ? (
-                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); onStudyNavigate(t.internalStudy); }}>{t.label}</a>
-                    ) : (
-                      <a key={i} className="related-link" href={t.url} target="_blank" rel="noopener noreferrer">{t.label}</a>
-                    );
+                    const go = t.link && wrappedInAppLink ? () => wrappedInAppLink(t.link)
+                      : openAnswers ? openAnswers
+                      : t.internalStudy && onStudyNavigate ? () => onStudyNavigate(t.internalStudy) : null;
+                    return go ? <ListLink key={i} title={t.label} className="related-link" onClick={go} />
+                      : <ListLink key={i} title={t.label} className="related-link" href={t.url} />;
                   })}
-                </div>
-              )}
+                </ListGroup>
+              ) : null}
 
-              {letter.bibleStudies?.length > 0 && (
-                <div className="related-card">
-                  <div className="related-card-title" role="heading" aria-level={2}>Bible Study</div>
-                  {letter.bibleStudies.map((s, i) =>
-                    s.link && wrappedInAppLink ? (
-                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(s.link); }}>{s.label}</a>
-                    ) : s.internalStudy && onStudyNavigate ? (
-                      <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); onStudyNavigate(s.internalStudy); }}>{s.label}</a>
-                    ) : (
-                      <a key={i} className="related-link" href={s.url} target="_blank" rel="noopener noreferrer">{s.label}</a>
-                    )
-                  )}
-                </div>
-              )}
+              {letter.bibleStudies?.length > 0 ? (
+                <ListGroup label="Bible Study">
+                  {letter.bibleStudies.map((s, i) => {
+                    const go = s.link && wrappedInAppLink ? () => wrappedInAppLink(s.link)
+                      : s.internalStudy && onStudyNavigate ? () => onStudyNavigate(s.internalStudy) : null;
+                    return go ? <ListLink key={i} title={s.label} className="related-link" onClick={go} />
+                      : <ListLink key={i} title={s.label} className="related-link" href={s.url} />;
+                  })}
+                </ListGroup>
+              ) : null}
 
-              {/* Songs of the Letters (L4): in-app songs sit above the external ↗ Audio / Video links. */}
+              {/* Songs of the Letters (L4): in-app songs sit above the website's recordings and videos. */}
               {!studyMode ? <LetterSongsCard volKey={volKey} letterId={letter.id} letterTitle={letter.title} showSongs={showSongs} /> : null}
 
-              {/* W2d r-end: the outside recordings and videos are one group, "On the website" (it hides when empty). */}
-              <div className="rd-web">
-              <div className="rd-web-label" role="heading" aria-level={2}>On the website</div>
-              <LetterAudioLinks letter={letter} />
-
-              {/* C2-C [C5]: the presence guard its four siblings above all
-                  have. Without it this card rendered on EVERY letter — the
-                  heading "Videos" over a single link to the channel's front
-                  page, which is not a video of this letter. The guard mirrors
-                  what the card can actually show: a videos[] array, the
-                  voice-over URL, or the set-to-music URL. */}
-              {(letter.videos?.length > 0 || letter.videoVoiceUrl || letter.videoMusicUrl) && (
-              <div className="related-card">
-                <div className="related-card-title" role="heading" aria-level={2}>Videos</div>
-                {letter.videos?.map((v, i) => (
-                  <a key={i} className="related-link" href={v.url} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />{v.label}</a>
-                ))}
-                {letter.videoVoiceUrl && (
-                  <a className="related-link" href={letter.videoVoiceUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />{letter.videoVoiceLabel || "Video with voice over"}</a>
-                )}
-                {letter.videoMusicUrl && (
-                  <a className="related-link" href={letter.videoMusicUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />Video set to music</a>
-                )}
-                <a className="related-link" href="https://www.youtube.com/user/trumpetcallofgod" target="_blank" rel="noopener noreferrer">
-                  <UiIcon name="out" size="sm" />YouTube channel
-                </a>
-              </div>
-              )}
-              </div>
+              {/* W2d r-end: the outside recordings and videos are one group, "On the website"; it is not drawn when empty.
+                  C2-C [C5]: the videos half shows only for a letter with a video (videos[], the voice-over or the
+                  set-to-music URL); the channel's front page alone is not a video of this letter. */}
+              <LetterWebLinks letter={letter} />
             </div>
 
             {/* U01.3: the letter ends on Next letter. Related, songs, audio and videos sit above it, and the install
                 offer is one line under it. */}
-            <div className="bottom-nav">
-              {letter.prevLetter ? (
-                <button className="bottom-nav-card" onClick={() => onNavigate(letter.prevLetter.id)}>
-                  <div className="bottom-nav-label">Previous {String(unit).toLowerCase()}</div>
-                  <div className="bottom-nav-title">{letter.prevLetter.title}</div>
-                </button>
-              ) : prevBoundary ? (
-                <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                  <div className="bottom-nav-label">{prevBoundary.short ? `Previous · ${prevBoundary.short}` : "Previous book"}</div>
-                  <div className="bottom-nav-title">{prevBoundary.title}</div>
-                </button>
-              ) : (
-                <div className="bottom-nav-card placeholder">
-                  <div className="bottom-nav-label">Previous {String(unit).toLowerCase()}</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-
-              {letter.nextLetter ? (
-                <button className="bottom-nav-card next" onClick={() => onNavigate(letter.nextLetter.id)}>
-                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
-                  <div className="bottom-nav-title">{letter.nextLetter.title}</div>
-                </button>
-              ) : nextBoundary ? (
-                <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short}` : "Next book"}</div>
-                  <div className="bottom-nav-title">{nextBoundary.title}</div>
-                </button>
-              ) : letter.nextLetterExternal ? (
-                <a className="bottom-nav-card next" href={letter.nextLetterExternal.url} target="_blank" rel="noopener noreferrer">
-                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
-                  <div className="bottom-nav-title">{letter.nextLetterExternal.title}</div>
-                </a>
-              ) : (
-                <div className="bottom-nav-card next placeholder">
-                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-            </div>
+            <EndNav
+              prev={letter.prevLetter ? { label: 'Previous ' + String(unit).toLowerCase(), title: letter.prevLetter.title, onClick: () => onNavigate(letter.prevLetter.id) }
+                : prevBoundary ? { label: prevBoundary.short ? `Previous · ${prevBoundary.short}` : 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary }
+                : null}
+              next={letter.nextLetter ? { label: 'Next ' + String(unit).toLowerCase(), title: letter.nextLetter.title, onClick: () => onNavigate(letter.nextLetter.id) }
+                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary }
+                : letter.nextLetterExternal ? { label: 'Next ' + String(unit).toLowerCase(), title: letter.nextLetterExternal.title, href: letter.nextLetterExternal.url }
+                : null} />
             <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
           </div>
         </div>

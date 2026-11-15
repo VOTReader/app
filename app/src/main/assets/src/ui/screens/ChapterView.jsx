@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
+import { EndNav } from '../components/EndNav.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
@@ -265,41 +266,11 @@ export function ChapterView(props) {
             </div>
           )}
 
-          <div className="bottom-nav">
-            {prevCh ? (
-              <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
-                <div className="bottom-nav-label">Previous</div>
-                <div className="bottom-nav-title">{chapterRef(prevCh.num)}</div>
-              </button>
-            ) : prevBoundary ? (
-              <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                <div className="bottom-nav-label">Previous book</div>
-                <div className="bottom-nav-title">{prevBoundary.title}</div>
-              </button>
-            ) : (
-              <div className="bottom-nav-card placeholder">
-                <div className="bottom-nav-label">Previous</div>
-                <div className="bottom-nav-title">—</div>
-              </div>
-            )}
-
-            {nextCh ? (
-              <button className="bottom-nav-card next" onClick={() => onNavigate(nextCh.num)}>
-                <div className="bottom-nav-label">Next</div>
-                <div className="bottom-nav-title">{chapterRef(nextCh.num)}</div>
-              </button>
-            ) : nextBoundary ? (
-              <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                <div className="bottom-nav-label">Next book</div>
-                <div className="bottom-nav-title">{nextBoundary.title}</div>
-              </button>
-            ) : (
-              <div className="bottom-nav-card next placeholder">
-                <div className="bottom-nav-label">Next</div>
-                <div className="bottom-nav-title">—</div>
-              </div>
-            )}
-          </div>
+          <EndNav
+            prev={prevCh ? { label: 'Previous', title: chapterRef(prevCh.num), onClick: () => onNavigate(prevCh.num) }
+              : prevBoundary ? { label: 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
+            next={nextCh ? { label: 'Next', title: chapterRef(nextCh.num), onClick: () => onNavigate(nextCh.num) }
+              : nextBoundary ? { label: 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
         </div>
       </div>
 

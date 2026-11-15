@@ -1863,7 +1863,6 @@
       .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-4); margin:var(--sp-2) 0; padding:var(--sp-3) var(--card-pad); border-radius:var(--r-card); background:var(--surface-1); box-shadow:inset 3px 0 0 var(--dl-brick); }
       .dl-unsent p { flex:1 1 12em; margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
       .dl-cancel-ask { margin-top:var(--sp-3); }
-      .related-link > .ui-i { margin-right:var(--sp-2); color:var(--accent); vertical-align:-3px; }
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
@@ -2324,7 +2323,6 @@
       .bottom-nav-card { background: var(--surface-1); border: 0; border-radius: var(--r-card); padding: 12px 14px; text-align: left; color: inherit; cursor: pointer; min-width: 0; overflow-wrap: break-word; }
       @media (hover: hover) { .bottom-nav-card:hover { background: var(--surface-2); } }
       .bottom-nav-card.next { text-align: right; }
-      .bottom-nav-card.placeholder { opacity: 0.3; pointer-events: none; }
       .bottom-nav-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); overflow-wrap: break-word; }
       .bottom-nav-title { font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); line-height: 1.35; margin-top: 3px; }
       /* ── ORNAMENT DIVIDER ── */
@@ -2453,7 +2451,7 @@
     /* A word wider than the reading column (a letter title in an attribution,
        at a large Text Size) wraps rather than pushing the page sideways — the
        .bottom-nav-card rule of 2026-09-05, for the body text too. */
-    .letter-para, .letter-poetry, .related-link { overflow-wrap:break-word; }
+    .letter-para, .letter-poetry { overflow-wrap:break-word; }
     /* Scroll-memory exact restore (use-scroll-memory.js Effect 3): while a saved
        position is being applied, lift PERF4's content-visibility (here + the
        Bible .section-block) so scrollTop lands against REAL block heights, not
@@ -2966,7 +2964,7 @@
     .footnote-verse-toggle::before { content:''; position:absolute; inset:-16px -4px; }
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */
-    .related-section { margin-top:2.5rem; padding-top:2.5rem; border-top:1px solid var(--gold-border); display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; }
+    .related-section { display:block; }
     /* A WTLB entry's end matter holds only the songs card (L4); with no songs it is empty, and an empty section draws no rule. */
     .related-section:empty { display:none; }
     /* Songs of the Letters on a letter page (L4, picture final-05): LISTEN filled, HEAR IT SUNG outlined beside it, same
@@ -3006,19 +3004,6 @@
     .footnote-list-card .footnote-list-item { margin: 0; padding: 12px 14px; border-radius: 0; }
     .footnote-list-card .footnote-list-item + .footnote-list-item { box-shadow: inset 0 1px 0 var(--hairline); }
     .footnote-list-card .footnote-list-num { font-family: var(--font-ui); font-size: var(--ts-control); }
-    .related-section { display: block; border-top: 0; margin-top: 0; padding-top: 0; }
-    .related-section > .related-card:not(.letter-songs-card), .rd-web .related-card { display: contents; }
-    .related-section .related-card-title, .rd-web-label { display: block; font-family: var(--font-ui); font-size: var(--ts-label); line-height: var(--lh-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--accent); margin: var(--label-above) 0 var(--label-below); }
-    .related-section > .related-card:not(.letter-songs-card) > :not(.related-card-title) { display: inline-flex; vertical-align: top; margin: 0 8px 8px 0; }
-    .rd-web { display: flex; flex-wrap: wrap; gap: 8px; }
-    .rd-web > .rd-web-label { flex-basis: 100%; margin-bottom: 2px; }
-    .rd-web .related-card > div:not(.related-card-title) { display: contents; }
-    .related-section .related-link { display: inline-flex; align-items: center; gap: 7px; min-height: var(--chip-h); padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); line-height: 1.25; }
-    .related-section .related-link svg { color: var(--accent); flex: none; }
-    @media (hover: hover) { .related-section .related-link:hover { background: var(--surface-2); color: var(--text-1); border-bottom-color: transparent; } }
-    .rd-web .related-card-title { display: none; }
-    .rd-web:not(:has(.related-link)) { display: none; }
-    .letter-songs-card { margin-top: var(--label-above); }
     .bottom-nav { gap: var(--grid-gap); }
     /* A footnote that opens a letter: a plain row, the title over a meta line, no boxed button. */
     .footnote-list-card .footnote-list-link-btn.fn-list-rich { background: none; border: 0; padding: 0; width: 100%; }
@@ -3031,15 +3016,7 @@
     .letter-sung-pill { border-color:var(--gold); background:transparent; }
     .letter-sung-pill.is-playing { background:var(--gold-faint); }
     @media (hover: hover) { .letter-listen-pill:hover { background:var(--gold-bright); } }
-    .letter-songs-card { grid-column:1 / -1; }
     .letter-songs-card .songs-row:last-child { border-bottom:0; }
-    .letter-songs-all { display:inline-flex; align-items:center; gap:.15rem; min-height:44px; margin-top:.35rem; padding:0; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; }
-    .letter-songs-all svg { width:18px; height:18px; }
-    .letter-songs-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-    .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem min(1.4rem, 6vw); }
-    .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
-    .related-link { display:block; min-height:44px; box-sizing:border-box; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.6rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
-    @media (hover: hover) { .related-link:hover { color:var(--gold-bright); border-bottom-color:var(--gold-dim); } }
     /* External-link affordance: every target="_blank" anchor (audio/video
        links, related topics, About, footnote URLs, playlist buttons) leaves
        the app for the browser — a quiet trailing ↗ says so before the tap.
@@ -3230,7 +3207,7 @@
     .vot-large-text .root-search { height: auto; min-height: var(--field-h); padding-top: 8px; padding-bottom: 8px; }
     .vot-large-text .root-search span, .vot-large-text .upnext-title { white-space: normal; }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
-    :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool):active { background-color: var(--surface-2); }
+    :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool, .bottom-nav-card):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
     :is(.ui-btn.is-text):active { background-color: transparent; color: var(--text-1); }
     @media (hover:hover) { :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn):hover { background-color: var(--surface-2); } }
@@ -6136,6 +6113,10 @@
     .ws3-about-lead { margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-style:italic; line-height:var(--lh-headline); }
     .ws3-about-line { margin:var(--sp-3) 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
     .ws3-link-row a.ui-row-main { color:inherit; text-decoration:none; }
+    a.ui-row.is-link { color: inherit; text-decoration: none; }
+    a.ui-row.is-link[target="_blank"]::after { content: none; }
+    .ui-row.is-link .ui-row-title { white-space: normal; overflow-wrap: break-word; }
+    .related-section > .ui-group + .ui-label, .related-section > .ui-group + .ui-label-row, .related-section > * + .letter-songs-card { margin-top: var(--label-above); }
     .ui-row.ws3-version { gap:var(--sp-3); padding-right:var(--card-pad); }
     .ws3-version .ui-row-text { flex:1; min-width:0; }
     .ws3-about-build { margin:var(--sp-4) 0 0; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-label); text-align:center; }
@@ -9045,10 +9026,9 @@ body.light .install-step-num { color: #fff; }
 .install-steps-done { margin-top: 0.9rem; background: transparent; color: var(--gold); border: 1px solid var(--gold); }
 
 /* U01.1: "Mark as read" at a letter's end, "✓ Read · Undo" once it is. Quiet: a link, not a card. */
-.mark-read-row { display: flex; align-items: center; justify-content: center; gap: 0 1rem; margin: 0.25rem auto 0.75rem; font-family: var(--font-body); font-size: var(--fs-16); }
-.mark-read-btn, .mark-read-undo { min-height: 44px; padding: 0 0.5rem; background: none; border: 0; cursor: pointer; font: inherit; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
-.mark-read-undo { color: var(--cream-muted); }
-.mark-read-done { color: var(--gold); }
+.mark-read-row { display: flex; align-items: center; justify-content: center; gap: 0 var(--sp-3); margin: var(--sp-1) auto var(--sp-3); font-family: var(--font-ui); font-size: var(--ts-value); }
+.mark-read-undo { min-height: var(--tap); padding: 0 var(--sp-2); }
+.mark-read-done { color: var(--accent); font-weight: 500; }
 
 /* Wave 3 large text (J-w3g1.1): rules for text sizes of 1.8 and up, keyed on the root class use-settings sets. */
 .vot-large-text .pill-left { display: none; }   /* RC.8: "RESUME · 1 MIN LE" was cut at both screen edges at 300% */
@@ -9064,7 +9044,7 @@ body.light .install-step-num { color: #fff; }
    short labels onto three lines. In the reading area every letter gap is held to 1 px at large sizes. */
 .vot-large-text .screen-scroll * { letter-spacing: min(0.04em, 1px) !important; }
 /* J-w3g1.1: card padding in rem tripled with the text (a 48 px inset each side at 300%); held to phone px. */
-.vot-large-text :is(.bottom-nav-card, .related-card) { padding: 12px 14px; }
+.vot-large-text .bottom-nav-card { padding: 12px 14px; }
 .vot-large-text .bottom-nav { gap: 10px; }
 /* search200 wave 3: at 300% on a 320 px phone the search box's rem padding (36 px a side), its row gap and the
    ✕'s 60 px glyph left about three letters of the query in view. Held to phone px, and the box's own words to 36 px

@@ -37,11 +37,11 @@ import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
 import { listenFace, pausedHere, useStillLoading } from './AudioPlayButton.jsx';
 import { useAudioPositions } from './AudioShelf.jsx';
 import { SongCatalog } from '../../utils/song-catalog.js';
-import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
+import { SongListRow, songCountLabel, currentSongId, playerIsActive } from './SongParts.jsx';
 import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
-import { UiIcon } from './UiIcon.jsx';
+import { ListGroup, ListLink } from './UiParts.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -135,22 +135,30 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
  * The letter's outside recordings (its own audio file, SoundCloud): web pages, so offline the card goes and the hero
  * row above says what can play (downloads brief 2026-10-23, section 7 item 5: tapped offline, the link opened a page
  * that could not load, beside a Listen that had said why it could not play).
- * @param {{ letter: { audioUrl?: string, soundcloudUrl?: string } }} props
+ * @param {{ letter: { audioUrl?: string, soundcloudUrl?: string, videos?: Array<{ url: string, label: string }>, videoVoiceUrl?: string,
+ *   videoVoiceLabel?: string, videoMusicUrl?: string } }} props
  */
-/* Readers mock r-end (W3b): the chips read "Audio recording" and "SoundCloud", each with its icon. */
-export function LetterAudioLinks({ letter }) {
+/* Readers mock r-end (W3b): the rows read "Audio recording" and "SoundCloud", each with its icon. vot-ui 11-15: the
+   recordings and the videos are one kit list group, "On the website"; every row opens a web page (the out arrow). */
+export function LetterWebLinks({ letter }) {
   const online = useSongsOnline();
-  if (!online || !(letter.audioUrl || letter.soundcloudUrl)) return null;
+  const audio = online && !!(letter.audioUrl || letter.soundcloudUrl);
+  // C2-C [C5]: the channel row rides only with a video of this letter; alone it is not one.
+  const video = letter.videos?.length > 0 || !!letter.videoVoiceUrl || !!letter.videoMusicUrl;
+  if (!audio && !video) return null;
   return (
-    <div className="related-card">
-      <div className="related-card-title">Audio</div>
-      {letter.audioUrl && (
-        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="mic" size="sm" />Audio recording</a>
-      )}
-      {letter.soundcloudUrl && (
-        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="music" size="sm" />SoundCloud</a>
-      )}
-    </div>
+    <ListGroup label="On the website" className="rd-web">
+      {audio && letter.audioUrl ? <ListLink icon="mic" title="Audio recording" href={letter.audioUrl} /> : null}
+      {audio && letter.soundcloudUrl ? <ListLink icon="music" title="SoundCloud" href={letter.soundcloudUrl} /> : null}
+      {video ? (
+        <>
+          {(letter.videos || []).map((v, i) => <ListLink key={i} icon="film" title={v.label} href={v.url} />)}
+          {letter.videoVoiceUrl ? <ListLink icon="film" title={letter.videoVoiceLabel || 'Video with voice over'} href={letter.videoVoiceUrl} /> : null}
+          {letter.videoMusicUrl ? <ListLink icon="film" title="Video set to music" href={letter.videoMusicUrl} /> : null}
+          <ListLink icon="film" title="YouTube channel" href="https://www.youtube.com/user/trumpetcallofgod" />
+        </>
+      ) : null}
+    </ListGroup>
   );
 }
 
@@ -185,8 +193,8 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
   const open = (frames) => { if (typeof window.__openSongs === 'function') window.__openSongs(frames, letterTitle || ''); };
 
   return (
-    <div className="related-card letter-songs-card">
-      <div className="related-card-title">Songs from this letter</div>
+    <div className="letter-songs-card">
+      <ListGroup label="Songs from this letter">
       <div className="songs-list">
         {leads.slice(0, CARD_SONGS).map((lead) => {
           const fam = SongCatalog.familyById(lead.f);
@@ -205,13 +213,12 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
               current={playingFam} playing={playingFam && active} onPlay={play} />
           );
         })}
+        {/* Past three songs, the rest are one tap away. A song's own versions live on its song page. */}
+        {leads.length > CARD_SONGS ? (
+          <ListLink title={'All ' + songCountLabel(leads.length) + ' of this letter'} className="letter-songs-all" onClick={() => open([{ k: 'list', v: 'sung:' + letterKey }])} />
+        ) : null}
       </div>
-      {/* Past three songs, the rest are one tap away. A song's own versions live on its song page. */}
-      {leads.length > CARD_SONGS ? (
-        <button type="button" className="letter-songs-all" onClick={() => open([{ k: 'list', v: 'sung:' + letterKey }])}>
-          All {songCountLabel(leads.length)} of this letter<ChevronRightIcon />
-        </button>
-      ) : null}
+      </ListGroup>
       {/* K1: this letter's songs, every version, kept for listening with no signal. */}
       <SongKeepAction ids={songs.map((s) => s.id)} noteKey={'keep-letter-' + letterKey} label={songs.length > 1 ? 'Keep these ' + songs.length + ' songs' : 'Keep this song'} />
     </div>
