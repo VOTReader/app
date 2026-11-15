@@ -191,6 +191,8 @@ const FRAMES = {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [];
+/** frame -> browser relaunches it needed (0 when the first launch was judged) */
+const relaunches = /** @type {Record<string, number>} */ ({});
 let nothingToCheck = null;
 const notes = [];
 const note = (s) => { notes.push(s); console.log('[e2e-myweb-r2] ' + s); };
@@ -548,22 +550,15 @@ async function armR(page, tag, fname, c, r0, attempt) {
     ? `${tag} R: POP: the cap fraction jumped to full ${jumpGap} ms after the previous tick through ${fading.length} fading frames (frame cadence ${cadence} ms): there was no fade`
     : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
   else if (!(fadeSpan >= 100)) fadeFails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
-  // r2-fade (vot-ui 11-15, 23 desktop launches, 10 alone + 10 beside a vitest batch): 12 had one 94-124 ms main-thread
-  // frame in the release window (the tick before the last live one to the first full frame), alone 8/12, loaded 4/11,
-  // so it is the page's own long frame at the cap's release, not machine load. The fade's clock runs through it, so
-  // where it lands decides what the sampler can see: on the fade's first half it leaves 2-3 fading frames from cf
-  // ~0.47 (3 of 23 failed 'spanned 57 ms' / POP, all three stalled; no unstalled launch failed). A fade check that fails
-  // on a launch with such a stall is that launch's luck, not a number: relaunch, as the coarse-launch rule above does;
-  // three launches failing it is a fail. A launch with no stall over RESOLVE_MS is judged as it stands.
+  // r2-fade -> myweb-pop (vot-ui 11-15): one 94-124 ms frame at the cap's release used to swallow the fade's first
+  // half (3 of 23 desktop launches failed; f0d12949e relaunched them). The scheduler now advances the fade at most a
+  // third of FADE_MS a drawn frame, so a stall delays the fade instead of skipping it: such a launch is judged as it
+  // stands. The stall is still measured and named in a failure, as information.
   const liveIdx = shots.reduce((acc, x, i) => (x.cf === 0 ? acc.concat(i) : acc), /** @type {number[]} */ ([]));
   const winLo = liveIdx.length > 1 ? liveIdx[liveIdx.length - 2] : (liveIdx[0] || 0);
   const relWin = shots.slice(winLo, (firstFull ? shots.indexOf(firstFull) : shots.length - 1) + 1);
   const stall = relWin.length > 1 ? Math.max(...relWin.slice(1).map((x, i) => x.t - relWin[i].t)) : 0;
-  if (fadeFails.length && stall > RESOLVE_MS && attempt < 3) {
-    note(`${tag} R: launch ${attempt}: ${fadeFails[0].replace(`${tag} R: `, '')}, with a ${stall} ms main-thread frame in the release window (over ${RESOLVE_MS}): the stall hid the fade's start, not a number; relaunching the browser`);
-    return 'software';
-  }
-  for (const f of fadeFails) fails.push(stall > RESOLVE_MS ? `${f} (release stall ${stall} ms on launch ${attempt} of 3)` : f);
+  for (const f of fadeFails) fails.push(stall > RESOLVE_MS ? `${f} (release stall ${stall} ms)` : f);
   if (falls) fails.push(`${tag} R: the cap fraction fell ${falls} times during the release: not monotone`);
   await resetBoth(page); await sleep(300);
   return 'ok';
@@ -619,6 +614,7 @@ try {
     // storage. A software-raster launch (arm R) gets a whole new browser: a new
     // page in the same browser inherits the state (measured 3 of 3).
     for (let attempt = 1; attempt <= 3; attempt++) {
+      relaunches[fname] = attempt - 1;
       const page = await (await browser.createBrowserContext()).newPage();
       let r;
       try { r = await walk(page, own.url, fname, attempt); } catch (e) {
@@ -642,6 +638,8 @@ try {
   if (browser) await browser.close();
   if (own) own.server.close();
 }
+// the gate log names how often a frame needed a new browser (hub 11-15: a forgiven launch must stay visible)
+if (ARMS.includes('R')) console.log('[e2e-myweb-r2] R relaunches: ' + FRAME_LIST.map((f) => f + ' ' + (relaunches[f] || 0)).join(', '));
 if (OUT) writeFileSync(resolve(OUT, 'e2e-myweb-r2.json'), JSON.stringify({ tree: TREE, sha: sha(TREE), notes, fails }, null, 2));
 if (process.exitCode === 3) process.exit(3);
 if (nothingToCheck) { console.log('[e2e-myweb-r2] NOTHING TO CHECK: ' + nothingToCheck); process.exit(2); }
