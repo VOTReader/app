@@ -88,7 +88,9 @@ export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSea
   const readN = chapters.filter(read).length;
   const byId = chapters.map((ch) => ({ id: ch.num, ch }));
   const step = studyNextStep(byId, currentChapter, (x) => read(x.ch));
-  const next = step ? step.ch.ch : null;
+  // The card shows only once there is progress (Continue / Up next): at zero it repeated row 1 word for word and, at
+  // text 2.0, pushed every chapter row off the first screen; all read ('Read again') leaves the list to speak.
+  const next = step && (step.k === 'Continue' || step.k === 'Up next') ? step.ch.ch : null;
   const hasNotes = !!noteWeights && Object.values(noteWeights).some((r) => r > 0);
 
   return (
