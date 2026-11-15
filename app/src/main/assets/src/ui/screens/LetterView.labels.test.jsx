@@ -85,8 +85,9 @@ const renderLetter = (props = {}, letter = LETTER) => render(
 
 const backBtn = () => document.querySelector('.nav-back-icon');
 const eyebrow = () => document.querySelector('.hero-eyebrow').textContent;
-const videoCard = () => [...document.querySelectorAll('.related-card-title')]
-  .find((t) => t.textContent === 'Videos');
+/* The videos half of "On the website": its rows end on the channel's row, which rides only with a video. */
+const webRows = () => [...document.querySelectorAll('.rd-web .ui-row-title')].map((t) => t.textContent);
+const videoCard = () => webRows().find((t) => t === 'YouTube channel');
 
 describe('LetterView — the collection label is never invented [C2]', () => {
   it('names the collection everywhere when it is given', () => {
@@ -165,8 +166,7 @@ describe('LetterView — the Videos card appears only when there are videos [C5]
 
   it('leaves the sibling cards untouched', () => {
     renderLetter({}, { ...LETTER, audioUrl: 'https://example.org/a.mp3' });
-    const titles = [...document.querySelectorAll('.related-card-title')].map((t) => t.textContent);
-    expect(titles).toEqual(['Audio']);   // Audio present, Videos absent
+    expect(webRows()).toEqual(['Audio recording']);   // Audio present, Videos absent
   });
 });
 

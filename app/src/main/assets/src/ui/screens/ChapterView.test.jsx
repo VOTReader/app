@@ -156,12 +156,12 @@ describe('ChapterView — the last chapter does not dead-end', () => {
     expect(onNextBoundary).toHaveBeenCalled();
   });
 
-  it('renders a dead placeholder — not a live button — with no chapter and no boundary', () => {
+  it('draws no card on a side with no chapter and no boundary: Next is the only card', () => {
     renderCh({}, 1);
-    const [prev] = navCards();
-    expect(prev.className).toContain('placeholder');
-    expect(prev.tagName).toBe('DIV');          // not a button: nothing to press
-    expect(prev.textContent).toContain('—');
+    const cards = navCards();
+    expect(cards).toHaveLength(1);              // no dimmed dead card on the Previous side
+    expect(cards[0].className).toBe('bottom-nav-card next');
+    expect(cards[0].tagName).toBe('BUTTON');
   });
 
   it('disables the sticky arrows at a true end and leaves them live at a boundary', () => {

@@ -24,7 +24,7 @@ const { player, setPlayerState, audio } = vi.hoisted(() => {
 });
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { LetterListenRow, LetterSongsCard, LetterAudioLinks } from './LetterSongs.jsx';
+import { LetterListenRow, LetterSongsCard, LetterWebLinks } from './LetterSongs.jsx';
 import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { NetStatus } from '../../utils/net-status.js';
@@ -113,7 +113,7 @@ describe('SONGS FROM THIS LETTER', () => {
   it('lists the letter\'s songs as in-app rows: a tap on the row plays (W-02), its menu opens the song page', () => {
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     const card = document.querySelector('.letter-songs-card');
-    expect(card.querySelector('.related-card-title').textContent).toBe('Songs from this letter');
+    expect(card.querySelector('.ui-label').textContent).toBe('Songs from this letter');
     const row = card.querySelector('.songs-row');
     expect(row.textContent).toContain('2 versions');
     fireEvent.click(within(row).getByRole('button', { name: /Play Come, Love Awaits You/ }));
@@ -370,19 +370,19 @@ describe('the hero row while the reading loads (U10.2)', () => {
 describe('the outside audio links of a letter', () => {
   const LINKS = { audioUrl: 'https://example.org/a.mp3', soundcloudUrl: 'https://soundcloud.com/x/y' };
   it('online: both links show', () => {
-    render(<LetterAudioLinks letter={LINKS} />);
+    render(<LetterWebLinks letter={LINKS} />);
     expect(screen.getByRole('link', { name: 'Audio recording' }).getAttribute('href')).toBe(LINKS.audioUrl);
     expect(screen.getByRole('link', { name: 'SoundCloud' }).getAttribute('href')).toBe(LINKS.soundcloudUrl);
   });
   it('offline: the card is gone, and it comes back with the network', () => {
     NetStatus.reportFailure();
-    const { container } = render(<LetterAudioLinks letter={LINKS} />);
+    const { container } = render(<LetterWebLinks letter={LINKS} />);
     expect(container.textContent).toBe('');
     act(() => { NetStatus.reportOk(); });
     expect(screen.queryByRole('link', { name: 'SoundCloud' })).not.toBeNull();
   });
   it('a letter with neither link renders nothing', () => {
-    const { container } = render(<LetterAudioLinks letter={{}} />);
+    const { container } = render(<LetterWebLinks letter={{}} />);
     expect(container.textContent).toBe('');
   });
 });

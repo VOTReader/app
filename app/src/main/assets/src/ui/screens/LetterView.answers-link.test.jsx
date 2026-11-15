@@ -59,9 +59,9 @@ describe('LetterView — an Answers row opens the topic at the section its URL n
     render(<LetterView letter={LETTER} volKey="two" volumeLabel="Volume Two" theme="dark" markAsReadEnabled={false}
       onNavigate={() => {}} onHome={() => {}} onNavigateToLink={onNavigateToLink} />);
     const [withSection, plain, mainPage] = rows();
-    // Still in-app links, never the website.
-    expect(withSection.getAttribute('href')).toBe('#');
-    expect(mainPage.getAttribute('href')).toBe('#');
+    // Still in-app rows (buttons, the chevron), never the website (an <a target=_blank>, the out arrow).
+    expect(withSection.tagName).toBe('BUTTON');
+    expect(mainPage.tagName).toBe('BUTTON');
     fireEvent.click(withSection);
     expect(onNavigateToLink.mock.calls[0][0]).toEqual({
       type: 'wtlb', screen: 'answers-entry', letterId: 'regarding-pride',

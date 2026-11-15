@@ -643,7 +643,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
     '.audio-library-eyebrow',
     '.select-sheet-eyebrow',
-    '.footnote-list-header', '.related-card-title', '.settings-section-label',
+    '.footnote-list-header', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.ans-label',
     '.section-heading',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.

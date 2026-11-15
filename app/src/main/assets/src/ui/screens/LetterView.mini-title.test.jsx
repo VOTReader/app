@@ -64,6 +64,9 @@ const LETTER = {
   blocks: [], footnotes: {}, nkjv: {}, prevLetter: null, nextLetter: null,
 };
 
+/* The footers name a real neighbour each side (a side with none draws no card since vot-ui 11-15). */
+const NEIGHBOURS = { prevLetter: { id: 'the-one-before', title: 'The One Before' }, nextLetter: { id: 'the-one-after', title: 'The One After' } };
+
 const renderLetter = (props = {}, letter = LETTER) => render(
   <LetterView letter={letter} volKey="three" volumeLabel="Volume Three" theme="dark" markAsReadEnabled={false}
     onNavigate={() => {}} onHome={() => {}} {...props} />,
@@ -136,7 +139,7 @@ describe('LetterView — the sticky mini title (B10 item 1)', () => {
    the hero, the band and both footers. */
 describe('LetterView — a study names its parts (A02.10)', () => {
   it('a study in Parts says Part in the eyebrow, the band and the footers', () => {
-    renderLetter({ studyMode: true, volumeLabel: 'Purity' }, { ...LETTER, num: 1, unitWord: 'Part' });
+    renderLetter({ studyMode: true, volumeLabel: 'Purity' }, { ...LETTER, num: 1, unitWord: 'Part', ...NEIGHBOURS });
     expect(document.querySelector('.hero-eyebrow').textContent).toBe('Purity \xA0\xB7\xA0 Part 1');
     expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('Purity \xB7 Part 1');
     const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
@@ -157,7 +160,7 @@ describe('LetterView — a study names its parts (A02.10)', () => {
   });
 
   it('a letter still says Letter', () => {
-    renderLetter();
+    renderLetter({}, { ...LETTER, ...NEIGHBOURS });
     const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
     expect(labels).toEqual(['Previous letter', 'Next letter']);
   });
