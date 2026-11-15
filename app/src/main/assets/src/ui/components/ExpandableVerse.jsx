@@ -49,7 +49,7 @@ export function ExpandableVerse({ text, refStr }) {
           className="footnote-verse-toggle"
           aria-expanded={expanded}
         >
-          {expanded ? "Show less ▲" : "Read more ▼"}
+          {expanded ? "Show less" : "Read more"}
         </button>
       )}
     </span>

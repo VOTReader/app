@@ -2668,8 +2668,8 @@
     .fn-sheet-verse-missing { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:1.5; }
     .fn-sheet-verse-missing strong { color:var(--text-1); font-weight:600; }
     .fn-sheet-url-extra { font-size:var(--fs-14); color:var(--cream-muted); margin-top:0.4rem; font-style:italic; }
-    .fn-sheet-see-also { margin-top:1.1rem; padding-top:0.9rem; border-top:1px solid var(--gold-border); }
-    .fn-sheet-see-also-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.1rem; display:block; }
+    .fn-sheet-see-also { margin-top:16px; padding-top:12px; box-shadow:inset 0 1px 0 var(--hairline); }
+    .fn-sheet-see-also-label { display:block; margin-bottom:2px; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     /* Footnote list (bottom of letter) — compact in-app link */
     .footnote-list-link-btn {
       display:inline-flex; align-items:center; gap:0.35rem;
@@ -2681,7 +2681,7 @@
       font-style:normal; vertical-align:middle;
     }
     .footnote-list-link-btn:active { background:rgba(200,164,86,0.18); }
-    .footnote-list-link-btn .chev { color:var(--gold-dim); font-size:var(--fs-14); flex-shrink:0; align-self:center; }
+    .footnote-list-link-btn .chev { color:var(--text-3); flex-shrink:0; align-self:center; }
     /* Rich variant: shows the destination title so the reader knows what
        they're tapping into (the old pill only said "Open in App"). Used
        by the bottom-of-page footnote list now that a redundant "See: X"
@@ -2845,6 +2845,7 @@
     .sc-compare-part { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-weight:600; }
     .sc-compare-vn { font-size:0.7em; color:var(--text-3); margin-right:0.15em; }
     .sc-compare-wait, .sc-compare-none, .sc-compare-note { color:var(--text-2); }
+    .sc-compare-note { font-family:var(--font-ui); }
     .sc-compare-note { margin:0; padding:12px 0; box-shadow:inset 0 1px 0 var(--hairline); font-size:var(--ts-meta); text-align:center; }
     .sc-sheet-compound { display:flex; flex-direction:column; gap:1.1rem; }
     .sc-sheet-compound-part { display:flex; flex-direction:column; gap:0.35rem; }
@@ -2937,7 +2938,7 @@
        without moving a pixel of text: 16 px up covers the end of the line above (same card), and 16 px down
        stays inside the card's bottom padding plus the gap before the next card (0.5rem + 0.6rem here,
        0.7rem + 1rem in the WTLB list), so it never takes a tap meant for the next footnote. */
-    .footnote-verse-toggle { display:inline-block; position:relative; margin-left:0.5em; background:none; border:none; cursor:pointer; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; padding:0; vertical-align:middle; line-height:1; }
+    .footnote-verse-toggle { display:inline-block; position:relative; margin-left:0.5em; background:none; border:none; cursor:pointer; color:var(--accent); font-family:var(--font-ui); font-size:var(--fs-12); font-weight:600; font-style:normal; padding:0; vertical-align:middle; line-height:1; }
     .footnote-verse-toggle::before { content:''; position:absolute; inset:-16px -4px; }
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */

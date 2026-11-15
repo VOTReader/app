@@ -20,7 +20,7 @@ export function InAppLinkButton({ link, onActivate, compact, label }) {
           <span className="fn-list-rich-eyebrow">{where}</span>
           <span className="fn-list-rich-title">{title}</span>
         </span>
-        <span className="chev">{"\u203A"}</span>
+        <UiIcon name="chev" size="sm" className="chev" />
       </button>
     );
   }
