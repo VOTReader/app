@@ -92,11 +92,15 @@ try {
       const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > 0 && r.left < vw && r.bottom > 0 && r.top < window.innerHeight; };
       const label = (e) => (e.getAttribute('aria-label') || e.textContent.trim().replace(/\s+/g, ' ')).slice(0, 26);
       const els = [...document.querySelectorAll('button,[role=button],a,input,select,textarea')].filter(vis);
-      const offRight = els.filter((e) => e.getBoundingClientRect().right > vw + 1).map((e) => `${label(e)} right=${Math.round(e.getBoundingClientRect().right)}`);
-      // Any leaf that shortens its text (ellipsis or a line clamp): reported when it loses a little,
+      // A control inside a sideways scroller (a book's chapter-number strip) passes the edge by design: it scrolls into view.
+      const inScroller = (e) => { for (let p = e.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowX)) return true; return false; };
+      const offRight = els.filter((e) => e.getBoundingClientRect().right > vw + 1 && !inScroller(e)).map((e) => `${label(e)} right=${Math.round(e.getBoundingClientRect().right)}`);
+      // Any leaf that shortens its text (ellipsis or a line clamp), or a box whose children are all inline (a row's
+      // meta line holding a minutes chip: '2% read · ~3 min l…' at 2.0 hid there, 11-15): reported when it loses a little,
       // FAILED when it loses more than a third of its width or height — that is a label that stopped
       // doing its job, whatever the selector ("Matthew" rendering as "M a…" at 1.8 was one).
-      const clipped = [...document.querySelectorAll('*')].filter((e) => { if (!vis(e) || e.children.length) return false; const cs = getComputedStyle(e); return (cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && e.scrollHeight > e.clientHeight + 1); });
+      const inlineOnly = (e) => [...e.children].every((c) => getComputedStyle(c).display.startsWith('inline'));
+      const clipped = [...document.querySelectorAll('*')].filter((e) => { if (!vis(e) || (e.children.length && !inlineOnly(e))) return false; const cs = getComputedStyle(e); return (cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && e.scrollHeight > e.clientHeight + 1); });
       const ellipsed = clipped.map((e) => e.textContent.trim().slice(0, 30));
       // Width: a label that cannot show two thirds of itself has stopped doing its job. Height: a
       // line clamp is a design choice for long titles, so it fails only when the column is under
@@ -157,6 +161,16 @@ try {
     await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(600); await setScale();
     await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(900); await setScale();
     await stop('bible-chapter');
+    // Back to the book's contents with a chapter part read, so its Next card ('Continue', 'Chapter 1 · N% read · ~M min
+    // left', the longest meta a contents row carries) is measured too: at 2.0 on 360 it was cut, 11-15.
+    // The progress is seeded through the app's own store under the chapter's own track key (the live tracker's dwell
+    // timing made it land at some scales and not others): 3 of 10 parts read, the state that prints that meta.
+    await page.evaluate(() => { const m = window.__readTrackerMeta; if (m && m.key && typeof ReadingStatsStore !== 'undefined') ReadingStatsStore.recordProgress(m.key, 10, [0, 1, 2]); }); await sleep(300);
+    await page.evaluate(() => { const b = [...document.querySelectorAll('[aria-label^="Back to"]')].filter((x) => x.checkVisibility()).pop(); b && b.click(); }); await sleep(900); await setScale();
+    await page.evaluate(() => { const e = [...document.querySelectorAll('.screen-scroll')].filter((x) => x.checkVisibility()).pop(); if (e) e.scrollTop = 0; }); await sleep(300);
+    const nextCard = await page.evaluate(() => { const n = document.querySelector('.sty-next'); return n ? n.textContent : ''; });
+    if (!/% read/.test(nextCard)) fail(`${scale} bible-next: no Next card with progress after reading part of a chapter (${nextCard || 'none'})`);
+    await stop('bible-next');
     await tab('Read'); await tab('Library'); await stop('library');
     await libTile('notes');
     await stop('notes-index');
