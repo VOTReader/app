@@ -7,7 +7,7 @@
 
    Built from the UI pass's parts as a study's contents page is (vot-ui,
    2026-11-15): a centred hero, the card that says where to go next, Play all,
-   then one grouped list. A row is the letter's number over its name, and its
+   then one grouped list. A row is the letter's name over one line of facts,
    date and reading time under it; the one mark says it has been read. The old
    page (a number column, hairline rows, serif caps labels, two columns for
    Words To Live By) is gone with its CSS. */
@@ -46,7 +46,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, sub, noun = 'letter', 
   const readN = order.filter(read).length;
   const next = studyNextStep(order, currentLetter, read);
 
-  /** The small line over a name: "Letter 12", or "Preface". */
+  /** Where the item sits: "Letter 12", or "Preface" (the first fact on its row and on the next card). */
   const overOf = (item) => (item === preface ? 'Preface' : item.num != null ? cap(noun) + ' ' + item.num : null);
   /** Its facts: the date in words and the reading time. */
   const factsOf = (item) => {
@@ -55,7 +55,8 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, sub, noun = 'letter', 
     if (!date && !chip) return null;
     return <>{date}{date && chip ? ' · ' : null}{chip}</>;
   };
-  /** The next card's line: where the item is, then its facts ("Letter 12 · April 18, 2005 · ~7 min"). */
+  /** A row's one meta line and the next card's, worded alike (hub 11-15: one row is a title and one meta line,
+   * so a screen holds six or more): "Letter 12 · April 18, 2005 · ~7 min", "Preface · ~1 min". */
   const nextFacts = (item) => {
     const o = overOf(item), f = factsOf(item);
     return o || f ? <>{o}{o && f ? ' · ' : null}{f}</> : null;
@@ -82,7 +83,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, sub, noun = 'letter', 
       {headerExtra || null}
       <ListGroup label="Contents" aside={readN > 0 ? readN + ' of ' + order.length + ' read' : countOf(letters.length, noun)}>
         {order.map((item) => (
-          <ListRow key={item.id} noLead className="sty-row" over={overOf(item)} title={item.title} meta={factsOf(item)}
+          <ListRow key={item.id} noLead className="sty-row" title={item.title} meta={nextFacts(item)}
             mark={read(item) ? readMark(Math.max(1, readCount ? readCount(item.id) : 1)) : null}
             current={item.id === currentLetter} onClick={() => open(item)} />
         ))}

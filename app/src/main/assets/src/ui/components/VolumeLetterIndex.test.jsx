@@ -78,8 +78,8 @@ describe('VolumeLetterIndex — "~N min" reading-time chip', () => {
     setupCounters();
     renderIndex({ letters: [ENTRY_B], noun: 'entry' });
     const row = document.querySelector('.ui-group .sty-row');
-    expect(row.querySelector('.ui-row-over').textContent).toBe('Entry 11');
-    expect(row.querySelector('.ui-row-meta .idx-min-chip').textContent).toBe('~1 min');
+    expect(row.querySelector('.ui-row-over')).toBeNull();
+    expect(row.querySelector('.ui-row-meta').textContent).toBe('Entry 11 · ~1 min');
   });
 });
 
@@ -110,12 +110,12 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
 
 describe('VolumeLetterIndex — the kit page (vot-ui 2026-11-15)', () => {
   const B = { id: 'b', num: 2, title: 'The Seventh Day', date: '4/18/05' };
-  it('a row is "Letter N" over the name, the date in words under it', () => {
+  it('a row is the name and one meta line: "Letter N · date in words · time"', () => {
     const { container } = renderIndex({ letters: [LETTER_A] });
     const row = container.querySelector('.ui-group .sty-row');
-    expect(row.querySelector('.ui-row-over').textContent).toBe('Letter 1');
+    expect(row.querySelector('.ui-row-over')).toBeNull();
     expect(row.querySelector('.ui-row-title').textContent).toBe('The Wide Path');
-    expect(row.querySelector('.ui-row-meta').textContent).toContain('March 28, 2005');
+    expect(row.querySelector('.ui-row-meta').textContent).toMatch(/^Letter 1 · March 28, 2005/);
   });
   it('nothing read: the card says Start here and opens the first letter', () => {
     const picked = [];
@@ -131,11 +131,11 @@ describe('VolumeLetterIndex — the kit page (vot-ui 2026-11-15)', () => {
     expect(container.querySelector('.sty-next').textContent).toContain('The Seventh Day');
     expect(container.textContent).toContain('1 of 2 read');
   });
-  it('the preface opens through onSelectPreface and reads "Preface" over its name', () => {
+  it('the preface opens through onSelectPreface and its meta line starts "Preface"', () => {
     const got = [];
     const { container } = renderIndex({ preface: { id: 'pre', title: 'To the Reader' }, onSelectPreface: (id) => got.push(id) });
     const first = container.querySelector('.ui-group .sty-row');
-    expect(first.querySelector('.ui-row-over').textContent).toBe('Preface');
+    expect(first.querySelector('.ui-row-meta').textContent).toMatch(/^Preface/);
     first.click();
     expect(got).toEqual(['pre']);
   });
