@@ -1,20 +1,30 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ChapterIndex — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   A Bible book's chapters (bible-idx) and the Matthew study's (matthew-idx).
+
+   Built from the UI pass's parts as a volume's contents page is (vot-ui,
+   2026-11-15): a centred hero with the book's Listen, the card that says
+   where to go next, the strip of chapter numbers for a long book, then one
+   grouped list. A row is the chapter's heading over one line of facts
+   ("Chapter 5 · ~5 min"); the one mark says it has been read. The old page
+   (a gold number column, hairline rows, .chapter-card* and .vol-index*) is
+   gone with its CSS. */
 
 import { BarAction } from '../components/RootNav.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
+import { ListGroup, ListRow, NextCard, readMark } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { studyNextStep } from '../../utils/study-titles.js';
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, currentChapter, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
-  const currentRef = React.useRef(null);
-  // Chapter-level bookmark indicator (owner report 2026-08-09): a chapter
-  // holding a bookmark — the whole-chapter bookmark or any verse bookmark
-  // within it — shows a small flag on its card. Indicator only; managing
-  // the bookmark stays with the reading view's header button.
+export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSearch, currentChapter, isRead, readCount, progressKeyFor, markAsReadEnabled, restoredNames, showChapterTitle, bookmarkKeyFor, bibleAudio = null, noteWeights = null }) {
+  const pageRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // A chapter holding a bookmark (the whole chapter or any verse in it) says so in its facts (owner report
+  // 2026-08-09). Indicator only; the reading view's header button manages the bookmark.
   React.useSyncExternalStore(
     React.useCallback((cb) => (bookmarkKeyFor && typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, [bookmarkKeyFor]),
     () => (bookmarkKeyFor && typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
@@ -24,132 +34,101 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, curr
     try { return BookmarkStore.getForKeyPrefix(bookmarkKeyFor(num)).length > 0; }
     catch (_e) { return false; }
   };
+  // The chapter the reader is in sits in the middle of the screen on the way in.
   React.useEffect(() => {
-    if (!currentRef.current) return undefined;
     const timer = setTimeout(() => {
-      if (currentRef.current) currentRef.current.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+      const cur = pageRef.current && pageRef.current.querySelector('.sty-row[aria-current="true"]');
+      if (cur && cur.scrollIntoView) cur.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     }, 120);
     return () => clearTimeout(timer);
   }, []);
-  // Restored-Name chrome lookup for the chapter cards. When restoredNames
-  // is on, show the restored chapter title; otherwise fall back to the
-  // standard. If showChapterTitle is off, titles are hidden entirely.
-  const getChapterTitle = (ch) => {
+  // The chapter's heading: the restored one when Restored Names is on, none when Chapter Titles is off.
+  const titleOf = (ch) => {
     if (showChapterTitle === false) return null;
-    if (restoredNames && typeof BOOKS_RESTORED !== "undefined" && BOOKS_RESTORED[book.id]) {
+    if (restoredNames && typeof BOOKS_RESTORED !== 'undefined' && BOOKS_RESTORED[book.id]) {
       const r = BOOKS_RESTORED[book.id].chapters.find((c) => c.num === ch.num);
       if (r && r.title) return r.title;
     }
-    return ch.title;
+    return ch.title || null;
   };
-  // Wave 0: the back affordance must name its REAL destination. Callers
-  // pass backLabel ("Poetry & Wisdom", "Studies", "Home", …); "Books" is
-  // the legacy fallback for any call site that doesn't. One string feeds
-  // BOTH the tooltip and the TalkBack label so they can never disagree.
-  const backDest = backLabel || "Books";
-  // "~N min" per chapter card — or "N% · ~M min left" once the read tracker
-  // has left a frontier inside it ([26] smart-resume). The chip itself lives
-  // in components/ReadingMinChip.jsx: index cards, letter rows and History
-  // rows all render the SAME one. progressKeyFor threads the tracker's
-  // v1:<bid>:<cid> key; absent (legacy caller) → cold chip only.
+  // Wave 0: Back names its real destination ("Gospels", "Studies", ...); "Books" is the legacy fallback.
+  const backDest = backLabel || 'Books';
+  // "~N min", or "N% read · ~M min left" for a chapter part read (the one shared chip, keyed as the tracker records).
   const _wpm = readingChipWpm();
-  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm, { plain: true });
-  // BACKLOG [29a] / C2-C [C7] — the SECOND signal, on the study screens that
-  // pass a measured table (utils/matthew-note-weight.js). It answers a
-  // question the minute chip is contractually forbidden to answer: study
-  // panels are excluded from countItemWords by design, so a chapter carrying
-  // 8,640 words of letter excerpts over 1,025 words of verse reads as an
-  // ordinary chapter until you open it. A chapter with NO notes shows no
-  // chip — silence is the honest signal for nothing.
-  //
-  // It renders UNDER the title, inside the info column, rather than as a
-  // second right-hand chip: at 375px a right-hand pill crushed the title
-  // column to 48px (measured live). See the .idx-note-chip block in app.css.
+  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
+  // BACKLOG [29a] / C2-C [C7]: on the Matthew study, how long a chapter's study notes run against its verses
+  // (utils/matthew-note-weight.js). The minute chip counts verses only, by design. No notes, no fact.
   const noteChip = (ch) => {
     const ratio = noteWeights ? noteWeights[ch.num] : 0;
     if (!(ratio > 0)) return null;
     return (
-      <span
-        className="idx-note-chip"
+      <span className="idx-note-chip"
         title={`Study commentary runs ${ratio.toFixed(1)}× the length of this chapter's verse text`}
-      >{ratio.toFixed(1)}{"\xD7"} notes</span>
+      >{ratio.toFixed(1)}{'\xD7'} notes</span>
     );
   };
+  /** One line of facts, joined by middots; parts that are null drop out. */
+  const facts = (parts) => {
+    const on = parts.filter(Boolean);
+    return on.length ? on.map((p, i) => <React.Fragment key={i}>{i ? ' · ' : null}{p}</React.Fragment>) : null;
+  };
+  /** "Chapter 5" leads the facts when a heading is the row's name; an untitled row is named "Chapter 5" itself. */
+  const where = (ch) => (titleOf(ch) ? 'Chapter ' + ch.num : null);
+  const bookmark = (ch) => (hasBookmark(ch.num)
+    ? <span className="sty-bm"><UiIcon name="mark" size="sm" filled /><span className="sr-only">Bookmarked</span></span>
+    : null);
+
+  /** A row's facts: the bookmark mark, then "Chapter 5 · ~5 min · 3.6× notes" (null when there are none). */
+  const rowFacts = (ch) => {
+    const bm = bookmark(ch), f = facts([where(ch), minChip(ch), noteChip(ch)]);
+    return bm || f ? <>{bm}{f}</> : null;
+  };
+  const chapters = book.chapters;
+  const read = (ch) => !!(markAsReadEnabled && ch && isRead && isRead(ch.num));
+  const readN = chapters.filter(read).length;
+  const byId = chapters.map((ch) => ({ id: ch.num, ch }));
+  const step = studyNextStep(byId, currentChapter, (x) => read(x.ch));
+  const next = step ? step.ch.ch : null;
+  const hasNotes = !!noteWeights && Object.values(noteWeights).some((r) => r > 0);
+
   return (
     <ScreenLayout
-      utility={{ title: book.title, onBack, backLabel: 'Back to ' + backDest,
+      utility={{ title: '', onBack, backLabel: 'Back to ' + backDest,
         actions: [onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null] }}
     >
-      {/* r-book (W2h): the book's line and Listen, a strip of chapter numbers, then one list of chapters with their
-          headings and minutes. (.chapter-card-btn keeps its name: the e2e walks tap it.) */}
-      <div className="vol-index rd-book">
-        <div className="vol-index-header rd-book-head">
-          <p className="rd-book-sub">{book.subtitle ? book.subtitle + ' · ' : ''}{countOf(book.chapters.length, 'chapter')}</p>
-          {/* Recorded Bible edition (per-chapter since 2026-08-09; comment
-              corrected 2026-08-10). No chapter is named here — this is the
-              book index — so the book starts at its first chapter and
-              auto-advance carries on through the book. The selected edition
-              arrives via bibleAudio (null = Settings 'Off' / unknown edition);
-              a book the edition's manifest doesn't carry self-hides the same
-              way a letter without a recording does. */}
-          {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-            <HeroListen {...bibleHero(bibleAudio, book)} />
-          )}
-          {/* A02.11: the chip's tooltip is the only thing that said what it meant, and a phone shows no tooltips */}
-          {noteWeights && Object.values(noteWeights).some((r) => r > 0) ? (
-            <div className="idx-note-legend">{"\xD7"} notes: how long a chapter{"\u2019"}s study notes run, against its verses</div>
-          ) : null}
-        </div>
-        {book.chapters.length > 1 ? (
+      <div className="sty" ref={pageRef}>
+        <header className="sty-hero">
+          <div className="root-eyebrow">{eyebrow || 'The Holy Bible'}</div>
+          <h1>{book.title}</h1>
+          <p>{book.subtitle ? book.subtitle + ' · ' : ''}{countOf(chapters.length, 'chapter')}</p>
+          {/* The recorded edition (null = Settings 'Off'): the book from its first chapter, auto-advance carrying
+              on; a book the edition's manifest does not carry hides it. */}
+          {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) ? <HeroListen {...bibleHero(bibleAudio, book)} /> : null}
+          {/* A02.11: a phone shows no tooltip, so the page says once what the notes fact means. */}
+          {hasNotes ? <p className="idx-note-legend">{'\xD7'} notes: how long a chapter{'’'}s study notes run, against its verses</p> : null}
+        </header>
+        {next ? (
+          <NextCard step={step.k} title={titleOf(next) || 'Chapter ' + next.num}
+            meta={facts([where(next), minChip(next)])}
+            done={readN} total={chapters.length} onClick={() => onSelect(next.num)} />
+        ) : null}
+        {chapters.length > 1 ? (
           <nav className="rd-book-strip" aria-label="Chapters">
-            {book.chapters.map((ch) => (
+            {chapters.map((ch) => (
               <button key={ch.num} type="button" className={'rd-book-num' + (ch.num === currentChapter ? ' is-current' : '')}
                 aria-label={'Chapter ' + ch.num} aria-current={ch.num === currentChapter ? 'true' : undefined}
                 onClick={() => onSelect(ch.num)}>{ch.num}</button>
             ))}
           </nav>
         ) : null}
-        <div className="chapter-cards">
-          {book.chapters.map((ch, _i) => {
-            const isCurrent = ch.num === currentChapter;
-            return (
-              <button
-                key={ch.num}
-                ref={isCurrent ? currentRef : null}
-                className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
-                aria-current={isCurrent ? 'true' : undefined}
-                onClick={() => onSelect(ch.num)}
-              >
-                <span className="chapter-card-num">{ch.num}</span>
-                <div className="chapter-card-divider" />
-                <div className="chapter-card-info">
-                  {(() => {
-                    const t = getChapterTitle(ch);
-                    return t
-                      ? <div className="chapter-card-title">{t}</div>
-                      : <div className="chapter-card-title untitled">Chapter {ch.num}</div>;
-                  })()}
-                  {noteChip(ch)}
-                </div>
-                {hasBookmark(ch.num) && (
-                  <span className="chapter-card-bookmark" title="Bookmarked">
-                    <span className="sr-only">Bookmarked</span>
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                    </svg>
-                  </span>
-                )}
-                {minChip(ch)}
-                {markAsReadEnabled && isRead(ch.num) && (
-                  <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.num) > 1) ? `Read ${readCount(ch.num)} times` : 'Read'}</span>
-                    <span aria-hidden="true">{"✓"}</span>
-                    {readCount && readCount(ch.num) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.num)}</span>}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <ListGroup label="Chapters" aside={readN > 0 ? readN + ' of ' + chapters.length + ' read' : countOf(chapters.length, 'chapter')}>
+          {chapters.map((ch) => (
+            <ListRow key={ch.num} noLead className="sty-row" title={titleOf(ch) || 'Chapter ' + ch.num}
+              meta={rowFacts(ch)}
+              mark={read(ch) ? readMark(Math.max(1, readCount ? readCount(ch.num) : 1)) : null}
+              current={ch.num === currentChapter} onClick={() => onSelect(ch.num)} />
+          ))}
+        </ListGroup>
       </div>
     </ScreenLayout>
   );

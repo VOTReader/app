@@ -1756,6 +1756,7 @@ export function buildScreenRoutes({
       return (
         <ChapterIndex
           book={MATTHEW}
+          eyebrow="Study Bible"
           bibleAudio={bibleAudioFor(MATTHEW.id)}
           onSelect={(num) => { _pickFromIndex(); selectMatthewCh(num); }}
           onBack={() => { if (fromSearch) { _backToResults(); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
@@ -1813,6 +1814,7 @@ export function buildScreenRoutes({
       if (book) return (
         <ChapterIndex
           book={book}
+          eyebrow={_idxGenre ? _idxGenre.label : 'The Holy Bible'}
           bibleAudio={bibleAudioFor(book.id)}
           onSelect={(num) => { _pickFromIndex(); selectBibleCh(num); }}
           onBack={fromSearch ? _backToResults : genreId ? () => setScreen('scripture-genre') : goScripturesHome}

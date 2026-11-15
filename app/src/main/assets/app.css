@@ -753,7 +753,7 @@
          grey over cream); --scrim is the warm one the reader menu already uses. */
       body.light :is(.sh-modal-backdrop, .audio-manager-backdrop, .fn-sheet-backdrop, .select-sheet-backdrop, .disable-tabs-overlay,
         .link-picker-overlay, .note-sheet-overlay, .nb-picker-overlay, .multinote-overlay, .install-steps-backdrop) { background: var(--scrim); }
-      body.light :is(.home-eyebrow, .vol-index-eyebrow, .coverage-badge-no-recording, .idx-min-chip) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
+      body.light :is(.home-eyebrow, .coverage-badge-no-recording, .idx-min-chip) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
       /* words drawn in the tertiary ink: --text-3 (#8a8070) is the chevrons' 3:1 ink, 3.5:1 on parchment; text takes --text-2 */
       body.light :is(.plan-ribbon-why, .ws3-about-build, .tour-never) { color: var(--text-2); }
       body.light .song-lyrics-follow.is-on { color: var(--text-1); }
@@ -1229,28 +1229,6 @@
          byte-identical: 16px root × the same /16 value). Reading surfaces keep
          a ~constant CHARACTER measure by the same mechanism. The shell
          (--col-max) and fixed sheets stay px — they anchor overlay geometry. */
-      .vol-index {
-        /* Side padding capped in viewport terms: at a large text size every horizontal rem on the
-           card chain (this, .chapter-cards, the card's padding and gap, the number column) grew
-           together and left the Gospels cards 35 px for their text at --font-scale 1.8 on 360 px.
-           7.5vw equals 1.5rem on a 320 px phone at scale 1, so nothing changes at 1.0 (a11y-ux-6). */
-        max-width: 42.5rem; margin: 0 auto; padding: 2.5rem min(1.5rem, 7.5vw) 5rem;
-      }
-      .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
-      .vol-index-eyebrow {
-        font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing:0.18em;
-        text-transform: uppercase; color: var(--gold); opacity: 0.8; margin-bottom: 0.5rem;
-      }
-      .vol-index-title {
-        font-family: 'Cinzel Decorative', serif; font-size: var(--fs-36);
-        color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2; text-wrap: balance;
-      }
-      .vol-index-subtitle {
-        font-size: var(--fs-16); color: var(--cream-muted); font-style: italic; margin-bottom: 1.5rem;
-      }
-      .vol-index-ornament {
-        display: flex; align-items: center; gap: 0.75rem; max-width: 300px; margin: 0 auto;
-      }
       /* Holy Days' two playlists (the redesign, 2026-09-25). They were two boxed
          tiles ABOVE the page's own title, most of a phone's first screen; now two
          quiet link rows under the title and Play All (VolumeLetterIndex's
@@ -2354,9 +2332,6 @@
       .ornament-divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent); }
       .ornament-divider-symbol { font-family: 'Cinzel', serif; font-size: var(--fs-12); color: var(--gold-dim); letter-spacing: 0.15em; }
       /* ── ANIMATIONS ── */
-      @media (max-width: 500px) {
-        .vol-index-title { font-size: var(--fs-30); }
-      }
       /* ── INLINE NOTES ── */
       .inline-notes {
         margin: 0.4rem 0 1.1rem 1.1rem;
@@ -3009,9 +2984,9 @@
     .hero-eyebrow-col { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .hero-eyebrow-pos { flex: none; white-space: pre; }
     .hero-title { font-family: var(--font-serif); font-weight: 600; font-size: min(var(--ts-display), 9vw); line-height: 1.17; color: var(--text-1); margin: 0; overflow-wrap: break-word; hyphens: auto; }
-    .hero .hero-play-row { margin-top: 14px; }
-    .hero .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
-    .hero .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
+    .hero .hero-play-row, .sty-hero .hero-play-row { margin-top: 14px; }
+    .hero .hero-play-pill, .sty-hero .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .hero .hero-play-pill svg, .sty-hero .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
     .hero .hero-play-pill.letter-sung-pill { background: var(--surface-1); color: var(--text-1); }
     .hero .hero-play-pill.letter-sung-pill svg { color: var(--accent); }
     @media (hover: hover) { .hero .hero-play-pill:hover { transform: none; filter: brightness(1.06); } }
@@ -4002,16 +3977,6 @@
     .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
     @media (hover: hover) { .settings-gear-btn:hover { color:var(--gold); } }
     .settings-gear-btn svg { width:20px; height:20px; }
-    /* ── Mark as Read ── */
-    .read-check { font-size:var(--fs-12); color:var(--gold); opacity:0.7; flex-shrink:0; align-self:center; margin-left:0.5rem; }
-    /* Chapter index bookmark flag — indicator only; managing the bookmark
-       stays with the chapter header button inside the reading view. */
-    .chapter-card-bookmark { flex-shrink:0; align-self:center; display:inline-flex; color:var(--gold); opacity:0.85; }
-    .chapter-card-bookmark svg { width:13px; height:13px; }
-    /* Re-read count (2026-08-03): ✓ ×N once the detector has credited a
-       second full read. Dimmer + smaller than the check so a once-read row
-       stays visually identical to before. */
-    .read-check-count { font-size:var(--fs-10); color:var(--gold-dim); margin-left:0.15rem; letter-spacing:0.03em; }
     /* white-space:nowrap → normal + max-width (300%-cap spill fix): at the
        Text Size extreme, "Clear All" as one unbreakable line ran off a 375px
        screen; letting the label wrap inside the button keeps it on-screen. */
@@ -4229,56 +4194,6 @@
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
     @media (hover: hover) { .nav-search-btn:hover { color:var(--gold); } }
     .nav-search-btn svg { width:20px; height:20px; }
-    /* ── CHAPTER INDEX CARDS ── */
-    .chapter-cards { padding:1rem min(1rem, 5vw) 2.5rem; display:flex; flex-direction:column; gap:0.55rem; }   /* side padding capped, see .vol-index */
-    .chapter-cards.two-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.55rem; align-items:stretch; }
-    @media (max-width: 339px) { .chapter-cards.two-col { grid-template-columns:1fr; } }
-    .chapter-cards.two-col .chapter-card-btn {
-      padding:0; gap:0; min-height:4.5rem; text-align:center; align-items:stretch;
-    }
-    .chapter-cards.two-col .chapter-card-divider,
-    .chapter-cards.two-col .chapter-card-label { display:none; }
-    /* Inner wrapper handles vertical centering — works regardless of grid row height */
-    .chapter-card-btn { display:flex; align-items:center; gap:min(0.9rem, 4.5vw); width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem min(1.1rem, 5.5vw); transition:border-color 0.18s, background 0.18s; position:relative; }
-    .chapter-card-btn:active { background:var(--bg3); border-color:var(--gold-dim); }
-    .chapter-card-btn.is-current { border-color:rgba(200,164,86,0.5); background:var(--gold-faint); }
-    body.light .chapter-card-btn { background:var(--bg2); }
-    body.light .chapter-card-btn:active { background:var(--bg3); }
-    /* The card is a size container so the minute chip can step aside when the text column would
-       otherwise be crushed: at --font-scale 1.8 a 360 px phone gives the card 270 px, and number +
-       divider + gaps + chip left the title 79 px ("A Word of Warning" clamped to "A Word…"). Below
-       14rem (224 px at scale 1, which no phone reaches; 403 px at 1.8, which every phone does) the
-       chip is hidden on the one-column index; the two-column Bible grid keeps its own chip rule. */
-    .chapter-card-btn { container-type:inline-size; }
-    @container (max-width: 14rem) { .chapter-cards:not(.two-col) .chapter-card-btn .idx-min-chip { display:none; } }
-    .chapter-card-num { font-family:'Cinzel',serif; font-size:var(--fs-20); font-weight:600; color:var(--gold); min-width:min(2.2rem, 11vw); text-align:center; flex-shrink:0; line-height:1; }
-    .chapter-card-btn.is-current .chapter-card-num { color:var(--gold-bright); }
-    .chapter-card-divider { width:1px; align-self:stretch; background:var(--gold-border); flex-shrink:0; min-height:1.8rem; }
-    .chapter-card-info { flex:1; min-width:0; }
-    /* Long study/letter names must not eat the card (owner report 2026-08-09):
-       the eyebrow label ellipsizes on one line, the title clamps at two. */
-    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
-    .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:var(--fs-14); }
-    /* THE INDEX LISTS ARE ROWS (the redesign, 2026-09-25). A volume's letters, a
-       book's chapters, a study's parts, a genre's books, History and the Studies
-       list were each a stack of gold-outlined cards with a rule after the number;
-       one column of them is now rows on hairlines, the Library and Answers rows'
-       language: the gold numeral and the date stay, the boxes, the rule and the
-       italic go, and a title gets the width the box took (measured at 360 px:
-       Genesis shows chapters 1-10 on the first screen, not 1-8). A title still
-       clamps at two lines (owner report 2026-08-09). The two-column grids keep
-       their cards. */
-    .chapter-cards:not(.two-col) { gap:0; }
-    .chapter-cards:not(.two-col) .chapter-card-btn { background:none; border:0; border-bottom:1px solid var(--border); border-radius:0; padding:0.75rem 0.2rem; }
-    .chapter-cards:not(.two-col) .chapter-card-btn:active,
-    .chapter-cards:not(.two-col) .chapter-card-btn.is-current { background:var(--gold-faint); }
-    @media (hover: hover) { .chapter-cards:not(.two-col) .chapter-card-btn:hover .chapter-card-title { color:var(--gold-bright); } }
-    .chapter-cards:not(.two-col) .chapter-card-divider { display:none; }
-    .chapter-cards:not(.two-col) .chapter-card-num { font-size:var(--fs-16); font-weight:400; color:var(--gold-dim); font-variant-numeric:tabular-nums; min-width:1.75rem; text-align:right; }
-    .chapter-cards:not(.two-col) .chapter-card-btn.is-current .chapter-card-num { color:var(--gold); }
-    .chapter-cards:not(.two-col) .chapter-card-title:not(.untitled) { font-style:normal; color:var(--cream-dim); font-size:var(--fs-18); }
-    .chapter-cards:not(.two-col) .chapter-card-label { letter-spacing:0.08em; }
     /* Coverage badge (hub order 2026-09-22) — one word per work: can it be
        read along with, only listened to, or is nothing recorded? It rides the
        page's own tokens, so the light theme swaps with everything else, and it
@@ -4291,11 +4206,6 @@
     .coverage-badge-no-recording { opacity:0.72; }
     /* A study with no recording yet opens to read (Codex critique 1, 2026-09-23): an ordinary outlined word, not dimmed. */
     .coverage-badge-detail { font-size:var(--fs-12); font-style:italic; color:var(--gold-dim); white-space:nowrap; }
-    /* In a study card, and on a shelf row, the badge sits on its own line
-       under the title rather than stretching the one-line ellipsis. */
-    .chapter-card-info .coverage-badge-wrap { margin-left:0; margin-top:0.3rem; }
-    .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
-    .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* Estimated reading time — quiet, right-aligned, never wraps or
        pushes the title (info is flex:1; the chip pins to the row end). */
     .idx-min-chip.in-progress { color:var(--gold); opacity:0.9; }
@@ -4303,25 +4213,6 @@
       margin-left:auto; flex-shrink:0; white-space:nowrap; align-self:center;
       font-family:var(--font-body);   /* upright since 2026-09-25: 12 px italics read worst */
       font-size:var(--fs-12); color:var(--cream-muted); opacity:0.85;
-    }
-    /* [29a] commentary-weight chip — the study index's SECOND signal. It lives
-       INSIDE the info column, under the title, NOT as a second right-hand chip:
-       measured at 375px, a right-hand pill (74px + gap, flex-shrink:0 like its
-       neighbour) squeezed the title column from 145px to 48px, which is about
-       ten readable characters of a fifty-character chapter title. One extra
-       line costs ~14px of card height and costs the title nothing, at every
-       width. */
-    .idx-note-chip {
-      display:inline-block; margin-top:0.3rem; white-space:nowrap;
-      font-family:'Cinzel',serif; font-size:var(--fs-12);
-      letter-spacing:0.06em; text-transform:uppercase;
-      color:var(--gold-dim); border:1px solid var(--gold-border);
-      border-radius:999px; padding:1px 7px;
-    }
-    /* A02.11: what the chip means, said once under the index header (a phone shows no tooltip) */
-    .idx-note-legend {
-      margin-top:0.7rem; font-family:var(--font-body); font-style:italic; font-size:var(--fs-13);
-      color:var(--cream-muted); text-align:center;
     }
     /* ── The study pages (Studies, a study's contents; second studies pass 2026-11-12) in the UI pass's parts:
        a centred hero as Answers has, a card that says where to go next, one grouped list. A study's long title is
@@ -4338,6 +4229,8 @@
     .sty-sub { display: block; margin-top: 1px; color: var(--text-2); font-size: var(--fs-15); font-weight: 400; font-style: italic; }
     .sty-row[aria-current=true] { box-shadow: inset 3px 0 0 var(--accent); }
     .sty-row.is-locked { opacity: 0.45; }   /* a collection that loaded empty: dimmed, no button (VolumesHome) */
+    .sty-bm { margin-right: 6px; color: var(--accent); vertical-align: -2px; }   /* a chapter holding a bookmark (ChapterIndex) */
+    .sty > .rd-book-strip { margin: var(--sp-4) 0 0; }
     .sty-note { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); padding: var(--sp-6) 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-control); text-align: center; }
     .root-sublist .ui-row { padding-left: 26px; }
     .root-sublist .ui-row + .ui-row::before { left: 26px; }
@@ -6612,10 +6505,6 @@
     .rd-study-switch { margin: var(--sp-4) 0 0; text-align: left; }
     .rd-study-label { margin: 0 0 var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
     .rd-study-switch .ui-seg { width: 100%; }
-    .rd-book { text-align: left; }
-    .rd-book-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin: 0 0 var(--sp-3); padding: var(--sp-2) 0 0; text-align: left; }
-    .rd-book-head > * { margin-top: 0; margin-bottom: 0; }
-    .rd-book-sub { flex: 1 1 12em; margin: 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
     /* POL7: the strip is its own size container so its gap can stretch to end on a chip cut clearly (about 60 %
        hidden, a sure hint that it scrolls) instead of a half one: n whole chips + 14 px of the next fill the width. */
     .rd-book-strip { display: flex; overflow-x: auto; margin: 0 0 var(--sp-3); padding: 4px 2px var(--sp-1); scrollbar-width: none; container-type: inline-size; }
@@ -6627,31 +6516,15 @@
     .rd-book-num { position: relative; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid var(--hairline); border-radius: 50%; background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
     .rd-book-num::before { content: ''; position: absolute; inset: -4px; }
     .rd-book-num.is-current { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
-    .rd-book .chapter-cards { display: block; overflow: hidden; padding: 0; background: var(--surface-1); border-radius: var(--r-card); }
     /* POL1: prophecy Expand / Collapse all, in the page above the first group (was the .mode-toggle-wrap FAB) */
     .prophecy-expand-row { display: flex; justify-content: flex-end; margin: var(--sp-2) 0 var(--sp-1); }
     .prophecy-expand-btn { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: var(--tap); padding: 0 var(--sp-1); border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--fsc-14); font-weight: 500; cursor: pointer; }
     .prophecy-expand-btn svg { width: var(--icon-sm); height: var(--icon-sm); }
-    .rd-book .chapter-cards:not(.two-col) .chapter-card-btn { display: flex; align-items: center; gap: 14px; width: 100%; min-height: var(--row-h); margin: 0; padding: 10px 12px 10px 14px; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; background: none; box-shadow: none; text-align: left; }
-    .rd-book .chapter-card-btn:last-child { border-bottom: 0; }
-    .rd-book .chapter-card-btn.is-current { background: var(--accent-soft); }
-    .rd-book .chapter-cards:not(.two-col) .chapter-card-num { flex: none; width: 26px; min-width: 26px; text-align: center; color: var(--accent); font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 600; opacity: 1; }
-    .rd-book .idx-min-chip { margin-left: 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--fsc-14); opacity: 1; }
-    .rd-book .chapter-card-divider { display: none; }
-    .rd-book .chapter-card-info { flex: 1; min-width: 0; }
-    .rd-book .chapter-cards:not(.two-col) .chapter-card-title { display: block; overflow: visible; -webkit-line-clamp: unset; white-space: normal; color: var(--text-1); font-family: var(--font-serif); font-size: var(--fsc-17); font-weight: var(--fw-name); line-height: 22px; letter-spacing: 0; text-transform: none; }
     /* ── end W2h readers (r-bible, r-study, r-book) ── */
     /* ── W2i readers (r-book, r-bindex, r-trans, gospels): the book's gold Listen at the head's right with the gap
        above it trimmed; the index rows are ListRow one (54 px, the mock's .row.one); translation rows 60 px as the
-       mock draws; a Bible group (Gospels...) is the index's rows, keeping .chapter-card-btn for the walks. ── */
-    .vol-index.rd-book { padding-top: var(--sp-2); padding-left: var(--gutter); padding-right: var(--gutter); }   /* POL1: the mock's 20 px gutter (was 24) */
-    .rd-book-head { padding-top: 0; }
-    .rd-book-head .hero-play-row { flex: none; margin: 0; }
-    .rd-book-head .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
-    .rd-book-head .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
+       mock draws; a Bible group (Gospels...) is the index's rows. ── */
     .select-sheet-option.has-code { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
-    .rd-genre .ui-row.chapter-card-btn { gap: 14px; padding: 10px 12px 10px var(--card-pad); border: 0; border-radius: 0; background: transparent; container-type: normal; }
-    .rd-genre .ui-row.chapter-card-btn:active { background: var(--surface-2); }
     /* a book name never gives way to its chapter count: the count wraps instead (textzoom: "Matthew" crushed at 2).
        POL3: the Bible's group rows too ("Poetry & Wisdom" lost to "5 books · 243 chapters" at 360 px), and the
        Library's rows at large text ("Highlights" lost to "None yet", which ran off the card at 2). */
