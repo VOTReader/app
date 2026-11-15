@@ -34,6 +34,13 @@ beforeEach(() => {
   localStorage.clear();
   JournalIndexStore._resetForTests({ forceLoaded: true });
 });
+// Each save queues a merge behind the store's lock (cached-store _saveMerged). A test that ended with merges still
+// queued let them run inside the NEXT test, on its cache and its mocks: under shuffle seed 20261115 the W70 test's
+// mocked get read the disk as empty after its own put "landed", and a leaked merge took that as a sibling tab's
+// delete and wiped the index, so the unchanged refs looked changed. Drain the queue so no test inherits a save.
+afterEach(async () => {
+  try { await JournalIndexStore.whenSaved(); } catch { /* a failed write belongs to the test that made it */ }
+});
 
 describe('JournalIndexStore — entriesReferencing', () => {
   it('returns empty array for an unknown refKey', () => {
