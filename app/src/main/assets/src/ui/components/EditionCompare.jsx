@@ -9,6 +9,7 @@
    reads only what is in memory or already on the device.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from './UiIcon.jsx';
 import { translationLabel, translationName, translationLang } from '../../data/translations.js';
 import { OfflineEditions } from '../../utils/offline-editions.js';
 import { bibleReady, compareEditions, compareParts, readCompare } from '../../utils/edition-compare.js';
@@ -75,8 +76,9 @@ export function EditionCompare({ cite }) {
   return (
     <div className="sc-compare">
       <button type="button" className="sc-compare-toggle" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
-        <span>Compare editions</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="sc-compare-chev"><path d="M6 9l6 6 6-6" /></svg>
+        <span className="ui-row-lead fn-sheet-link-lead" aria-hidden="true"><UiIcon name="list" /></span>
+        <span className="sc-compare-title">Compare editions</span>
+        <UiIcon name="down" size="sm" className="sc-compare-chev" />
       </button>
       {open ? (
         <div className="sc-compare-list" id={listId} aria-busy={state.phase !== 'ready' || state.shown.some((c) => state.rows[c] === undefined)}>

@@ -2645,7 +2645,7 @@
     .fn-sheet-nav-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fsc-20); line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s ease, border-color 0.15s ease; padding:0; }
     .fn-sheet-nav-btn:hover:not(:disabled), .fn-sheet-nav-btn:focus-visible:not(:disabled) { background:rgba(200,164,86,0.1); border-color:var(--gold); }
     .fn-sheet-nav-btn:disabled { opacity:0.32; cursor:default; }
-    .fn-sheet-ref { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.75rem; display:block; }
+    .fn-sheet-ref { display:block; margin-bottom:8px; color:var(--accent); font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; }
     /* up1: What's new (WhatsNewSheet): a day per heading, the changes as a plain list */
     .whats-new-day { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); margin:0.9rem 0 0.35rem; font-weight:400; }
     .whats-new-list { margin:0; padding-left:1.15rem; color:var(--cream); font-size:var(--fs-16); line-height:1.55; }
@@ -2665,34 +2665,9 @@
     .fn-note-lit { background:var(--gold-faint); box-shadow:0 0 0 1px var(--gold-border); }
     .fn-sheet-back { display:inline-flex; align-items:center; gap:0.4em; min-height:44px; padding:0 0.25rem 0 0; margin:-0.35rem 0 0.2rem; background:none; border:0; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
     .fn-sheet-back:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-    .fn-sheet-verse-missing { font-size:var(--fs-15); color:var(--cream-muted); line-height:1.55; font-style:italic; padding:0.6rem 0.9rem; border-left:2px solid var(--gold-border); background:rgba(200,164,86,0.04); border-radius:0 4px 4px 0; }
-    .fn-sheet-verse-missing strong { color:var(--gold-dim); font-weight:600; font-style:normal; }
+    .fn-sheet-verse-missing { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:1.5; }
+    .fn-sheet-verse-missing strong { color:var(--text-1); font-weight:600; }
     .fn-sheet-url-extra { font-size:var(--fs-14); color:var(--cream-muted); margin-top:0.4rem; font-style:italic; }
-    /* ── In-app footnote link (tap-through to a letter in another volume) ── */
-    .fn-sheet-link-btn {
-      display:flex; align-items:center; gap:0.5rem;
-      width:100%; margin-top:0.85rem; padding:0.7rem 0.9rem;
-      background:rgba(200,164,86,0.08); border:1px solid var(--gold-border);
-      border-radius:6px; color:var(--gold-bright); cursor:pointer;
-      font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.04em;
-      text-align:left; transition:all 0.2s ease;
-      font-style:normal;
-    }
-    .fn-sheet-link-btn:active { background:rgba(200,164,86,0.18); transform:scale(0.99); }
-    @media (hover: hover) { .fn-sheet-link-btn:hover { background:rgba(200,164,86,0.14); border-color:var(--gold-dim); } }
-    .fn-sheet-link-btn .fn-sheet-link-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; display:block; margin-bottom:0.1rem; }
-    .fn-sheet-link-btn .fn-sheet-link-title { display:block; color:var(--gold-bright); font-size:var(--fs-15); line-height:1.3; }
-    /* a footnote citing several passages: one door, a button for each (2026-10-24) */
-    .fn-sheet-link-btn.fn-web-doors { cursor:default; }
-    .fn-sheet-link-btn.fn-web-doors:active { background:rgba(200,164,86,0.08); transform:none; }
-    @media (hover: hover) { .fn-sheet-link-btn.fn-web-doors:hover { background:rgba(200,164,86,0.08); border-color:var(--gold-border); } }
-    .fn-web-refs { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.35rem; }
-    .fn-web-ref { min-height:44px; padding:0 0.8rem; background:transparent; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold-bright); font-family:inherit; font-size:var(--fs-15); cursor:pointer; }
-    .fn-web-ref:active { background:rgba(200,164,86,0.18); }
-    @media (hover: hover) { .fn-web-ref:hover { background:rgba(200,164,86,0.14); border-color:var(--gold-dim); } }
-    .fn-web-ref:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
-    .fn-sheet-link-btn .fn-sheet-link-chevron { margin-left:auto; color:var(--gold-dim); font-size:var(--fs-18); flex-shrink:0; align-self:center; }
-    .fn-sheet-link-body { flex:1; min-width:0; }
     .fn-sheet-see-also { margin-top:1.1rem; padding-top:0.9rem; border-top:1px solid var(--gold-border); }
     .fn-sheet-see-also-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.1rem; display:block; }
     /* Footnote list (bottom of letter) — compact in-app link */
@@ -2850,25 +2825,27 @@
         box-shadow: 0 0 10px rgba(var(--hl-peak-r), var(--hl-peak-g), var(--hl-peak-b), var(--hl-glow-a));
       }
     }
-    .sc-sheet-tag { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.35rem; display:block; }
-    .sc-sheet-cite { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.85rem; display:block; }
+    .sc-sheet-tag { display:block; margin-bottom:6px; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); text-transform:uppercase; }
+    .sc-sheet-cite { display:block; margin-bottom:8px; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:700; }
     .sc-sheet-verse { font-size:var(--fs-16); line-height:1.85; color:var(--cream-dim); font-style:italic; }
-    /* n166 Compare editions (EditionCompare.jsx; Codex mockup lanes/myweb/out/id1/F/mockup/board-r1.png, A): a small-caps
-       toggle on a hairline under the verse, then one row per edition, its short name beside the whole text. */
-    .sc-compare { margin-top:1rem; border-top:1px solid var(--gold-border); }
-    .sc-compare-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:44px; padding:0; background:none; border:none; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; cursor:pointer; }
+    .sc-sheet-verse.is-missing { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-style:normal; }
+    /* n166 Compare editions (EditionCompare.jsx; Codex mockup lanes/myweb/out/id1/F/mockup/board-r1.png, A), on the kit
+       since Reading chrome 1d: a door-row card (lead, name, down chevron), then one row per edition on hairlines. */
+    .sc-compare { margin-top:12px; padding:0 14px; border-radius:var(--r-card); background:var(--surface-2); }
+    .sc-compare-toggle { display:flex; align-items:center; gap:12px; width:100%; min-height:var(--tap); padding:12px 0; background:none; border:0; color:var(--text-1); font-family:var(--font-ui); text-align:left; cursor:pointer; }
+    .sc-compare-title { flex:1; min-width:0; font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; line-height:1.3; }
     .sc-compare-toggle:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:4px; }
-    .sc-compare-chev { flex-shrink:0; transition:transform 0.2s ease; }
+    .sc-compare-chev { flex:none; color:var(--text-3); transition:transform 0.2s ease; }
     .sc-compare-toggle[aria-expanded="true"] .sc-compare-chev { transform:rotate(180deg); }
-    .sc-compare-row { display:grid; grid-template-columns:3.6rem 1fr; column-gap:0.75rem; padding:0.7rem 0; border-top:1px solid var(--gold-border); }
-    .sc-compare-ed { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; color:var(--gold); padding-top:0.2rem; overflow-wrap:anywhere; }
+    .sc-compare-row { display:grid; grid-template-columns:3.6rem 1fr; column-gap:12px; padding:12px 0; box-shadow:inset 0 1px 0 var(--hairline); }
+    .sc-compare-ed { padding-top:0.2rem; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); overflow-wrap:anywhere; }
     .sc-compare-row > .sc-compare-text, .sc-compare-body { grid-column:2; min-width:0; }
-    .sc-compare-text { margin:0; font-size:var(--fs-15); line-height:1.6; color:var(--cream); }
+    .sc-compare-text { margin:0; font-size:var(--fs-15); line-height:1.6; color:var(--text-1); }
     .sc-compare-text + .sc-compare-text { margin-top:0.4rem; }
-    .sc-compare-part { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.1em; color:var(--gold-dim); }
-    .sc-compare-vn { font-size:0.7em; color:var(--gold-dim); margin-right:0.15em; }
-    .sc-compare-wait, .sc-compare-none, .sc-compare-note { color:var(--cream-dim); font-style:italic; }
-    .sc-compare-note { margin:0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); font-size:var(--fs-14); text-align:center; }
+    .sc-compare-part { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); font-weight:600; }
+    .sc-compare-vn { font-size:0.7em; color:var(--text-3); margin-right:0.15em; }
+    .sc-compare-wait, .sc-compare-none, .sc-compare-note { color:var(--text-2); }
+    .sc-compare-note { margin:0; padding:12px 0; box-shadow:inset 0 1px 0 var(--hairline); font-size:var(--ts-meta); text-align:center; }
     .sc-sheet-compound { display:flex; flex-direction:column; gap:1.1rem; }
     .sc-sheet-compound-part { display:flex; flex-direction:column; gap:0.35rem; }
     .sc-sheet-compound-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; margin-bottom:0.1rem; display:block; }
@@ -2952,7 +2929,7 @@
     .footnote-list-url-extra { display:block; font-size:var(--fs-14); margin-top:0.3rem; }
     @keyframes fnPulse { 0%{background:transparent} 12%{background:rgba(200,164,86,0.28)} 30%{background:rgba(200,164,86,0.06)} 48%{background:rgba(200,164,86,0.22)} 70%{background:rgba(200,164,86,0.04)} 85%{background:rgba(200,164,86,0.14)} 100%{background:transparent} }
     .footnote-list-num { font-family:'Cinzel',serif; font-size:var(--fs-12); color:var(--gold); font-weight:600; min-width:1.2rem; padding-top:0.15rem; }
-    .footnote-list-ref { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); display:inline; margin-right:0.4rem; }
+    .footnote-list-ref { display:inline; margin-right:0.4rem; color:var(--accent); font-family:var(--font-serif); font-weight:600; }
     .footnote-list-verse { font-style:italic; color:var(--cream-dim); }
     /* ExpandableVerse's "Read more / Show less" (styled inline until 2026-09-24). The label is 12 px tall
        at the end of a line of verse, inside a card whose own tap scrolls up to the footnote's bubble, so a
@@ -5909,12 +5886,20 @@
     .fn-sheet-nav { gap: 0; }
     .fn-sheet-nav-btn { width: var(--tap); height: var(--tap); border: 0; color: var(--text-1); }
     .fn-sheet-x { margin-right: -12px; }
-    .fn-sheet-link-btn { gap: 12px; margin-top: 12px; padding: 12px 14px; border: 0; border-radius: var(--r-card); background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); letter-spacing: 0; }
-    .fn-sheet-link-btn:active { background: var(--surface-3); transform: none; }
-    .fn-sheet-link-btn .fn-sheet-link-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; }
-    .fn-sheet-link-btn .fn-sheet-link-eyebrow { margin: 2px 0 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; }
+    /* every door on a footnote / scripture sheet and in the letter-end list (Go to Scripture, Show in Scripture Web, a letter
+       or topic in the app): one kit row - lead chip, the place, what the door does, the kit chevron (Reading chrome 1d) */
+    .fn-sheet-link-btn { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 12px; padding: 12px 14px; border: 0; border-radius: var(--r-card); background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); text-align: left; cursor: pointer; }
+    .fn-sheet-link-btn:active { background: var(--surface-3); }
+    .fn-sheet-link-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .fn-sheet-link-btn .fn-sheet-link-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: 1.3; }
+    .fn-sheet-link-btn .fn-sheet-link-eyebrow { margin-top: 2px; color: var(--text-2); font-size: var(--ts-meta); }
     .fn-sheet-link-btn > svg { flex: none; color: var(--text-3); }
     .fn-sheet-link-lead { background: var(--surface-1); color: var(--accent); }
+    .fn-web-doors { cursor: default; }
+    .fn-web-doors:active { background: var(--surface-2); }
+    .fn-web-doors .fn-sheet-link-eyebrow { margin: 0 0 8px; }
+    .footnote-list-also { margin-top: 8px; color: var(--text-2); font-size: var(--ts-meta); }
+    .footnote-list-also-label { margin-right: 0.4rem; }
     .fn-sheet-url-extra { margin-top: 8px; font-style: normal; }
     .fn-sheet .fn-link { display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); text-decoration: none; }
     .fn-sheet .fn-link svg { color: var(--text-2); }
@@ -8715,9 +8700,6 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 .ans-sc-note a{color:var(--cream-dim);text-decoration:none}
 .ans-sc-note a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-/* R9. Kit pin (as A11): the scripture sheet's two Cinzel labels ("Scripture Reference", "Go to Scripture") paint at
-   --fs-10, under the 12px floor; pinned to --fs-12. App-wide: every scripture and footnote sheet (about +70 B) */
-.sc-sheet-tag,.fn-sheet-link-btn .fn-sheet-link-eyebrow{font-size:var(--fs-12)}
 
 /* R10 (O3). Note sheet: the note reads at 18/1.6 (.ans-quote); "‹ Back to note 1" sits above it after a nested marker */
 .ans-note-sheet .ans-note-text{margin:16px 0 4px}

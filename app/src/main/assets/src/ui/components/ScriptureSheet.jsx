@@ -37,7 +37,7 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
                 <ScriptureVerseText text={verseText} cite={activeRef.cite} />
               </div>
             ) : (
-              <div className="sc-sheet-verse" style={{ color: 'var(--cream-dim)', fontStyle: 'italic' }}>Verse text not available in app data</div>
+              <div className="sc-sheet-verse is-missing">Verse text not available in app data</div>
             )}
             {typeof GoToRefButton !== 'undefined' && onGoToRef && (
               <GoToRefButton refStr={activeRef.cite} onGo={onGoToRef} />

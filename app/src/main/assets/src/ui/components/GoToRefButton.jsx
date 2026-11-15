@@ -4,7 +4,7 @@
    The "Go to Scripture" action on every scripture-reference bottom sheet
    (FootnoteSheet, ScriptureSheet, the LetterView / WtlbEntryView inline
    ref sheets). Parses the sheet's ref string; when it reads as a Bible
-   reference, renders the gold in-app-link-style button. A tap resolves
+   reference, renders the sheet's door row (as InAppLinkButton). A tap resolves
    the ref to a {type:'bible'} endpoint and hands it to `onGo` — the host
    closes its sheet and routes the endpoint through navigateToLink, which
    owns the scroll-to-verse flash highlight, the "Back to …" pill, and
@@ -36,6 +36,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { noteLoading, noteDone, noteGaveUp } from '../../utils/wait-notice.js';
+import { UiIcon } from './UiIcon.jsx';
 
 const WARM_LOOKAHEAD = '800px 0px';
 
@@ -100,11 +101,12 @@ export function GoToRefButton({ refStr, onGo }) {
         // dropped, dash variants normalized, an inherited book spelled out.
         <button key={i} ref={i === 0 ? firstBtnRef : undefined} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn"
           onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed, part.ref)}>
+          <span className="ui-row-lead fn-sheet-link-lead" aria-hidden="true"><UiIcon name="book" /></span>
           <span className="fn-sheet-link-body">
-            <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
             <span className="fn-sheet-link-title">{part.ref}</span>
+            <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
           </span>
-          <span className="fn-sheet-link-chevron">{"›"}</span>
+          <UiIcon name="chev" size="sm" />
         </button>
       ))}
     </>

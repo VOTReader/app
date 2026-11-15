@@ -73,9 +73,11 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, o
                 {/* and the sheet's other door: the web opens on this verse (ideas audit s14.5) */}
                 <WebDoorButton fn={fn} />
                 {fn.seeAlso && (
-                  <div style={{ marginTop: "0.5rem" }}>
-                    <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>
-                    <span style={{ fontStyle: "italic" }}>{fn.seeAlso.label || fn.seeAlso.letterTitle}</span>
+                  <div className="footnote-list-also">
+                    <span className="footnote-list-also-label">Also see:</span>
+                    {/* the door below already names the letter: the label only when it says something else */}
+                    {fn.seeAlso.label && fn.seeAlso.label !== fn.seeAlso.letterTitle
+                      ? <span className="footnote-list-also-title">{fn.seeAlso.label}</span> : null}
                     <InAppLinkButton compact={true} link={{ collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt }} onActivate={onInAppLink} />
                   </div>
                 )}
