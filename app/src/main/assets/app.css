@@ -4251,6 +4251,7 @@
     @keyframes ribbon-pulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
     /* W2b (mock v2 l-hist): a history row is a ListRow; its reading chip reads as plain meta text. */
     .history-entry-card .idx-min-chip, .sty .idx-min-chip { margin:0; padding:0; border:0; background:none; font:inherit; color:inherit; letter-spacing:0; opacity:1; }
+    .sty .idx-min-chip { white-space: normal; }   /* a contents page's meta wraps (4228): '2% read · ~3 min left' was cut at text 2.0 */
     /* A broad search draws the newest 100 matches; this draws the rest (sweep W69). The tally's
        voice (Cinzel caps, dim gold) on a full-width hairline button, 44 px tall for a thumb. */
     .history-show-all {
