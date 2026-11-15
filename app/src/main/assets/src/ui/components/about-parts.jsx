@@ -73,7 +73,8 @@ export function versionWords(b) {
   let line;
   // 'Up to date' only when the server answered this time (fetchServerBuildVersion: no-store, null on any failure).
   const fresh = b.checkedAt ? ' · checked just now' : '';
-  if (b.state === 'installed') line = 'Installed on this phone. New versions arrive by installing an update.' + (b.checkedAt ? ' Checked just now.' : '');
+  // Android: the installed build answers for itself, so nothing was checked; the line never says it was (hub 11-15).
+  if (b.state === 'installed') line = 'Installed on this phone. New versions arrive by installing an update.';
   else if (b.waiting) line = 'An update is ready. Reopen the app to apply it.';
   else if (!b.server) line = 'Could not reach the server to compare' + (b.checkedAt ? ' · tried just now' : '');
   else if (b.server.cacheVersion === b.running.cacheVersion) line = 'Up to date with the published version' + fresh;
