@@ -8,6 +8,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useSettingsFind } from './settings-find.jsx';
+import { SetRowText } from './SettingsRow.jsx';
 import { OfflineEditions, editionCodes, editionBytes, formatEditionBytes, useOfflineEditions } from '../../utils/offline-editions.js';
 
 /** @param {{ translation?: string }} props the picked edition: a new pick re-reads the caches */
@@ -44,11 +45,9 @@ export function OfflineEditionsRow({ translation }) {
   return (
     <div className="settings-row offline-editions-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-text">
-          {f.place ? <span className="ws2-place">{f.place}</span> : null}
-          <span className="settings-row-label">Editions on this phone</span>
+        <SetRowText place={f.place} label="Editions on this phone">
           <span className="settings-row-desc" role="status">{line}</span>
-        </span>
+        </SetRowText>
         {action ? (
           <button type="button" className="ui-btn is-small ws2-pill-btn" aria-label={actionName || undefined} onClick={(e) => { e.stopPropagation(); void OfflineEditions.downloadAll(); }}>
             {action}

@@ -4,6 +4,7 @@
 
 import { ListRow, UiButton } from './UiParts.jsx';
 import { useSettingsFind } from './settings-find.jsx';
+import { SetRowText } from './SettingsRow.jsx';
 
 /* Options are { id, label, desc? } plus optional presentation fields
    added for the Reading Font picker (2026-07-31), ignored elsewhere:
@@ -34,13 +35,9 @@ export function SelectField({ eyebrow, title, label, desc, line = null, value, o
   return (
     <div className="settings-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-text">
-          {f.place ? <span className="ws2-place">{f.place}</span> : null}
-          <span className="settings-row-label">{label}</span>
-          {desc && !long && <span className="settings-row-desc" id={descId}>{desc}</span>}
-          {long && line ? <span className="settings-row-desc" id={descId}>{line}</span> : null}
+        <SetRowText place={f.place} label={label} desc={long ? line : desc} descId={descId}>
           {long ? <button type="button" className="ws1-more" aria-expanded={more} aria-haspopup={moreTitle ? 'dialog' : undefined} onClick={() => setMore((v) => !v)}>{more && !moreTitle ? 'Less' : 'More'}</button> : null}
-        </span>
+        </SetRowText>
         <button type="button" className="settings-select-trigger" aria-label={label + ': ' + shown} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? sheetId : undefined}
           aria-describedby={desc && (!long || line) ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{shown}</span>

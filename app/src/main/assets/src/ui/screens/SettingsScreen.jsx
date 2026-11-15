@@ -20,7 +20,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiParts.jsx';
 import { ActionSheet, SelectSheet } from '../components/SelectField.jsx';
-import { SettingsNavRow, SettingsStepRow } from '../components/SettingsRow.jsx';
+import { SettingsNavRow, SettingsStepRow, SetRowText, DataRow, RadioRows } from '../components/SettingsRow.jsx';
 import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
 
 /* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
@@ -146,10 +146,7 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
     <>
       <div className="settings-row ws2-history" data-found={f.place ? '' : undefined}>
         <div className="settings-row-head">
-          <span className="settings-row-text">
-            {f.place ? <span className="ws2-place">{f.place}</span> : null}
-            <span className="settings-row-label">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
-          </span>
+          <SetRowText place={f.place} label={<>{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</>} />
           {!confirming && (
             <button type="button" className="ui-btn is-small is-danger ws2-text-btn" disabled={historyCount === 0}
               onClick={(e) => { e.stopPropagation(); setConfirming(true); }}>Clear history</button>
@@ -340,11 +337,7 @@ function SkipStepRow({ value, onChange }) {
   return (
     <div className="settings-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-text">
-          {f.place ? <span className="ws2-place">{f.place}</span> : null}
-          <span className="settings-row-label" id="settings-skip-label">Skip length</span>
-          <span className="settings-row-desc">Player, lock screen and headphones</span>
-        </span>
+        <SetRowText place={f.place} label="Skip length" labelId="settings-skip-label" desc="Player, lock screen and headphones" />
         <span className="settings-step" role="group" aria-labelledby="settings-skip-label">
           <button type="button" className="settings-step-btn" aria-label="Shorter skip" disabled={sec <= lo}
             onClick={() => set(Math.ceil(sec / SKIP_STEP_BY) * SKIP_STEP_BY - SKIP_STEP_BY)}>{'−'}</button>
@@ -433,43 +426,6 @@ function AboutRootRow({ onAbout }) {
     : buildInfo.server.cacheVersion === (buildInfo.running && buildInfo.running.cacheVersion) ? 'up to date' : 'update ready';
   const meta = [v.title !== 'Version' ? v.title : 'Version', verdict, 'What’s new'].filter(Boolean).join(' · ');
   return <ListRow icon="info" title="About VOTReader" meta={meta} onClick={onAbout} />;
-}
-
-function DataRow({ label, desc = null, value = null, pill = false, children = null, className = '', find = '' }) {
-  const f = useSettingsFind(label + ' ' + (typeof desc === 'string' ? desc : '') + ' ' + find);
-  if (!f.show) return null;
-  return (
-    <div className={'settings-row ws3-data-row' + (className ? ' ' + className : '')} data-found={f.place ? '' : undefined}>
-      <div className="settings-row-head">
-        <span className="settings-row-text">
-          {f.place ? <span className="ws2-place">{f.place}</span> : null}
-          <span className="settings-row-label">{label}</span>
-          {desc ? <span className="settings-row-desc">{desc}</span> : null}
-        </span>
-        {value != null && value !== '' ? <span className={pill ? 'ws3-pill' : 'settings-row-value'}>{value}</span> : null}
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/* WS3 settings (st-data, st-prog): a row that opens something: icon chip, name, line, chevron. */
-function DataNavRow({ icon, label, desc, onClick, disabled = false, find = '' }) {
-  const f = useSettingsFind(label + ' ' + desc + ' ' + find);
-  if (!f.show) return null;
-  return (
-    <div className="settings-row" data-found={f.place ? '' : undefined}>
-      <button type="button" className="settings-row-head ws2-nav ws3-nav" aria-label={label} disabled={disabled} onClick={onClick}>
-        <span className="ws2-opt-lead" aria-hidden="true"><UiIcon name={icon} size="sm" /></span>
-        <span className="settings-row-text">
-          {f.place ? <span className="ws2-place">{f.place}</span> : null}
-          <span className="settings-row-label">{label}</span>
-          <span className="settings-row-desc">{desc}</span>
-        </span>
-        <span className="settings-select-chev" aria-hidden="true">{'›'}</span>
-      </button>
-    </div>
-  );
 }
 
 /* The Growth row's line (BACKLOG [30]: the sentence is the feature). The mock draws the line and the size, no bars. */
@@ -776,26 +732,6 @@ function arrowOptions() {
     const w = ARROW_WORDS[/** @type {'off'} */ (o.id)];
     return { id: o.id, label: w ? w[0] : o.label, desc: w ? w[1] : o.desc, lead: <ArrowPicture id={o.id} /> };
   });
-}
-
-/** WS2 settings (st-share): a short choice drawn as rows with a radio each, right on the screen (no sheet). */
-function RadioRows({ label, value, options, onChange, find = '' }) {
-  const f = useSettingsFind(label + ' ' + find + ' ' + options.map((/** @type {any} */ o) => o.label + ' ' + o.desc).join(' '));
-  if (!f.show) return null;
-  return (
-    <div role="radiogroup" aria-label={label} className="ws2-radios" data-found={f.place ? '' : undefined}>
-      {f.place ? <span className="ws2-place ws2-place-pad">{f.place}</span> : null}
-      {options.map((/** @type {any} */ o) => (
-        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} className="settings-row ws2-radio" onClick={() => onChange(o.id)}>
-          <span className="settings-row-text">
-            <span className="settings-row-label">{o.label}</span>
-            <span className="settings-row-desc">{o.desc}</span>
-          </span>
-          <span className={'ws2-radio-dot' + (value === o.id ? ' is-on' : '')} aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
 }
 
 /* WS2 settings (st-find): the group topic table that opened whole groups is gone; each row is found by its own name,
@@ -1705,9 +1641,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             </div>
           </Findable>}
           <div className="settings-card">
-            <DataNavRow icon="reset" label="Restore from a backup" desc="Replaces your data on this phone with a backup file (.votbak). You confirm first."
+            <SettingsNavRow icon="reset" label="Restore from a backup" desc="Replaces your data on this phone with a backup file (.votbak). You confirm first."
               find="import restore votbak load" disabled={backupBusy} onClick={() => { _runBackupOperation(importPersonalData); }} />
-            <DataNavRow icon="check" label="Check a backup file" desc="Reads the whole file and says what is in it. Nothing on this phone changes."
+            <SettingsNavRow icon="check" label="Check a backup file" desc="Reads the whole file and says what is in it. Nothing on this phone changes."
               find="verify check test votbak" disabled={backupBusy} onClick={() => { setVerifyReport(null); _runLockedBackupOperation(verifyBackupFile); }} />
           </div>
           <SettingsSection label="Kept safe by themselves">
@@ -1857,7 +1793,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               onToggle={() => onToggle("markAsRead")}
             />
             {typeof onOpenProgress === 'function' ? (
-              <DataNavRow icon="chart" label="See your progress" desc="Library · Progress" find="progress totals streaks library" onClick={onOpenProgress} />
+              <SettingsNavRow icon="chart" label="See your progress" desc="Library · Progress" find="progress totals streaks library" onClick={onOpenProgress} />
             ) : null}
           </div>
           {settings.markAsRead && !searching && (
