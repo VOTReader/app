@@ -8,11 +8,12 @@
    has. A part is a row that opens its sections under it. */
 
 import { ListGroup, ListRow, NextCard, UiButton, readMark as readMarkOf } from '../components/UiParts.jsx';
+import { BarAction } from '../components/RootNav.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { studyTitleParts, chapterTitleParts, studyNextStep } from '../../utils/study-titles.js';
 
-export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack, onListen = null }) {
+export function BibleStudyIndex({ study, onSelect, onBack, onSearch, currentChapter, isRead, readCount, progressKeyFor, markAsReadEnabled, backHint = null, onTapThroughBack, onListen = null }) {
   const [expandedPart, setExpandedPart] = React.useState(null);
 
   // Auto-expand the part containing the current reading position
@@ -103,13 +104,12 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
     );
   };
 
-  const navBar = LibraryNav({
-    onBack, backLabel: 'Studies',
-    onSettings, onHistory, onSearch, theme, onThemeChange,
-  });
-
   return (
-    <ScreenLayout navChildren={navBar}>
+    // The utility bar as a volume's contents page has (rule 11): Back to Studies, Search, Tabs; a blank title.
+    <ScreenLayout utility={{
+      title: '', onBack, backLabel: 'Back to Studies',
+      actions: [onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null],
+    }}>
       {/* Opened as a tap-through (the Listening Library's Studies screen opens a
           study with no recording yet here, item 4b): the same pill
           BibleChapterView shows, so the reader is one tap from where they were. */}

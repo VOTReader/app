@@ -11,11 +11,12 @@
    one line of facts: how big it is and whether it can be read along with. */
 
 import { ListGroup, ListRow, UiButton } from '../components/UiParts.jsx';
+import { BarAction } from '../components/RootNav.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { coverageCopy } from '../../utils/audio-coverage.js';
 import { studyTitleParts } from '../../utils/study-titles.js';
 
-export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the
   // user picks a study from the list, the 618 KB corpus is already
   // downloading in parallel.
@@ -51,12 +52,11 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
   };
 
   return (
-    <ScreenLayout
-      navChildren={LibraryNav({
-        onBack, backLabel: 'Home', showHome: false,
-        onSettings, onHistory, onSearch, theme, onThemeChange,
-      })}
-    >
+    // The utility bar as Volumes has (rule 11): Back, Search, Tabs; the hero names the page, so the bar title is blank.
+    <ScreenLayout utility={{
+      title: '', onBack, backLabel: 'Back to Home',
+      actions: [onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null],
+    }}>
       <div className="sty">
         <header className="sty-hero">
           <div className="root-eyebrow">In-Depth Bible Studies</div>

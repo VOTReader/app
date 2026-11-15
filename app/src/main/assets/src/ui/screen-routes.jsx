@@ -847,21 +847,24 @@ export function buildScreenRoutes({
    * failure an alert, so a screen reader hears both. A FALLBACK MUST NOT BE ABLE
    * TO FAIL: it only runs because something already went wrong, so ScreenLayout
    * and LibraryNav (bare Cluster-D globals) wrap it only when they are there.
-   * @param {{ say: any, label?: string, onGo?: () => void, nav?: () => any, role?: 'status' | 'alert' }} v
+   * @param {{ say: any, label?: string, onGo?: () => void, nav?: () => any, bar?: (() => any) | null, role?: 'status' | 'alert' }} v
    * @returns {any} never null
    */
-  const _fallbackView = ({ say, label, onGo, nav, role }) => {
+  const _fallbackView = ({ say, label, onGo, nav, bar, role }) => {
     const body = (
       <div className="sc-sheet-loading route-fallback" role={role}>
         <div>{say}</div>
         {label ? <button type="button" className="route-fallback-btn" onClick={onGo}>{label}</button> : null}
       </div>
     );
+    if (typeof ScreenLayout !== 'function') return body;
+    // A contents page's loading or failed view wears the page's own utility bar (bar), so nothing jumps when it lands.
+    let utility = null;
+    try { utility = bar ? bar() : null; } catch (_e) { utility = null; }
+    if (utility) return <ScreenLayout utility={utility}>{body}</ScreenLayout>;
     let navEl = null;
     try { navEl = (typeof LibraryNav === 'function' && nav) ? nav() : null; } catch (_e) { navEl = null; }
-    return (typeof ScreenLayout === 'function')
-      ? <ScreenLayout navChildren={navEl}>{body}</ScreenLayout>
-      : body;
+    return <ScreenLayout navChildren={navEl}>{body}</ScreenLayout>;
   };
   /** LibraryNav with a way back to `onBack` (named `backLabel`) and the usual top-bar actions. */
   const _navTo = (/** @type {() => void} */ onBack, /** @type {string} */ backLabel) => () => LibraryNav({
@@ -869,10 +872,15 @@ export function buildScreenRoutes({
     onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
     theme, onThemeChange: setTheme,
   });
-  const _corpusView = (corpus, loadFn, loadingLabel, nav = _navTo(goHome, 'Home')) => {
+  /** A contents page's utility bar for its loading view: Back to `backLabel`, Search (as the page itself has). */
+  const _barTo = (/** @type {() => void} */ onBack, /** @type {string} */ backLabel) => () => ({
+    title: '', onBack, backLabel: 'Back to ' + backLabel,
+    actions: [<BarAction key="s" icon="search" label="Search" onClick={goSearch} />],
+  });
+  const _corpusView = (corpus, loadFn, loadingLabel, nav = _navTo(goHome, 'Home'), bar = null) => {
     if (corpus && corpus.error) {
       return _fallbackView({
-        say: 'Couldn’t load this section.', label: 'Try again', role: 'alert', nav,
+        say: 'Couldn’t load this section.', label: 'Try again', role: 'alert', nav, bar,
         onGo: () => { if (typeof loadFn === 'function') loadFn(true); },   // an explicit retry (h1104-19: a render's ask waits out a fresh failure)
       });
     }
@@ -886,7 +894,7 @@ export function buildScreenRoutes({
     // concurrent render can't loop or warn. Both invariants are load-bearing: a
     // future loader that notifies synchronously would turn this into a render loop.
     if (typeof loadFn === 'function') loadFn();
-    return _fallbackView({ say: loadingLabel, role: 'status', nav });
+    return _fallbackView({ say: loadingLabel, role: 'status', nav, bar });
   };
   /**
    * What a letter/entry route renders when the corpus IS loaded and the active
@@ -1046,7 +1054,8 @@ export function buildScreenRoutes({
    *   on every letter/entry route; index routes have no letter to lose.
    */
   const _wrapVot = (jsx, volKey) => {
-    if (!_votReady) return _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…', _idxNav);
+    // A contents page (no volKey) loads under its own utility bar; a letter under the reading bar it opens with.
+    if (!_votReady) return _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…', _idxNav, volKey ? null : _idxBar);
     // Corpus loaded and nothing to render: a dead letterId, never a blank screen.
     if (!jsx && volKey) return _deadLetter(volKey);
     return jsx;
@@ -1744,7 +1753,7 @@ export function buildScreenRoutes({
     ),
     'matthew-idx': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
-      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…', _navTo(goStudiesHome, 'Studies'));
+      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…', _navTo(goStudiesHome, 'Studies'), _barTo(goStudiesHome, 'Studies'));
       // Wave 0: onBack + backLabel mirror the matthew-idx hardware-back
       // branch in use-android-back.js — fromSearch is consumed FIRST (a
       // book-level search result lands here; P1-13), then fromStudies,
@@ -1797,9 +1806,6 @@ export function buildScreenRoutes({
         }}
         onBack={goHome}
         onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
       />
     ),
     'bible-idx': () => {
@@ -1835,7 +1841,7 @@ export function buildScreenRoutes({
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
-        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…', _navTo(goScripturesHome, 'Scriptures'));
+        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…', _navTo(goScripturesHome, 'Scriptures'), _barTo(goScripturesHome, 'Scriptures'));
       }
       // The corpus is in and the bookId did not resolve (v109): a way out, not nothing.
       return _missingBook();
@@ -1951,14 +1957,11 @@ export function buildScreenRoutes({
           onSelect={(chId) => { _startNewTrail(); selectStudyChapter(studyId, chId); }}
           onBack={goStudiesHome}
           onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
           currentChapter={chapterIndexCurrentChapter(studyReadKey(study.slug), activeReadKey, lastReadChapters)}
           isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
           readCount={(chId) => Number(readItems[getReadKey(studyReadKey(study.slug), chId)]) || 0}
           progressKeyFor={(chId) => getReadKey(studyReadKey(study.slug), chId)}
           markAsReadEnabled={settings.markAsRead}
-          theme={theme} onThemeChange={setTheme}
           backHint={backHint} onTapThroughBack={tapThroughBack}
         />
       );
@@ -2005,7 +2008,7 @@ export function buildScreenRoutes({
     },
 
     'holy-days-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
+      <ScreenLayout utility={_idxBar()}>
         {/* The playlists sit under the title and Play All (2026-09-25), not above the page. */}
         <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} headerExtra={<HolyDaysPlaylistHeader />} />
       </ScreenLayout>
