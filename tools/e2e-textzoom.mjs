@@ -92,8 +92,11 @@ try {
       const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > 0 && r.left < vw && r.bottom > 0 && r.top < window.innerHeight; };
       const label = (e) => (e.getAttribute('aria-label') || e.textContent.trim().replace(/\s+/g, ' ')).slice(0, 26);
       const els = [...document.querySelectorAll('button,[role=button],a,input,select,textarea')].filter(vis);
-      // A control inside a sideways scroller (a book's chapter-number strip) passes the edge by design: it scrolls into view.
-      const inScroller = (e) => { for (let p = e.parentElement; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowX)) return true; return false; };
+      // A control inside a sideways strip (a book's chapter-number strip) passes the edge by design: it scrolls into view.
+      // A strip is a box laid out as one line (flex without wrap, or nowrap text) that scrolls sideways and not
+      // down. overflow-x alone is not enough: a box with only overflow-y: auto computes overflow-x to auto too
+      // (27 sheets, panels and lists), and those stay checked. The six strips in app.css are all one-line boxes.
+      const inScroller = (e) => { for (let p = e.parentElement; p; p = p.parentElement) { const cs = getComputedStyle(p); if (!/auto|scroll/.test(cs.overflowX)) continue; const oneLine = (/flex/.test(cs.display) && cs.flexWrap === 'nowrap') || cs.whiteSpace === 'nowrap'; if (oneLine && p.scrollWidth > p.clientWidth + 1 && p.scrollHeight <= p.clientHeight + 1) return true; } return false; };
       const offRight = els.filter((e) => e.getBoundingClientRect().right > vw + 1 && !inScroller(e)).map((e) => `${label(e)} right=${Math.round(e.getBoundingClientRect().right)}`);
       // Any leaf that shortens its text (ellipsis or a line clamp), or a box whose children are all inline (a row's
       // meta line holding a minutes chip: '2% read · ~3 min l…' at 2.0 hid there, 11-15): reported when it loses a little,
