@@ -397,7 +397,7 @@ async function main() {
     refs.dark[0] = await refShot();
     // tab 2 = Genesis 1 scrolled
     await openTabs(); await clickText(/^New tab$/, 'button'); await sleep(800);
-    await goHome(); await clickText(/^The Holy Bible/); await clickText(/^The Law/); await clickText(/^Genesis/); await clickText(/^1\D/);
+    await goHome(); await clickText(/^The Holy Bible/); await clickText(/^The Law/); await clickText(/^Genesis/); await clickText(/^The Creation\b.*Chapter 1\b/);
     await scrollTo(600);
     refs.dark[1] = await refShot();
     // tab 3 = Home

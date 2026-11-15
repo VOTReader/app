@@ -448,11 +448,11 @@ async function makeLink(page, route, verseIdx, ref) {
   return picked.key + ' -> ' + ref;
 }
 const LINK_PLAN = [
-  [['The Holy Bible', 'The Law', /^Genesis/, /^1The Creation/], 0, 'Eph 6:5'],
-  [['The Holy Bible', 'The Law', /^Genesis/, /^1The Creation/], 5, 'Rom 8:28'],
-  [['The Holy Bible', 'The Law', /^Genesis/, /^1The Creation/], 12, 'Ps 23:1'],
-  [['The Holy Bible', 'The Law', /^Genesis/, /^1The Creation/], 20, 'John 3:16'],
-  [['The Holy Bible', 'The Law', /^Genesis/, /^1The Creation/], 26, 'Isa 53:5'],
+  [['The Holy Bible', 'The Law', /^Genesis/, /^The Creation\b.*Chapter 1\b/], 0, 'Eph 6:5'],
+  [['The Holy Bible', 'The Law', /^Genesis/, /^The Creation\b.*Chapter 1\b/], 5, 'Rom 8:28'],
+  [['The Holy Bible', 'The Law', /^Genesis/, /^The Creation\b.*Chapter 1\b/], 12, 'Ps 23:1'],
+  [['The Holy Bible', 'The Law', /^Genesis/, /^The Creation\b.*Chapter 1\b/], 20, 'John 3:16'],
+  [['The Holy Bible', 'The Law', /^Genesis/, /^The Creation\b.*Chapter 1\b/], 26, 'Isa 53:5'],
 ];
 async function shot(page, name) { if (!OUT) return; await page.screenshot({ path: resolve(OUT, name + '.png') }); }
 
