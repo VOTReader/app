@@ -29,24 +29,24 @@ afterEach(() => { cleanup(); for (const g of GLOBALS) delete window[g]; });
 const noop = () => {};
 function renderTiles() {
   render(<VolumesHome onSelect={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
-  return [...document.querySelectorAll('.genre-tile')]
+  return [...document.querySelectorAll('.ui-group .sty-row')]
     .filter((t) => !/Return to The Garden/.test(t.textContent));
 }
-const titleOf = (t) => t.querySelector('.genre-tile-title').textContent;
+const titleOf = (t) => t.querySelector('.ui-row-title').textContent;
 
 describe('VolumesHome — a Coming Soon tile is disabled, not a silent no-op', () => {
   // One empty volume and one empty collection, everything else holds letters.
   const EMPTY = new Set(['four', 'timothy']);
   const count = (k) => (EMPTY.has(k) ? 0 : 12);
 
-  it('a locked volume tile and a locked collection tile are disabled buttons', () => {
+  it('a locked volume row and a locked collection row are no buttons at all, and say Coming soon', () => {
     install(count);
     const tiles = renderTiles();
-    const locked = tiles.filter((t) => t.classList.contains('locked'));
+    const locked = tiles.filter((t) => t.classList.contains('is-locked'));
     expect(locked.map(titleOf), 'the two empty tiles are the locked ones').toEqual(['Volume Four', 'Letters from Timothy']);
     for (const t of locked) {
-      expect(t.tagName).toBe('BUTTON');
-      expect(t.disabled, `${titleOf(t)} is disabled`).toBe(true);
+      expect(t.tagName, `${titleOf(t)} is not a button`).not.toBe('BUTTON');
+      expect(t.querySelector('.ui-row-meta').textContent).toMatch(/Coming soon$/);
     }
   });
 
@@ -60,9 +60,9 @@ describe('VolumesHome — a Coming Soon tile is disabled, not a silent no-op', (
 
   it('CONTROL: every tile that holds letters stays a live, focusable button', () => {
     install(count);
-    const open = renderTiles().filter((t) => !t.classList.contains('locked'));
+    const open = renderTiles().filter((t) => !t.classList.contains('is-locked'));
     expect(open.length).toBe(KEYS.length - EMPTY.size);
-    expect(open.filter((t) => t.disabled).map(titleOf), 'open tiles marked disabled').toEqual([]);
+    expect(open.filter((t) => t.tagName !== 'BUTTON' || t.disabled).map(titleOf), 'open rows that are not live buttons').toEqual([]);
     open[0].focus();
     expect(document.activeElement).toBe(open[0]);
   });
@@ -71,6 +71,6 @@ describe('VolumesHome — a Coming Soon tile is disabled, not a silent no-op', (
     install(() => 0, false);
     const tiles = renderTiles();
     expect(tiles.length).toBe(KEYS.length);
-    expect(tiles.filter((t) => t.disabled).map(titleOf)).toEqual([]);
+    expect(tiles.filter((t) => t.tagName !== 'BUTTON').map(titleOf)).toEqual([]);
   });
 });

@@ -36,12 +36,12 @@ afterEach(() => { cleanup(); for (const g of GLOBALS) delete window[g]; });
 const noop = () => {};
 function readTiles() {
   render(<VolumesHome onSelect={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
-  return [...document.querySelectorAll('.genre-tile')]
+  return [...document.querySelectorAll('.ui-group .sty-row')]
     .filter((t) => !/Return to The Garden/.test(t.textContent))
     .map((t) => {
-      const title = t.querySelector('.genre-tile-title').textContent;
+      const title = t.querySelector('.ui-row-title').textContent;
       const text = t.textContent.replace(title, ' ');
-      const m = text.match(/(\d+) (Letters?|Entries|Entry|Chapters?)/);
+      const m = text.match(/(\d+) (Letters?|Entries|Entry|Chapters?)/i);
       return { title, n: m && Number(m[1]), noun: m && m[2].toLowerCase() };
     });
 }

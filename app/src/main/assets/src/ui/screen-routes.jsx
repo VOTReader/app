@@ -42,6 +42,8 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { h } from './jsx-h.js';
+import { BarAction } from './components/RootNav.jsx';
+import { VOLUME_YEARS } from '../utils/volume-facts.js';
 import { bookTitle, runName } from '../data/plan-catalog.js';
 import { runStatus } from '../data/plan-engine.js';
 import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace } from '../utils/plan-session.js';
@@ -543,6 +545,12 @@ export function buildScreenRoutes({
     onBack: goVolumesHome, backLabel: 'Volumes',
     onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
     theme, onThemeChange: setTheme,
+  });
+  // The contents pages' utility bar (U rule 11, vot-ui 2026-11-15): Back to Volumes and Search; the page's hero
+  // carries the title, so the bar's is blank as on About's second page.
+  const _idxBar = () => ({
+    title: '', onBack: goVolumesHome, backLabel: 'Back to Volumes',
+    actions: [<BarAction key="s" icon="search" label="Search" onClick={goSearch} />],
   });
   // Back to results (search200 UX B1). From a search hit the reader's ‹ went to the
   // parent index (a letter could never get back to its results by the arrows; a Bible
@@ -1148,68 +1156,68 @@ export function buildScreenRoutes({
   return {
     // ── Volume index screens (13) ──
     'vot-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Two" letters={colLetterArr(COL_BY_KEY.get('two'))} {...colIdxProps('two')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Two" sub={VOLUME_YEARS.two} letters={colLetterArr(COL_BY_KEY.get('two'))} {...colIdxProps('two')} />
       </ScreenLayout>
     )),
     'vot-one-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume One" letters={colLetterArr(COL_BY_KEY.get('one'))} preface={colPreface(COL_BY_KEY.get('one'))} {...colIdxProps('one')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume One" sub={VOLUME_YEARS.one} letters={colLetterArr(COL_BY_KEY.get('one'))} preface={colPreface(COL_BY_KEY.get('one'))} {...colIdxProps('one')} />
       </ScreenLayout>
     )),
     'vot-three-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Three" letters={colLetterArr(COL_BY_KEY.get('three'))} preface={colPreface(COL_BY_KEY.get('three'))} {...colIdxProps('three')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Three" sub={VOLUME_YEARS.three} letters={colLetterArr(COL_BY_KEY.get('three'))} preface={colPreface(COL_BY_KEY.get('three'))} {...colIdxProps('three')} />
       </ScreenLayout>
     )),
     'vot-four-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Four" letters={colLetterArr(COL_BY_KEY.get('four'))} preface={colPreface(COL_BY_KEY.get('four'))} {...colIdxProps('four')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Four" sub={VOLUME_YEARS.four} letters={colLetterArr(COL_BY_KEY.get('four'))} preface={colPreface(COL_BY_KEY.get('four'))} {...colIdxProps('four')} />
       </ScreenLayout>
     )),
     'vot-five-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Five" letters={colLetterArr(COL_BY_KEY.get('five'))} preface={colPreface(COL_BY_KEY.get('five'))} {...colIdxProps('five')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Five" sub={VOLUME_YEARS.five} letters={colLetterArr(COL_BY_KEY.get('five'))} preface={colPreface(COL_BY_KEY.get('five'))} {...colIdxProps('five')} />
       </ScreenLayout>
     )),
     'vot-six-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Six" letters={colLetterArr(COL_BY_KEY.get('six'))} preface={colPreface(COL_BY_KEY.get('six'))} {...colIdxProps('six')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Six" sub={VOLUME_YEARS.six} letters={colLetterArr(COL_BY_KEY.get('six'))} preface={colPreface(COL_BY_KEY.get('six'))} {...colIdxProps('six')} />
       </ScreenLayout>
     )),
     'vot-seven-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Seven" letters={colLetterArr(COL_BY_KEY.get('seven'))} preface={colPreface(COL_BY_KEY.get('seven'))} {...colIdxProps('seven')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Volume Seven" sub={VOLUME_YEARS.seven} letters={colLetterArr(COL_BY_KEY.get('seven'))} preface={colPreface(COL_BY_KEY.get('seven'))} {...colIdxProps('seven')} />
       </ScreenLayout>
     )),
     'vot-timothy-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
+      <ScreenLayout utility={_idxBar()}>
         <VolumeLetterIndex volumeTitle="Letters from Timothy" eyebrow="The Volumes of Truth" letters={colLetterArr(COL_BY_KEY.get('timothy'))} preface={colPreface(COL_BY_KEY.get('timothy'))} {...colIdxProps('timothy')} />
       </ScreenLayout>
     )),
     'vot-flock-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
+      <ScreenLayout utility={_idxBar()}>
         <VolumeLetterIndex volumeTitle="Letters to The Lord's Little Flock" eyebrow="The Volumes of Truth" letters={colLetterArr(COL_BY_KEY.get('flock'))} preface={colPreface(COL_BY_KEY.get('flock'))} {...colIdxProps('flock')} />
       </ScreenLayout>
     )),
     'vot-rebuke-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
+      <ScreenLayout utility={_idxBar()}>
         <VolumeLetterIndex volumeTitle="The Lord's Rebuke" eyebrow="A Testament Against The World" letters={colLetterArr(COL_BY_KEY.get('rebuke'))} preface={colPreface(COL_BY_KEY.get('rebuke'))} {...colIdxProps('rebuke')} />
       </ScreenLayout>
     )),
     'wtlb-one-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb1'))} columns={2} {...colIdxProps('wtlb1')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb1'))} noun="entry" {...colIdxProps('wtlb1')} />
       </ScreenLayout>
     )),
     'wtlb-two-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb2'))} columns={2} {...colIdxProps('wtlb2')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb2'))} noun="entry" {...colIdxProps('wtlb2')} />
       </ScreenLayout>
     )),
     'blessed-index': () => _wrapVot((
-      <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="The Blessed" eyebrow="Blessings & Promises" letters={colLetterArr(COL_BY_KEY.get('blessed')).map((e) => ({ ...e, date: e.sourceLabel || '' }))} {...colIdxProps('blessed')} />
+      <ScreenLayout utility={_idxBar()}>
+        <VolumeLetterIndex volumeTitle="The Blessed" eyebrow="Blessings & Promises" letters={colLetterArr(COL_BY_KEY.get('blessed')).map((e) => ({ ...e, date: e.sourceLabel || '' }))} noun="entry" {...colIdxProps('blessed')} />
       </ScreenLayout>
     )),
 

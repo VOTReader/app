@@ -1,10 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════
    VolumesHome — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   The Volumes of Truth in the UI pass's parts (vot-ui, 2026-11-15): the
+   centred hero the Studies list has, then three grouped lists, The Seven
+   Volumes, the Collections, and A Return to The Garden. A row is the name
+   in the serif and its facts in the sans; a collection with nothing in it
+   yet says "Coming soon" and opens nothing. Before, two columns of bordered
+   tiles under an ornament, all one weight. */
 
 import { GARDEN_TOTAL } from '../../utils/garden.js';
+import { ListGroup, ListRow } from '../components/UiParts.jsx';
+import { BarAction } from '../components/RootNav.jsx';
+import { countOf } from '../../utils/download-tree.js';
+import { VOLUME_YEARS } from '../../utils/volume-facts.js';
 
-export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function VolumesHome({ onSelect, onBack, onSearch }) {
   // Q8.3: VOT corpus is lazy. Subscribe + pre-fire on mount so the
   // letter-count details fill in once bundle-a-vot.js loads. Use
   // colLetterArr (lazy-safe) for all collections — returns [] when
@@ -25,82 +35,46 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
   // Once loaded, `locked` reflects actual content state (a collection with 0
   // letters is "Coming Soon").
   const _locked = (k) => _votReady && _cnt(k) === 0;
+  /** Its facts: how many it holds, then what it is; before the corpus lands, only what it is. */
+  const facts = (k, noun, what) => [_cnt(k) > 0 ? countOf(_cnt(k), noun) : '', what].filter(Boolean).join(' · ');
+  // Its count like every other row's (catalogue row 17, 2026-09-12): the collection's own letter list, never a typed number.
   const collections = [
-  // Its count like every other tile's (catalogue row 17, 2026-09-12): the collection's own letter
-  // list, never a typed number — 31 today, and the same "N Letters · <subtitle>" shape as the Holy Days.
-  { id: "lords-rebuke", title: "The Lord's Rebuke", sub: _cnt('rebuke') > 0 ? `${_cnt('rebuke')} Letters · Correction & Warning` : "Correction & Warning", locked: _locked('rebuke') },
-  { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: _cnt('wtlb1') > 0 ? `${_cnt('wtlb1')} Entries · Words of Wisdom` : "Words of Wisdom", locked: _locked('wtlb1') },
-  { id: "words-to-live-by-2", title: "Words To Live By: Part Two", sub: _cnt('wtlb2') > 0 ? `${_cnt('wtlb2')} Entries · More Words of Wisdom` : "More Words of Wisdom", locked: _locked('wtlb2') },
-  { id: "the-blessed", title: "The Blessed", sub: _cnt('blessed') > 0 ? `${_cnt('blessed')} Entries · Blessings & Promises` : "Blessings & Promises", locked: _locked('blessed') },
-  { id: "little-flock", title: "Letters to The Lord's Little Flock", sub: _cnt('flock') > 0 ? `${_cnt('flock')} Letters` : "Personal Instruction", locked: _locked('flock') },
-  { id: "letters-timothy", title: "Letters from Timothy", sub: _cnt('timothy') > 0 ? `${_cnt('timothy')} Letters` : "A Servant's Pen", locked: _locked('timothy') },
-  { id: "holy-days", title: "Regarding The Holy Days", sub: _cnt('holydays') > 0 ? `${_cnt('holydays')} Letters · Appointed Times` : "Appointed Times", locked: _locked('holydays') }];
+    { id: 'lords-rebuke', k: 'rebuke', title: "The Lord's Rebuke", sub: facts('rebuke', 'letter', 'Correction & Warning') },
+    { id: 'words-to-live-by-1', k: 'wtlb1', title: 'Words To Live By: Part One', sub: facts('wtlb1', 'entry', 'Words of Wisdom') },
+    { id: 'words-to-live-by-2', k: 'wtlb2', title: 'Words To Live By: Part Two', sub: facts('wtlb2', 'entry', 'More Words of Wisdom') },
+    { id: 'the-blessed', k: 'blessed', title: 'The Blessed', sub: facts('blessed', 'entry', 'Blessings & Promises') },
+    { id: 'little-flock', k: 'flock', title: "Letters to The Lord's Little Flock", sub: facts('flock', 'letter', _cnt('flock') > 0 ? '' : 'Personal Instruction') },
+    { id: 'letters-timothy', k: 'timothy', title: 'Letters from Timothy', sub: facts('timothy', 'letter', _cnt('timothy') > 0 ? '' : "A Servant's Pen") },
+    { id: 'holy-days', k: 'holydays', title: 'Regarding The Holy Days', sub: facts('holydays', 'letter', 'Appointed Times') },
+  ];
+  const NAMES = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'];
+  const volumes = NAMES.map((n) => {
+    const k = n.toLowerCase();
+    return { id: 'volume-' + k, k, title: 'Volume ' + n, sub: facts(k, 'letter', VOLUME_YEARS[k]) };
+  });
 
-  const volumes = [
-  { id: "volume-one", title: "Volume One", detail: _cnt('one') > 0 ? `${_cnt('one')} Letters` : null, sub: "2004 – 2006", locked: _locked('one') },
-  { id: "volume-two", title: "Volume Two", detail: _cnt('two') > 0 ? `${_cnt('two')} Letters` : null, sub: "2004 – 2010", locked: _locked('two') },
-  { id: "volume-three", title: "Volume Three", detail: _cnt('three') > 0 ? `${_cnt('three')} Letters` : null, sub: "2006 – 2010", locked: _locked('three') },
-  { id: "volume-four", title: "Volume Four", detail: _cnt('four') > 0 ? `${_cnt('four')} Letters` : null, sub: "2010 – 2011", locked: _locked('four') },
-  { id: "volume-five", title: "Volume Five", detail: _cnt('five') > 0 ? `${_cnt('five')} Letters` : null, sub: "2011 – 2014", locked: _locked('five') },
-  { id: "volume-six", title: "Volume Six", detail: _cnt('six') > 0 ? `${_cnt('six')} Letters` : null, sub: "2011 – 2014", locked: _locked('six') },
-  { id: "volume-seven", title: "Volume Seven", detail: _cnt('seven') > 0 ? `${_cnt('seven')} Letters` : null, sub: "2005 – 2014", locked: _locked('seven') }];
+  /** One row; a locked one says so and opens nothing. */
+  const row = (v) => (
+    <ListRow key={v.id} noLead className={'sty-row' + (_locked(v.k) ? ' is-locked' : '')} title={v.title} meta={_locked(v.k) ? [v.sub, 'Coming soon'].filter(Boolean).join(' · ') : v.sub}
+      onClick={_locked(v.k) ? undefined : () => onSelect(v.id)} />
+  );
 
   return (
-    <ScreenLayout
-      navChildren={LibraryNav({
-        onBack, backLabel: 'Home', showHome: false,
-        onSettings, onHistory, onSearch, theme, onThemeChange,
-      })}
-    >
-      <div className="home-screen volumes-landing">
-        <div className="home-eyebrow">Prophetic Letters</div>
-        <h1 className="home-title">The Volumes of Truth</h1>
-        <p className="home-sub">Letters from The Lord, Our God and Savior</p>
-        <div className="home-ornament">
-          <div className="home-ornament-line" />
-          <div className="home-ornament-diamond" />
-          <div className="home-ornament-line r" />
-        </div>
-        <div className="genre-columns">
-          <div className="genre-col genre-col-stretch">
-            <div className="genre-col-label">The Seven Volumes</div>
-            {volumes.map((v, _i) => (
-              <button
-                key={v.id}
-                className={`genre-tile${v.locked ? " locked" : ""}`}
-                onClick={() => !v.locked && onSelect(v.id)}
-                disabled={v.locked}
-              >
-                <div className="genre-tile-title">{v.title}</div>
-                {(v.detail || v.sub) && <div className="genre-tile-sub">{[v.detail, v.sub].filter(Boolean).join(" · ")}</div>}
-                {v.locked && <div className="genre-tile-badge">Coming Soon</div>}
-              </button>
-            ))}
-          </div>
-          <div className="genre-col genre-col-stretch">
-            <div className="genre-col-label">Collections</div>
-            {collections.map((b, _i) => (
-              <button
-                key={b.id}
-                className={`genre-tile${b.locked ? " locked" : ""}`}
-                onClick={() => !b.locked && onSelect(b.id)}
-                disabled={b.locked}
-              >
-                <div className="genre-tile-title">{b.title}</div>
-                {b.sub && <div className="genre-tile-sub">{b.sub}</div>}
-                {b.locked && <div className="genre-tile-badge">Coming Soon</div>}
-              </button>
-            ))}
-          </div>
-          <button
-            className="genre-tile genre-full-width"
-            style={{ textAlign: "center", padding: "1.4rem 1rem" }}
-            onClick={() => onSelect("garden")}
-          >
-            <div className="genre-tile-title">A Return to The Garden</div>
-            <div className="genre-tile-sub">{GARDEN_TOTAL} Pages · A Visual Journey</div>
-          </button>
-        </div>
+    <ScreenLayout utility={{
+      title: '', onBack, backLabel: 'Back to Home',
+      actions: [onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null],
+    }}>
+      <div className="sty">
+        <header className="sty-hero">
+          <div className="root-eyebrow">Prophetic Letters</div>
+          <h1>The Volumes of Truth</h1>
+          <p>Letters from The Lord, Our God and Savior</p>
+        </header>
+        <ListGroup label="The Seven Volumes">{volumes.map(row)}</ListGroup>
+        <ListGroup label="Collections">{collections.map(row)}</ListGroup>
+        <ListGroup label="A Visual Journey">
+          <ListRow noLead className="sty-row" title="A Return to The Garden" meta={countOf(GARDEN_TOTAL, 'page')} onClick={() => onSelect('garden')} />
+        </ListGroup>
       </div>
     </ScreenLayout>
   );

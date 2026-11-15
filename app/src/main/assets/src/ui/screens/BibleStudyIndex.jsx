@@ -7,8 +7,7 @@
    says where to go next, and one grouped list as The Scriptures of Truth
    has. A part is a row that opens its sections under it. */
 
-import { UiIcon } from '../components/UiIcon.jsx';
-import { ListGroup, ListRow, UiButton } from '../components/UiParts.jsx';
+import { ListGroup, ListRow, NextCard, UiButton, readMark as readMarkOf } from '../components/UiParts.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { studyTitleParts, chapterTitleParts, studyNextStep } from '../../utils/study-titles.js';
@@ -53,15 +52,8 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
 
   const names = (ch) => (ch.title ? chapterTitleParts(ch.title, head) : { over: '', name: 'Part ' + ch.num });
 
-  /** A read chapter's one mark: the round tick, or the tick and "×2" once it has been read again.
-   * @returns {any} (the counted mark's label is a node: its words for a screen reader, "×2" for the eye) */
-  const readMark = (ch) => {
-    if (!read(ch)) return null;
-    const n = readCount ? readCount(ch.id) : 1;
-    return n > 1
-      ? { icon: 'check', label: <><span className="sr-only">{'Read ' + n + ' times'}</span><span aria-hidden="true">{'×' + n}</span></> }
-      : { tick: true, label: 'Read' };
-  };
+  /** A read chapter's one mark (the kit's readMark). */
+  const readMark = (ch) => (read(ch) ? readMarkOf(Math.max(1, readCount ? readCount(ch.id) : 1)) : null);
 
   const chapterRow = (ch) => {
     if (!ch) return null;
@@ -106,17 +98,8 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
     const where = [part ? 'Part ' + part.num : '', t.over].filter(Boolean).join(' · ');
     const chip = minChip(next.ch);
     return (
-      <button type="button" className="ui-card ui-row-press sty-next" onClick={() => onSelect(next.ch.id)}>
-        <span className="sty-next-main">
-          <span className="ui-row-text">
-            <span className="root-eyebrow">{next.k}</span>
-            <span className="ui-row-title">{t.name}</span>
-            {where || chip ? <span className="ui-row-meta">{where}{where && chip ? ' · ' : null}{chip}</span> : null}
-          </span>
-          <UiIcon name="chev" className="ui-row-chev" />
-        </span>
-        {readN > 0 ? <span className="ui-progress" aria-hidden="true"><span style={{ width: Math.round((100 * readN) / order.length) + '%' }} /></span> : null}
-      </button>
+      <NextCard step={next.k} title={t.name} meta={where || chip ? <>{where}{where && chip ? ' · ' : null}{chip}</> : null}
+        done={readN} total={order.length} onClick={() => onSelect(next.ch.id)} />
     );
   };
 

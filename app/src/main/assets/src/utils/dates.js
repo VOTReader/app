@@ -87,3 +87,16 @@ export function timeAgo(ts) {
   return months === 1 ? '1 month ago' : `${months} months ago`;
 }
 
+
+const _MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/**
+ * A letter's own date ("4/18/05", as the volumes print it) in words: "April 18, 2005". Anything that is not
+ * M/D/YY or M/D/YYYY comes back as it is (The Blessed's source labels, an empty date).
+ * @param {string | null | undefined} s @returns {string}
+ */
+export function letterDate(s) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(s || '').trim());
+  if (!m || +m[1] < 1 || +m[1] > 12) return String(s || '');
+  const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+  return _MONTHS[+m[1] - 1] + ' ' + +m[2] + ', ' + y;
+}

@@ -168,27 +168,7 @@ describe('app.css — a Settings group line shows its values whole', () => {
   });
 });
 
-/* THE BROWSE TILES KEEP GOLD TITLES, NOT GOLD BOXES (redesign, 2026-09-25). Volumes, Scriptures and
-   the Answers subjects were grids of gold outlines with 12 px italic counts; the tiles now sit on
-   the hairline with upright muted counts, and only hover lights the edge gold. */
-describe('app.css — browse tiles sit on the hairline', () => {
-  // The UNSCOPED rule: ruleBlock would find `.scriptures-landing .genre-tile-sub {` first.
-  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-  const base = (sel) => {
-    const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
-    return m ? m[1] : null;
-  };
-  it('outlines a tile with the hairline and keeps its title gold', () => {
-    expect(base('.genre-tile')).toMatch(/border:\s*1px solid var\(--border\)/);
-    expect(base('.genre-tile-title')).toMatch(/color:\s*var\(--gold\)/);
-  });
-  it('sets the count line upright and muted', () => {
-    const sub = base('.genre-tile-sub');
-    expect(sub).not.toBeNull();
-    expect(sub).not.toMatch(/font-style:\s*italic/);
-    expect(sub).toMatch(/color:\s*var\(--cream-muted\)/);
-  });
-});
+/* The browse tiles (Volumes, 2026-09-25) are gone: the Volumes page is grouped rows (vot-ui, 2026-11-15). */
 
 /* THE PERSONAL-STUDY HEADER HOLDS STILL (redesign, 2026-09-25). The eight screens share .study-head
    (src/ui/screens/study-head.test.js checks the markup); their containers padded their tops 1.1 to
@@ -684,8 +664,7 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
    the 12 px step or more, with their tracking capped at 0.18em. */
 describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
-    '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
-    '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
+    '.vol-index-eyebrow', '.audio-library-eyebrow',
     '.select-sheet-eyebrow',
     '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
@@ -693,7 +672,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
-    '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
+    '.hero-play-pill',
     '.idx-note-chip',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -724,14 +703,6 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
   });
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
     expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*var\(--ts-meta\)/);   // 13 px, sentence case since W2d
-  });
-  it('a column label is tracked tight enough to stay on one line in half a phone', () => {
-    // 176 px at 360: "THE SEVEN VOLUMES" wrapped at 0.18em (the 09-25 walk, labels-volumes-home.png).
-    // blocksOf, not ruleBlock: the scoped `.volumes-landing .genre-col-label {` comes first in the file.
-    const [base] = blocksOf('.genre-col-label');
-    const ls = /letter-spacing:\s*([\d.]+)em/.exec(base);
-    expect(ls).not.toBeNull();
-    expect(Number(ls[1])).toBeLessThanOrEqual(0.1);
   });
 });
 

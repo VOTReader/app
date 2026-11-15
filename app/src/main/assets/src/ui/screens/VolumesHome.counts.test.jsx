@@ -23,9 +23,9 @@ function install(countOf) {
   window.__loadVotCorpus = () => Promise.resolve();
 }
 const noop = () => {};
-const tiles = () => [...document.querySelectorAll('.genre-tile')]
+const tiles = () => [...document.querySelectorAll('.ui-group .sty-row')]
   .filter((t) => !/Return to The Garden/.test(t.textContent))
-  .map((t) => ({ title: t.querySelector('.genre-tile-title').textContent, sub: (t.querySelector('.genre-tile-sub') || {}).textContent || '' }));
+  .map((t) => ({ title: t.querySelector('.ui-row-title').textContent, sub: (t.querySelector('.ui-row-meta') || {}).textContent || '' }));
 
 beforeEach(() => install(() => 0));
 afterEach(() => { cleanup(); for (const g of GLOBALS) delete window[g]; });
@@ -36,7 +36,7 @@ describe('VolumesHome — every collection tile shows its count', () => {
     render(<VolumesHome onSelect={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
     const rebuke = tiles().find((t) => t.title === "The Lord's Rebuke");
     expect(rebuke, 'the tile is on screen').toBeTruthy();
-    expect(rebuke.sub).toBe('31 Letters · Correction & Warning');
+    expect(rebuke.sub).toBe('31 letters · Correction & Warning');
   });
 
   it('DERIVED: with letters in every collection, every collection tile carries a number — and each its own', () => {
@@ -58,6 +58,6 @@ describe('VolumesHome — every collection tile shows its count', () => {
   it('CONTROL: with no letters loaded yet, the Rebuke keeps its subtitle and no number', () => {
     render(<VolumesHome onSelect={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
     const rebuke = tiles().find((t) => t.title === "The Lord's Rebuke");
-    expect(rebuke.sub).toBe('Correction & Warning');
+    expect(rebuke.sub).toMatch(/^Correction & Warning( · Coming soon)?$/);
   });
 });

@@ -6,7 +6,7 @@
    user's measured pace when ReadingStatsStore has one (230-wpm default
    otherwise). Contracts pinned here: the estimate itself, the measured-
    pace override, the absent-counter guard (no chip, no crash), and the
-   two-col exception — compact centered cards carry no chip. */
+   entry rows (Words To Live By) keep their chip too. */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -74,37 +74,74 @@ describe('VolumeLetterIndex — "~N min" reading-time chip', () => {
     expect(document.querySelector('.idx-min-chip')).toBeNull();
   });
 
-  it('keeps the time estimate in the two-col compact cards', () => {
+  it('keeps the time estimate on an entry row (Words To Live By is one list now, not two columns)', () => {
     setupCounters();
-    renderIndex({ letters: [ENTRY_B], columns: 2 });
-    expect(document.querySelector('.two-col-inner')).not.toBeNull();
-    expect(document.querySelector('.two-col-meta .idx-min-chip').textContent).toBe('~1 min');
+    renderIndex({ letters: [ENTRY_B], noun: 'entry' });
+    const row = document.querySelector('.ui-group .sty-row');
+    expect(row.querySelector('.ui-row-over').textContent).toBe('Entry 11');
+    expect(row.querySelector('.ui-row-meta .idx-min-chip').textContent).toBe('~1 min');
   });
 });
 
 describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
-  it('a once-read letter renders the plain check, no count', () => {
+  const rowMark = (c) => c.querySelector('.ui-group .ui-row-mark');
+  it('a once-read letter renders the round tick named Read, no count', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 1 });
-    expect(container.querySelector('.read-check')).not.toBeNull();
-    expect(container.querySelector('.read-check-count')).toBeNull();
+    expect(rowMark(container).classList.contains('is-tick')).toBe(true);
+    expect(rowMark(container).getAttribute('aria-label')).toBe('Read');
   });
 
   it('a re-read letter renders ✓ ×N with an AT label', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
-    const mark = container.querySelector('.read-check');
-    expect(mark.querySelector('.sr-only').textContent).toBe('Read 3 times');   // s16.4: sr-only text, not aria-label on a span
-    expect(container.querySelector('.read-check-count').textContent).toBe('×3');
+    expect(rowMark(container).querySelector('.sr-only').textContent).toBe('Read 3 times');   // s16.4: sr-only text, not aria-label on a span
+    expect(rowMark(container).textContent).toContain('×3');
   });
 
-  it('legacy callers without readCount still get the plain check (guard path)', () => {
+  it('legacy callers without readCount still get the plain tick (guard path)', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true });
-    expect(container.querySelector('.read-check')).not.toBeNull();
-    expect(container.querySelector('.read-check-count')).toBeNull();
+    expect(rowMark(container).classList.contains('is-tick')).toBe(true);
   });
 
-  it('keeps the re-read count in the two-col compact cards', () => {
-    const { container } = renderIndex({ columns: 2, markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
-    expect(container.querySelector('.two-col-meta .read-check .sr-only').textContent).toBe('Read 3 times');
+  it('a read count of 0 on a letter marked read still shows the tick', () => {
+    const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 0 });
+    expect(rowMark(container)).not.toBeNull();
+  });
+});
+
+describe('VolumeLetterIndex — the kit page (vot-ui 2026-11-15)', () => {
+  const B = { id: 'b', num: 2, title: 'The Seventh Day', date: '4/18/05' };
+  it('a row is "Letter N" over the name, the date in words under it', () => {
+    const { container } = renderIndex({ letters: [LETTER_A] });
+    const row = container.querySelector('.ui-group .sty-row');
+    expect(row.querySelector('.ui-row-over').textContent).toBe('Letter 1');
+    expect(row.querySelector('.ui-row-title').textContent).toBe('The Wide Path');
+    expect(row.querySelector('.ui-row-meta').textContent).toContain('March 28, 2005');
+  });
+  it('nothing read: the card says Start here and opens the first letter', () => {
+    const picked = [];
+    const { container } = renderIndex({ letters: [LETTER_A, B], onSelect: (id) => picked.push(id) });
+    const card = container.querySelector('.sty-next');
+    expect(card.textContent).toContain('Start here');
+    card.click();
+    expect(picked).toEqual(['the-wide-path']);
+  });
+  it('one read: the card says Up next and the group says 1 of 2 read', () => {
+    const { container } = renderIndex({ letters: [LETTER_A, B], markAsReadEnabled: true, isRead: (id) => id === 'the-wide-path' });
+    expect(container.querySelector('.sty-next').textContent).toContain('Up next');
+    expect(container.querySelector('.sty-next').textContent).toContain('The Seventh Day');
+    expect(container.textContent).toContain('1 of 2 read');
+  });
+  it('the preface opens through onSelectPreface and reads "Preface" over its name', () => {
+    const got = [];
+    const { container } = renderIndex({ preface: { id: 'pre', title: 'To the Reader' }, onSelectPreface: (id) => got.push(id) });
+    const first = container.querySelector('.ui-group .sty-row');
+    expect(first.querySelector('.ui-row-over').textContent).toBe('Preface');
+    first.click();
+    expect(got).toEqual(['pre']);
+  });
+  it('the letter the reader is in is the current row', () => {
+    const { container } = renderIndex({ letters: [LETTER_A, B], currentLetter: 'b' });
+    expect(container.querySelector('.sty-row[aria-current="true"] .ui-row-title').textContent).toBe('The Seventh Day');
   });
 });
 

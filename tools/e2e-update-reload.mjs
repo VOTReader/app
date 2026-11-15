@@ -397,7 +397,7 @@ try {
 
   // ── a letter, scrolled ──
   await click('Prophetic Letters'); await click('Volume One');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][1]; if (b) b.click(); });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][1]; if (b) b.click(); });
   await page.waitForSelector('.hero-title', { timeout: 15000 }); await sleep(900);
   const title0 = await page.evaluate(() => (document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll').querySelector('.hero-title') || { textContent: '' }).textContent.trim());
   // The LIVE reading scroller: the one under .screen-layout's pager viewport. The

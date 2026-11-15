@@ -1,134 +1,92 @@
 /* ═══════════════════════════════════════════════════════════════════════
    VolumeLetterIndex — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   The contents page of every volume and collection (the seven Volumes,
+   Timothy, the Little Flock, The Lord's Rebuke, both parts of Words To Live
+   By, The Blessed, The Holy Days): one component, thirteen routes.
 
-import { AudioPlayButton, AudioSectionChips } from './AudioPlayButton.jsx';
+   Built from the UI pass's parts as a study's contents page is (vot-ui,
+   2026-11-15): a centred hero, the card that says where to go next, Play all,
+   then one grouped list. A row is the letter's number over its name, and its
+   date and reading time under it; the one mark says it has been read. The old
+   page (a number column, hairline rows, serif caps labels, two columns for
+   Words To Live By) is gone with its CSS. */
+
+import { AudioSectionChips } from './AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from './ReadingMinChip.jsx';
+import { ListGroup, ListRow, NextCard, UiButton, readMark } from './UiParts.jsx';
+import { countOf } from '../../utils/download-tree.js';
+import { letterDate } from '../../utils/dates.js';
+import { studyNextStep } from '../../utils/study-titles.js';
 
-/* Read marks are COUNT-aware (2026-08-03): a re-read letter shows ✓ ×N.
-   Rendered as one shared element so every index surface stays identical. */
-function ReadCheck({ count }) {
-  if (!count) return null;
-  return (
-    <span className="read-check"><span className="sr-only">{count > 1 ? `Read ${count} times` : 'Read'}</span>
-      <span aria-hidden="true">{"✓"}</span>
-      {count > 1 && <span className="read-check-count" aria-hidden="true">{"×" + count}</span>}
-    </span>
-  );
-}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, columns, onPlayAll, sections, onPlaySection, headerExtra }) {
-  const currentRef = React.useRef(null);
+/**
+ * @param {{ volumeTitle: string, eyebrow?: string, sub?: string, noun?: string, letters: any[], preface?: any,
+ *   onSelect: (id: any) => void, onSelectPreface?: (id: any) => void, currentLetter?: any, isRead?: (id: any) => boolean,
+ *   readCount?: (id: any) => number, progressKeyFor?: (id: any) => string, markAsReadEnabled?: boolean,
+ *   onPlayAll?: () => void, sections?: any[], onPlaySection?: (i: number) => void, headerExtra?: any }} props
+ *   noun: what one item is called ("letter"; "entry" for Words To Live By and The Blessed)
+ */
+export function VolumeLetterIndex({ volumeTitle, eyebrow, sub, noun = 'letter', letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, progressKeyFor, markAsReadEnabled, onPlayAll, sections, onPlaySection, headerExtra }) {
+  const pageRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // The letter the reader is in sits in the middle of the screen on the way in.
   React.useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
-    }
+    const cur = pageRef.current && pageRef.current.querySelector('.sty-row[aria-current="true"]');
+    if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'center', behavior: 'instant' });
   }, []);
-  // "~N min" per row — or "N% · ~M min left" for an IN-PROGRESS item (the
-  // tracker left a frontier inside it; [26] smart-resume). One shared chip
-  // for every index surface: components/ReadingMinChip.jsx. progressKeyFor
-  // threads the SAME v1:<bid>:<cid> key the tracker records under; absent
-  // (legacy caller) → cold chip only.
-  const _wpm = readingChipWpm();
-  const minChip = (item, itemId) => readingMinChip(
-    item, (itemId != null && progressKeyFor) ? progressKeyFor(itemId) : null, _wpm
-  );
-  const compactMeta = (item, itemId) => {
-    const chip = minChip(item, itemId);
-    const read = markAsReadEnabled && isRead(itemId)
-      ? <ReadCheck count={readCount ? readCount(itemId) : 1} />
-      : null;
-    if (!chip && !read) return null;
-    return <div className="two-col-meta">{chip}{read}</div>;
-  };
-  return (
-    <div className="vol-index">
-      <div className="vol-index-header">
-        <div className="vol-index-eyebrow">{eyebrow || "The Volumes of Truth"}</div>
-        <h1 className="vol-index-title">{volumeTitle}</h1>
-        <div className="vol-index-ornament">
-          <div className="vol-index-ornament-line" />
-          <div className="vol-index-ornament-diamond" />
-          <div className="vol-index-ornament-line r" />
-        </div>
-        {/* Streaming audio (2026-08-05): queue the whole collection like a
-            Bandcamp album; WTLB additionally offers its Part/Section range
-            compilations as chips. Props come from screen-routes' colIdxProps
-            and are absent when the collection has no tracks. */}
-        {onPlayAll && (
-          <div className="vol-index-play-row">
-            <AudioPlayButton variant="playall" label="Play All" onClick={onPlayAll} />
-          </div>
-        )}
-        {sections && onPlaySection && (
-          <AudioSectionChips sections={sections} onPlay={onPlaySection} />
-        )}
-        {/* A collection's own extras under its title (Holy Days' two playlists). */}
-        {headerExtra || null}
-      </div>
-      <div className={`chapter-cards${columns === 2 ? " two-col" : ""}`}>
-        {preface && (columns === 2 ? (
-          <button className="chapter-card-btn" onClick={() => onSelectPreface && onSelectPreface(preface.id)}>
-            <div className="two-col-inner">
-              <div className="two-col-num">0</div>
-              <div className="two-col-title">{preface.title}</div>
-              {compactMeta(preface, preface.id)}
-            </div>
-          </button>
-        ) : (
-          <button className="chapter-card-btn" onClick={() => onSelectPreface && onSelectPreface(preface.id)}>
-            <span className="chapter-card-num">0</span>
-            <div className="chapter-card-divider" />
-            <div className="chapter-card-info">
-              <div className="chapter-card-label">Preface</div>
-              <div className="chapter-card-title">{preface.title}</div>
-            </div>
-            {minChip(preface, preface.id)}
-            {markAsReadEnabled && isRead(preface.id) && (
-              <ReadCheck count={readCount ? readCount(preface.id) : 1} />
-            )}
-          </button>
-        ))}
 
-        {letters.map((letter) => {
-          const isCurrent = letter.id === currentLetter;
-          if (columns === 2) {
-            return (
-              <button
-                key={letter.id}
-                className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
-                ref={isCurrent ? currentRef : null}
-                onClick={() => onSelect(letter.id)}
-              >
-                <div className="two-col-inner">
-                  <div className="two-col-num">{letter.num}</div>
-                  <div className="two-col-title">{letter.title}</div>
-                  {compactMeta(letter, letter.id)}
-                </div>
-              </button>
-            );
-          }
-          return (
-            <button
-              key={letter.id}
-              className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
-              ref={isCurrent ? currentRef : null}
-              onClick={() => onSelect(letter.id)}
-            >
-              <span className="chapter-card-num">{letter.num}</span>
-              <div className="chapter-card-divider" />
-              <div className="chapter-card-info">
-                <div className="chapter-card-label">{letter.date}</div>
-                <div className="chapter-card-title">{letter.title}</div>
-              </div>
-              {minChip(letter, letter.id)}
-              {markAsReadEnabled && isRead(letter.id) && (
-                <ReadCheck count={readCount ? readCount(letter.id) : 1} />
-              )}
-            </button>
-          );
-        })}
-      </div>
+  // "~N min" in a row's facts, or "N% · ~M min left" for one the reader is part way through
+  // (the one shared chip, components/ReadingMinChip.jsx, keyed as the tracker records).
+  const _wpm = readingChipWpm();
+  const minChip = (item) => readingMinChip(item, progressKeyFor ? progressKeyFor(item.id) : null, _wpm);
+
+  const order = preface ? [preface, ...letters] : letters;
+  const read = (item) => !!(markAsReadEnabled && item && isRead && isRead(item.id));
+  const readN = order.filter(read).length;
+  const next = studyNextStep(order, currentLetter, read);
+
+  /** The small line over a name: "Letter 12", or "Preface". */
+  const overOf = (item) => (item === preface ? 'Preface' : item.num != null ? cap(noun) + ' ' + item.num : null);
+  /** Its facts: the date in words and the reading time. */
+  const factsOf = (item) => {
+    const date = item === preface ? '' : letterDate(item.date);
+    const chip = minChip(item);
+    if (!date && !chip) return null;
+    return <>{date}{date && chip ? ' · ' : null}{chip}</>;
+  };
+  /** The next card's line: where the item is, then its facts ("Letter 12 · April 18, 2005 · ~7 min"). */
+  const nextFacts = (item) => {
+    const o = overOf(item), f = factsOf(item);
+    return o || f ? <>{o}{o && f ? ' · ' : null}{f}</> : null;
+  };
+  const open = (item) => (item === preface ? (onSelectPreface && onSelectPreface(item.id)) : onSelect(item.id));
+
+  return (
+    <div className="sty" ref={pageRef}>
+      <header className="sty-hero">
+        <div className="root-eyebrow">{eyebrow || 'The Volumes of Truth'}</div>
+        <h1>{volumeTitle}</h1>
+        {sub ? <p>{sub}</p> : null}
+      </header>
+      {next ? (
+        <NextCard step={next.k} title={next.ch.title}
+          meta={nextFacts(next.ch)}
+          done={readN} total={order.length} onClick={() => open(next.ch)} />
+      ) : null}
+      {/* Streaming audio (2026-08-05): the whole collection queued as one album; Words To Live By also
+          offers its parts' range recordings. Absent until the lazy corpus with AUDIO_MANIFEST lands. */}
+      {onPlayAll ? <UiButton wide icon="play" onClick={onPlayAll}>Play all</UiButton> : null}
+      {sections && onPlaySection ? <AudioSectionChips sections={sections} onPlay={onPlaySection} /> : null}
+      {/* A collection's own extras under its title (Holy Days' two playlists). */}
+      {headerExtra || null}
+      <ListGroup label="Contents" aside={readN > 0 ? readN + ' of ' + order.length + ' read' : countOf(letters.length, noun)}>
+        {order.map((item) => (
+          <ListRow key={item.id} noLead className="sty-row" over={overOf(item)} title={item.title} meta={factsOf(item)}
+            mark={read(item) ? readMark(Math.max(1, readCount ? readCount(item.id) : 1)) : null}
+            current={item.id === currentLetter} onClick={() => open(item)} />
+        ))}
+      </ListGroup>
     </div>
   );
 }

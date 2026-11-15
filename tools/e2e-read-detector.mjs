@@ -251,12 +251,12 @@ try {
   // The one that failed on the runner: the index rows are what `opened` below
   // clicks, so wait for THEM rather than for a plausible number of milliseconds.
   await waitForScreen('the Volume One index rows', () => [...document.querySelectorAll(
-    '.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]',
+    '.sty .ui-group .sty-row',
   )].some((b) => b.querySelector('.idx-min-chip')));
 
   // Open the preface (first chip row).
   const opened = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
+    const rows = [...document.querySelectorAll('.sty .ui-group .sty-row')].filter((b) => b.querySelector('.idx-min-chip'));
     if (!rows.length) return null;
     rows[0].click();
     return rows[0].textContent.trim().slice(0, 40);
@@ -318,7 +318,7 @@ try {
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || '')); if (b) b.click(); });
   await sleep(900);
   await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
+    const rows = [...document.querySelectorAll('.sty .ui-group .sty-row')].filter((b) => b.querySelector('.idx-min-chip'));
     if (rows[3]) rows[3].click();
   });
   await sleep(600);
@@ -348,7 +348,7 @@ try {
   // Reopen that same letter. Scroll memory restores the bottom and NOTHING
   // moves it afterwards.
   await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.vol-index button, .vol-index [role=button], .vol-index li, .vol-index [class*=row]')].filter((b) => b.querySelector('.idx-min-chip') && !b.querySelector('[class*=row] [class*=row]'));
+    const rows = [...document.querySelectorAll('.sty .ui-group .sty-row')].filter((b) => b.querySelector('.idx-min-chip'));
     if (rows[3]) rows[3].click();
   });
   await sleep(2200);

@@ -254,3 +254,33 @@ export function Notice({ tone = 'info', icon, title, text, actions = [], onDismi
     </div>
   );
 }
+
+/**
+ * The "where to go next" card under a contents page's hero (a study, a volume): the step's word in gold ("Start here",
+ * "Continue", "Up next", "Read again"), the name, one line of facts, and how far through the reader is.
+ * @param {{ step: string, title: any, meta?: any, done?: number, total?: number, onClick: () => void }} props
+ */
+export function NextCard({ step, title, meta, done = 0, total = 0, onClick }) {
+  return (
+    <button type="button" className="ui-card ui-row-press sty-next" onClick={onClick}>
+      <span className="sty-next-main">
+        <span className="ui-row-text">
+          <span className="root-eyebrow">{step}</span>
+          <span className="ui-row-title">{title}</span>
+          {meta ? <span className="ui-row-meta">{meta}</span> : null}
+        </span>
+        <UiIcon name="chev" className="ui-row-chev" />
+      </span>
+      {done > 0 && total > 0 ? <span className="ui-progress" aria-hidden="true"><span style={{ width: Math.round((100 * done) / total) + '%' }} /></span> : null}
+    </button>
+  );
+}
+
+/** A read item's one row mark (rule 12): the round tick, or a tick and "×2" once it has been read again.
+ * @param {number} n times read (0 = no mark) @returns {{ label: any, icon?: string, tick?: boolean } | null} */
+export function readMark(n) {
+  if (!n) return null;
+  return n > 1
+    ? { icon: 'check', label: <><span className="sr-only">{'Read ' + n + ' times'}</span><span aria-hidden="true">{'×' + n}</span></> }
+    : { tick: true, label: 'Read' };
+}

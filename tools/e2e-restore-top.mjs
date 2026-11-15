@@ -201,7 +201,7 @@ try {
 
   // ── the letter, a record captured at the TOP with an anchor ──
   await click('Prophetic Letters'); await click('Volume One');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][1]; if (b) b.click(); });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][1]; if (b) b.click(); });
   await page.waitForSelector('.hero-title', { timeout: 15000 }); await sleep(1500);
   const title = await page.evaluate(() => (document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll').querySelector('.hero-title') || { textContent: '' }).textContent.trim());
   const settled = await page.evaluate((sel) => { const el = document.querySelector(sel); const p = el.querySelector('[data-hl-key]'); const cr = el.getBoundingClientRect(); const hero = el.querySelector('.hero'); return { firstKey: p && p.getAttribute('data-hl-key'), top: p ? Math.round(p.getBoundingClientRect().top - cr.top + el.scrollTop) : null, hero: hero ? Math.round(hero.getBoundingClientRect().height) : null, font: document.fonts.check('16px "Cinzel Decorative"') }; }, SCROLLER);

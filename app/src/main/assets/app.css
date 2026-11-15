@@ -185,7 +185,6 @@
         width: 44px; height: 44px; flex: 0 0 44px; padding: 0;
         display: grid; place-items: center;
       }
-      
       body.offline-strip-open :not(.tabs-overview-layer) > .screen-layout > .top-nav { margin-bottom: var(--offline-strip-h, 0px); }
       /* ═══ end WS6 notices ═══ */
 
@@ -1252,15 +1251,6 @@
       .vol-index-ornament {
         display: flex; align-items: center; gap: 0.75rem; max-width: 300px; margin: 0 auto;
       }
-      .vol-index-ornament-line {
-        flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent);
-      }
-      .vol-index-ornament-line.r {
-        background: linear-gradient(to left, transparent, var(--gold-border), transparent);
-      }
-      .vol-index-ornament-diamond {
-        width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0;
-      }
       /* Holy Days' two playlists (the redesign, 2026-09-25). They were two boxed
          tiles ABOVE the page's own title, most of a phone's first screen; now two
          quiet link rows under the title and Play All (VolumeLetterIndex's
@@ -2154,13 +2144,10 @@
       /* Placement rows: the pill sits under the hero ornament, or under a
          collection index header with its chips wrapping below. */
       .hero-play-row { margin-top: 1.1rem; display: flex; justify-content: center; }
-      .vol-index-play-row { margin-top: 1.4rem; display: flex; justify-content: center; }
-      .vol-index-play-row + .audio-sec-chips { margin-top: 0.8rem; }
       /* D4b (downloads brief 3a, 3j; pictures 15, 16, 21): beside a Listen pill, its download (a round icon with the size
          under it, a ring with a stop square while it downloads, a tick with "On this phone" once saved); offline and
          not on the phone, the pill itself reads "Not on this phone" with "Download when online" under the line. */
       .hero-play-row { flex-wrap: wrap; align-items: center; gap: .6rem .9rem; }
-      
       .hero-play-pill.is-off:disabled { opacity: 1; color: var(--cream-dim); border-color: var(--gold-border); background: rgba(128, 112, 80, .14); }
       .hero-play-pill.is-off .offline-icon { width: 1.2em; height: 1.2em; }
       .hero-alt-line { margin: .5rem auto 0; max-width: 34rem; color: var(--cream-dim); font-size: var(--fs-13); font-style: italic; text-align: center; }
@@ -3097,12 +3084,6 @@
     .volumes-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.15rem; }
     .volumes-landing .home-sub { margin-bottom:0.6rem; font-size:var(--fs-15); }
     .volumes-landing .home-ornament { margin-bottom:0.8rem; }
-    .volumes-landing .genre-columns { gap:0.5rem; }
-    .volumes-landing .genre-tile { padding:0.55rem 0.85rem; }
-    .volumes-landing .genre-col-label { margin-bottom:0.3rem; font-size:var(--fs-12); }
-    .volumes-landing .genre-col { gap:0.35rem; }
-    .volumes-landing .genre-col-stretch .genre-tile { flex:1; display:flex; flex-direction:column; justify-content:center; }
-    .volumes-landing .genre-full-width { padding:0.7rem 0.85rem !important; }
     /* ── Scriptures landing: fill screen, no scroll ── */
     .scriptures-landing { padding:1.2rem 1.3rem 0.8rem; justify-content:flex-start; }
     .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
@@ -3110,19 +3091,6 @@
 
     .scriptures-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.2rem; }
     .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
-    .scriptures-landing .genre-columns { max-width:33.75rem; gap:0.65rem; }
-    .scriptures-landing .genre-tile { padding:0.85rem 0.95rem; }
-    .scriptures-landing .genre-tile-title { font-size:var(--fs-16); }
-    .scriptures-landing .genre-tile-sub { font-size:var(--fs-13); }
-    .scriptures-landing .genre-col { gap:0.55rem; }
-    .scriptures-landing .genre-col-label { margin-bottom:0.4rem; font-size:var(--fs-12); }
-    .scriptures-landing .genre-col-stretch .genre-tile { flex:1; display:flex; flex-direction:column; justify-content:center; }
-    .scriptures-landing .genre-full-width { background:rgba(200,164,86,0.03); border-color:var(--gold-border); box-shadow:0 0 12px rgba(200,164,86,0.04); }
-    .scriptures-landing .genre-full-width .genre-tile-title { font-size:var(--fs-18); }
-    .scriptures-landing .genre-full-width .genre-tile-sub { color:var(--gold-dim); }
-    .home-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
-    .home-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
-    .home-ornament-diamond { width:8px; height:8px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
 
     /* ── HOME SCREEN — AMBIENT MINIMAL ── */
     /* Primary hero title — elegant Cinzel Decorative, lighter weight for less blockiness */
@@ -3733,26 +3701,16 @@
        360px phone): each column's floor is the larger of 6.5rem and half the row, so the
        grid can never show three columns on a wide phone and never clips the second column
        under overflow:hidden at a large size (a11y-ux-6, measured at 1.8 and 2.0). */
-    .genre-columns { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(6.5rem, calc(50% - 0.5rem))), 1fr)); gap:0.75rem; width:100%; max-width:32.5rem; }
     /* A column label heads HALF a phone's width (176 px at 360): at 12 px and
        0.18em "THE SEVEN VOLUMES" took two lines beside a one-line "COLLECTIONS"
        and set the columns out of step (the 09-25 walk). 0.1em fits it. */
-    .genre-col-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
     /* The browse tiles (Volumes, Scriptures, Answers subjects) keep their gold
        titles but sit on the hairline, not a gold outline, with their counts in
        upright muted type (the redesign, 2026-09-25): a grid of gold boxes was
        the busiest thing on those screens, and 12 px italics the hardest to read.
        Hover still lights the edge gold. */
-    .genre-tile { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:0.9rem 1rem; cursor:pointer; text-align:left; transition:all var(--transition); }
-    @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .genre-tile.locked { opacity:0.38; pointer-events:none; }
-    .genre-tile-title { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold); letter-spacing:0.04em; line-height:1.3; }
-    .genre-tile-badge { display:inline-block; margin-top:0.3rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.1rem 0.4rem; }
-    .genre-tile-sub { font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted); margin-top:0.15rem; }
     .studies-empty { font-family:var(--font-body); font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
     /* Studies home — stacked full-width tiles */
-    .genre-full-width { grid-column:1 / -1; margin-left:10%; margin-right:10%; }
-    .genre-full-width .genre-tile-title { font-size:var(--fs-16); }
 
     /* ═══ WS6 garden (mock settings.html g-page, g-jump, g-fail, g-gate) ═══
        The viewer is a dark room in both themes: the photographs sit on black, so its tokens are set dark here
@@ -3798,8 +3756,6 @@
     .garden-gate-wifi .garden-gate-note { margin:0; }
     .garden-gate-foot { margin-top:var(--sp-2); }
     /* ═══ end WS6 garden ═══ */
-    .genre-col { display:flex; flex-direction:column; gap:0.6rem; }
-    .genre-col-stretch .genre-tile { flex:1; }
     /* Genre sub-screen: compact hero, top-aligned */
     /* Larger book cards for small groups */
       /* Inline Surprise Me button — sits below the last home card, in the
@@ -4027,14 +3983,12 @@
        absolute descendants (.home-nav-item.pressing::after) already resolve
        against positioned parents inside it, so nothing else moves. */
     .home-screen { position:relative; }
-    
     /* Gentle attention pulse (owner request 2026-08-04): the layout cycler is
        the one control on this screen nobody finds. Opacity only — no transform,
        so it can't nudge the 44px target under a finger mid-tap — and it stops
        for good on hover/press, where the user has clearly found it. The global
        prefers-reduced-motion block (iteration-count:1 !important) collapses it
        to a single 0.01ms cycle for readers who ask for stillness. */
-    
     /* The caption is ABSOLUTE inside the cluster, not stacked under the
        button in flow: an in-flow caption widens the flex column, which
        re-centers — and visibly JOLTS — the icon sideways the moment it
@@ -4285,27 +4239,6 @@
     .chapter-cards.two-col .chapter-card-divider,
     .chapter-cards.two-col .chapter-card-label { display:none; }
     /* Inner wrapper handles vertical centering — works regardless of grid row height */
-    .chapter-cards.two-col .two-col-inner {
-      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:0.35rem; padding:0.85rem 0.95rem; width:100%; min-width:0;
-    }
-    .chapter-cards.two-col .two-col-num {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
-      text-transform:uppercase; color:var(--gold-dim); font-weight:600; line-height:1;
-    }
-    .chapter-cards.two-col .chapter-card-btn.is-current .two-col-num { color:var(--gold); }
-    .chapter-cards.two-col .two-col-title {
-      font-family:var(--font-body); font-size:var(--fs-15);
-      line-height:1.3; font-style:italic; color:var(--cream);
-    }
-    .chapter-cards.two-col .two-col-meta {
-      display:flex; align-items:center; justify-content:center; gap:0.35rem;
-      max-width:100%; min-width:0;
-    }
-    .chapter-cards.two-col .two-col-meta .idx-min-chip {
-      margin-left:0; white-space:normal; font-size:var(--fs-11); line-height:1.2;
-    }
-    .chapter-cards.two-col .two-col-meta .read-check { margin-left:0; }
     .chapter-card-btn { display:flex; align-items:center; gap:min(0.9rem, 4.5vw); width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem min(1.1rem, 5.5vw); transition:border-color 0.18s, background 0.18s; position:relative; }
     .chapter-card-btn:active { background:var(--bg3); border-color:var(--gold-dim); }
     .chapter-card-btn.is-current { border-color:rgba(200,164,86,0.5); background:var(--gold-faint); }
