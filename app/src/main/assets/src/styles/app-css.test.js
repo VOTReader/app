@@ -231,9 +231,6 @@ describe('app.css — the redesign walk\'s large-type fixes hold', () => {
     expect(ruleBlock(CSS, '.settings-group-chevron {')).toMatch(/width:\s*24px/);
     expect(ruleBlock(CSS, '.settings-group-head {')).toMatch(/gap:\s*12px/);
   });
-  it('the index lists draw no line above their first row', () => {
-    expect(block('.chapter-cards:not(.two-col)')).not.toMatch(/border-top/);
-  });
 });
 
 /* r-sel (the UI pass, mock v2 readers): the selection is one bottom sheet docked at the foot, its six
@@ -264,31 +261,11 @@ describe('app.css — the Notebooks tab is rows', () => {
   });
 });
 
-/* THE INDEX LISTS ARE ROWS (redesign, 2026-09-25). One column of .chapter-card-btn (a volume's
-   letters, a book's chapters, a study's parts, a genre's books, History, Studies) was a stack of
-   gold-outlined cards; it is rows on hairlines now. The two-column grids keep their cards, and a
-   title still clamps at two lines (owner report 2026-08-09). */
-describe('app.css — one-column index lists are rows', () => {
-  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-  const block = (sel) => {
-    const i = bare.indexOf('\n    ' + sel + ' {');
-    if (i === -1) return null;
-    return bare.slice(bare.indexOf('{', i) + 1, bare.indexOf('}', i));
-  };
-  it('a row sits on a hairline, with no box', () => {
-    const row = block('.chapter-cards:not(.two-col) .chapter-card-btn');
-    expect(row).toMatch(/background:\s*none/);
-    expect(row).toMatch(/border:\s*0/);
-    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
-    expect(row).toMatch(/border-radius:\s*0/);
-    expect(block('.chapter-cards:not(.two-col) .chapter-card-divider')).toMatch(/display:\s*none/);
-  });
-  it('titles are upright but still clamp at two lines', () => {
-    expect(block('.chapter-cards:not(.two-col) .chapter-card-title:not(.untitled)')).toMatch(/font-style:\s*normal/);
-    expect(block('.chapter-card-title')).toMatch(/-webkit-line-clamp:\s*2/);
-  });
-  it('the two-column grids keep their cards (the base rule still draws the box)', () => {
-    expect(block('.chapter-card-btn')).toMatch(/border:\s*1px solid var\(--gold-border\)/);
+/* THE INDEX LISTS ARE THE KIT'S ROWS (vot-ui, 2026-11-15). A volume's letters, a book's chapters and a genre's books
+   are ListRow in a ListGroup (UiParts); the old card and hairline rules (.chapter-card*, .vol-index*) are gone. */
+describe('app.css — the index lists are the kit rows', () => {
+  it('no chapter card, index header or read check is left', () => {
+    expect(CSS).not.toMatch(/\.chapter-card|\.vol-index|\.read-check|\.idx-note-/);
   });
 });
 
@@ -664,16 +641,15 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
    the 12 px step or more, with their tracking capped at 0.18em. */
 describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
-    '.vol-index-eyebrow', '.audio-library-eyebrow',
+    '.audio-library-eyebrow',
     '.select-sheet-eyebrow',
     '.footnote-list-header', '.related-card-title', '.settings-section-label',
-    '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
+    '.srch-section-label', '.srch-group-header', '.ans-label',
     '.section-heading',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
     '.hero-play-pill',
-    '.idx-note-chip',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   const blocksOf = (sel) => {

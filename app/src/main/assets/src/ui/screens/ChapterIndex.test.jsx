@@ -86,14 +86,33 @@ describe('ChapterIndex — back affordance names the real destination', () => {
 });
 
 describe('ChapterIndex — current-chapter marker', () => {
-  it('marks only the current chapter card with is-current', () => {
+  it('marks only the current chapter row as current', () => {
     setupGlobals();
     renderIndex({ currentChapter: 2 });
-    const cards = document.querySelectorAll('.chapter-card-btn');
-    expect(cards).toHaveLength(3);
-    expect(cards[1].className).toContain('is-current');
-    expect(cards[0].className).not.toContain('is-current');
-    expect(cards[2].className).not.toContain('is-current');
+    const rows = document.querySelectorAll('.ui-group .sty-row');
+    expect(rows).toHaveLength(3);
+    expect([...rows].map((r) => r.getAttribute('aria-current'))).toEqual([null, 'true', null]);
+  });
+
+  it('names a row by its heading over one line of facts, and an untitled one by its number', () => {
+    setupGlobals();
+    renderIndex({ book: { ...BOOK, chapters: [...BOOK.chapters, { num: 4, title: '' }] } });
+    const rows = [...document.querySelectorAll('.ui-group .sty-row')];
+    expect(rows[0].querySelector('.ui-row-title').textContent).toBe('Blessed Is the Man');
+    expect(rows[0].querySelector('.ui-row-meta').textContent).toBe('Chapter 1');
+    expect(rows[3].querySelector('.ui-row-title').textContent).toBe('Chapter 4');
+    expect(rows[3].querySelector('.ui-row-meta')).toBeNull();
+  });
+
+  it('says where to go next: the chapter the reader is in, else the first unread', () => {
+    setupGlobals();
+    renderIndex({ currentChapter: 2 });
+    expect(document.querySelector('.sty-next .root-eyebrow').textContent).toBe('Continue');
+    expect(document.querySelector('.sty-next .ui-row-title').textContent).toBe('The Reign of the Anointed');
+    cleanup();
+    renderIndex({ markAsReadEnabled: true, isRead: (n) => n === 1 });
+    expect(document.querySelector('.sty-next .root-eyebrow').textContent).toBe('Up next');
+    expect(document.querySelector('.ui-label-aside').textContent).toBe('1 of 3 read');
   });
 
   it('cancels the delayed current-card scroll when navigation unmounts the index', () => {
@@ -121,7 +140,7 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
     globalThis.countItemWords = countItemWords;
     globalThis.readingMinutes = readingMinutes;
     renderIndex({ book: WORDY_BOOK });
-    expect(document.querySelector('.idx-min-chip').textContent).toBe('2 min');
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('~2 min');
   });
 
   it('uses the measured pace when ReadingStatsStore has one', () => {
@@ -130,7 +149,7 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
     globalThis.readingMinutes = readingMinutes;
     globalThis.ReadingStatsStore = { measuredWpm: () => 100 };
     renderIndex({ book: WORDY_BOOK });
-    expect(document.querySelector('.idx-min-chip').textContent).toBe('5 min');
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('~5 min');
   });
 
   it('renders no chip when the word counters are absent (guard path)', () => {
@@ -196,8 +215,8 @@ describe('ChapterIndex — commentary-weight chip', () => {
     globalThis.readingMinutes = readingMinutes;
     const WORDY = { ...BOOK, chapters: [{ num: 1, title: 'One', sections: [{ verses: [{ n: 1, text: Array.from({ length: 460 }, () => 'w').join(' ') }] }] }] };
     renderIndex({ book: WORDY, noteWeights: { 1: 3.58 } });
-    const card = document.querySelector('.chapter-card-btn');
-    expect(card.querySelector('.idx-min-chip').textContent).toBe('2 min');
+    const card = document.querySelector('.ui-group .sty-row');
+    expect(card.querySelector('.idx-min-chip').textContent).toBe('~2 min');
     expect(card.querySelector('.idx-note-chip').textContent).toBe('3.6× notes');
   });
 });

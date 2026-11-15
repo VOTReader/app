@@ -346,7 +346,7 @@ describe('axe — ChapterIndex', () => {
 
   it('the current chapter is announced as current, not only drawn so', () => {
     renderIdx();
-    const cards = [...document.querySelectorAll('.chapter-card-btn')];
+    const cards = [...document.querySelectorAll('.ui-group .sty-row')];
     expect(cards.map((c) => c.getAttribute('aria-current'))).toEqual([null, 'true', null]);
   });
 });

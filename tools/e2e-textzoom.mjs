@@ -150,12 +150,12 @@ try {
     await stop('home');
     await click('Prophetic Letters'); await stop('volumes');
     await click('Volume One'); await stop('volume-index');
-    await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][1]; b && b.click(); }); await sleep(900); await setScale();
+    await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][1]; b && b.click(); }); await sleep(900); await setScale();
     await stop('letter');
     await tab('Read'); await click('The Holy Bible'); await stop('scriptures');
     await click('Gospels'); await stop('gospels');
-    await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][0]; b && b.click(); }); await sleep(600); await setScale();
-    await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][0]; b && b.click(); }); await sleep(900); await setScale();
+    await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(600); await setScale();
+    await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(900); await setScale();
     await stop('bible-chapter');
     await tab('Read'); await tab('Library'); await stop('library');
     await libTile('notes');

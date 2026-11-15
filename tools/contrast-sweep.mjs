@@ -129,12 +129,12 @@ try {
   await stop('home');
   await click('Prophetic Letters'); await stop('volumes');
   await click('Volume One'); await stop('volume-index');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][1]; b && b.click(); }); await sleep(900);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][1]; b && b.click(); }); await sleep(900);
   await stop('letter');
   await click('Home'); await click('The Holy Bible'); await stop('scriptures');
   await click('Gospels'); await stop('gospels');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][0]; b && b.click(); }); await sleep(600);
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn, .ui-group .sty-row')][0]; b && b.click(); }); await sleep(900);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(600);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][0]; b && b.click(); }); await sleep(900);
   await stop('bible-chapter');
   await click('Home'); await click('Personal Study'); await stop('library');
   await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Notes'); t && t.click(); }); await sleep(700);
