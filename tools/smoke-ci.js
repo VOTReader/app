@@ -98,7 +98,8 @@ async function auditCompactReadingNav(page) {
   }
   await clickButton(/Prophetic Letters/);
   await clickButton(/Words To Live By:\s*Part One/);
-  await clickButton(/^1\s*Introduction/);
+  // The first entry's row: its name, then its meta line "Entry 1 · ..." (a contents row is a name and one meta line).
+  await clickButton(/^Introduction\s*Entry 1\b/);
 
   return page.evaluate(() => {
     const nav = document.querySelector('.top-nav');

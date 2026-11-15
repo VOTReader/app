@@ -94,7 +94,7 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
   it('a re-read letter renders ✓ ×N with an AT label', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
     expect(rowMark(container).querySelector('.sr-only').textContent).toBe('Read 3 times');   // s16.4: sr-only text, not aria-label on a span
-    expect(rowMark(container).textContent).toContain('×3');
+    expect(rowMark(container).querySelector('span[aria-hidden="true"]').textContent).toBe('×3');
   });
 
   it('legacy callers without readCount still get the plain tick (guard path)', () => {
@@ -104,7 +104,9 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
 
   it('a read count of 0 on a letter marked read still shows the tick', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 0 });
-    expect(rowMark(container)).not.toBeNull();
+    expect(rowMark(container).classList.contains('is-tick')).toBe(true);
+    expect(rowMark(container).getAttribute('aria-label')).toBe('Read');
+    expect(rowMark(container).textContent).not.toContain('×');
   });
 });
 

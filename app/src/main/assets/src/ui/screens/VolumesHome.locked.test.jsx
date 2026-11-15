@@ -39,15 +39,15 @@ describe('VolumesHome — a Coming Soon tile is disabled, not a silent no-op', (
   const EMPTY = new Set(['four', 'timothy']);
   const count = (k) => (EMPTY.has(k) ? 0 : 12);
 
-  it('a locked volume row and a locked collection row are no buttons at all, and say Coming soon', () => {
+  it('a locked volume row and a locked collection row are no buttons at all, dimmed, with no added words', () => {
     install(count);
     const tiles = renderTiles();
     const locked = tiles.filter((t) => t.classList.contains('is-locked'));
     expect(locked.map(titleOf), 'the two empty tiles are the locked ones').toEqual(['Volume Four', 'Letters from Timothy']);
     for (const t of locked) {
       expect(t.tagName, `${titleOf(t)} is not a button`).not.toBe('BUTTON');
-      expect(t.querySelector('.ui-row-meta').textContent).toMatch(/Coming soon$/);
     }
+    expect(locked.map((t) => t.querySelector('.ui-row-meta').textContent)).toEqual(['2010\u00a0–\u00a02011', "A Servant's Pen"]);   // the years keep no-break spaces round the dash
   });
 
   it('a keyboard user cannot land on a locked tile', () => {

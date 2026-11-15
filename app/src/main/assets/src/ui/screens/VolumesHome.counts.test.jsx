@@ -58,6 +58,6 @@ describe('VolumesHome — every collection tile shows its count', () => {
   it('CONTROL: with no letters loaded yet, the Rebuke keeps its subtitle and no number', () => {
     render(<VolumesHome onSelect={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
     const rebuke = tiles().find((t) => t.title === "The Lord's Rebuke");
-    expect(rebuke.sub).toMatch(/^Correction & Warning( · Coming soon)?$/);
+    expect(rebuke.sub).toBe('Correction & Warning');
   });
 });
