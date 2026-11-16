@@ -34,6 +34,10 @@ const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
     lines, no footnote numbers), so an excerpt cut from the index lands on the
     words it came from. Headings carry no hl-key (nothing to land on). */
 const _blockText = blockReadText;
+/** Related Topics rows a long list shows before 'Show all N topics'. */
+const RELATED_SHOWN = 6;
+/** A list caps only past this many rows: hiding one to four rows behind a tap costs more than drawing them. */
+const RELATED_CAP_OVER = 10;
 
 /**
  * W44: the saved-state key of every prophecy card a letter renders: ProphecyGroup's
@@ -84,6 +88,9 @@ export function LetterView(props) {
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);
+  // Related Topics past RELATED_CAP wait behind 'Show all N topics' (3 letters of the corpus: 11, 12 and 23 rows); the
+  // opened state belongs to one letter, so the next letter starts capped again.
+  const [topicsAllFor, setTopicsAllFor] = React.useState(null);
   // POL1 (rule: nothing floats over a reader): Expand / Collapse all sits in the page, just above the first group.
   const firstProphecyGroup = letter.blocks.findIndex((b) => b.type === "prophecy-group");
   // W44: an expand/collapse-all belongs to the letter it was pressed on. This view
@@ -619,7 +626,8 @@ export function LetterView(props) {
 
               {letter.relatedTopics?.length > 0 ? (
                 <ListGroup label="Related Topics">
-                  {letter.relatedTopics.map((t, i) => {
+                  {(letter.relatedTopics.length > RELATED_CAP_OVER && topicsAllFor !== letter.id
+                    ? letter.relatedTopics.slice(0, RELATED_SHOWN) : letter.relatedTopics).map((t, i) => {
                     // An answersonlygodcangive.com row opens the vendored topic
                     // in-app at once — the answers-entry route shows Loading…
                     // while the corpus arrives — at the section its #fragment
@@ -635,6 +643,11 @@ export function LetterView(props) {
                     return go ? <ListLink key={i} title={t.label} className="related-link" onClick={go} />
                       : <ListLink key={i} title={t.label} className="related-link" href={t.url} />;
                   })}
+                  {letter.relatedTopics.length > RELATED_CAP_OVER && topicsAllFor !== letter.id ? (
+                    <button type="button" className="ui-link related-more" onClick={() => setTopicsAllFor(letter.id)}>
+                      {'Show all ' + letter.relatedTopics.length + ' topics'}
+                    </button>
+                  ) : null}
                 </ListGroup>
               ) : null}
 

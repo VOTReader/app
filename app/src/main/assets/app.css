@@ -6023,6 +6023,7 @@
     a.ui-row.is-link[target="_blank"]::after { content: none; }
     .ui-row.is-link .ui-row-title { white-space: normal; overflow-wrap: break-word; }
     .related-section > .ui-group + .ui-label, .related-section > .ui-group + .ui-label-row, .related-section > * + .letter-songs-card { margin-top: var(--label-above); }
+    .related-more { display: block; padding: var(--sp-3) var(--card-pad); }   /* vot-ui 11-15: Show all N topics, the last line of the Related Topics group (as .listen-chapters-all) */
     .ui-row.ws3-version { gap:var(--sp-3); padding-right:var(--card-pad); }
     .ws3-version .ui-row-text { flex:1; min-width:0; }
     .ws3-about-build { margin:var(--sp-4) 0 0; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-label); text-align:center; }
