@@ -97,6 +97,16 @@ def split_decls(text, start, end):
     return out
 
 
+NEWER = re.compile(r'\b(?:dvh|svh|lvh|dvw|svw|lvw|dvb|svb|lvb|dvi|svi|lvi|cqw|cqh|cqi|cqb|cqmin|cqmax)\b|'
+                   r'(?<![\w-])(?:env|color-mix|oklch|oklab|lch|lab|clamp|min|max|light-dark|round|mod|rem|hwb)\(|:has\(', re.I)
+
+
+def newer_features(decl):
+    """The parse-time features a declaration's VALUE needs that an old WebView lacks (minSdk 26 allows Chromium < 79)."""
+    v = decl.split(':', 1)[1] if ':' in decl else ''
+    return set(m.group(0).lower() for m in NEWER.finditer(v))
+
+
 def norm_sel(s):
     s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
     s = re.sub(r'\s+', ' ', s).strip()
@@ -141,7 +151,7 @@ def main():
     for idx, sels, decls, _, _ in rules:
         for s in sels:
             for ds, de, prop, imp in decls:
-                later.setdefault((s, prop), []).append((idx, imp, ds))
+                later.setdefault((s, prop), []).append((idx, imp, ds, de))
 
     dead = []   # (decl_start, decl_end, prop, overrider_pos)
     for idx, sels, decls, _, _ in rules:
@@ -149,6 +159,10 @@ def main():
             over = None
             for s in sels:
                 hits = [h for h in later.get((s, prop), []) if h[0] > idx and (h[1] or not imp)]
+                # a fallback pair: when a later value needs a feature the earlier one does not, an older WebView drops
+                # the later one at parse and the earlier is live there (hub 11-15). Keep it.
+                if any(newer_features(text[h[2]:h[3]]) - newer_features(text[ds:de]) for h in hits):
+                    hits = []
                 if not hits:
                     over = None
                     break

@@ -34,7 +34,9 @@ async function readStore(needles) {
   const shape = (k) => String(k).replace(/[0-9a-f]{8,}/gi, '#h').replace(/\d+/g, '#');
   const out = { shapes: {}, hits: {} };
   const dbs = indexedDB.databases ? await indexedDB.databases() : [];
-  for (const d of dbs.sort((a, b) => (a.name > b.name ? 1 : -1))) {
+  // vot-thumbs is the open-tabs page-picture cache: it is rewritten on every visit (a reload makes a new key), so it is
+  // neither a place notes live nor a stable shape (first run on 7caf0796c, 11-15).
+  for (const d of dbs.filter((x) => x.name !== 'vot-thumbs').sort((a, b) => (a.name > b.name ? 1 : -1))) {
     const db = await new Promise((ok, no) => { const r = indexedDB.open(d.name); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
     for (const s of [...db.objectStoreNames].sort()) {
       const tx = db.transaction(s, 'readonly'); const st = tx.objectStore(s);
@@ -115,7 +117,12 @@ async function main() {
       return { gid, text: marks.filter((m) => m.getAttribute('data-group-id') === gid).map((m) => m.textContent).join('') };
     }, sel.key);
     if (!made.gid) { fails.push('P1 no mark with a data-group-id over the selection after the colour tap'); throw new Error('stop'); }
-    if (made.text.replace(/\s+/g, ' ').trim() !== sel.text.replace(/\s+/g, ' ').trim()) fails.push(`P1 the marks read "${made.text}", the selection was "${sel.text}"`);
+    // A highlight snaps to whole words: "To everyone who hear" marks "To everyone who hears". Only word characters
+    // past the selection's ends may be added; anything else (a skipped word, a shifted range) still fails.
+    const mt = made.text.replace(/\s+/g, ' ').trim(), st = sel.text.replace(/\s+/g, ' ').trim();
+    const at = mt.indexOf(st);
+    const snapped = at >= 0 && /^\w*$/.test(mt.slice(0, at)) && /^\w*$/.test(mt.slice(at + st.length));
+    if (!snapped) fails.push(`P1 the marks read "${made.text}", the selection was "${sel.text}"`);
     note(`P1 highlight ${made.gid} over "${made.text}"`);
 
     // the note: re-select the marked words, Note, type, Save
