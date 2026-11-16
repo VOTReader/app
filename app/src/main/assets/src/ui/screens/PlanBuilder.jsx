@@ -25,11 +25,12 @@ import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js'
 
 const ALL_WEEK = [true, true, true, true, true, true, true];
 
-/** @param {{ state: boolean | 'mixed' }} props */
-function Box({ state }) {
+/** The kit check (.ui-check): a tick when on, a dash for part of it; `radio` shows the ring and dot.
+ * @param {{ state: boolean | 'mixed', radio?: boolean }} props */
+function Box({ state, radio }) {
   return (
-    <span className="today-check build-box" data-done={state === true ? '1' : state === 'mixed' ? 'some' : '0'} aria-hidden="true">
-      {state === true ? <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12.5l4.2 4.2L19 7" /></svg> : null}
+    <span className={'ui-check' + (radio ? ' is-radio' : '')} data-state={state === true ? 'on' : state === 'mixed' ? 'some' : 'off'} aria-hidden="true">
+      {radio ? null : state === true ? <svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" /></svg> : state === 'mixed' ? <svg viewBox="0 0 24 24"><path d="M7 12h10" /></svg> : null}
     </span>
   );
 }
@@ -135,13 +136,13 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
     return (
       <div className="plans-build">
         <header className="study-head">
-          <span className="today-eyebrow">Step 1 of 2</span>
+          <span className="root-eyebrow">Step 1 of 2</span>
           <h1 className="study-head-title">What do you want to read?</h1>
           <p className="study-head-sub">Pick books, chapters, collections or single letters, in any mix.</p>
         </header>
-        <div className="build-tabs" role="tablist" aria-label="What to pick from">
-          <button type="button" role="tab" aria-selected={tab === 'bible'} onClick={() => setTab('bible')}>The Bible</button>
-          <button type="button" role="tab" aria-selected={tab === 'letters'} onClick={() => setTab('letters')}>The Letters</button>
+        <div className="ui-seg build-tabs" role="tablist" aria-label="What to pick from">
+          <button type="button" className="ui-seg-item" role="tab" aria-selected={tab === 'bible'} onClick={() => setTab('bible')}>The Bible</button>
+          <button type="button" className="ui-seg-item" role="tab" aria-selected={tab === 'letters'} onClick={() => setTab('letters')}>The Letters</button>
         </div>
         {tab === 'bible' ? (
           <ul className="build-list" aria-label="The Bible">
@@ -243,7 +244,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
           ) : null}
           <div className="build-bar-row">
             <span className="build-summary" role="status">{preview ? preview.picked.split(' · ')[0] : 'Nothing picked yet'}{preview ? <span className="build-summary-words">{' · ' + preview.picked.split(' · ')[1]}</span> : null}</span>
-            <button type="button" className="today-btn" disabled={!preview} onClick={() => onStep(2)}>Next</button>
+            <button type="button" className="ui-btn is-primary" disabled={!preview} onClick={() => onStep(2)}>Next</button>
           </div>
         </div>
       </div>
@@ -289,22 +290,22 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
       <section className="build-card" role="radiogroup" aria-label="Your goal">
         <h2 className="build-card-title">Your goal</h2>
         <div className="build-goal">
-          <button type="button" className="build-radio" {...radio('minutes')}><Box state={mode === 'minutes'} /><span>About {minutes} minutes a day</span></button>
+          <button type="button" className="build-radio" {...radio('minutes')}><Box radio state={mode === 'minutes'} /><span>About {minutes} minutes a day</span></button>
           {mode === 'minutes' ? <Stepper label="minutes a day" value={minutes} min={5} step={5} unit=" min" onChange={setMinutes} /> : null}
         </div>
         <div className="build-goal">
-          <button type="button" className="build-radio" {...radio('items')}><Box state={mode === 'items'} /><span>{items + (items === 1 ? ' chapter or letter a day' : ' chapters or letters a day')}</span></button>
+          <button type="button" className="build-radio" {...radio('items')}><Box radio state={mode === 'items'} /><span>{items + (items === 1 ? ' chapter or letter a day' : ' chapters or letters a day')}</span></button>
           {mode === 'items' ? <Stepper label="chapters or letters a day" value={items} min={1} step={1} unit="" onChange={setItems} /> : null}
         </div>
         <div className="build-goal">
-          <button type="button" className="build-radio" {...radio('days')}><Box state={mode === 'days'} /><span>In {days} days</span></button>
+          <button type="button" className="build-radio" {...radio('days')}><Box radio state={mode === 'days'} /><span>In {days} days</span></button>
           {mode === 'days' ? (
             <input className="build-input" type="number" inputMode="numeric" min={1} aria-label="Number of days" value={days}
               onChange={(e) => setDays(Math.max(1, Math.floor(Number(e.target.value) || 1)))} />
           ) : null}
         </div>
         <div className="build-goal">
-          <button type="button" className="build-radio" {...radio('by')}><Box state={mode === 'by'} /><span>Finish by a date</span></button>
+          <button type="button" className="build-radio" {...radio('by')}><Box radio state={mode === 'by'} /><span>Finish by a date</span></button>
           {mode === 'by' ? (
             <input className="build-input" type="date" aria-label="Finish by" min={todayKey(now)} value={by} onChange={(e) => setBy(e.target.value)} />
           ) : null}
@@ -317,20 +318,20 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
       <section className="build-card" role="radiogroup" aria-label="Order">
         <h2 className="build-card-title">Order</h2>
         <button type="button" className="build-radio" role="radio" aria-checked={order === 'picked'} onClick={() => setOrder('picked')}>
-          <Box state={order === 'picked'} /><span className="build-row-text"><span>As picked</span><span className="build-row-sub">In the order you chose</span></span>
+          <Box radio state={order === 'picked'} /><span className="build-row-text"><span>As picked</span><span className="build-row-sub">In the order you chose</span></span>
         </button>
         <button type="button" className="build-radio" role="radio" aria-checked={order === 'canonical'} onClick={() => setOrder('canonical')}>
-          <Box state={order === 'canonical'} /><span className="build-row-text"><span>Bible order</span><span className="build-row-sub">Genesis to Revelation, the Volumes in order</span></span>
+          <Box radio state={order === 'canonical'} /><span className="build-row-text"><span>Bible order</span><span className="build-row-sub">Genesis to Revelation, the Volumes in order</span></span>
         </button>
       </section>
       {mixed ? (
         <section className="build-card" role="radiogroup" aria-label="Bible and letters on the same day?">
           <h2 className="build-card-title">Bible and letters on the same day?</h2>
           <button type="button" className="build-radio" role="radio" aria-checked={share === 'side'} onClick={() => setShare('side')}>
-            <Box state={share === 'side'} /><span className="build-row-text"><span>Side by side</span><span className="build-row-sub">Some Bible and some letters each day; both finish together</span></span>
+            <Box radio state={share === 'side'} /><span className="build-row-text"><span>Side by side</span><span className="build-row-sub">Some Bible and some letters each day; both finish together</span></span>
           </button>
           <button type="button" className="build-radio" role="radio" aria-checked={share === 'serial'} onClick={() => setShare('serial')}>
-            <Box state={share === 'serial'} /><span className="build-row-text"><span>One after the other</span><span className="build-row-sub">{order === 'canonical' || picks[0].t === 'b' ? 'All the Bible first, then the letters' : 'All the letters first, then the Bible'}</span></span>
+            <Box radio state={share === 'serial'} /><span className="build-row-text"><span>One after the other</span><span className="build-row-sub">{order === 'canonical' || picks[0].t === 'b' ? 'All the Bible first, then the letters' : 'All the letters first, then the Bible'}</span></span>
           </button>
         </section>
       ) : null}
