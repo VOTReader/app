@@ -691,9 +691,9 @@
       }
       /* While the tour card is up a toast sits beside it, never over its Back (TourOverlay sets the two lengths). */
       body.tour-open { --dock-toast-bottom: var(--tour-toast-bottom, var(--dock-message)); --dock-toast-top: var(--tour-toast-top, auto); }
-      /* While the selection bar is up (it fills the bottom), a toast (Highlighted · Undo) goes under the top bar, never over the
-         bar's rows (vot-ui 11-16 sweep item 4). */
-      body:has(.sel-toolbar) { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
+      /* While the selection bar is up (it fills the bottom), a toast (Highlighted · Undo) sits 12 px above the sheet's top edge,
+         over body text, never over the bar's rows or the heading (vot-ui 11-16 sweep item 4; SelectionToolbar sets --sel-sheet-h). */
+      body:has(.sel-toolbar) { --dock-toast-bottom: calc(var(--sel-sheet-h, 0px) + 12px); --dock-toast-top: auto; }
 
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {

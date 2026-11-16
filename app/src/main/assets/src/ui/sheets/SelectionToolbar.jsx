@@ -258,6 +258,18 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     active: visible,
   });
   const toolbarRef = React.useRef(null);
+  // The toast lane sits just above this sheet while it is up (app.css body:has(.sel-toolbar)): --sel-sheet-h is how far
+  // its top edge is from the bottom of the window (hub 11-16, sweep item 4 follow-up). No effect deps: the sheet mounts
+  // and unmounts with the selection.
+  React.useEffect(() => {
+    const el = /** @type {HTMLElement | null} */ (toolbarRef.current);
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const set = () => { document.body.style.setProperty('--sel-sheet-h', Math.max(0, Math.round(window.innerHeight - el.getBoundingClientRect().top)) + 'px'); };
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => { ro.disconnect(); document.body.style.removeProperty('--sel-sheet-h'); };
+  });
   const suppressRef = React.useRef(false);
 
   /**
