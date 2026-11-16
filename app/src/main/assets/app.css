@@ -798,47 +798,33 @@
       .more-menu {
         position: fixed; z-index: 400;
         width: max-content; min-width: min(248px, calc(100vw - 16px)); max-width: calc(100vw - 16px);
-        padding: 6px 0; background: var(--bg3); color: var(--cream);
-        border: 1px solid var(--gold-border); border-radius: 12px;
-        box-shadow: 0 14px 36px rgba(0,0,0,0.55);
-        font-family: 'EB Garamond', serif;   /* no Georgia: under System Serif it painted the menu in a second serif (L1) */
-        animation: moreMenuIn 0.14s ease-out;
+        animation: moreMenuIn 0.14s ease-out;   /* look: the kit block (.more-menu, W2g), later in this file */
       }
       @keyframes moreMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
       @media (prefers-reduced-motion: reduce) { .more-menu { animation: none; } }
       .more-menu-item {
         display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 18px;
-        background: none; border: none; color: var(--cream); font: inherit; font-size: var(--fsc-18);
+        background: none; border: none; font: inherit;
         text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
       }
-      .more-menu-item svg { width: 20px; height: 20px; color: var(--gold); flex-shrink: 0; }
+      .more-menu-item svg { width: 20px; height: 20px; flex-shrink: 0; }
       /* cp2: "Copy website link" names the site it copies, under it. */
       .more-menu-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .more-menu-item-sub { font-size: var(--fsc-13); color: var(--cream-muted); }
+      .more-menu-item-sub { font-size: var(--fsc-13); }
       .more-menu-item:focus-visible, .more-menu-seg button:focus-visible, .more-menu-step button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-      .more-menu-item:active { background: var(--gold-faint); }
-      /* id-datasafe 122: the screen's own items (a journal entry's Pin, Delete) head the menu, ruled off. */
-      .more-menu-page-item + .more-menu-item:not(.more-menu-page-item) { border-top: 1px solid var(--border); }
-      .more-menu-page-item.danger { color: var(--danger); }
-      @media (hover: hover) { .more-menu-item:hover { background: var(--gold-faint); } }
+      /* id-datasafe 122: the screen's own items (a journal entry's Pin, Delete) head the menu, ruled off (kit block). */
       .more-menu-row {
         display: flex; align-items: center; justify-content: space-between; gap: 16px;
-        min-height: 52px; padding: 0 12px 0 18px; border-top: 1px solid var(--border);
+        min-height: 52px; padding: 0 12px 0 18px;
       }
-      .more-menu-row + .more-menu-item, .more-menu-row + .more-menu-row { border-top: 1px solid var(--border); }
-      .more-menu-row:first-child { border-top: none; }   /* History hidden: the Theme row opens the menu */
-      .more-menu-row-label { font-size: var(--fsc-18); color: var(--cream); }
       .more-menu-seg, .more-menu-step { display: inline-flex; align-items: center; gap: 2px; }
       .more-menu-seg button, .more-menu-step button {
-        min-width: 48px; min-height: 48px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 999px;   /* 48 dp (L3; was 44 x 40) */
-        background: none; color: var(--cream-muted); font: inherit; font-size: var(--fsc-15); cursor: pointer;
+        min-width: 48px; min-height: 48px; padding: 0 12px; border-radius: 999px;   /* 48 dp (L3; was 44 x 40) */
+        font: inherit; font-size: var(--fsc-15); cursor: pointer;
         -webkit-tap-highlight-color: transparent;
       }
-      .more-menu-seg button.on { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
-      .more-menu-step button { color: var(--gold); }
       .more-menu-step button:disabled, .more-menu-step button[aria-disabled="true"] { opacity: 0.35; cursor: default; }
-      .more-menu-step-value { min-width: 5.2em; text-align: center; font-size: var(--fsc-15); color: var(--cream-muted); font-variant-numeric: tabular-nums; }
-      body.light .more-menu { box-shadow: 0 14px 36px rgba(60,40,10,0.22); }
+      .more-menu-step-value { min-width: 5.2em; text-align: center; font-size: var(--fsc-15); font-variant-numeric: tabular-nums; }
       html { scroll-behavior: smooth; }
       html { overflow-x: hidden; }
       /* WL1 — global text-size scale. --font-scale (default 1) multiplies the
@@ -5693,7 +5679,6 @@
     .more-menu-seg button.on { background: var(--accent-soft); border: 0; box-shadow: inset 0 0 0 1px var(--accent-ring); color: var(--accent); font-weight: 500; }
     .more-menu-step button { color: var(--text-1); }
     .more-menu-step-value { color: var(--text-2); font-family: var(--font-ui); }
-    body.light .more-menu { box-shadow: var(--shadow-float); }
     /* the picker sheets (LinkPicker, the nav picker, BookmarkCreateSheet) on the sheet tokens: surface-1, 20 px corners,
        no gold edge, the title in the serif. The bookmark sheet's head reads Cancel | title | Save in words (rule 9). */
     .link-picker-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
