@@ -1538,7 +1538,7 @@
       .np-sheet-link { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; cursor: pointer; }
       /* POL4: a head link (Up next's Clear) sits level with the title line and the sheet's x, not centred on title + sub. */
       /* sweep item 6: a status at the head's right (the sleep timer's "Off" / time left) keeps clear of the close x, not on its hit box */
-      .np-sheet > .sheet-handle-row + .np-sheet-head:has(> .np-sheet-status) { padding-right: 56px; }
+      .np-sheet > .sheet-handle-row + .np-sheet-head:has(> .np-sheet-status, > .np-sheet-link) { padding-right: 56px; }
       .np-sheet-head > .np-sheet-link { align-self: flex-start; margin-top: calc(var(--ts-sheet) * 0.625 - 22px); }
       .np-chips, .np-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(var(--np-cols, 3), minmax(0, 1fr)); }
       .np-sleep-mins { --np-cols: 4; }
