@@ -31,7 +31,8 @@ const note = (m) => console.log('  ' + m);
 // In the page: every IndexedDB database, its stores, and their keys' SHAPES (ids and numbers folded), plus the
 // records (JSON) that mention any of `needles`. Large stores are listed by count only.
 async function readStore(needles) {
-  const shape = (k) => String(k).replace(/[0-9a-f]{8,}/gi, '#h').replace(/\d+/g, '#');
+  // a cache chunk's id rotates per load (votreader/meta 'songs-catalog#chunk:mwizk#hrbna:#'): its shape is the prefix
+  const shape = (k) => String(k).replace(/#chunk:.*$/, '#chunk:*').replace(/[0-9a-f]{8,}/gi, '#h').replace(/\d+/g, '#');
   const out = { shapes: {}, hits: {} };
   const dbs = indexedDB.databases ? await indexedDB.databases() : [];
   // vot-thumbs is the open-tabs page-picture cache: it is rewritten on every visit (a reload makes a new key), so it is
@@ -163,7 +164,12 @@ async function main() {
       else if (again.hits[k] !== before.hits[k]) fails.push(`P4 after reload the record ${k} changed: ${before.hits[k].slice(0, 120)} -> ${again.hits[k].slice(0, 120)}`);
     }
     for (const k of Object.keys(again.hits)) if (!(k in before.hits)) fails.push(`P4 after reload a new record names the note or group: ${k}`);
-    if (JSON.stringify(again.shapes) !== JSON.stringify(before.shapes)) fails.push('P4 the database/store/key shapes changed across the reload');
+    if (JSON.stringify(again.shapes) !== JSON.stringify(before.shapes)) {
+      const ids = [...new Set([...Object.keys(before.shapes), ...Object.keys(again.shapes)])]
+        .filter((id) => JSON.stringify(before.shapes[id]) !== JSON.stringify(again.shapes[id]))
+        .map((id) => id + ' ' + JSON.stringify(before.shapes[id] ?? null).slice(0, 80) + ' -> ' + JSON.stringify(again.shapes[id] ?? null).slice(0, 80));
+      fails.push('P4 the database/store/key shapes changed across the reload: ' + ids.join(' ; '));
+    }
     note(`P4 ${Object.keys(before.hits).length} record(s) identical across the reload; ${Object.keys(before.shapes).length} stores' key shapes compared`);
     result = { selection: sel, group: made, shapes: before.shapes, records: before.hits };
   } catch (e) {
