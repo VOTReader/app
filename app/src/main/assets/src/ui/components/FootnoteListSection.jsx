@@ -67,11 +67,11 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, o
                   // The list item is itself role=button (scroll back to the
                   // bubble); swallow the click so the two don't fight.
                   <span onClick={(e) => e.stopPropagation()}>
-                    <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
+                    <GoToRefButton refStr={fn.ref} onGo={onGoToRef} refFirst />
                   </span>
                 )}
                 {/* and the sheet's other door: the web opens on this verse (ideas audit s14.5) */}
-                <WebDoorButton fn={fn} />
+                <WebDoorButton fn={fn} refFirst />
                 {fn.seeAlso && (
                   <div className="footnote-list-also">
                     <span className="footnote-list-also-label">Also see:</span>

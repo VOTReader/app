@@ -45,9 +45,10 @@ export function webDoorsOf(fn) {
 /**
  * "Show in Scripture Web ›" for a scripture footnote, or nothing when it has no door; with
  * several passages, one row holding a button for each.
- * @param {{ fn: any, onBefore?: () => void }} props  onBefore: runs first (the sheet closes)
+ * @param {{ fn: any, onBefore?: () => void, refFirst?: boolean }} props  onBefore: runs first (the sheet closes);
+ *   refFirst: the ref is the title (the letter-end list), else the action is (a sheet that heads with the ref)
  */
-export function WebDoorButton({ fn, onBefore }) {
+export function WebDoorButton({ fn, onBefore, refFirst = false }) {
   const doors = webDoorsOf(fn);
   if (!doors.length) return null;
   /** @param {any} e @param {any} start */
@@ -79,8 +80,8 @@ export function WebDoorButton({ fn, onBefore }) {
     <button type="button" className="fn-sheet-link-btn" data-door="web" onClick={(e) => go(e, doors[0].start)}>
       {lead}
       <span className="fn-sheet-link-body">
-        <span className="fn-sheet-link-title">{fn.ref}</span>
-        <span className="fn-sheet-link-eyebrow">Show in Scripture Web</span>
+        <span className="fn-sheet-link-title">{refFirst ? fn.ref : 'Show in Scripture Web'}</span>
+        <span className="fn-sheet-link-eyebrow">{refFirst ? 'Show in Scripture Web' : fn.ref}</span>
       </span>
       <UiIcon name="chev" size="sm" />
     </button>

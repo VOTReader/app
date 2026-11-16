@@ -45,9 +45,12 @@ function warmBibleCorpus() {
 }
 
 /**
- * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null }} props
+ * refFirst: the reference is the row's title and the action its meta: the letter-end footnote list, where no heading
+ * names the ref. On a sheet that heads with the ref (footnote, scripture, inline ref) the action is the title (hub 11-15:
+ * the ref three times in a row read as noise; what differs between the rows is the action).
+ * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null, refFirst?: boolean }} props
  */
-export function GoToRefButton({ refStr, onGo }) {
+export function GoToRefButton({ refStr, onGo, refFirst = false }) {
   const retryRef = React.useRef(/** @type {any} */ (null));
   const firstBtnRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
   React.useEffect(() => () => {
@@ -103,8 +106,8 @@ export function GoToRefButton({ refStr, onGo }) {
           onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed, part.ref)}>
           <span className="ui-row-lead fn-sheet-link-lead" aria-hidden="true"><UiIcon name="book" /></span>
           <span className="fn-sheet-link-body">
-            <span className="fn-sheet-link-title">{part.ref}</span>
-            <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
+            <span className="fn-sheet-link-title">{refFirst ? part.ref : 'Go to Scripture'}</span>
+            <span className="fn-sheet-link-eyebrow">{refFirst ? 'Go to Scripture' : part.ref}</span>
           </span>
           <UiIcon name="chev" size="sm" />
         </button>
