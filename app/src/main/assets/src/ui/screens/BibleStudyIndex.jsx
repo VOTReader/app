@@ -9,6 +9,7 @@
 
 import { ListGroup, ListRow, NextCard, UiButton, readMark as readMarkOf } from '../components/UiParts.jsx';
 import { BarAction } from '../components/RootNav.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { studyTitleParts, chapterTitleParts, studyNextStep } from '../../utils/study-titles.js';
@@ -116,7 +117,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, currentChap
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onTapThroughBack} aria-label={'Back to ' + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+            <span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to</span>{' '}
             <span className="back-hint-title">{backHint.title}</span>
           </button>
         </div>

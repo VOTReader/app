@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { BarTextAction, BarMenu } from '../components/RootNav.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
 
 /* Shared utility for rendering inline markup in p/h2/quote text. */
 function jrnInteractiveProps(activate, role) {
@@ -883,7 +884,7 @@ export function JournalViewerScreen(props) {
         {jrnBack ? (
           <div className="back-hint-row">
             <button className="back-hint-pill" onClick={jrnGoBack} aria-label={'Back to ' + jrnBack.fromTitle}>
-              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+              <span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to</span>{' '}
               <span className="back-hint-title">{jrnBack.fromTitle}</span>
             </button>
           </div>
@@ -894,7 +895,7 @@ export function JournalViewerScreen(props) {
           // would have to re-derive this same decision.
           <div className="back-hint-row">
             <button className="back-hint-pill" onClick={function() { tapThroughBack && tapThroughBack(); }} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title)}>
-              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+              <span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to</span>{' '}
               <span className="back-hint-title">{backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title}</span>
             </button>
           </div>

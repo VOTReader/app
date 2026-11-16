@@ -9,6 +9,7 @@ import { composeNotesExport, notesExportFilename, shareNotesExport } from '../..
 import { clearNoteDraft } from '../../utils/note-draft.js';
 import { snapshotGroups, offerUndoRemoved } from '../../utils/annotation-undo.js';
 import { countOf } from '../../utils/download-tree.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 import { relativeDate } from '../../utils/dates.js';
 import { BarMenu } from '../components/RootNav.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
@@ -341,7 +342,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
               onClick={() => { setBackPill(null); onBack(); }}
               aria-label={'Back to ' + backPill.title}
             >
-              <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+              <span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to</span>{' '}
               <span className="back-hint-title">{backPill.title}</span>
             </button>
           </div>

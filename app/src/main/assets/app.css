@@ -2726,7 +2726,7 @@
     }
     .back-hint-pill:active { opacity:0.7; }
     @media (hover: hover) { .back-hint-pill:hover { color:var(--text-1); } }
-    .back-hint-pill .back-hint-arrow { color:var(--gold); font-size:var(--fs-18); line-height:1; margin-right:0.1rem; }
+    .back-hint-pill .back-hint-arrow { color:var(--accent); margin:0 -0.1rem 0 -0.2rem; }   /* the kit back icon (vot-ui) */
     .back-hint-pill .back-hint-lead { display:inline-flex; align-items:center; gap:0.35rem; flex:0 0 auto; }
     .back-hint-pill .back-hint-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60vw; }
 

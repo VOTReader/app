@@ -15,6 +15,8 @@
    MiniTitleBand there, so the band pins under the "Back to" row (B10 item 1).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from './UiIcon.jsx';
+
 /**
  * @param {{ backHint: { title: string, volumeLabel?: string | null, plain?: boolean } | null | undefined,
  *   onClick: () => void, children?: import('react').ReactNode }} props
@@ -26,8 +28,8 @@ export function BackHintPill({ backHint, onClick, children }) {
     <div className="back-hint-row">
       <button className="back-hint-pill" onClick={onClick} aria-label={'Back to ' + place}>
         {backHint.plain
-          ? <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to {place}</span>
-          : <><span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
+          ? <span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to {place}</span>
+          : <><span className="back-hint-lead"><UiIcon name="back" size="sm" className="back-hint-arrow" />Back to</span>{' '}
             <span className="back-hint-title">{place}</span></>}
       </button>
       {children}
