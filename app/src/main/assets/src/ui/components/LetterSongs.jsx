@@ -220,8 +220,10 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
         ) : null}
       </div>
       </ListGroup>
-      {/* K1: this letter's songs, every version, kept for listening with no signal. */}
-      <SongKeepAction ids={songs.map((s) => s.id)} noteKey={'keep-letter-' + letterKey} label={songs.length > 1 ? 'Keep these ' + songs.length + ' songs' : 'Keep this song'} />
+      {/* K1: this letter's songs, every version, kept for listening with no signal. The line counts SONGS (the rows
+          above), not versions: a WTLB entry's one row said '20 versions' over 'Keep these 19 songs' (vot-ui 11-15). */}
+      <SongKeepAction ids={songs.map((s) => s.id)} noteKey={'keep-letter-' + letterKey}
+        label={(leads.length > 1 ? 'Keep these ' + leads.length + ' songs' : 'Keep this song') + (songs.length > leads.length ? ', all versions' : '')} />
     </div>
   );
 }
