@@ -8124,7 +8124,8 @@
       }
       .tour-inline .tour-prompt-text { flex: 1 1 calc(100% - 56px); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.4; }
       .tour-inline .tour-prompt-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; }
-      .tour-inline .tour-btn { flex: 0 0 auto; min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-weight: 500; letter-spacing: 0; text-transform: none; }
+      /* font-size below is the fallback for a WebView before Chromium 79, which drops the later min() cap (hub 11-15: keep fallback pairs) */
+      .tour-inline .tour-btn { flex: 0 0 auto; min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .tour-inline .tour-btn.primary { flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
       .tour-inline .tour-btn.quiet { padding: 0 10px; background: none; color: var(--text-2); }
       .tour-inline .tour-never { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; color: var(--text-3); }
