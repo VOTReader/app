@@ -486,7 +486,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
               <input
                 ref={inputRef}
                 className="navpick-search-input"
-                placeholder={searchScope === 'text' ? "Search the text…" : "Titles and references…"}
+                placeholder={searchScope === 'text' ? "Search the text…" : "Search titles…"}
                 aria-label={searchScope === 'text' ? "Search any phrase in the text" : "Search titles and references"}
                 value={input}
                 onChange={e => setInput(e.target.value)}
