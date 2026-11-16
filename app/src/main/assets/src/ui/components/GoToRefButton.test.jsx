@@ -82,8 +82,8 @@ it('a compound semicolon cite renders ONE button per passage (Matthew study cite
   const { container } = render(<Btn refStr="Psalm 118:14; Isaiah 12:2" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
   expect(btns.length).toBe(2);
-  expect(btns[0].querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Psalm 118:14');
-  expect(btns[1].querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Isaiah 12:2');
+  expect(btns[0].querySelector('.fn-sheet-link-title').textContent).toBe('Psalm 118:14');
+  expect(btns[1].querySelector('.fn-sheet-link-title').textContent).toBe('Isaiah 12:2');
   click(btns[1]);
   expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: 'isaiah', chapter: 12, verse: 2 });
   click(btns[0]);
@@ -102,7 +102,7 @@ it('a book-implied continuation carries the book forward (12 of matthew.js 23 co
   const onGo = vi.fn();
   const { container } = render(<Btn refStr="Daniel 9:27; 11:31; 12:11" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
-  expect(btns.map(b => b.querySelector('.fn-sheet-link-eyebrow').textContent))
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
     .toEqual(['Daniel 9:27', 'Daniel 11:31', 'Daniel 12:11']);
   click(btns[2]);
   expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: 'daniel', chapter: 12, verse: 11 });
@@ -113,7 +113,7 @@ it('a comma verse list becomes its own button (bible-studies.js "1 John 4:9-10, 
   const onGo = vi.fn();
   const { container } = render(<Btn refStr="1 John 4:9-10, 14" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
-  expect(btns.map(b => b.querySelector('.fn-sheet-link-eyebrow').textContent))
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
     .toEqual(['1 John 4:9-10', '1 John 4:14']);
   // Verse 14 used to be swallowed by parseRefStr's comma group — unreachable.
   click(btns[1]);
