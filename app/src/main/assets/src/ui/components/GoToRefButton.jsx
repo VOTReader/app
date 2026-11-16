@@ -47,7 +47,8 @@ function warmBibleCorpus() {
 /**
  * refFirst: the reference is the row's title and the action its meta: the letter-end footnote list, where no heading
  * names the ref. On a sheet that heads with the ref (footnote, scripture, inline ref) the action is the title (hub 11-15:
- * the ref three times in a row read as noise; what differs between the rows is the action).
+ * the ref three times in a row read as noise; what differs between the rows is the action). A cite of several passages
+ * (Matthew study) draws one row each: there the refs are what differ, so those rows lead with the ref too.
  * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null, refFirst?: boolean }} props
  */
 export function GoToRefButton({ refStr, onGo, refFirst = false }) {
@@ -106,8 +107,8 @@ export function GoToRefButton({ refStr, onGo, refFirst = false }) {
           onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed, part.ref)}>
           <span className="ui-row-lead fn-sheet-link-lead" aria-hidden="true"><UiIcon name="book" /></span>
           <span className="fn-sheet-link-body">
-            <span className="fn-sheet-link-title">{refFirst ? part.ref : 'Go to Scripture'}</span>
-            <span className="fn-sheet-link-eyebrow">{refFirst ? 'Go to Scripture' : part.ref}</span>
+            <span className="fn-sheet-link-title">{refFirst || targets.length > 1 ? part.ref : 'Go to Scripture'}</span>
+            <span className="fn-sheet-link-eyebrow">{refFirst || targets.length > 1 ? 'Go to Scripture' : part.ref}</span>
           </span>
           <UiIcon name="chev" size="sm" />
         </button>
