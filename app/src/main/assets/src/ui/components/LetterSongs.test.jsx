@@ -158,7 +158,7 @@ describe('SONGS FROM THIS LETTER', () => {
     SongKeep._reset();
     try {
       render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
-      expect(screen.getByRole('button', { name: 'Keep this song, all versions · 6 MB' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Keep all versions · 6 MB' })).toBeTruthy();
     } finally { delete globalThis.OfflineSongsStore; SongKeep._reset(); }
   });
 
