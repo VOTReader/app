@@ -77,9 +77,9 @@ const playLetter = () => AudioPlayer.playLetter({ volKey: 'one', letter: { id: '
 const current = () => { const s = AudioPlayer.getState(); return s.queue[s.qi]; };
 
 describe('liveLineAt', () => {
-  it('is nothing before the first timed clause (the voice is on the heading)', () => {
+  it('before the first timed clause (the voice is on the heading) shows the line about to be read', () => {
     playLetter();
-    expect(liveLineAt(current(), 1)).toBe(null);
+    expect(liveLineAt(current(), 1)).toMatchObject({ lead: '', now: 'Beloved, hear Me.' });
   });
 
   it('names the clause being read, and the clauses before it in the same sentence', () => {
@@ -131,10 +131,10 @@ describe('liveLineAt', () => {
     });
     expect(liveLineAt(current(), 4.5).now).toBe('Many things you must overcome in the years ahead;');
   });
-  it('leaves out a header line that only repeats the title', () => {
+  it('leaves out a header line that only repeats the title, and shows the line about to be read instead', () => {
     globalThis.colLetterArr = () => [{ ...LETTER, title: 'A Vision (Jesus) of the World', from: 'A Vision of the World' }];
     playLetter();
-    expect(liveLineAt(current(), 1)).toBe(null);
+    expect(liveLineAt(current(), 1)).toMatchObject({ lead: '', now: 'Beloved, hear Me.' });
   });
 });
 
@@ -209,6 +209,7 @@ describe('LiveLine', () => {
 
   it('with no line known, is just "Open the letter"', () => {
     playLetter();
+    delete globalThis.colLetterArr;   // the corpus has not landed: no words to show
     render(<LiveLine track={current()} time={0.5} title="Chosen by God" onOpen={() => {}} />);
     expect(screen.queryByText('Reading now')).toBeNull();
     expect(screen.getByRole('button').textContent).toContain('Open the letter');
@@ -217,6 +218,7 @@ describe('LiveLine', () => {
 
   it('with neither a line nor a reading to open, renders nothing', () => {
     playLetter();
+    delete globalThis.colLetterArr;
     const { container } = render(<LiveLine track={current()} time={0.5} title="" onOpen={null} />);
     expect(container.innerHTML).toBe('');
   });

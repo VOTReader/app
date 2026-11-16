@@ -3130,6 +3130,28 @@
     .vot-large-text .root-tiles { grid-template-columns: minmax(0, 1fr); }
     .vot-large-text .root-search { height: auto; min-height: var(--field-h); padding-top: 8px; padding-bottom: 8px; }
     .vot-large-text .root-search span, .vot-large-text .upnext-title { white-space: normal; }
+    /* Text 2.0 sweep (hub 04:1x, Corbin "check, photograph and open anything"): at large text nothing clips to a few letters.
+       A row's title and meta wrap; a trailing value drops under the text (lead | text | chev, value under the text);
+       a title beside buttons stacks over them; a segmented control, an action-tile row and a two-column tile grid wrap
+       instead of squeezing. All under .vot-large-text (1.8 and up), so standard size is untouched. */
+    .vot-large-text :is(.root-row-title, .ui-row-title, .root-row-sub, .ui-row-meta) { white-space: normal; }
+    .vot-large-text :is(.root-row, .ui-row):has(> :is(.plan-find-meta, .ui-row-value, .root-row-count)) {
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "lead text chev" "lead val chev"; column-gap: 14px; row-gap: 2px;
+    }
+    .vot-large-text :is(.root-row, .ui-row) > :is(.root-row-icon, .ui-row-lead) { grid-area: lead; }
+    .vot-large-text :is(.root-row, .ui-row):has(> :is(.plan-find-meta, .ui-row-value, .root-row-count)) > :is(.root-row-text, .ui-row-text) { grid-area: text; }
+    .vot-large-text :is(.root-row, .ui-row) > :is(.plan-find-meta, .ui-row-value, .root-row-count) { grid-area: val; justify-self: start; text-align: left; }
+    .vot-large-text :is(.root-row, .ui-row) > :is(.plan-chev, .ui-row-chev, .root-row-chev) { grid-area: chev; }
+    .vot-large-text .plan-find-meta { flex-direction: row; flex-wrap: wrap; gap: 0 10px; }
+    .vot-large-text .upnext-plan { grid-template-columns: minmax(0, 1fr); }
+    .vot-large-text .upnext-plan > .upnext-actions { justify-self: start; flex-wrap: wrap; }
+    .vot-large-text .plan-day-row { flex-wrap: wrap; row-gap: 4px; }
+    .vot-large-text .plan-day-portion { order: 3; flex-basis: 100%; }
+    .vot-large-text .ui-seg { display: flex; flex-wrap: wrap; }
+    .vot-large-text .ui-seg-item { flex: 1 1 auto; padding: 0 10px; }
+    .vot-large-text .rd-tiles, .vot-large-text .rd-tiles.is-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .vot-large-text .np-custom { flex-wrap: wrap; }
+    .vot-large-text .np-custom-label { flex-basis: 100%; }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
     :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool, .bottom-nav-card):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }

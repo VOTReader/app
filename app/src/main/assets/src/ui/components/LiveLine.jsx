@@ -202,7 +202,8 @@ export function liveLineAt(track, time) {
   // Before the first timed clause the voice reads the letter's header (about 25 s: "From The Lord ... For All Those
   // Who Have Ears to Hear"), which has no rows; the card shows those lines then, not an empty box (sweep item 7).
   if (i < 0) {
-    const words = introWords(unit);
+    // with no header to show (a vision's header is its title), the line about to be read: the card is never an empty box
+    const words = introWords(unit) || rowWords(unit, frags[0]);
     return words ? { lead: '', now: words, key, at: Math.max(0, Math.min(1, time / Math.max(1, frags[0][0]))) } : null;
   }
   const now = rowWords(unit, frags[i]);

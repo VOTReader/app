@@ -419,6 +419,7 @@
   R('.jrn-ins-label:first-child { margin-top: 0; }');
   R('body.light .jrn-ins-label { color: var(--text-1); }');   // LIGHT2: --text-2 on the cream sheet read 4.49:1
   R('.jrn-ins-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }');
+  R('.vot-large-text .jrn-ins-tiles { grid-template-columns: minmax(0, 1fr); }');   // text 2.0: a tile never runs off the sheet
   R('.jrn-ins-tile { min-height: 52px; border-radius: var(--r-field); background: var(--surface-2); border: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; color: var(--text-1); text-align: left; cursor: pointer; }');
   R('.jrn-ins-tile:active { background: var(--surface-3); }');
   R('.jrn-ins-tile .ui-i { color: var(--accent); flex: 0 0 auto; }');
