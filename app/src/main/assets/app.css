@@ -783,7 +783,7 @@
          hides the per-chapter quick-bookmark icon. */
       body.no-bookmark-nav .nav-bookmark-btn { display: none; }
 
-      .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
+      .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
       @media (hover: hover) { .nav-theme-btn:hover { color: var(--gold-bright); } }
       .nav-theme-btn svg { width: 22px; height: 22px; }
 
@@ -791,7 +791,7 @@
          switches compactTopBar / showSettingsGear / historyInNav / showThemeBtn are gone). The ⋯ menu
          (ui/components/MoreMenu.jsx) names them. The tab screens' bar shows its gear (ONE TOP-BAR RULE). ── */
       .top-nav :is(.settings-gear-btn, .nav-search-btn[title="History"], .nav-theme-btn) { display: none; }
-      .nav-more-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); min-width: 44px; min-height: 44px; flex-shrink: 0; transition: color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
+      .nav-more-btn { background: none; border: none; cursor: pointer; color: var(--gold); display: flex; align-items: center; justify-content: center; border-radius: var(--radius); min-width: 44px; min-height: 44px; flex-shrink: 0; transition: color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
       .nav-more-btn svg { width: 22px; height: 22px; }
       .more-menu {
         position: fixed; z-index: 400;
@@ -1054,12 +1054,10 @@
            icon set (back, home, gear, history, search, theme) + the reading
            dot + the tabs button all fit without overflow on a 360-375px
            phone — the owner's dot-cut-off / tabs-gone report. */
-        display: flex; align-items: center; gap: 0.12rem;
-        padding: 0.7rem 0.5rem 0.7rem;
+        display: flex; align-items: center; 
         /* --inset-top is injected by MainActivity in correct logical px (dp).
            Accounts for camera cutout, status bar, notch — whatever this device
            has. 0px fallback = no cutout device. No hardcoded numbers. */
-        padding-top: calc(var(--inset-top, 0px) + 0.7rem);
         /* No backdrop-filter (2026-07-28): blur(16px) behind 95%-opaque black
            was visually nil but forced a backdrop readback+blur every composited
            frame — at the 120 Hz ARR vote that's half the raster budget on an
@@ -1077,9 +1075,9 @@
          already a first-class Home card, so keep it there on compact phones;
          on the smallest supported tier Settings follows the same rule. */
       .nav-home {
-        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.18em;
+        font-family: 'Cinzel', serif; letter-spacing: 0.18em;
         text-transform: uppercase; color: var(--gold); background: none; border: none;
-        cursor: pointer; padding: 0.45rem 0.55rem; transition: color var(--transition);
+        cursor: pointer; transition: color var(--transition);
         white-space: nowrap; opacity: 0.85; min-height: 44px; display: flex; align-items: center;
       }
       @media (hover: hover) { .nav-home:hover { color: var(--gold-bright); opacity: 1; } }
@@ -1089,18 +1087,18 @@
          to decongest the nav — the label ate the room the reading dot + tabs
          button now need). Bigger glyph = a clear, thumb-friendly target that
          still costs far less width than the old text. */
-      .nav-back-icon { padding: 0 0.35rem; min-width: 2.75rem; justify-content: center; max-width: none; opacity: 1; }
+      .nav-back-icon { justify-content: center; max-width: none; opacity: 1; }
       /* `.nav-volume` was deleted 2026-07-30. It was LetterView's back button
          only, and because it sat AFTER .nav-back-icon at equal specificity (here
          AND in the chrome-pin block) it silently shrank that arrow to 11.52px on
          13 reading screens. LetterView now renders the standard
          `nav-home nav-back-icon` through LibraryNav. Do not reintroduce. */
-      .nav-arrows { display: flex; gap: 0.3rem; flex-shrink: 0; }
+      .nav-arrows { flex-shrink: 0; }
       .nav-btn {
-        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.1em;
+        font-family: 'Cinzel', serif; letter-spacing: 0.1em;
         color: var(--cream-muted); background: transparent;
         border: 1px solid var(--gold-border); border-radius: 4px;
-        padding: 0.45rem 0.75rem; cursor: pointer; transition: all var(--transition);
+        cursor: pointer; transition: all var(--transition);
         white-space: nowrap; text-transform: uppercase;
         max-width: 32vw; overflow: hidden; text-overflow: ellipsis;
         min-height: 40px; display: flex; align-items: center; flex-shrink: 1; min-width: 0;
@@ -1110,7 +1108,7 @@
       /* ── Minimal arrow-only prev/next — clean circular chrome for chapter/letter nav ── */
       .nav-arrow-btn {
         position: relative; display: inline-flex; align-items: center; justify-content: center;
-        width: 1.9rem; height: 1.9rem; padding: 0; flex-shrink: 0;
+        padding: 0; flex-shrink: 0;
         background: none; border: 0; border-radius: var(--r-pill); color: var(--text-1); cursor: pointer;
         transition: background-color var(--press) ease; -webkit-tap-highlight-color: transparent;
       }
@@ -1383,7 +1381,7 @@
       .np-kicker {
         min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 6px; text-align: center;
         min-width: 0; white-space: nowrap;
-        color: var(--gold); font-family: var(--font-cinzel); font-size: clamp(11px, var(--fs-12), 14px); letter-spacing: 0.12em; line-height: 1.5; text-transform: uppercase;
+        line-height: 1.5; 
         touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
       }
       /* One line at 360 px and 200 % text (S22 wrapped "LETTER 1 OF / 29"): the collection shrinks to an ellipsis, the count never does. */
@@ -1414,8 +1412,8 @@
       }
       .np-chip span { color: var(--gold); font-size: 0.8em; }
       .np-live {
-        width: 100%; max-width: 560px; min-height: 52px; margin: 4px 0 0; padding: 12px 16px; display: block; text-align: left;
-        border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); color: inherit; cursor: pointer;
+        max-width: 560px; min-height: 52px; margin: 4px 0 0; 
+        color: inherit; cursor: pointer;
       }
       /* A spoken recording's body stands at the top: the small title stays put and the card grows down toward the
          scrubber as its words need lines (LiveLine sizes the window from the body's spare room). */
@@ -1883,7 +1881,7 @@
       .songs-row .ui-row-lead.is-cover { width:44px; height:44px; border:0; border-radius:8px; background:var(--surface-2); }
       .songs-row.is-current .ui-row-title { color:var(--accent); }
       .songs-row.is-unavailable .ui-row-main { opacity:.45; }
-      .songs-row-kept { display:inline-flex; margin-right:4px; vertical-align:-3px; color:var(--accent); }
+      .songs-row-kept { margin-right:4px; vertical-align:-3px; }
       .songs-row-kept svg { width:16px; height:16px; }
       .song-cover { position:relative; flex:none; width:56px; height:56px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; background:var(--bg3); }
       .song-cover-note { color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
@@ -2262,7 +2260,7 @@
         /* minmax(0, 1fr), not 1fr: 1fr's auto minimum let the caps label's min-content push the two
            tracks to 197 + 165 px in a 274 px row at Text Size 1.8, and the Next card ran 74 px past the
            screen behind overflow-x: hidden on every letter and chapter (2026-09-05). */
-        display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1rem; margin-top: 1.5rem;
+        display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); margin-top: 1.5rem;
       }
       /* At a large Text Size two cards leave a few characters a line ("Regarding
          Judas Iscariot" stood one letter per line at 300 % on a 360 px phone):
@@ -2516,7 +2514,7 @@
        bottom-padding stays at 2.5rem (design baseline ergonomic
        spacing); the OS-driven bottom safe area is handled by the
        bottom offset itself, so the two add cleanly without doubling. */
-    .fn-sheet { position:fixed; bottom:max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); left:0; right:0; z-index:201; background:var(--bg3); border-top:1px solid var(--gold-border); border-radius:14px 14px 0 0; padding:1rem min(1.5rem, 24px) 2.5rem; transform:translateY(calc(100% + max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)) + 2px)); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1), bottom 0.18s ease; max-height:calc(67vh - var(--inset-top, 0px)); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent; }
+    .fn-sheet { position:fixed; bottom:max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); left:0; right:0; z-index:201; padding:1rem min(1.5rem, 24px) 2.5rem; transform:translateY(calc(100% + max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)) + 2px)); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1), bottom 0.18s ease; max-height:calc(67vh - var(--inset-top, 0px)); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent; }
     .fn-sheet::-webkit-scrollbar { width:3px; }
     .fn-sheet::-webkit-scrollbar-track { background:transparent; }
     .fn-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
@@ -2559,40 +2557,37 @@
        at the sheet's upper-left are real 44px close buttons. Sizes in px on
        purpose: sheet chrome, like nav chrome, must not scale with the Text
        Size slider.) */
-    .sheet-handle-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin:-0.4rem 0 0.45rem; }
+    .sheet-handle-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; }
     /* POL1: the close x sits at the sheet's upper RIGHT, as every mock draws it (rule 13) */
     .sheet-handle-back {
       grid-column:3; grid-row:1; justify-self:end;
       width:44px; height:44px; margin-right:-8px; padding:0;
       background:none; border:none; cursor:pointer;
-      color:var(--gold-dim); font-size:var(--fsc-30); line-height:1; font-family:'Cinzel',serif;
+      font-size:var(--fsc-30); line-height:1; font-family:'Cinzel',serif;
       display:flex; align-items:center; justify-content:center;
       -webkit-tap-highlight-color:transparent; transition:color 0.15s ease;
     }
-    .sheet-handle-back:active { color:var(--gold-bright); }
     @media (hover:hover) { .sheet-handle-back:hover { color:var(--gold-bright); } }
     .sheet-handle-grab { touch-action: none; /* U06.8: the pill takes the drag, the page does not scroll */
       grid-column:2; grid-row:1; width:132px; height:44px; padding:0;
       background:none; border:none; cursor:pointer;
-      display:flex; align-items:center; justify-content:center;
+      display:flex; justify-content:center;
       -webkit-tap-highlight-color:transparent;
     }
-    .sheet-handle-bar { width:44px; height:4px; background:var(--gold-border); border-radius:2px; transition:background 0.15s ease; }
-    .sheet-handle-grab:active .sheet-handle-bar { background:var(--gold); }
+    .sheet-handle-bar { border-radius:2px; transition:background 0.15s ease; }
     @media (hover:hover) { .sheet-handle-grab:hover .sheet-handle-bar { background:var(--gold); } }
     .fn-sheet-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.4rem; }
     /* flex-wrap (300%-cap spill fix): at Text Size extremes the Cinzel
        "Footnote N of M" label + the two 44px pager circles exceed a 375px
        phone's sheet width — the pager wraps under the label instead of
        handing the bottom sheet a horizontal scrollbar. Inert normally. */
-    .fn-sheet-num-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.6rem; row-gap:8px; margin-bottom:0.4rem; }
+    .fn-sheet-num-row { display:flex; align-items:center; justify-content:space-between; row-gap:8px; }
     .fn-sheet-num-row .fn-sheet-num { margin-bottom:0; }
-    .fn-sheet-num-of { color:var(--gold-dim); font-weight:400; letter-spacing:0.18em; }
-    .fn-sheet-nav { display:flex; gap:0.4rem; }
+    .fn-sheet-nav { display:flex; }
     /* 44px px-pinned circles (was 1.9rem ≈ 30px) — the ‹ › footnote pager is
        the sheet's smallest target and the owner's older reader is the
        audience; px so the Text Size slider can't balloon them. */
-    .fn-sheet-nav-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fsc-20); line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s ease, border-color 0.15s ease; padding:0; }
+    .fn-sheet-nav-btn { border-radius:50%; background:transparent; font-family:'Cinzel',serif; font-size:var(--fsc-20); line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s ease, border-color 0.15s ease; padding:0; }
     .fn-sheet-nav-btn:hover:not(:disabled), .fn-sheet-nav-btn:focus-visible:not(:disabled) { background:rgba(200,164,86,0.1); border-color:var(--gold); }
     .fn-sheet-nav-btn:disabled { opacity:0.32; cursor:default; }
     .fn-sheet-ref { display:block; margin-bottom:8px; color:var(--accent); font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; }
@@ -2617,7 +2612,7 @@
     .fn-sheet-back:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .fn-sheet-verse-missing { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:1.5; }
     .fn-sheet-verse-missing strong { color:var(--text-1); font-weight:600; }
-    .fn-sheet-url-extra { font-size:var(--fs-14); color:var(--cream-muted); margin-top:0.4rem; font-style:italic; }
+    .fn-sheet-url-extra { font-size:var(--fs-14); color:var(--cream-muted); }
     .fn-sheet-see-also { margin-top:16px; padding-top:12px; box-shadow:inset 0 1px 0 var(--hairline); }
     .fn-sheet-see-also-label { display:block; margin-bottom:2px; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     /* Footnote list (bottom of letter) — compact in-app link */
@@ -3082,7 +3077,7 @@
     /* The open-tabs counter: the number in a 22 px rounded square, no pill around it; the 44 px press comes from ::before. */
     .top-nav .tabs-nav-btn { justify-content: center; min-width: var(--tap); height: var(--tap); margin: 0; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-1); }
     .top-nav .tabs-nav-btn::before { inset: 0; }
-    .top-nav .tabs-nav-btn-count { display: grid; place-items: center; box-sizing: border-box; width: 22px; height: 22px; border: 1.6px solid currentColor; border-radius: 6px; font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0; line-height: 1; opacity: 0.88; }
+    .top-nav .tabs-nav-btn-count { display: grid; place-items: center; box-sizing: border-box; width: 22px; height: 22px; border: 1.6px solid currentColor; border-radius: 6px; font-family: var(--font-ui); font-weight: 600; letter-spacing: 0; line-height: 1; opacity: 0.88; }
     .top-nav .tabs-nav-btn.active { background: none; color: var(--accent); }
     .top-nav .tabs-nav-btn:active { background: var(--surface-2); }
     @media (hover:hover) { .top-nav .tabs-nav-btn:hover { background: var(--surface-1); color: var(--text-1); border-color: transparent; } }
@@ -3760,15 +3755,13 @@
     .select-field:active { background:var(--gold-faint); border-color:var(--gold-dim); }
     @media (hover: hover) { .select-field:hover { border-color:var(--gold-dim); } }
 
-    .select-sheet-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:250; backdrop-filter:blur(3px); animation:selectSheetBackdropIn 0.22s ease; }
+    .select-sheet-backdrop { display:none; position:fixed; inset:0; z-index:250; animation:selectSheetBackdropIn 0.22s ease; }
     .select-sheet-backdrop.open { display:block; }
     @keyframes selectSheetBackdropIn { from { opacity:0; } to { opacity:1; } }
     .select-sheet {
       position:fixed; bottom:0; left:0; right:0;
-      z-index:251; background:var(--bg3);
-      border-top:1px solid var(--gold-border);
-      border-radius:14px 14px 0 0;
-      padding:0.9rem 1.4rem calc(var(--inset-bottom, 0px) + 1.8rem);
+      z-index:251; 
+      
       max-height:75vh; overflow-y:auto; overscroll-behavior:contain;
       scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent;
       transform:translateY(100%);
@@ -3782,33 +3775,20 @@
        sheet with no transform of its own popped in where it stood. */
     @keyframes sheetRiseIn { from { transform:translateY(100%); } to { transform:translateY(0); } }
     /* (.select-sheet-handle RETIRED — see the SheetHandle block by .fn-sheet.) */
-    .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
-    .select-sheet-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
-    .select-sheet-options { display:flex; flex-direction:column; gap:0.55rem; }
-    .select-sheet-option {
-      display:block; width:100%; padding:0.85rem 1rem;
-      background:var(--bg2); border:1px solid var(--gold-border);
-      border-radius:8px; cursor:pointer; text-align:left;
-      transition:all 0.18s ease; color:inherit; font:inherit;
-      -webkit-tap-highlight-color:transparent;
-    }
-    .select-sheet-option:active { background:var(--gold-faint); transform:scale(0.99); }
+    .select-sheet-eyebrow { margin-bottom:0.35rem; }
+    
+    
     @media (hover: hover) { .select-sheet-option:hover { border-color:var(--gold-dim); } }
     .select-sheet-option.selected {
-      background:rgba(200,164,86,0.10);
       border-color:var(--gold);
-      box-shadow:0 0 14px rgba(200,164,86,0.12) inset;
     }
-    body.light .select-sheet-option.selected { background:rgba(122,92,16,0.12); box-shadow:0 0 14px rgba(122,92,16,0.14) inset; }
-    .select-sheet-option-main { display:flex; align-items:center; gap:0.6rem; }
-    .select-sheet-option-label { font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; flex:1; }
+    
     /* Right-aligned per-option status (Reading Font picker: "Built in" /
        "Downloaded" / "~77 KB" / "Downloading…"). */
-    .select-sheet-option-meta { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
-    .select-sheet-option-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; margin-top:0.3rem; line-height:1.45; }
+    
     /* A09.4: a heading over a run of options, and a sample line in the option's own face (the Reading Font sheet). */
-    .select-sheet-group { display:flex; align-items:center; gap:0.6rem; margin:0.45rem 0 0.05rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
-    .select-sheet-group::after { content:''; flex:1; height:1px; background:var(--gold-border); }
+    .select-sheet-group { align-items:center; gap:0.6rem; }
+    .select-sheet-group::after { flex:1; height:1px; background:var(--gold-border); }
     .select-sheet-option-sample { font-size:var(--fs-16); color:var(--cream); margin-top:0.35rem; line-height:1.4; overflow-wrap:break-word; }
     /* U05.7: at large text the sheet keeps px gutters and a long font name wraps inside its card ("Atkinson Hyperlegible"
        ran past the card edge at 300%). */
@@ -3856,7 +3836,7 @@
        reading as a deliberate 1.5s toast rather than a text collision. */
 
     @keyframes layoutCycleFade { 0% { opacity:0; } 15% { opacity:0.85; } 65% { opacity:0.85; } 100% { opacity:0; } }
-    .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
+    .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold); display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
     @media (hover: hover) { .settings-gear-btn:hover { color:var(--gold); } }
     .settings-gear-btn svg { width:20px; height:20px; }
     /* white-space:nowrap → normal + max-width (300%-cap spill fix): at the
@@ -3931,17 +3911,17 @@
     .srch-topic-open { display:inline-flex; align-items:center; gap:0.4em; min-height:44px; margin-top:0.2rem; padding:0; background:none; border:none; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); }
     .srch-topic-open:active { color:var(--gold-bright); }
     .srch-snippet-scroll { max-height:4.5em; overflow:hidden; }
-    .srch-places-toggle, .srch-also-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid var(--gold-border); cursor:pointer; text-align:left; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); }
+    .srch-places-toggle, .srch-also-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; min-height:44px; padding:0.35rem 0; background:none; border:none; border-top:1px solid var(--gold-border); cursor:pointer; text-align:left; }
     .srch-places-toggle:active, .srch-also-toggle:active { color:var(--gold-bright); }
     .srch-also { list-style:none; margin:0; padding:0 0 0.5rem; }
-    .srch-also-item { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:0.2rem; box-sizing:border-box; width:calc(100% - 2.2rem - 16px); min-height:44px; margin-left:calc(1.1rem + 16px); padding:0.3rem 0 0.3rem 0.8rem; background:none; border:none; border-left:2px solid var(--gold); cursor:pointer; text-align:left; font-family:'Cinzel',serif; text-transform:uppercase; }
+    .srch-also-item { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:0.2rem; box-sizing:border-box; width:calc(100% - 2.2rem - 16px); min-height:44px; margin-left:calc(1.1rem + 16px); padding:0.3rem 0 0.3rem 0.8rem; background:none; border:none; border-left:2px solid var(--gold); cursor:pointer; text-align:left; }
     .srch-also-item:active { background:var(--gold-faint); }
-    .srch-also-title { font-size:var(--fs-10); letter-spacing:0.12em; line-height:1.4; color:var(--gold); }
-    .srch-also-where { font-size:var(--fs-10); letter-spacing:0.1em; line-height:1.4; color:var(--gold-dim); }
+    .srch-also-title { line-height:1.4; }
+    .srch-also-where { line-height:1.4; }
     .srch-places-chevron { width:24px; height:24px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:var(--fs-15); line-height:1; color:var(--gold); transition:transform 0.18s ease; }
     .srch-places-chevron.open { transform:rotate(90deg); }
     .srch-places { list-style:none; margin:0; padding:0 0 0.35rem; }
-    .srch-place { display:flex; align-items:center; gap:0.6rem; box-sizing:border-box; width:100%; min-height:44px; padding:0.5rem 1.1rem 0.5rem 2rem; background:none; border:none; border-top:1px solid rgba(200,164,86,0.08); cursor:pointer; text-align:left; font-family:var(--font-body); font-size:var(--fs-15); line-height:1.45; color:var(--cream-muted); }
+    .srch-place { display:flex; align-items:center; gap:0.6rem; box-sizing:border-box; width:100%; min-height:44px; padding:0.5rem 1.1rem 0.5rem 2rem; background:none; border:none; border-top:1px solid rgba(200,164,86,0.08); cursor:pointer; text-align:left; font-size:var(--fs-15); line-height:1.45; }
     .srch-place:active { background:var(--gold-faint); }
     .srch-place-text { flex:1; min-width:0; }
     .srch-place-go { flex-shrink:0; color:var(--gold-dim); font-size:var(--fs-15); }
@@ -4071,7 +4051,7 @@
     .srch-sort-btn.srch-sort-pick { display:inline-flex; align-items:center; gap:4px; color:var(--text-1); font-weight:500; }
     .srch-sort-pick svg { color:var(--text-2); }
     /* ── end FA search ── */
-    .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
+    .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
     @media (hover: hover) { .nav-search-btn:hover { color:var(--gold); } }
@@ -4122,7 +4102,7 @@
        a position:fixed float over the top-right of index screens; in the nav
        it overlaps nothing and is excluded from tab thumbnails for free (the
        nav is not part of a tab picture). 40px hit target. */
-    .reading-dot-nav { width:2.5rem; height:2.5rem; flex-shrink:0; border-radius:50%; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
+    .reading-dot-nav { flex-shrink:0; border-radius:50%; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
     /* The marker glyph (text lines with a pointer at the one you were on; a bookmark
        ribbon for a day, until it was the Bookmark button's icon too) keeps the dot's
        token (gold) and its breath; the glow moves from box-shadow (a circle's) to
@@ -4215,12 +4195,12 @@
 
     /* ── TABS: nav button ─────────────────────────────────────────── */
     .tabs-nav-btn {
-      display:inline-flex; align-items:center; gap:0.25rem;
+      display:inline-flex; align-items:center; 
       padding:0.35rem 0.5rem;
       background:transparent; border:1px solid var(--gold-border);
       border-radius:6px; cursor:pointer;
       color:var(--gold); transition:all 0.18s ease;
-      font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.08em;
+      font-family:'Cinzel',serif; letter-spacing:0.08em;
       -webkit-tap-highlight-color:transparent; margin-left:0.15rem; flex-shrink:0;
       position:relative;
     }
@@ -4231,8 +4211,8 @@
     .tabs-nav-btn:active { background:var(--gold-faint); border-color:var(--gold); }
     .tabs-nav-btn.active { background:var(--gold-faint); border-color:var(--gold); color:var(--gold-bright); }
     @media (hover:hover) { .tabs-nav-btn:hover { color:var(--gold-bright); border-color:var(--gold-dim); } }
-    .tabs-nav-btn-glyph { font-size:var(--fs-14); line-height:1; display:inline-block; transform:translateY(-1px); }
-    .tabs-nav-btn-count { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.05em; min-width:0.9em; text-align:center; }
+    .tabs-nav-btn-glyph { line-height:1; display:inline-block; transform:translateY(-1px); }
+    .tabs-nav-btn-count { font-family:'Cinzel',serif; letter-spacing:0.05em; min-width:0.9em; text-align:center; }
 
     /* UX5 — first-use coachmark pointing at the tab switcher glyph. */
     .tabs-hint-wrap { position:relative; display:inline-flex; flex-shrink:0; }
@@ -4668,7 +4648,7 @@
       width: 30px; height: 30px; border-radius: 8px;
       border: 1.5px solid transparent; cursor: pointer;
       background: transparent; color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-16); font-weight: 600;
+      font-family: 'Cinzel', serif; font-weight: 600;
       display: flex; align-items: center; justify-content: center;
       -webkit-tap-highlight-color: transparent;
       transition: border-color 0.12s, background 0.12s, color 0.12s;
@@ -4818,8 +4798,7 @@
     }
     .link-picker-sheet {
       width: 100%; max-width: 600px;
-      background: var(--bg3); border-top: 1px solid var(--gold-border);
-      border-radius: 18px 18px 0 0; padding: 14px 0 0;
+      padding: 14px 0 0;
       /* Simple opacity fade-in — avoids transform-based layer promotion
          that causes fuzzy text on Windows/Chromium. forwards keeps the
          end-state (opacity:1) after animation; opacity-only doesn't
@@ -5099,7 +5078,6 @@
       margin: 0 0 14px; padding: 0;
     }
     .picker-verse-num {
-      font-weight: 700; color: var(--cream);
       margin-right: 4px; cursor: pointer;
       -webkit-tap-highlight-color: rgba(212,183,114,0.25);
       user-select: none; -webkit-user-select: none;
@@ -5499,7 +5477,6 @@
     /* Link action sheet (long-press) */
     .link-action-overlay {
       position: fixed; inset: 0; z-index: 8550;
-      background: rgba(0,0,0,0.65);
       display: flex; align-items: flex-end; justify-content: center;
       /* Safe-area insets — also reused by BookmarkRowActionSheet. */
       padding-top: var(--inset-top, 0px);
@@ -5509,40 +5486,32 @@
     }
     .link-action-sheet {
       width: 100%; max-width: 480px;
-      background: var(--bg3);
-      border-top: 1px solid var(--gold-border);
-      border-radius: 18px 18px 0 0;
-      padding: 12px 0 28px;
+      
+      
       animation: sheetRiseIn 0.25s cubic-bezier(0.32,0.72,0,1);
       max-height: 100%; overflow-y: auto;
     }
     /* (.link-action-handle RETIRED — see the SheetHandle block by .fn-sheet.
        The action sheets' 0-side-padding body relies on the row's own inline
        margins; the shared handle row gets side padding here instead.) */
-    .link-action-sheet .sheet-handle-row { padding: 0 14px; }
     .link-action-btn {
-      display: flex; align-items: center; gap: 12px;
-      width: 100%; padding: 14px 20px;
+      display: flex; align-items: center; 
+      width: 100%; 
       background: transparent; border: none;
       text-align: left; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-dim);
+      
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s;
     }
-    .link-action-btn + .link-action-btn { border-top: 1px solid rgba(214,179,95,0.06); }
-    .link-action-btn:active { background: var(--gold-faint); color: var(--gold); }
+    
     @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
-    .link-action-btn svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--gold-dim); }
+    .link-action-btn svg { flex-shrink: 0; }
     /* Destructive Delete row in the action sheets sits behind a gap + rule
        so it reads as its own zone below Open/Edit/Share. (Doubled class for
        specificity — the base .link-action-btn { border:none } is declared
        later in this file and would otherwise clobber the border-top.) */
-    .link-action-btn.link-action-btn-danger { margin-top: 6px; border-top: 1px solid rgba(224,201,127,0.18); }
-    .link-action-btn-danger { color: var(--danger); }
-    .link-action-btn-danger svg { color: var(--danger); }
-    .link-action-btn-danger:active { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
+    
+    
     @media (hover: hover) { .link-action-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); } }
     /* ── THE SHEETS (W1, the UI pass; mock/v2 base.css .sheet, U rule 13). surface-1, 20 px top corners, a grab handle,
        the title in the serif (an optional gold label above it), actions as worded rows in an inset group, and a confirm
@@ -6460,8 +6429,8 @@
     }
     /* Both sizes are restated as their --fsc- twins in the chrome-pin block
        at the end of the file (--fs-10/--fsc-10 and --fs-11/--fsc-11). */
-    .ascroll-dwell-label { font-size: var(--fs-10); text-transform: uppercase; padding-right: 2px; }
-    .ascroll-dwell-value { font-size: var(--fs-11); min-width: 42px; text-align: center; color: var(--accent); letter-spacing: 0; }
+    .ascroll-dwell-label { text-transform: uppercase; padding-right: 2px; }
+    .ascroll-dwell-value { min-width: 42px; text-align: center; color: var(--accent); letter-spacing: 0; }
 
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top
@@ -6801,7 +6770,6 @@
        ...)), so the phone's pill names four too, after it */
     .sw-root.sw-compact.sw-chrome-hidden .sw-hide-all { width: auto; padding: 0 14px 0 10px; border-radius: 20px; }
     /* A narrow root parks the strip bottom-left at full width; it yields the corner. */
-    .sw-root.sw-narrow .sw-controls { max-width: calc(100% - 76px); }
     /* Hidden = the controls, not the legend: the colour key stays with the book
        rail on the canvas (Corbin, 2026-09-11: "keep the web legend … just hide
        the interactable UI"). */
@@ -6861,7 +6829,7 @@
       left: var(--sw-goto-x, calc((100% - var(--sw-goto-inset, 0px)) / 2)); transform: translateX(-50%);
       width: var(--sw-goto-w, min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px)));
       background: rgba(36, 45, 47, 0.96); border: 1px solid var(--sw-control-border); border-radius: 14px;
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: var(--sw-text); font-family: var(--sw-font);
+      color: var(--sw-text); font-family: var(--sw-font);
       overflow: hidden;
     }
     /* compact takes the header row (w4; the spec's 64 / 64 at top 8 met Back edge to edge, its
@@ -6880,7 +6848,6 @@
     /* turned (a portrait phone, .sw-rotated): the keyboard rises from the glass's bottom, which is
        the turned root's right end, so there it takes width, not height */
     .sw-root.sw-rotated > .sw-goto.is-compact {
-      right: calc(16px + max(var(--sw-goto-inset, 0px), var(--keyboard-height, 0px), var(--inset-bottom, 0px)));
       max-height: calc(100% - var(--sw-chrome-top) - 8px);
     }
     /* the compact box lies over the title and the control row by the spec's geometry, and its 0.96
@@ -7604,7 +7571,7 @@
        portrait width inside the CSS-rotated landscape and stack the controls
        over the web. */
     .sw-root.sw-narrow .sw-controls { max-width: 100%; left: 14px; right: auto; justify-content: flex-start;
-      top: auto; bottom: calc(30px + var(--sw-safe-bottom)); }
+      top: auto; }
     .sw-root.sw-narrow .sw-legend { display: none; }
     @media (prefers-reduced-motion: reduce) {
       .sw-btn, .sw-seg-btn { transition: none; }
@@ -7622,7 +7589,6 @@
       padding: 16px 20px 14px; border-radius: 10px;
       /* the web's own panel in both themes (Q4: panels pinned dark), as the docked panel is */
       background: var(--sw-panel); border: 1px solid var(--sw-panel-edge);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
       font-family: var(--sw-font); color: var(--sw-text-body);
     }
     .sw-guide-title { font-size: var(--fs-20); color: var(--sw-title); margin-bottom: 8px; }
@@ -8065,11 +8031,8 @@
       .tour-card {
         position: fixed; left: 12px; right: 12px; z-index: 322;
         max-width: 520px; margin: 0 auto;
-        background: var(--bg3); color: var(--cream-dim);
-        border: 1px solid var(--gold-border); border-radius: 16px;
-        padding: 16px 18px 14px;
-        box-shadow: 0 10px 34px rgba(0,0,0,0.55);
-        font-family: var(--font-body);
+        
+        
         /* Never taller than the screen: at a large text size the card is the only way out
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
         max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto;
@@ -8130,7 +8093,6 @@
          fade into its own background above the row, and one small chevron; both leave at the end.
          The fade is the row's own shadow rather than a pseudo-element, because ::before/::after on
          a flex container become flex ITEMS and would sit in the button row. */
-      .tour-card.has-more .tour-row { box-shadow: 0 -14px 14px -12px var(--bg3); }
       .tour-more { position: absolute; bottom: 100%; left: 50%; width: 9px; height: 9px;
         margin: 0 0 3px -5px; border-right: 1.5px solid var(--gold-dim); border-bottom: 1.5px solid var(--gold-dim);
         transform: rotate(45deg); opacity: 0.85; pointer-events: none; }
@@ -8156,13 +8118,13 @@
          never a float. Words left, × at the top right; Show me around (primary) and Later (text) under them. */
       .tour-prompt.tour-strip.tour-inline {
         position: relative; left: auto; right: auto; bottom: auto; z-index: auto; max-width: none; max-height: none;
-        margin: 16px 0 0; padding: 12px 6px 10px var(--card-pad); overflow: visible;
+        margin: 16px 0 0; overflow: visible;
         border: 0; border-radius: var(--r-card); background: var(--surface-2); color: var(--text-1); box-shadow: none;
         font-family: var(--font-ui); justify-content: flex-start; gap: var(--sp-2);
       }
       .tour-inline .tour-prompt-text { flex: 1 1 calc(100% - 56px); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.4; }
       .tour-inline .tour-prompt-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; }
-      .tour-inline .tour-btn { flex: 0 0 auto; min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; letter-spacing: 0; text-transform: none; }
+      .tour-inline .tour-btn { flex: 0 0 auto; min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .tour-inline .tour-btn.primary { flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
       .tour-inline .tour-btn.quiet { padding: 0 10px; background: none; color: var(--text-2); }
       .tour-inline .tour-never { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; color: var(--text-3); }
@@ -8378,8 +8340,8 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
 .ans-note-ref{font-size:.72em;color:var(--gold)}
 
 /* Running head (absolute in .screen-layout, at the dock line) */
-.ans-runhead{position:absolute;top:calc(var(--dock-nav-bottom) + 4px + var(--offline-strip-h,0px));left:0;right:0;z-index:99;display:flex;align-items:center;gap:12px;width:100%;height:48px;padding:0 24px;border:0;border-bottom:1px solid var(--border);background:var(--bg);color:var(--cream);font-size:var(--fsc-15);text-align:left;transition:transform .2s ease,visibility .2s} /* r2: 48 tall */
-.ans-runhead.is-hidden{transform:translateY(-100%);visibility:hidden}
+.ans-runhead{position:absolute;z-index:99;display:flex;align-items:center;border-bottom:1px solid var(--border);text-align:left;} /* r2: 48 tall */
+.ans-runhead.is-hidden{visibility:hidden}
 /* r2: one clipped line, DOM [section][title + " · "], laid out row-reverse with wrap: both show while they fit together;
    otherwise the title wraps onto the clipped second line and the section shows alone (when it alone is too long, R13 ends it
    on a whole word + "…") */
@@ -8689,7 +8651,7 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 
 /* ── WA1 answers (AnswersHome.jsx: a-land, a-contents, a-az; mock v2 answers.html, WA1-answers 2026-11-11) ──
    The landing as cards on the UI pass tokens; Contents | A-Z and its strip pinned under the bar while the page scrolls. */
-.ans-bar-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);opacity:0;transition:opacity var(--press)}
+.ans-bar-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-family:var(--font-serif);font-weight:600;color:var(--text-1);opacity:0;transition:opacity var(--press)}
 .is-scrolled .ans-bar-title{opacity:1}
 .ans-landing{padding:0 var(--sp-4) 48px}
 .ans-hero-c{padding-top:var(--sp-3);text-align:center}
@@ -8768,7 +8730,7 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-hero .ans-label{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);color:var(--accent)}
 .ans-hero .ans-display{font-weight:600}
 .ans-hero .ans-meta{font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
-.ans-runhead{top:calc(var(--dock-nav-bottom) - var(--bar-h) + var(--offline-strip-h,0px));left:var(--rh-left,52px);right:var(--rh-right,184px);width:auto;gap:4px;height:var(--bar-h);padding:0 4px;border:0;background:var(--bg);font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);transition:opacity var(--press),visibility var(--press)}
+.ans-runhead{top:calc(var(--dock-nav-bottom) - var(--bar-h) + var(--offline-strip-h,0px));left:var(--rh-left,52px);right:var(--rh-right,184px);width:auto;gap:4px;height:var(--bar-h);padding:0 4px;border:0;background:var(--bg);font-family:var(--font-serif);font-weight:600;color:var(--text-1);transition:opacity var(--press),visibility var(--press)}
 .ans-runhead.is-hidden{transform:none;opacity:0}
 .ans-runhead :is(.ans-runhead-num,.ans-runhead-t){display:none}
 .ans-runhead .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
