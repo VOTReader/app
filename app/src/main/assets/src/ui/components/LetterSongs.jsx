@@ -221,9 +221,10 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
       </div>
       </ListGroup>
       {/* K1: this letter's songs, every version, kept for listening with no signal. The line counts SONGS (the rows
-          above), not versions: a WTLB entry's one row said '20 versions' over 'Keep these 19 songs' (vot-ui 11-15). */}
+          above), not versions: a WTLB entry's one row said '20 versions' over 'Keep these 19 songs' (vot-ui 11-15). One song with
+          several versions says 'Keep all versions': it sits under that song's row and fits one line at 360 px (hub 11-15). */}
       <SongKeepAction ids={songs.map((s) => s.id)} noteKey={'keep-letter-' + letterKey}
-        label={(leads.length > 1 ? 'Keep these ' + leads.length + ' songs' : 'Keep this song') + (songs.length > leads.length ? ', all versions' : '')} />
+        label={leads.length > 1 ? 'Keep these ' + leads.length + ' songs' : songs.length > 1 ? 'Keep all versions' : 'Keep this song'} />
     </div>
   );
 }
