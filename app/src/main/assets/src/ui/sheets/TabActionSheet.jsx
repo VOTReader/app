@@ -49,11 +49,6 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
         <SheetHandle onClose={onDismiss} />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>
         <div className="select-sheet-title" id="tab-actions-title">Tab actions</div>
-        <div className="select-sheet-ornament" aria-hidden="true">
-          <div className="select-sheet-ornament-line" />
-          <div className="select-sheet-ornament-diamond">{"✦"}</div>
-          <div className="select-sheet-ornament-line r" />
-        </div>
         <div className="select-sheet-options">
           {/* [7] Rename — a persisted custom title that overrides the
               remembered label. Inline editor; Enter saves, empty clears. */}

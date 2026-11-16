@@ -3784,10 +3784,6 @@
     /* (.select-sheet-handle RETIRED — see the SheetHandle block by .fn-sheet.) */
     .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
     .select-sheet-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
-    .select-sheet-ornament { display:flex; align-items:center; justify-content:center; gap:0.6rem; margin:0.55rem 0 1.1rem; }
-    .select-sheet-ornament-line { height:1px; width:56px; background:linear-gradient(to right, transparent, var(--gold-dim)); }
-    .select-sheet-ornament-line.r { background:linear-gradient(to left, transparent, var(--gold-dim)); }
-    .select-sheet-ornament-diamond { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.2em; }
     .select-sheet-options { display:flex; flex-direction:column; gap:0.55rem; }
     .select-sheet-option {
       display:block; width:100%; padding:0.85rem 1rem;
@@ -5594,7 +5590,6 @@
     .ui-sheet-head-text { flex: 1; min-width: 0; }
     .ui-sheet-head .ui-sheet-lead { width: 44px; height: 44px; border-radius: 9px; }
     .select-sheet-title { margin-bottom: 14px; }
-    .select-sheet-ornament { display: none; }
     /* a picker's options: one inset group of rows; the chosen one carries the radio */
     .select-sheet-options { display: flex; flex-direction: column; gap: 0; border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
     .select-sheet-option {
