@@ -174,9 +174,10 @@ export function offlineLine(listenOff, singOff) {
 }
 
 /**
- * @param {{ volKey: string, letterId: string, letterTitle?: string, showSongs?: boolean }} props
+ * `unit` names the page in the group label: "letter" (default) or "entry" on a WTLB entry.
+ * @param {{ volKey: string, letterId: string, letterTitle?: string, showSongs?: boolean, unit?: string }} props
  */
-export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = true }) {
+export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = true, unit = 'letter' }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   useSongCatalog(showSongs);
   const letterKey = volKey + ':' + letterId;
@@ -194,7 +195,7 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
 
   return (
     <div className="letter-songs-card">
-      <ListGroup label="Songs from this letter">
+      <ListGroup label={'Songs from this ' + unit}>
       <div className="songs-list">
         {leads.slice(0, CARD_SONGS).map((lead) => {
           const fam = SongCatalog.familyById(lead.f);

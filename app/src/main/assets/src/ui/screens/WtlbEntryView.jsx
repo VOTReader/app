@@ -616,16 +616,17 @@ export function WtlbEntryView(props) {
             </div>
             {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
 
+            {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry.
+                vot-ui letter-end: above Prev/Next, so an entry ends on Next entry as a letter does (U01.3). */}
+            <div className="related-section">
+              <LetterSongsCard volKey={volKey} letterId={entry.id} letterTitle={entry.title} showSongs={showSongs} unit="entry" />
+            </div>
+
             <EndNav
               prev={prevEntry ? { label: 'Previous entry', title: prevEntry.title, onClick: () => onNavigate(prevEntry.id) }
                 : prevBoundary ? { label: prevBoundary.short ? `Previous · ${prevBoundary.short}` : 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
               next={nextEntry ? { label: 'Next entry', title: nextEntry.title, onClick: () => onNavigate(nextEntry.id) }
                 : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
-
-            {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry. */}
-            <div className="related-section">
-              <LetterSongsCard volKey={volKey} letterId={entry.id} letterTitle={entry.title} showSongs={showSongs} />
-            </div>
           </div>
         </div>
       </div>
