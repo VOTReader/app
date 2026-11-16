@@ -147,6 +147,8 @@ describe('FootnoteListSection: the Scripture Web door', () => {
     const doors = container.querySelectorAll('[data-door="web"]');
     expect(doors).toHaveLength(1);
     expect(doors[0].textContent).toContain('Show in Scripture Web');
+    // no heading names the ref at the letter end: the ref stays the title
+    expect(doors[0].querySelector('.fn-sheet-link-title').textContent).toBe('Isaiah 13:11');
     fireEvent.click(doors[0]);
     expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'isaiah', chapter: 13, verse: 11 } });
     expect(scrollIntoView).not.toHaveBeenCalled();

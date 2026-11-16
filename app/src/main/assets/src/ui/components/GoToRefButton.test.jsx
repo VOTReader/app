@@ -51,8 +51,14 @@ it('renders nothing when no onGo handler is wired', () => {
 
 it('shows a clean human label — translation tag stripped', () => {
   const { container } = render(<Btn refStr="John 14:6 (CJB)" onGo={() => {}} />);
-  expect(container.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Go to Scripture');
+  expect(container.querySelector('.fn-sheet-link-title').textContent).toBe('Go to Scripture');
+  expect(container.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('John 14:6');
+});
+
+it('refFirst (the letter-end list): the ref is the title, the action the meta', () => {
+  const { container } = render(<Btn refStr="John 14:6 (CJB)" onGo={() => {}} refFirst />);
   expect(container.querySelector('.fn-sheet-link-title').textContent).toBe('John 14:6');
+  expect(container.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Go to Scripture');
 });
 
 it('tap resolves the ref and calls onGo with a bible endpoint', () => {
@@ -76,8 +82,8 @@ it('a compound semicolon cite renders ONE button per passage (Matthew study cite
   const { container } = render(<Btn refStr="Psalm 118:14; Isaiah 12:2" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
   expect(btns.length).toBe(2);
-  expect(btns[0].querySelector('.fn-sheet-link-title').textContent).toBe('Psalm 118:14');
-  expect(btns[1].querySelector('.fn-sheet-link-title').textContent).toBe('Isaiah 12:2');
+  expect(btns[0].querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Psalm 118:14');
+  expect(btns[1].querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Isaiah 12:2');
   click(btns[1]);
   expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: 'isaiah', chapter: 12, verse: 2 });
   click(btns[0]);
@@ -88,7 +94,7 @@ it('an unparseable segment in a compound cite is skipped, parseable ones survive
   const { container } = render(<Btn refStr="see the gloss; Isaiah 12:2" onGo={() => {}} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
   expect(btns.length).toBe(1);
-  expect(btns[0].querySelector('.fn-sheet-link-title').textContent).toBe('Isaiah 12:2');
+  expect(btns[0].querySelector('.fn-sheet-link-eyebrow').textContent).toBe('Isaiah 12:2');
 });
 
 it('a book-implied continuation carries the book forward (12 of matthew.js 23 compound cites)', () => {
@@ -96,7 +102,7 @@ it('a book-implied continuation carries the book forward (12 of matthew.js 23 co
   const onGo = vi.fn();
   const { container } = render(<Btn refStr="Daniel 9:27; 11:31; 12:11" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
-  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-eyebrow').textContent))
     .toEqual(['Daniel 9:27', 'Daniel 11:31', 'Daniel 12:11']);
   click(btns[2]);
   expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: 'daniel', chapter: 12, verse: 11 });
@@ -107,7 +113,7 @@ it('a comma verse list becomes its own button (bible-studies.js "1 John 4:9-10, 
   const onGo = vi.fn();
   const { container } = render(<Btn refStr="1 John 4:9-10, 14" onGo={onGo} />);
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
-  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-eyebrow').textContent))
     .toEqual(['1 John 4:9-10', '1 John 4:14']);
   // Verse 14 used to be swallowed by parseRefStr's comma group — unreachable.
   click(btns[1]);

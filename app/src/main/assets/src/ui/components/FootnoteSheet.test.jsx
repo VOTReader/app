@@ -183,6 +183,9 @@ describe('the Scripture Web door', () => {
     const btn = webBtn();
     expect(btn).not.toBeNull();
     expect(btn.textContent).toContain('Show in Scripture Web');
+    // the sheet heads with the ref, so the row's title is the action and its meta the ref (hub 11-15)
+    expect(btn.querySelector('.fn-sheet-link-title').textContent).toBe('Show in Scripture Web');
+    expect(btn.querySelector('.fn-sheet-link-eyebrow').textContent).toBe(fn.ref);
     btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onClose).toHaveBeenCalled();
     expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'isaiah', chapter: 13, verse: 11 } });
