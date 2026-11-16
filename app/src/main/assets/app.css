@@ -6301,10 +6301,10 @@
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       width: max-content; max-width: calc(100vw - 24px);
       padding: 3px 10px 3px 4px;
-      background: var(--bg3);  /* cz7: opaque, the verse text no longer reads through */
-      border: 1px solid var(--gold-border);
-      border-radius: 999px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      background: var(--surface-1);  /* cz7: opaque, the verse text no longer reads through (vot-ui 1e: the kit float) */
+      border: 0;
+      border-radius: var(--r-pill);
+      box-shadow: var(--shadow-float);
       transition: opacity 260ms ease;
     }
     /* BACK TO THE VOICE (player brief 3d, picture 17): the reader scrolled the lit line away; one tap glides back.
@@ -6315,15 +6315,14 @@
       z-index: 195;
       display: inline-flex; align-items: center; gap: 8px;
       min-height: 44px; max-width: calc(100vw - 32px); padding: 0 20px;
-      background: var(--bg3); color: var(--gold); border: 1px solid var(--gold); border-radius: 999px;
-      font: inherit; font-size: var(--fs-15); white-space: nowrap; cursor: pointer;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      background: var(--surface-1); color: var(--text-1); border: 0; border-radius: var(--r-pill);
+      font: inherit; font-family: var(--font-ui); font-size: var(--fs-15); font-weight: 500; white-space: nowrap; cursor: pointer;
+      box-shadow: var(--shadow-float); transition: background-color var(--press) ease;
     }
-    .voice-pill svg { width: 18px; height: 18px; flex-shrink: 0; }
-    body.light .voice-pill { box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    .voice-pill svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent); }
+    .voice-pill:active { background: var(--surface-2); }
     body.autoscroll-on .voice-pill { display: none; }
-    .voice-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-    body.light .ascroll-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    .voice-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* IDLE FADE — reading text is the product; chrome that stays bright
        competes with it. Any touch restores full opacity (the component
        clears .is-dim on document touchstart/pointerdown). Kept above zero
@@ -6440,20 +6439,21 @@
     .vot-large-text .rd-bindex .ui-row-value { order: 3; flex: 1 0 100%; text-align: left; }
     /* ── end W2i readers (r-book, r-bindex, r-trans, gospels) ── */
     .ascroll-btn {
-      background: none; border: none; cursor: pointer; color: var(--gold);
+      background: none; border: none; cursor: pointer; color: var(--text-1);
       display: flex; align-items: center; justify-content: center;
-      border-radius: 999px; padding: 0; flex-shrink: 0;
+      border-radius: var(--r-pill); padding: 0; flex-shrink: 0;
+      transition: background-color var(--press) ease;
     }
     .ascroll-btn:disabled { opacity: 0.3; cursor: default; }
-    @media (hover: hover) { .ascroll-btn:not(:disabled):hover { color: var(--gold-bright); } }
-    .ascroll-btn:active:not(:disabled) { background: var(--gold-faint); }
+    @media (hover: hover) { .ascroll-btn:not(:disabled):hover { background: var(--surface-2); } }
+    .ascroll-btn:active:not(:disabled) { background: var(--surface-2); }
     .ascroll-step { width: 40px; height: 40px; line-height: 1; }
     .ascroll-toggle { width: 44px; height: 44px; }
     .ascroll-toggle svg { width: 22px; height: 22px; }
-    .ascroll-cancel { width: auto; height: 40px; padding: 0 12px; font-family: var(--font-cinzel, Georgia, serif); letter-spacing: 0.08em; text-transform: uppercase; }
+    .ascroll-cancel { width: auto; height: 40px; padding: 0 12px; color: var(--accent); font-family: var(--font-ui); font-weight: 600; }
     .ascroll-readout {
-      font-family: var(--font-cinzel, Georgia, serif);
-      color: var(--cream-dim); letter-spacing: 0.06em;
+      font-family: var(--font-ui);
+      color: var(--text-2);
       white-space: nowrap; padding-left: 4px;
     }
     .ascroll-readout-wide { padding: 0 4px 0 12px; }
@@ -6466,14 +6466,14 @@
     .ascroll-timer svg { width: 19px; height: 19px; }
     .ascroll-dwell-row { gap: 2px; padding-left: 6px; }
     .ascroll-dwell-label, .ascroll-dwell-value {
-      font-family: var(--font-cinzel, Georgia, serif);
-      color: var(--cream-dim); letter-spacing: 0.06em;
+      font-family: var(--font-ui);
+      color: var(--text-2); letter-spacing: 0.04em;
       white-space: nowrap;
     }
     /* Both sizes are restated as their --fsc- twins in the chrome-pin block
        at the end of the file (--fs-10/--fsc-10 and --fs-11/--fsc-11). */
     .ascroll-dwell-label { font-size: var(--fs-10); text-transform: uppercase; padding-right: 2px; }
-    .ascroll-dwell-value { font-size: var(--fs-11); min-width: 42px; text-align: center; color: var(--gold); }
+    .ascroll-dwell-value { font-size: var(--fs-11); min-width: 42px; text-align: center; color: var(--accent); letter-spacing: 0; }
 
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top
@@ -6504,10 +6504,10 @@
     .nav-arrow-btn { width: 30.4px; height: 30.4px; }
     .sel-style-btn { font-size: var(--fsc-16); }
     .ascroll-step { font-size: var(--fsc-20); }
-    .ascroll-cancel { font-size: var(--fsc-10); }
-    .ascroll-readout { font-size: var(--fsc-11); }
+    .ascroll-cancel { font-size: var(--fsc-13); }
+    .ascroll-readout { font-size: var(--fsc-12); }
     .ascroll-dwell-label { font-size: var(--fsc-10); }
-    .ascroll-dwell-value { font-size: var(--fsc-11); }
+    .ascroll-dwell-value { font-size: var(--fsc-12); }
 
     /* ── Text Size slider row (Settings) ── */
     .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 0 0.95rem; }   /* A01.8: the row inset */
