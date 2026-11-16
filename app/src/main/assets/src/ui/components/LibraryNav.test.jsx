@@ -8,7 +8,7 @@
 
    What these tests pin — the things a screen-level test can't see, and the
    things CSS silently depends on:
-   - the back button's EXACT class list. `nav-back-icon` is the 2.1rem glyph;
+   - the back button's EXACT class list. `nav-back-icon` is the 44 px target, `bar-back` the kit icon;
      `nav-home` is the right-cluster margin-right:auto anchor (app.css:318-319).
      Dropping either one is a visual regression with no other test coverage.
    - `nav-volume` never appears again. That single class was the whole bug.
@@ -41,10 +41,12 @@ const titles = (c) => [...c.querySelectorAll('button[title]')].map((b) => b.getA
 describe('back button', () => {
   it('carries BOTH load-bearing classes and names the destination from backLabel', () => {
     const { container } = nav({ backLabel: 'Volumes' });
-    expect(back(container).className).toBe('nav-home nav-back-icon');
+    expect(back(container).className).toBe('nav-home nav-back-icon bar-back');
     expect(back(container).getAttribute('title')).toBe('← Volumes');
     expect(back(container).getAttribute('aria-label')).toBe('Back to Volumes');
-    expect(back(container).textContent).toBe('‹');
+    // vot-ui 1b: the kit's back icon, as RootNav's utility bar draws it, not a text glyph
+    expect(back(container).textContent).toBe('');
+    expect(back(container).querySelector('svg.ui-i[data-icon="back"]')).not.toBeNull();
   });
 
   it('falls back to the raw backTitle when no backLabel is given (JournalEditor "Done")', () => {
@@ -141,8 +143,9 @@ describe('reading arrows', () => {
     });
     const arrows = container.querySelectorAll('.nav-arrows .nav-arrow-btn');
     expect(arrows).toHaveLength(2);
-    expect(arrows[0].textContent).toBe('‹');
-    expect(arrows[1].textContent).toBe('›');
+    expect(arrows[0].querySelector('svg.ui-i[data-icon="back"]')).not.toBeNull();
+    expect(arrows[1].querySelector('svg.ui-i[data-icon="chev"]')).not.toBeNull();
+    expect(arrows[0].textContent + arrows[1].textContent).toBe('');
     expect(arrows[0].getAttribute('title')).toBe('Previous');
     expect(arrows[1].getAttribute('title')).toBe('Next');
     expect(arrows[0].getAttribute('aria-label')).toBe('Previous letter');
