@@ -192,7 +192,7 @@ function Box({ state, removing, label, onClick }) {
     <button type="button" role="checkbox" aria-checked={state === 'all' ? true : state === 'some' ? 'mixed' : false}
       aria-label={label} className={'dl-box is-' + state + (removing && state === 'none' ? ' is-remove' : '')} onClick={onClick}>
       <span className="ui-check" data-state={state === 'all' ? 'on' : state === 'some' ? 'some' : 'off'} aria-hidden="true">
-        <svg viewBox="0 0 24 24">{state === 'all' ? <CheckGlyph /> : state === 'some' ? <path d="M7 12h10" /> : null}</svg>
+        {state === 'all' ? <svg viewBox="0 0 24 24"><CheckGlyph /></svg> : state === 'some' ? <svg viewBox="0 0 24 24"><path d="M7 12h10" /></svg> : null}
       </span>
     </button>
   );

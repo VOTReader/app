@@ -174,9 +174,12 @@ export function introWords(unit) {
   const note = Array.isArray(unit.noteLine)
     ? unit.noteLine.filter((/** @type {any} */ s) => s && s.t !== 'fn').map((/** @type {any} */ s) => String(s.v || '')).join('')
     : typeof unit.noteLine === 'string' ? unit.noteLine : '';
+  // a header line that only repeats the title (a vision's "from" line is its title) is left out: the title shows above
+  const bare = (/** @type {string} */ t) => t.replace(/\s*\([^)]*\)/g, '').replace(/[’']/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+  const title = bare(String(unit.title || ''));
   return [unit.from, unit.spoken, unit.forLine, note]
     .map((s) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim() : ''))
-    .filter(Boolean).join(' · ');
+    .filter((s) => s && bare(s) !== title).join(' · ');
 }
 
 /**

@@ -131,6 +131,11 @@ describe('liveLineAt', () => {
     });
     expect(liveLineAt(current(), 4.5).now).toBe('Many things you must overcome in the years ahead;');
   });
+  it('leaves out a header line that only repeats the title', () => {
+    globalThis.colLetterArr = () => [{ ...LETTER, title: 'A Vision (Jesus) of the World', from: 'A Vision of the World' }];
+    playLetter();
+    expect(liveLineAt(current(), 1)).toBe(null);
+  });
 });
 
 describe('rowWords', () => {
