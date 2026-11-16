@@ -739,7 +739,7 @@ describe('bottom dock stack (cz1)', () => {
   it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
     expect(decl('\n    .find-pill {', 'background')).toBe('var(--bg)'); // r-find (W2h): the find row is the page's own ground
     for (const sel of ['\n    .ascroll-pill {']) {
-      expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
+      expect(decl(sel, 'background'), sel).toBe('var(--surface-1)'); // vot-ui 1e: the kit's opaque float surface (was --bg3)
     }
     expect(decl('.vot-toast {', 'background')).toBe('var(--surface-3)'); // MERGE2: the notice pill, an opaque surface
     expect(bare).not.toMatch(/\.ascroll-pill\.is-dim\s*\{\s*opacity/);
