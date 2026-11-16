@@ -318,9 +318,12 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     // Each selector's OWN rule (the title and text also appear in comma lists shared with the tour
     // card, which keep growing: the card is the only way out of the tour and must stay readable).
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const sel of ['\\.tour-inline \\.tour-prompt-text', '\\.tour-inline \\.tour-prompt-title', '\\.tour-inline \\.tour-btn']) {
+    for (const sel of ['\\.tour-inline \\.tour-prompt-text', '\\.tour-inline \\.tour-prompt-title']) {
       expect(bare, sel).toMatch(new RegExp('[\\n\\r]\\s*' + sel + ' \\{[^}]*font-size:\\s*var\\(--ts-'));
     }
+    // The strip's button: its own rule's size is the later px cap; the base var(--ts-value) under it was dead CSS,
+    // removed by tools/css-dead-base.py (vot-ui 11-15).
+    expect(bare, '.tour-inline .tour-btn').toMatch(/[\n\r]\s*\.tour-inline \.tour-btn \{[^}]*font-size:\s*min\(var\(--fs-14\),\s*18px\)/);
   });
   /* THE TOUR CARD'S OWN LINES (the Tour Reviewer, 2026-09-13, five measured defects on 5fc80c69): the
      card's type had no caps (the strip's were added 09-12), so at Text Size 3 on a 360x800 phone the

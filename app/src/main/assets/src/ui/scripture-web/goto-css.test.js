@@ -104,7 +104,9 @@ describe('the compact box takes the header row and keeps above the keyboard', ()
      bottom, which is the turned root's right end, so there it takes width, not height */
   it('turned (a portrait phone), the keyboard takes the right end, not the height', () => {
     const r = declsFor('.sw-root.sw-rotated > .sw-goto.is-compact');
-    expect(r).toMatch(/right:\s*calc\(16px \+ max\(var\(--sw-goto-inset, 0px\), var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)\)/);
+    // the live right: is the later rule's max(clear of the top bar, 16px past the keyboard); the earlier calc() it
+    // overrode was dead CSS, removed by tools/css-dead-base.py (vot-ui 11-15)
+    expect(r).toMatch(/right:\s*max\(calc\(68px \+ var\(--sw-topbar-pad\)\),\s*calc\(16px \+ max\(var\(--sw-goto-inset, 0px\), var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)\)\)/);
     expect(r).toMatch(/max-height:\s*calc\(100% - var\(--sw-chrome-top\) - 8px\)/);
   });
 });
