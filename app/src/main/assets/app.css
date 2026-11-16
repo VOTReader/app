@@ -691,6 +691,9 @@
       }
       /* While the tour card is up a toast sits beside it, never over its Back (TourOverlay sets the two lengths). */
       body.tour-open { --dock-toast-bottom: var(--tour-toast-bottom, var(--dock-message)); --dock-toast-top: var(--tour-toast-top, auto); }
+      /* While the selection bar is up (it fills the bottom), a toast (Highlighted · Undo) goes under the top bar, never over the
+         bar's rows (vot-ui 11-16 sweep item 4). */
+      body:has(.sel-toolbar) { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
 
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
@@ -3351,6 +3354,9 @@
     .build-letter { min-height:var(--tap); }
     .build-letter .build-row-name { font-size:var(--ts-control); font-weight:400; }
     .build-bar { position:sticky; bottom:0; z-index:2; margin:0.75rem -1rem 0; padding:0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); box-shadow:0 -1px 0 var(--hairline); background:var(--bg2); }
+    /* the screen ends 16 px above the tab bar (body.tabbar-on .screen-scroll padding); the sticky footer reaches down over it so no
+       sliver of the list shows between them (hub 11-16 nit on fix-1) */
+    body.tabbar-on .build-bar { bottom:-16px; }
     /* mw-pb1: the bar never outgrows the screen - the picks scroll inside it (about two rows of chips, less at large text) */
     .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; max-height:min(5.6rem, 22vh); overflow-y:auto; overscroll-behavior:contain; }
     .build-chip { display:inline-flex; align-items:center; gap:2px; max-width:100%; padding-left:12px; overflow-wrap:anywhere; border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-value); font-weight:500; }
