@@ -10,6 +10,7 @@
    chapter; absent (legacy callers) the panels render exactly as before. */
 
 import { renderCommentaryCite } from './ModeToggle.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   const hasScriptures = scriptures && scriptures.length > 0;
@@ -28,7 +29,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                 <button key={i} className="scripture-ref" onClick={() => onScriptureClick && onScriptureClick(s)}>
                   <span className="scripture-ref-tag">{s.ref}</span>
                   <span className="scripture-ref-text">{s.cite}</span>
-                  <span className="scripture-ref-chevron" aria-hidden="true">{"›"}</span>
+                  <UiIcon name="chev" size="sm" className="scripture-ref-chevron" />
                 </button>
               ) : (
                 <div key={hlKeyBase ? hlKeyBase + '-s' + i : i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>

@@ -2232,7 +2232,7 @@
       .scripture-ref-text { flex: 1; min-width: 0; color: var(--text-1); font-size: var(--fs-16); font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
       .scripture-ref-note { cursor: default; }
       .scripture-ref-note .scripture-ref-text { color: var(--text-2); font-family: var(--font-serif); font-style: italic; font-weight: 400; }
-      .scripture-ref-chevron { flex: none; color: var(--text-3); font-size: var(--fs-20); line-height: 1; }
+      .scripture-ref-chevron { flex: none; color: var(--text-3); }   /* the kit chev (UiIcon), vot-ui */
       .study-panels .vot-note { display: block; width: 100%; margin: 0; padding: 14px var(--card-pad); border: 0; border-radius: 0; background: none; color: inherit; font: inherit; text-align: left; box-sizing: border-box; }
       .study-panels .vot-note + .vot-note { border-top: 1px solid var(--hairline); }
       .vot-note-tappable { cursor: pointer; }
