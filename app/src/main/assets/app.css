@@ -1105,11 +1105,7 @@
          to decongest the nav — the label ate the room the reading dot + tabs
          button now need). Bigger glyph = a clear, thumb-friendly target that
          still costs far less width than the old text. */
-      .nav-back-icon {
-        font-size: var(--fs-36); padding: 0 0.35rem; letter-spacing: 0;
-        min-width: 2.75rem; justify-content: center; line-height: 1;
-        max-width: none; opacity: 1;
-      }
+      .nav-back-icon { padding: 0 0.35rem; min-width: 2.75rem; justify-content: center; max-width: none; opacity: 1; }
       /* `.nav-volume` was deleted 2026-07-30. It was LetterView's back button
          only, and because it sat AFTER .nav-back-icon at equal specificity (here
          AND in the chrome-pin block) it silently shrank that arrow to 11.52px on
@@ -1129,15 +1125,12 @@
       .nav-btn:disabled { opacity: 0.22; cursor: default; }
       /* ── Minimal arrow-only prev/next — clean circular chrome for chapter/letter nav ── */
       .nav-arrow-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 1.9rem; height: 1.9rem; padding: 0;
-        background: transparent; border: 1px solid var(--gold-border); border-radius: 50%;
-        color: var(--gold); cursor: pointer; font-size: var(--fs-16); line-height: 1;
-        font-family: 'Cinzel', serif; font-weight: 500;
-        transition: all 0.18s ease; flex-shrink: 0;
-        -webkit-tap-highlight-color: transparent;
-        position: relative;
+        position: relative; display: inline-flex; align-items: center; justify-content: center;
+        width: 1.9rem; height: 1.9rem; padding: 0; flex-shrink: 0;
+        background: none; border: 0; border-radius: var(--r-pill); color: var(--text-1); cursor: pointer;
+        transition: background-color var(--press) ease; -webkit-tap-highlight-color: transparent;
       }
+      .nav-arrow-btn .ui-i { opacity: 0.88; }
       /* Invisible hit-area halo: lifts the 30px circle to a ~44px-tall target
          without growing the visual (bigger circles float over reading text,
          and px growth risks the 360px-nav overflow class of bug). Horizontal
@@ -1147,9 +1140,9 @@
          Previous's visible edge — same asymmetric-halo pattern as
          .tabs-nav-btn. */
       .nav-arrow-btn::before { content: ''; position: absolute; inset: -7px -2px; border-radius: 50%; }
-      .nav-arrow-btn:active:not(:disabled) { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); transform: scale(0.94); }
-      @media (hover: hover) { .nav-arrow-btn:hover:not(:disabled) { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); } }
-      .nav-arrow-btn:disabled { opacity: 0.22; cursor: default; }
+      .nav-arrow-btn:active:not(:disabled) { background: var(--surface-2); }
+      @media (hover: hover) { .nav-arrow-btn:hover:not(:disabled) { background: var(--surface-1); } }
+      .nav-arrow-btn:disabled { opacity: 0.3; cursor: default; }
       /* ── STICKY CHAPTER/LETTER PREV-NEXT ARROWS ─────────────────── */
       /* Sits inside the scroll container so it sticks to the top of the
          visible area just below the nav bar. Buttons are large, premium,
@@ -1184,39 +1177,20 @@
       /* Nav-bar bubbles: only visible when arrowLayout === 'nav' */
       .nav-arrows { display: none; }
       body.arrows-nav .nav-arrows { display: flex; }
+      /* vot-ui 1b: the kit's floating control. Solid surface-1 (opaque, so the glyph reads over any verse
+         without a blur), the float shadow, the kit icons; pressed = one surface step, for --press. 44 px in px:
+         2.75rem grew with the reader's text size (88 px at 2.0). */
       .chapter-nav-sticky-arrow {
         pointer-events: auto;
-        width: 2.75rem; height: 2.75rem; padding: 0;
+        width: var(--tap); height: var(--tap); padding: 0;
         display: inline-flex; align-items: center; justify-content: center;
-        /* No backdrop-filter (2026-07-28): these arrows float OVER the live
-           scrolling text — the blur re-rasterized on every scrolled frame.
-           Slightly higher alpha keeps the glyph legible over any verse. */
-        background: rgba(0,0,0,0.85);
-        border: 1px solid var(--gold-border); border-radius: 50%;
-        color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-weight: 500;
-        font-size: var(--fs-24); line-height: 1;
-        transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(200,164,86,0.06);
+        background: var(--surface-1); border: 0; border-radius: 50%; color: var(--text-1); cursor: pointer;
+        box-shadow: var(--shadow-float);
+        transition: background-color var(--press) ease;
         -webkit-tap-highlight-color: transparent;
       }
-      body.light .chapter-nav-sticky-arrow {
-        background: rgba(247,242,232,0.82); border-color: var(--gold-border); color: var(--gold);
-        box-shadow: 0 3px 10px rgba(122,92,16,0.18);
-      }
-      .chapter-nav-sticky-arrow:active:not(:disabled) {
-        background: var(--gold); color: var(--bg); transform: scale(0.92);
-        border-color: var(--gold);
-      }
-      @media (hover: hover) {
-        .chapter-nav-sticky-arrow:hover:not(:disabled) {
-          background: rgba(0,0,0,0.88); border-color: var(--gold);
-          color: var(--gold-bright);
-        }
-        body.light .chapter-nav-sticky-arrow:hover:not(:disabled) {
-          background: rgba(247,242,232,0.95); border-color: var(--gold); color: var(--gold);
-        }
-      }
+      .chapter-nav-sticky-arrow:active:not(:disabled) { background: var(--surface-2); }
+      @media (hover: hover) { .chapter-nav-sticky-arrow:hover:not(:disabled) { background: var(--surface-2); } }
       .chapter-nav-sticky-arrow:disabled { opacity: 0.18; cursor: default; }
 
       /* ── CHAPTER INDEX ── */
@@ -6541,14 +6515,14 @@
        floating chrome here. */
     .top-nav { gap: 1.92px; padding: 6px 6px 6px 4px; padding-top: calc(var(--inset-top, 0px) + 6px); min-height: calc(var(--inset-top, 0px) + var(--bar-h)); box-sizing: border-box; }
     .nav-home { font-size: var(--fsc-12); padding: 7.2px 8.8px; }
-    .nav-back-icon { font-size: var(--fsc-36); padding: 0 5.6px; min-width: 44px; }
+    .nav-back-icon { padding: 0 5.6px; min-width: 44px; }
     .nav-theme-btn, .nav-search-btn, .nav-more-btn, .settings-gear-btn { padding: 8px; }  /* the gear (POL2: its 0.5rem grew the volume bars at text 2) and the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
     .reading-dot-nav { width: 40px; height: 40px; }
     .tabs-nav-btn { font-size: var(--fsc-11); gap: 4px; }
     .top-nav .tabs-nav-btn-count { font-size: var(--fsc-12); }
     .nav-arrows { gap: 4.8px; }
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
-    .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
+    .nav-arrow-btn { width: 30.4px; height: 30.4px; }
     .sel-style-btn { font-size: var(--fsc-16); }
     .ascroll-step { font-size: var(--fsc-20); }
     .ascroll-cancel { font-size: var(--fsc-10); }

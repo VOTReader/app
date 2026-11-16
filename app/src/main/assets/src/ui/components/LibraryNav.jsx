@@ -16,8 +16,10 @@
 
    Load-bearing details, do not "clean up":
    - the back button keeps BOTH classes: `nav-home` (the right-cluster
-     margin-right:auto anchor, app.css:318-319) and `nav-back-icon` (the
-     2.1rem glyph, app.css:544 + the px pin at the end of app.css).
+     margin-right:auto anchor, app.css:318-319) and `nav-back-icon` (its
+     44 px target, app.css + the px pin at the end of app.css). Since vot-ui
+     1b it is the kit's bar back (`bar-back`, UiIcon back), as RootNav draws
+     it: no text glyph.
    - HomeBtn's title="Home" is the anchor selector on screens that have it.
    - NavButtons' title strings ("Settings"/"History"/"Search") are what the
      Settings visibility toggles select on (app.css:320-338).
@@ -37,6 +39,8 @@
      onSettings / onHistory / onSearch / theme / onThemeChange
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from './UiIcon.jsx';
+
 export function LibraryNav(opts) {
   opts = opts || {};
   // Two historical conventions reconciled: backLabel names the DESTINATION
@@ -50,12 +54,12 @@ export function LibraryNav(opts) {
     <>
       {opts.hideBack ? null : (
         <button
-          className="nav-home nav-back-icon"
+          className="nav-home nav-back-icon bar-back"
           onClick={opts.onBack}
           title={backTitle}
           aria-label={backAria}
         >
-          {"‹"}
+          <UiIcon name="back" />
         </button>
       )}
       {opts.showHome === false ? null : <HomeBtn beforeGo={opts.onHomeBefore || null} />}
@@ -68,14 +72,14 @@ export function LibraryNav(opts) {
             onClick={arrows.onPrev}
             title={arrows.prevTitle || "Previous"}
             aria-label={arrows.prevLabel || arrows.prevTitle || "Previous"}
-          >{"‹"}</button>
+          ><UiIcon name="back" size="sm" /></button>
           <button
             className="nav-arrow-btn"
             disabled={!!arrows.nextDisabled}
             onClick={arrows.onNext}
             title={arrows.nextTitle || "Next"}
             aria-label={arrows.nextLabel || arrows.nextTitle || "Next"}
-          >{"›"}</button>
+          ><UiIcon name="chev" size="sm" /></button>
         </div>
       ) : null}
       <NavButtons
