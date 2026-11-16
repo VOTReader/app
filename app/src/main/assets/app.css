@@ -2255,16 +2255,8 @@
       }
       /* ── end W2i readers (r-study2) ── */
 
-      /* Links */
-      .study-links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-      .study-link {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-        text-transform: uppercase; color: var(--gold);
-        background: rgba(200,164,86,0.08); border: 1px solid rgba(200,164,86,0.25);
-        border-radius: 3px; padding: 0.3rem 0.7rem;
-        text-decoration: none; transition: all var(--transition);
-      }
-      @media (hover: hover) { .study-link:hover { background: rgba(200,164,86,0.16); border-color: var(--gold); color: var(--gold-bright); } }
+      /* Further study (Matthew chapters): kit link rows in a ui-group (vot-ui letter-end), set off from the body. */
+      .study-further { margin-top: var(--sp-8); }
       /* ── BOTTOM NAV ── */
       .bottom-nav {
         /* minmax(0, 1fr), not 1fr: 1fr's auto minimum let the caps label's min-content push the two

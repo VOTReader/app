@@ -4,6 +4,7 @@
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { EndNav } from '../components/EndNav.jsx';
+import { ListLink } from '../components/UiParts.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
@@ -254,13 +255,11 @@ export function ChapterView(props) {
           <div className="reading-end" />
 
           {showStudy && hasLinks && (
-            <div className="study-panel-group" style={{ marginTop: "2rem" }}>
-              <div className="study-panel-group-title ui-label">Further Study</div>
-              <div className="study-links">
+            <div className="study-panel-group study-further">
+              <div className="study-panel-group-title ui-label">Further study</div>
+              <div className="study-links ui-group">
                 {chapter.links.map((link, i) => (
-                  <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="study-link">
-                    {link.label}
-                  </a>
+                  <ListLink key={i} title={link.label} href={link.url} className="study-link" />
                 ))}
               </div>
             </div>
