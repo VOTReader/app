@@ -3152,6 +3152,13 @@
     .vot-large-text .rd-tiles, .vot-large-text .rd-tiles.is-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .vot-large-text .np-custom { flex-wrap: wrap; }
     .vot-large-text .np-custom-label { flex-basis: 100%; }
+    .vot-large-text .listen-continue-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+    .vot-large-text input { text-overflow: ellipsis; }
+    .vot-large-text .note-row-source-line { flex-wrap: wrap; row-gap: 2px; }
+    .vot-large-text .note-row-source { white-space: normal; flex: 1 1 calc(100% - 24px); }
+    .vot-large-text .note-row-preview { line-height: 1.35; }
+    .vot-large-text .note-row-anchor { line-height: 1.35; }
+    .vot-large-text .ans-media-page .ans-gallery { grid-template-columns: minmax(0, 1fr); }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
     :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool, .bottom-nav-card):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
