@@ -166,8 +166,23 @@ export function rowWords(unit, row) {
 }
 
 /**
+ * A letter's header lines as the voice reads them before the body ('' when it has none): who it is from, to whom
+ * it was spoken, for whom, and its note line (footnote markers left out).
+ * @param {any} unit @returns {string}
+ */
+export function introWords(unit) {
+  const note = Array.isArray(unit.noteLine)
+    ? unit.noteLine.filter((/** @type {any} */ s) => s && s.t !== 'fn').map((/** @type {any} */ s) => String(s.v || '')).join('')
+    : typeof unit.noteLine === 'string' ? unit.noteLine : '';
+  return [unit.from, unit.spoken, unit.forLine, note]
+    .map((s) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim() : ''))
+    .filter(Boolean).join(' · ');
+}
+
+/**
  * The card's words at `time`: the clause being read (`now`) and up to two clauses before it in the same block and
- * sentence (`lead`). Null before the first timed clause, or with no rows or no text.
+ * sentence (`lead`). Before the first timed clause, the letter's header lines
+ * (introWords); null with no header, no rows or no text.
  * @param {any} track @param {number} time
  * @returns {{ lead: string, now: string, key: string, at: number } | null} at: how far the voice is through `now`, 0..1
  */
@@ -179,9 +194,14 @@ export function liveLineAt(track, time) {
   const frags = liveFragments(track, sectionKey);
   if (!frags) return null;
   const i = fragmentAt(frags, time);
-  if (i < 0) return null;
   const unit = unitOfKey(key);
   if (!unit) return null;
+  // Before the first timed clause the voice reads the letter's header (about 25 s: "From The Lord ... For All Those
+  // Who Have Ears to Hear"), which has no rows; the card shows those lines then, not an empty box (sweep item 7).
+  if (i < 0) {
+    const words = introWords(unit);
+    return words ? { lead: '', now: words, key, at: Math.max(0, Math.min(1, time / Math.max(1, frags[0][0]))) } : null;
+  }
   const now = rowWords(unit, frags[i]);
   if (!now) return null;
   const lead = [];

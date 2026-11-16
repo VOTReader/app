@@ -117,6 +117,20 @@ describe('liveLineAt', () => {
     delete globalThis.colLetterArr;
     expect(liveLineAt(current(), 4.5)).toBe(null);
   });
+
+  it('shows the header lines while the voice reads them, before the first timed clause (sweep item 7)', () => {
+    const withHead = {
+      ...LETTER, from: 'From The Lord, Our God and Savior', spoken: 'The Word of The Lord Spoken to Timothy',
+      forLine: 'For All Those Who Have Ears to Hear', noteLine: [{ t: 'text', v: '(Regarding the dead' }, { t: 'fn', v: '1' }, { t: 'text', v: ')' }],
+    };
+    globalThis.colLetterArr = () => [withHead];
+    playLetter();
+    expect(liveLineAt(current(), 1)).toMatchObject({
+      lead: '', key: 'one:chosen', at: 0.5,
+      now: 'From The Lord, Our God and Savior · The Word of The Lord Spoken to Timothy · For All Those Who Have Ears to Hear · (Regarding the dead)',
+    });
+    expect(liveLineAt(current(), 4.5).now).toBe('Many things you must overcome in the years ahead;');
+  });
 });
 
 describe('rowWords', () => {

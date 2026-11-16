@@ -84,7 +84,6 @@
   R('.jrn-grow-quote::after, .jrn-grow-quote > textarea { padding: 2px 0; }');
   R('.jrn-block-textarea { background: none; color: var(--cream-dim); outline: none; border-radius: 4px; transition: background 0.15s; min-height: 28px; }');
   R('body.light .jrn-block-textarea { color: #3a3528; }');
-  R('.jrn-block-textarea:focus { background: rgba(212, 183, 114, 0.04); }');
   R('.jrn-block-textarea.h2 { color: var(--gold); }');
   R('.jrn-block-quote { border-left: 3px solid var(--gold); padding: 10px 0 10px 18px; margin: 4px 0; }');
   R('.jrn-block-quote textarea { background: none; color: var(--cream); outline: none; }');
@@ -297,8 +296,10 @@
   // Plainness (session 3): TEXT blocks show their delete × as a whisper until
   // the block is engaged — one always-on control per paragraph read as
   // clutter. Media/card blocks (no focus state) keep the default visibility.
-  R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.62; }');   // LIGHT2: a control's graphic keeps 3:1 (was .22, 1.35:1)
-  R('.jrn-block-edit.is-text:focus-within .jrn-block-del-btn { opacity: 0.8; }');
+  // Sweep item 8 (11-16): a text block's × shows only on the block being written (one x on the page, not one per
+  // paragraph); a tap on an unfocused block's corner lands in its text, never on a hidden delete.
+  R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0; pointer-events: none; }');
+  R('.jrn-block-edit.is-text:focus-within .jrn-block-del-btn { opacity: 0.8; pointer-events: auto; }');
   R('.jrn-block-edit.is-text .jrn-block-del-btn:hover { opacity: 1; }');
   // Every editor block reads as a discrete gold-outlined card. Text, quote and
   // divider blocks (which have no inner embed border of their own) get the same
@@ -313,7 +314,7 @@
   R('.jrn-editor .jrn-blocks { padding-left: 44px; }');
   R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.62; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }');
   R('.jrn-block-drag-btn:hover { opacity: 1; color: var(--gold); }');
-  R('body.light :is(.jrn-block-del-btn, .jrn-block-drag-btn), body.light .jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.8; }');   // LIGHT2: the light gold-dim at .62 read 2.65:1
+  R('body.light :is(.jrn-block-del-btn, .jrn-block-drag-btn) { opacity: 0.8; }');   // LIGHT2: the light gold-dim at .62 read 2.65:1
   R('.jrn-block-drag-btn:active { cursor: grabbing; }');
   R('.jrn-block-drag-btn svg { width: 15px; height: 15px; pointer-events: none; }');
   R('.jrn-block-drag-btn::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; }');
@@ -401,7 +402,7 @@
   R('.jrn-saved-ind { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); padding: 0 var(--sp-1); margin-left: auto; }');
   // Writing: no boxes; the block being written sits on surface-1 (mock .blk.on).
   R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: none; border-radius: var(--r-field); background: none; padding: 8px 10px; transition: background var(--press); }');
-  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { background: var(--surface-1); }');
+  // Sweep item 8: the block being written keeps the plain page (no grey box behind a paragraph); the caret marks it.
   // The bottom bar: Insert (gold) + Photo, Voice, Excerpt, above the system bar and any player.
   R('.jrn-ebar { position: fixed; left: 0; right: 0; bottom: calc(max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); z-index: 40; display: flex; gap: var(--sp-2); padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--hairline); overflow-x: auto; }');
   R('.jrn-ebar .ui-btn { flex: 0 0 auto; gap: 6px; }');
