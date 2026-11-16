@@ -2,6 +2,8 @@
    TabActionSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiButton } from '../components/UiParts.jsx';
+
 export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, onCloseToRight, onRename, onTogglePin, onMove = null, onDismiss }) {
   // Both actions here close SEVERAL tabs at once with no undo snapshot
   // (unlike the single × close, which gets an Undo toast) — so each is
@@ -57,22 +59,24 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
               remembered label. Inline editor; Enter saves, empty clears. */}
           {renaming != null ? (
             <div className="tab-rename-row">
-              <input
-                className="tab-rename-input"
-                type="text"
-                value={renaming}
-                maxLength={60}
-                placeholder="Tab name"
-                aria-label="Tab name"
-                autoFocus
-                onChange={(e) => setRenaming(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { onRename(renaming); onDismiss(); }
-                  if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); }
-                }}
-              />
-              <button className="tab-rename-save" onClick={() => { onRename(renaming); onDismiss(); }}>Save</button>
-              <button className="tab-rename-cancel" onClick={() => setRenaming(null)}>Cancel</button>
+              <label className="ui-field is-square tab-rename-field">
+                <input
+                  className="tab-rename-input"
+                  type="text"
+                  value={renaming}
+                  maxLength={60}
+                  placeholder="Tab name"
+                  aria-label="Tab name"
+                  autoFocus
+                  onChange={(e) => setRenaming(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { onRename(renaming); onDismiss(); }
+                    if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); }
+                  }}
+                />
+              </label>
+              <UiButton kind="primary" small className="tab-rename-save" onClick={() => { onRename(renaming); onDismiss(); }}>Save</UiButton>
+              <UiButton kind="text" small className="tab-rename-cancel" onClick={() => setRenaming(null)}>Cancel</UiButton>
             </div>
           ) : (
             <button className="select-sheet-option" data-autofocus onClick={() => setRenaming((tab && tab.customTitle) || '')}>

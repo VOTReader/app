@@ -4342,13 +4342,9 @@
     .tab-move-row { display:flex; gap:0.5rem; }
     .tab-move-row .select-sheet-option { flex:1; }
     .tab-move-btn:disabled { opacity:0.42; cursor:not-allowed; }
-    .tab-rename-row { display:flex; gap:0.45rem; align-items:center; padding:0.35rem 0; }
-    .tab-rename-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); padding:0.5rem 0.7rem; outline:none; }
-    .tab-rename-input:focus { border-color:var(--gold-dim); }
-    body.light .tab-rename-input { background:rgba(0,0,0,0.04); }
-    .tab-rename-save, .tab-rename-cancel { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.45rem 0.7rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; }
-    .tab-rename-save { color:var(--gold-bright); background:var(--gold-faint); border-color:var(--gold-dim); }
-    .tab-rename-cancel { color:var(--cream-muted); }
+    /* vot-ui 1e: the rename row is a kit field (surface-2 on the sheet) and two kit small buttons. */
+    .tab-rename-row { display:flex; gap:var(--sp-2); align-items:center; padding:var(--sp-1) 0; }
+    .tab-rename-row .tab-rename-field { flex:1; min-width:0; background:var(--surface-2); color:var(--text-1); }
     /* New tab: a tile the size of a card. */
     .tab-card-new { min-height:208px; align-items:center; justify-content:center; gap:var(--sp-2); font:inherit; color:var(--text-2); }
     .tab-card-new-plus { display:flex; color:var(--text-2); }
