@@ -110,6 +110,10 @@ describe('the hero row: LISTEN and HEAR IT SUNG', () => {
 });
 
 describe('SONGS FROM THIS LETTER', () => {
+  it('names a WTLB entry as an entry (unit="entry"; vot-ui letter-end)', () => {
+    render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} unit="entry" />);
+    expect(document.querySelector('.letter-songs-card .ui-label').textContent).toBe('Songs from this entry');
+  });
   it('lists the letter\'s songs as in-app rows: a tap on the row plays (W-02), its menu opens the song page', () => {
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     const card = document.querySelector('.letter-songs-card');
