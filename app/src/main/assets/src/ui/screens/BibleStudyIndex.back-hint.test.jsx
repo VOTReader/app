@@ -23,7 +23,7 @@ describe('BibleStudyIndex — the tap-through Back pill', () => {
     render(<BibleStudyIndex {...common} backHint={{ title: 'Studies' }} onTapThroughBack={onTapThroughBack} />);
     const pill = document.querySelector('.back-hint-pill');
     expect(pill).not.toBeNull();
-    expect(pill.textContent.replace(/\s+/g, ' ').trim()).toBe('‹Back to Studies');
+    expect(pill.textContent.replace(/\s+/g, ' ').trim()).toBe('Back to Studies');
     fireEvent.click(pill);
     expect(onTapThroughBack).toHaveBeenCalledTimes(1);
   });

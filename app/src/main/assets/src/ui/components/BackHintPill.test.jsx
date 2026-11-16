@@ -1,6 +1,6 @@
 /* BackHintPill — the "‹ Back to …" pill above a reading view (search200 UX Track D 2).
    ──────────────────────────────────────────────────────────────────────────
-   The pill's lead ("‹ Back to") is Cinzel capitals; the place after it is the
+   The pill's lead (the kit back icon + "Back to") is in the UI face; the place after it is the
    italic title slot, kept in its own case because it is a real name ("The Last
    Trump"). Round 1's search pill put the word "results" in that slot, so it
    read "BACK TO results": two cases in one label. A destination named by a word
@@ -22,7 +22,8 @@ describe('BackHintPill', () => {
     expect(pill.getAttribute('aria-label')).toBe('Back to results');
     expect(pill.querySelector('.back-hint-title')).toBeNull();
     const lead = pill.querySelector('.back-hint-lead');
-    expect(lead.textContent.replace(/\s+/g, ' ').trim()).toBe('‹Back to results');
+    expect(lead.textContent.replace(/\s+/g, ' ').trim()).toBe('Back to results');
+    expect(lead.querySelector('svg.ui-i[data-icon="back"]')).not.toBeNull();
     fireEvent.click(pill);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -31,7 +32,7 @@ describe('BackHintPill', () => {
     const { container } = render(<BackHintPill backHint={{ title: 'The Last Trump', volumeLabel: 'Volume Two' }} onClick={() => {}} />);
     const pill = container.querySelector('.back-hint-pill');
     expect(pill.getAttribute('aria-label')).toBe('Back to Volume Two · The Last Trump');
-    expect(pill.querySelector('.back-hint-lead').textContent).toBe('‹Back to');
+    expect(pill.querySelector('.back-hint-lead').textContent).toBe('Back to');
     expect(pill.querySelector('.back-hint-title').textContent).toBe('Volume Two · The Last Trump');
   });
 
