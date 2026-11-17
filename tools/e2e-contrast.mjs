@@ -524,10 +524,16 @@ async function runTheme(theme) {
   // Answers' sheets: more, a command tablet, media, saved, a topic, its share card, on this page
   await step('answers-sheets', async () => {
     await tab('Read'); await tap('^topics & doctrines'); await sleep(1500);
-    await must(click('.ans-chip.is-more'), 'more chip'); await stop('ans-more'); await esc();
+    // 0125: the question chips are three links and "More questions", whose sheet holds the rest
+    await must(click('.ans-q.is-more', '^more questions$'), 'More questions'); await stop('ans-more'); await esc();
     if (await click('.ans-tablet', null, 3)) { await stop('ans-cmd'); await esc(); }
-    if (await click('.ans-tile-btn', 'chart')) { await sleep(900); await stop('ans-media'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
-    if (await click('.ans-tile-btn', 'saved')) { await sleep(900); await stop('ans-saved'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
+    // 0125: the landing's new surfaces: an opened topic group, and its A-Z mode
+    await must(click('.ans-group-row', null, 3), 'a topic group'); await sleep(500); await stop('ans-group');
+    await must(click('.ans-head-link', '^A–Z$'), 'A–Z'); await sleep(900); await stop('ans-az');
+    await must(click('.ans-head-link', '^By group$'), 'By group'); await sleep(600);
+    // Charts and videos, Saved answers: rows on the landing since 0125 (were tiles)
+    if (await click('.ans-icon-row, .ans-tile-btn', 'chart')) { await sleep(900); await stop('ans-media'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
+    if (await click('.ans-icon-row, .ans-tile-btn', 'saved')) { await sleep(900); await stop('ans-saved'); await click('[aria-label="Back to Answers"]'); await sleep(900); }
     await ev(() => { const h = document.querySelector('.ans-hero-c'); if (h) h.closest('.screen-scroll').scrollTop = 0; });
     await tap('the sabbath.$'); await sleep(1200); await stop('ans-topic');
     // the landing has no card door since Answer of the day went (492955f64): a topic's ⋯ menu opens it

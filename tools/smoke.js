@@ -457,15 +457,20 @@
       return /letter-body|letter-para|letter-intro/.test(document.body.innerHTML);
     });
     await step('Answers', async function () {
-      // Home card -> landing -> Other Topics -> a topic (the AOGCG redesign: the
+      // Home card -> landing -> A-Z -> a topic (the AOGCG redesign: the
       // site's own contents). The tablets paint at once; the topic rows wait for
       // their own lazy file (src/data/answers.js, utils/sync-loaders.js): a deploy
       // or an APK ignore pattern that drops it leaves the lists empty forever, and
       // fails HERE.
       if (!clickByText(/Topics & Doctrines/)) return false;
       var ok = false;
-      // 29 Contents rows since the Main Page row left Contents (ANS1, 492955f64); an empty or half list still fails.
-      for (var w = 0; w < 60 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.ans-tablet').length === 10 && document.querySelectorAll('.ans-landing-b .ans-row').length >= 25; }
+      // 0125: the landing shows the topic groups (13) once the topic file is in; A-Z lists every topic (121).
+      // An empty or half list still fails.
+      for (var w = 0; w < 60 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.ans-tablet').length === 10 && document.querySelectorAll('.ans-landing-b .ans-group-row').length >= 10; }
+      if (!ok) return false;
+      if (!clickByText(/^A–Z\s*$/)) return false;
+      ok = false;
+      for (var z = 0; z < 40 && !ok; z++) { await sleep(150); ok = document.querySelectorAll('#ans-panel-az .ans-row').length >= 100; }
       if (!ok) return false;
       if (!clickByText(/^The Coming of The Lord/)) return false;
       await sleep(400);
