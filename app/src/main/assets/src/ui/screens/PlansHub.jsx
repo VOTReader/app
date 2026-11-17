@@ -21,7 +21,7 @@
 
 import { usePlanNav, planNavMounted, keepPlanNav, pushPlanView, replacePlanView, popPlanView, planNavToList } from '../../utils/plan-nav.js';
 import { endPlanSession } from '../../utils/plan-session.js';
-import { usePlanRuns, saveRun, shortDate, runRow, continueRun, startOverRun } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, saveRun, shortDate, runRow, continueRun, startOverRun, countOwnOnlyRun } from '../../utils/plan-runs-view.js';
 import { showUndoToast } from '../../utils/toast.js';
 import { runStatus, newRun, dayNum, itemKinds, againPace } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
@@ -176,6 +176,22 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     });
   };
 
+  // 0450: "Count only this plan's reading": a new run from today with the plan's own (dated) reading; the old one goes
+  // to Past plans, and the toast's Undo removes the new one and puts the old back exactly as it was stored.
+  const ownOnly = (/** @type {any} */ prev) => {
+    const pair = countOwnOnlyRun(prev, new Date());
+    if (!pair) return;
+    saveRun(pair[0]);
+    saveRun(pair[1]);
+    replacePlanView({ v: 'plan', id: pair[1].id });
+    showUndoToast(MANAGE_TOAST, 'Started again from today', () => {
+      const s = _store();
+      if (s && typeof s.remove === 'function') s.remove(pair[1].id);
+      saveRun(prev);
+      replacePlanView({ v: 'plan', id: prev.id });
+    });
+  };
+
   // 2310: a changed plan is a new run; the toast's Undo removes it and puts the plan back exactly as it was.
   // Only its name changed: the same run renamed, and Undo puts the old name back.
   const edited = (/** @type {any} */ prev, /** @type {any} */ fresh) => {
@@ -214,6 +230,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
         <PlanSettings run={run} now={now} tracksOf={planTracks} onClose={() => setSettings(false)}
           onStartOver={() => { setSettings(false); popPlanView(); startOver(run); }}
           onEdit={run.plan === 'custom' ? () => { setSettings(false); popPlanView(); setBuildStep(1); pushPlanView({ v: 'build', edit: run.id }); } : undefined}
+          onOwnOnly={() => { setSettings(false); popPlanView(); ownOnly(run); }}
           onStopped={(prev) => { setSettings(false); stopped(prev); }} />
       ) : null;
     }
@@ -232,7 +249,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     gear = true;
     body = (
       <PlanPage key={run.id} run={run} now={now} name={title} settingsOpen={settings} onSettings={setSettings} catchUpAtOpen={!!v.catchUp}
-        onStartOver={() => { setSettings(false); startOver(run); }}
+        onStartOver={() => { setSettings(false); startOver(run); }} onOwnOnly={() => { setSettings(false); ownOnly(run); }}
         onEdit={run.plan === 'custom' ? () => { setSettings(false); setBuildStep(1); pushPlanView({ v: 'build', edit: run.id }); } : undefined}
         onRead={(day, k, span) => readDay(run, day, k, span)} onListen={onListen} tracksOf={planTracks}
         onSchedule={(at) => pushPlanView({ v: 'schedule', id: run.id, at })} onDaySheet={setDaySheet}

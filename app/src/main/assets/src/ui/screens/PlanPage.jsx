@@ -26,7 +26,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runStatus, schedule, sections, streak, itemsLabel, itemsWords, minutesFor, itemKinds, dayItems, totalDays,
-  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate } from '../../data/plan-engine.js';
+  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate, canCountOwnOnly } from '../../data/plan-engine.js';
 import { planDef, bookTitle } from '../../data/plan-catalog.js';
 import { saveRun, stopRun, shortDate, itemRef, planStatus, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, isReminderTime, lastActive } from '../../utils/plan-reminder.js';
@@ -112,10 +112,11 @@ function WeekAudio({ plan, from, tracksOf }) {
 /**
  * Manage plan (the bar's Manage). Stop and Start over are one tap each: the toast that follows has Undo (PlansHub).
  * @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: (prev: any) => void, onStartOver?: () => void,
- *   onEdit?: () => void }} props
+ *   onEdit?: () => void, onOwnOnly?: () => void }} props
  *   onEdit (2310): a custom plan's "Change what's in it" (the builder on its picks; what is read stays read)
+ *   onOwnOnly (0450): "Count only this plan's reading", shown when the plan counts reads from before it began
  */
-export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver, onEdit }) {
+export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver, onEdit, onOwnOnly }) {
   const st = runStatus(run, now);
   const def = planDef(run.plan);
   const paces = paceChoices(def, run);
@@ -164,6 +165,14 @@ export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOv
             </PlanOptRow>
           ) : null}
           {tracksOf ? <WeekAudio plan={run} from={st.day} tracksOf={tracksOf} /> : null}
+          {/* 0450: what the tap does is said before it (hub: it starts again, keeps the plan's own reading, gives up being ahead) */}
+          {onOwnOnly && canCountOwnOnly(run) ? (
+            <PlanOptRow label="Read before">
+              <p className="plan-opt-text plan-own-only-text">{countOf(run.credited, unitWord(run).replace(/s$/, '')) + ' you had read before this plan began count toward it.'}</p>
+              <button type="button" className="ui-btn plan-own-only-btn" onClick={onOwnOnly}>Count only this plan’s reading</button>
+              <p className="plan-opt-note">Starts the plan again from today. What you read for it stays ticked; you give up the days the earlier reading put you ahead.</p>
+            </PlanOptRow>
+          ) : null}
         </div>
       )}
       <div className="plan-sheet-actions">
@@ -230,10 +239,10 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
  * @param {{ run: any, now: Date, settingsOpen: boolean, onSettings: (open: boolean) => void, catchUpAtOpen?: boolean, onStartOver?: () => void,
  *   onRead: (day: number, k?: string, span?: number) => void, onListen?: (refs: any[], name: string) => void, tracksOf?: (refs: any[]) => any[],
  *   onSchedule: (at?: number) => void, onDaySheet: (day: number) => void, onNote?: (day: number) => void, noteOf?: (day: number) => string | null,
- *   onStopped: (prev: any) => void, name: string, onEdit?: () => void }} props
+ *   onStopped: (prev: any) => void, name: string, onEdit?: () => void, onOwnOnly?: () => void }} props
  *   catchUpAtOpen: open on Catch up (Home's and the list's "N days behind")
  */
-export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = false, onStartOver, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name, onEdit }) {
+export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = false, onStartOver, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name, onEdit, onOwnOnly }) {
   const st = runStatus(run, now);
   const status = planStatus(run, now, st);
   const [adjust, setAdjust] = React.useState(() => catchUpAtOpen && status.key === 'behind');
@@ -393,7 +402,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       ) : null}
 
       {adjust && !st.finished ? <CatchUpSheet run={run} now={now} onClose={() => setAdjust(false)} onReadTwo={(day, span) => onRead(day, undefined, span)} /> : null}
-      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStartOver={onStartOver} onEdit={onEdit}
+      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStartOver={onStartOver} onEdit={onEdit} onOwnOnly={onOwnOnly}
         onStopped={(prev) => { onSettings(false); onStopped(prev); }} /> : null}
     </div>
   );

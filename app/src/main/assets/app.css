@@ -3000,6 +3000,7 @@
     .upnext-head > .upnext-manage { position:relative; margin:0 0 0 auto; padding:0; border:0; background:none; color:var(--text-2); text-transform:none; letter-spacing:0; white-space:nowrap; cursor:pointer; }
     .upnext-manage::after { content:''; position:absolute; inset:-10px -8px; }
     .upnext-text { display:flex; flex-direction:column; flex:1; min-width:0; }
+    .upnext-offer.upnext-plan .upnext-title { white-space:normal; }   /* 0450: 'You finished <plan>' whole at 360 px */
     .upnext-eyebrow { font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); text-transform:uppercase; color:var(--accent); line-height:var(--lh-label); }
     .upnext-title { margin-top:2px; color:var(--text-1); font-size:var(--ts-headline); font-weight:600; line-height:var(--lh-headline); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upnext-place { color:var(--text-2); font-weight:400; }
@@ -3439,7 +3440,7 @@
     .plans-hub, .plan-sheet, .plan-daydone, .plan-strip, .plan-end { --pl-ui: var(--font-ui); }
     .plan-bar-title { flex: 1; }
     .plan-bar-title.is-long { font-size: var(--ts-headline); line-height: var(--lh-headline); }
-    :is(.plan-bar-title.is-long, .vot-large-text .plan-bar-title) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }   /* 0430: wraps, two lines, before Manage goes */
+    :is(.plan-bar-title.is-long, .vot-large-text .plan-bar-title) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal; }   /* 0430: wraps (three lines at 360 px), before Manage goes */
     /* 0430: at large text beside Manage the title had a few letters ('Volu… and…'): it takes its own row under back and Manage */
     .vot-large-text .top-nav:has(> .plan-manage-btn) { flex-wrap: wrap; }
     .vot-large-text .top-nav:has(> .plan-manage-btn) > .bar-back { margin-right: auto; }
@@ -3475,7 +3476,7 @@
     .plan-tick { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid var(--gold-dim); border-radius: 50%; box-sizing: border-box; color: var(--bg); }
     .plan-tick[data-done="1"] { border-color: var(--gold); background: var(--gold); }
     /* Buttons are the shared .ui-btn (primary, plain, is-wide); here only the worded ones. */
-    .plan-text-btn { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-15); cursor: pointer; }
+    .plan-text-btn { min-height: var(--tap); min-width: var(--tap); padding: 0 6px; border: 0; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-15); cursor: pointer; }
     .plan-text-btn:disabled { opacity: 0.5; cursor: default; }
     .plan-link { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gold-border); }
     .plan-danger { color: var(--tone-danger); }
@@ -3515,17 +3516,21 @@
     .plan-opt-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
     .plan-opt-text { flex: 1 1 auto; color: var(--cream); font-size: var(--fs-16); }
     .plan-opt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+    .plan-own-only-text { flex-basis: 100%; margin: 0; font-family: var(--pl-ui); font-size: var(--fs-15); line-height: 1.4; }
     .plan-opt-note { width: 100%; margin: 2px 0 0; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.4; }
-    .plan-days { display: flex; flex-wrap: nowrap; gap: 4px; }
+    .plan-days { display: flex; flex-wrap: nowrap; gap: 10px; }   /* 0450: a 44 px pitch, so each day's 44 px press is its own */
+    .plan-opt:has(.plan-days) { flex-direction: column; align-items: stretch; gap: 6px; }   /* seven days need the row's width: the label goes over them */
+    .plan-opt:has(.plan-days) .plan-opt-label { width: auto; }
+    .plan-opt .plan-days { justify-content: space-between; width: 100%; max-width: 22rem; }
     .plan-day-toggle { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; cursor: pointer; }
-    .plan-day-toggle::after { content: ''; position: absolute; inset: -5px -2px; }   /* a 44 px press */
+    .plan-day-toggle::after { content: ''; position: absolute; inset: -5px; }   /* a 44 px press */
     .plan-day-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
     .plan-switch { position: relative; flex: none; width: 52px; height: 32px; margin-left: auto; padding: 0; border: 1px solid var(--gold-border); border-radius: 999px; background: var(--border); cursor: pointer; }
     .plan-switch::after { content: ''; position: absolute; inset: -6px -2px; }
     .plan-switch-knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--cream-muted); transition: transform 0.15s ease; }
     .plan-switch[aria-checked="true"] { border-color: var(--gold); background: var(--gold); }
     .plan-switch[aria-checked="true"] .plan-switch-knob { transform: translateX(20px); background: var(--bg); }
-    .plan-date, .plan-time { min-height: 40px; padding: 0 10px; border: 1px solid var(--gold-border); border-radius: 12px; background: transparent; color: var(--cream); font-family: var(--pl-ui); font-size: var(--fs-15); color-scheme: dark; }
+    .plan-date, .plan-time { min-height: var(--tap); padding: 0 10px; border: 1px solid var(--gold-border); border-radius: 12px; background: transparent; color: var(--cream); font-family: var(--pl-ui); font-size: var(--fs-15); color-scheme: dark; }
     body.light .plan-date, body.light .plan-time { color-scheme: light; }
     .plan-time-text { display: none; }
     .plan-start { margin-top: 22px; text-align: center; }
@@ -3608,7 +3613,7 @@
     .plan-manage-link { position: relative; flex: none; align-self: stretch; margin: 0 var(--sp-3) 0 0; padding: 0 2px; border: 0; background: none; color: var(--gold); font-family: var(--font-ui); font-size: var(--ts-meta); white-space: nowrap; cursor: pointer; }
     .plan-sched-status { margin: 0 0 10px; color: var(--gold); font-family: var(--font-ui); font-size: var(--ts-meta); }
     /* 0130: Pause, Start over and Stop drawn as buttons (outlined) at the sheet's foot; Resume stays the solid one. */
-    .plan-sheet-actions .ui-btn:not(.is-primary) { background: none; border: 1px solid var(--gold-border); }
+    :is(.plan-sheet-actions .ui-btn:not(.is-primary), .plan-own-only-btn) { background: none; border: 1px solid var(--gold-border); }
     /* 2310: at large text a fact tile's word ('chapters', 'reading') is wider than a third of the phone: one tile a row, number beside its words */
     .vot-large-text :is(.plan-facts, .prg-tiles) { grid-template-columns: minmax(0, 1fr); }
     .vot-large-text :is(.plan-fact, .prg-tile) { display: flex; flex-direction: row; align-items: baseline; gap: 0 10px; }
