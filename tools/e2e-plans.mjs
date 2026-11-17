@@ -6,6 +6,8 @@
       finished and the stopped plan.
    C  Catch up from the list opens the plan page on the Catch up sheet with its three ways forward.
    M  Manage plan (the bar's Manage): Pause, Start over, Stop; Stop is one tap and the toast's Undo puts it back.
+   S  a new plan starts at zero (0245, Corbin 11-17): a reader with Genesis 1-50 read starts Bible in a Year; the preview has
+      no Already read row, the run holds no tick, Home's card says Day 1 with Genesis 1-3, and a read of Genesis 1 ticks it today.
    Run: node tools/e2e-plans.mjs [--home-only] [--shots DIR] [--json FILE]   (after npm run build; ~40 s)
    Exit 1 on a finding (except --home-only, which only measures). */
 import puppeteer from 'puppeteer';
@@ -25,7 +27,7 @@ const W = 412, H = 915;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [];
 const need = (ok, msg) => { if (!ok) fails.push(msg); };
-const out = { home: {}, list: null, catchUp: null, manage: null };
+const out = { home: {}, list: null, catchUp: null, manage: null, start: null };
 
 const { server, url } = await serveOwnTree();
 const profile = join(tmpdir(), 'vot-plans-' + process.pid);
@@ -149,6 +151,46 @@ try {
     need(JSON.stringify(actions) === JSON.stringify(['Pause plan', 'Start over', 'Stop plan']), `M actions: ${JSON.stringify(actions)}`);
     need(afterStop.status === 'stopped' && afterStop.list && /^Stopped Three|^Stopped Bible in a Year/.test(afterStop.toast), `M stop: ${JSON.stringify(afterStop)}`);
     need(undone.status === 'running' && undone.rows === 7, `M undo: ${JSON.stringify(undone)}`);
+
+    // S: a new plan starts at zero, whatever was read before (0245). Genesis 1-50 go in the read record, no plans.
+    await page.evaluate(async () => {
+      const st = window.StateStore.get() || {};
+      const readItems = { ...(st.readItems || {}) };
+      for (let c = 1; c <= 50; c++) readItems['v1:genesis:' + c] = 1;
+      window.StateStore.set({ ...st, readItems });
+      await window.StateStore.whenSaved();
+    });
+    await seed([]);
+    const marks = await page.evaluate(() => Object.keys((window.StateStore.get() || {}).readItems || {}).filter((k) => /^v1:genesis:/.test(k)).length);
+    await clickText(/^Library$/, '.tabbar-tab, button');
+    await clickText(/^Reading plans/);
+    await clickText(/^Bible in a Year: Genesis/);
+    await page.waitForSelector('.plan-preview');
+    const preview = await page.evaluate(() => ({
+      already: /Already read|Count my|read already/.test(document.querySelector('.plan-preview').textContent),
+      week: [...document.querySelectorAll('[aria-label="Your first week"] .plan-day-portion')].map((e) => e.textContent),
+    }));
+    await shot('start-preview');
+    await clickText(/^Start plan$/);
+    await sleep(500);
+    const run = await page.evaluate(() => { const r = window.ReadingPlanStore.active()[0]; return r ? { plan: r.plan, ticks: Object.keys(r.ticks || {}).length, credited: r.credited || 0 } : null; });
+    await boot();
+    await page.waitForFunction(() => !!document.querySelector('.upnext [data-plan]'));
+    await sleep(500);
+    const home = await page.evaluate(() => { const r = document.querySelector('.upnext [data-plan]'); return { eyebrow: (r.querySelector('.upnext-eyebrow') || r).textContent.trim(), text: r.textContent }; });
+    await shot('start-home');
+    const today = await page.evaluate(async () => {
+      window.ReadingPlanStore.noteRead('genesis', 1);
+      await window.ReadingPlanStore.whenSaved();
+      const d = new Date();
+      return { ticks: window.ReadingPlanStore.active()[0].ticks, key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') };
+    });
+    out.start = { marks, preview, run, home, ticks: today.ticks };
+    need(marks === 50, `S seed: ${marks} Genesis read marks, not 50`);
+    need(!preview.already && JSON.stringify(preview.week) === JSON.stringify(['Genesis 1-3', 'Genesis 4-7', 'Genesis 8-10']), `S preview: ${JSON.stringify(preview)}`);
+    need(run && run.plan === 'bible-year' && run.ticks === 0 && run.credited === 0, `S run: ${JSON.stringify(run)}`);
+    need(/\bDay 1\b/.test(home.eyebrow) && /Genesis 1-3/.test(home.text), `S Home card: ${JSON.stringify(home)}`);
+    need(JSON.stringify(today.ticks) === JSON.stringify({ 'genesis:1': today.key }), `S read after start: ${JSON.stringify(today)}`);
   }
 } catch (e) {
   try { await page.screenshot({ path: join(tmpdir(), 'vot-plans-fail.png') }); console.error('[plans] failure shot', join(tmpdir(), 'vot-plans-fail.png'), await page.evaluate(() => [...document.querySelectorAll('button')].slice(0, 10).map((b) => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 24)).join(' | '))); } catch { /* no page */ }
@@ -160,6 +202,6 @@ try {
 }
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
 console.log(JSON.stringify(out.home));
-if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage }));
+if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage, start: out.start }));
 if (fails.length) { console.log(fails.length + ' finding(s):\n' + fails.map((f) => '  ' + f).join('\n') + '\nFAIL'); process.exit(HOME_ONLY ? 0 : 1); }
 console.log('PASS');

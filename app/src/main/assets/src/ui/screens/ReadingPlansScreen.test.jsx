@@ -120,17 +120,44 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(runs()[0].start).toBe(todayKey(new Date()));
   });
 
-  it('Already read: "Count my N" credits the chapters read before; they never make a day done today', () => {
-    const isRead = (b, c) => b === 'genesis' && Number(c) <= 3;
+  // Corbin 11-17 02:28: "reading plans should not be measured by what I've already read, but by a new, independent count
+  // kept by the new plan". A reader who has read all of Genesis starts Bible in a Year at day 1, with nothing counted.
+  it('a new plan starts at zero: Genesis 1-50 read before, Bible in a Year is at day 1 with nothing done, and a read afterwards ticks day 1 today', () => {
+    const isRead = (b, c) => b === 'genesis' && Number(c) <= 50;
     render(<PlansHub {...base({ isRead })} />);
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
-    expect(screen.getByText('Count my 3 chapters')).toBeTruthy();
+    expect(screen.queryByText('Already read')).toBeNull();
+    expect(screen.queryByText(/^Count my /)).toBeNull();
+    const week = within(screen.getByRole('list', { name: 'Your first week' })).getAllByRole('listitem');
+    expect(week.map((li) => li.querySelector('.plan-day-portion').textContent)).toEqual(['Genesis 1-3', 'Genesis 4-7', 'Genesis 8-10']);
     fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
-    const st = runStatus(runs()[0], new Date());
-    expect(st.itemsDone).toBe(3);
+    const run = runs()[0];
+    expect(run.ticks).toEqual({});
+    expect(run.credited).toBeUndefined();
+    const st = runStatus(run, new Date());
+    expect(st.itemsDone).toBe(0);
+    expect(st.percent).toBe(0);
+    expect(st.ahead).toBe(0);
+    expect(st.behind).toBe(0);
     expect(st.doneToday).toBe(false);
-    expect(st.day).toBe(1);                       // today's portion is the first day not read
-    expect(screen.getByText(/^Today · Genesis 4-7/)).toBeTruthy();
+    expect(screen.getByText(/^Today · Genesis 1-3/)).toBeTruthy();
+    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    expect(runs()[0].ticks).toEqual({ 'genesis:1': todayKey(new Date()) });
+    expect(dayItems(runs()[0], 0).map((it) => it.k)).toEqual(['genesis:1', 'genesis:2', 'genesis:3']);   // day 1
+  });
+
+  it('a plan that starts tomorrow counts nothing read today: its card still says Day 1 (0245, C6)', () => {
+    const isRead = (b, c) => b === 'genesis' && Number(c) <= 50;
+    render(<PlansHub {...base({ isRead })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tomorrow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    expect(runs()[0].ticks).toEqual({});
+    const card = document.querySelector('.plan-today');
+    expect(card.querySelector('.root-eyebrow').textContent).toMatch(/^Starts /);
+    expect(card.querySelector('.plan-today-title').textContent).toBe('Genesis 1-3');
+    expect(card.querySelector('.plan-today-sub').textContent).toMatch(/^Day 1 · about /);
   });
 
   it('Days: the seven toggles, at least one always on', () => {
@@ -549,7 +576,7 @@ describe('changing a custom plan after it starts (2310)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.getByRole('list', { name: 'Your picks' }).textContent).toMatch(/Ruth.*Jonah/);
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
-    expect(screen.getByText(/4 read already/)).toBeTruthy();
+    expect(screen.getByText(/4 read so far/)).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Plan name' }).value).toBe('Two short books');
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
     expect(runs().length).toBe(1);
