@@ -1160,6 +1160,10 @@ export function createBackupFlow(ctx) {
       if (deleteResults[0] !== 'deleted' || deleteResults[1] !== 'deleted') {
         throw new Error('A personal-data database could not be deleted' + (stillDeleting ? ' in time' : ''));
       }
+      // The voice memos are app-private files too (Android: cacheDir/recordings), so the native memo folder goes with
+      // the rest. Taken only now, like the copies below: a wipe that did not finish keeps the memos the journal may still
+      // need to recover. Best-effort; a no-op on web, which keeps no memos on the device.
+      try { PlatformBridge.nativeClearRecordings(); } catch (_e) { /* best-effort native memo wipe */ }
       // datasafe 10-05: the automatic snapshots copy the data being cleared; they
       // go with it (the phone app keeps them outside the database, so the deletes
       // above did not reach them).

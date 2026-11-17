@@ -422,6 +422,41 @@ class NativeAudioRecorder(private val context: Context) {
     }
 
     /**
+     * Clear All My Data: delete every served memo still on disk, any raw recording a killed process left
+     * in cacheDir, and forget every claim.
+     *
+     * Takes [lock], unlike the three readers above, because it deletes files that stop()
+     * writes under the same lock: the wipe lands wholly before or wholly after a memo is
+     * finished, never in the middle of one. A memo being recorded right now is not in
+     * recordings/ yet (its temp file sits in cacheDir until stop() moves it), so the live
+     * recording is left alone. Best-effort; never throws.
+     */
+    fun clearRecordings(): Unit = synchronized(lock) {
+        try {
+            servedNames.clear()
+            recordingsDir().listFiles()?.forEach { file ->
+                if (file.isFile) {
+                    try { file.delete() } catch (e: Exception) { Timber.w(e, "clearRecordings failed for %s", file.name) }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "clearRecordings could not enumerate recordings/")
+        }
+        // Raw audio a process killed mid-recording left in cacheDir. Nothing else claims it (start() removes only its
+        // own previous temp file), so it would outlive the wipe. The live recording's file is recordFile, and it stays.
+        val live = recordFile?.name
+        try {
+            context.cacheDir.listFiles()?.forEach { file ->
+                if (file.isFile && file.name.startsWith("votrec_") && file.name.endsWith(".m4a") && file.name != live) {
+                    try { file.delete() } catch (e: Exception) { Timber.w(e, "clearRecordings failed for %s", file.name) }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "clearRecordings could not enumerate cacheDir")
+        }
+    }
+
+    /**
      * Every served memo still on disk, as a JSON array string. NEVER null.
      *
      * journal-3 2b: the recovery half. [readRecording] answers "give me this memo",

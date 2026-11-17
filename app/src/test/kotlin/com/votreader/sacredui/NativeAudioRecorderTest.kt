@@ -308,6 +308,37 @@ class NativeAudioRecorderTest {
         )
     }
 
+    // ─── Clear All My Data: clearRecordings ────────────────────────────────
+    // The wipe empties the served folder, forgets every claim, and takes the raw temp audio a crash left in
+    // cacheDir. It never takes the live recording's own temp file, the one recordFile names.
+
+    @Test
+    fun `clearRecordings empties the served folder and leaves a recording in progress alone`() {
+        val first = File(servedDir(), servedName()).apply { writeBytes(ByteArray(4)) }
+        val second = File(servedDir(), servedName()).apply { writeBytes(ByteArray(4)) }
+        // The live recording's own temp file: start() writes votrec_*.m4a to cacheDir and names it recordFile.
+        val live = File(application.cacheDir, "votrec_live.m4a").apply { writeBytes(ByteArray(4)) }
+        setRecordFile(live)
+        // Raw audio a process killed mid-recording left behind: nothing claims it, so the wipe takes it.
+        val orphan = File(application.cacheDir, "votrec_orphan.m4a").apply { writeBytes(ByteArray(4)) }
+        // Not the recorder's: the wipe reaches only votrec_*.m4a in cacheDir, never the rest of it.
+        val unrelated = File(application.cacheDir, "garden-keep.bin").apply { writeBytes(ByteArray(4)) }
+
+        recorder.clearRecordings()
+
+        assertFalse(first.exists(), "every served memo goes")
+        assertFalse(second.exists(), "every served memo goes")
+        assertEquals("[]", recorder.listRecordings(), "the served folder is empty afterwards")
+        assertTrue(live.exists(), "a recording in progress is its recordFile, so the wipe leaves it")
+        assertFalse(orphan.exists(), "a crash's raw voice audio in cacheDir goes with the rest")
+        assertTrue(unrelated.exists(), "only votrec_*.m4a is the recorder's; the rest of cacheDir stays")
+    }
+
+    /** Sets the recorder's private recordFile: the temp file start() names for the recording in progress. */
+    private fun setRecordFile(f: File?) {
+        NativeAudioRecorder::class.java.getDeclaredField("recordFile").apply { isAccessible = true }.set(recorder, f)
+    }
+
     // ─── journal-3 2b: nativeListRecordings ────────────────────────────────
     // The recovery half. readRecording answers "give me this memo", which needs a name
     // JS already has; the lister answers "what is still here", which is the only

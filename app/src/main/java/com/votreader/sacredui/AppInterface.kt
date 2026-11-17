@@ -447,6 +447,11 @@ class AppInterface(
     @JavascriptInterface
     fun nativeListRecordings(): String = vm.audioRecorder.listRecordings()
 
+    /** Clear All My Data (backup-flow's wipe): every served memo on disk goes. A memo being recorded now is
+     *  still in cacheDir, not recordings/, so the live recording is untouched. */
+    @JavascriptInterface
+    fun nativeClearRecordings() { vm.audioRecorder.clearRecordings() }
+
     @JavascriptInterface
     fun setZoomEnabled(enabled: Boolean) {
         host.postToUi {
