@@ -372,7 +372,14 @@ export function createPagerGesture(io) {
     setStyle(io.getTrack(), SETTLE_TRANSITION, `translateX(${trackEnd}px)`);
     const pk = io.getPeek(dir);
     if (pk) setStyle(pk, SETTLE_TRANSITION, `translateX(${peekEnd}px)`);
-    settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
+    // rel6 (gate e2e-tabs, audio-letter-next): the settle's clock starts at the first frame that draws the slide,
+    // not at the lift. A main thread busy right after the lift (a letter turning while it plays) held the frame
+    // ~360 ms: the 300 ms timer fired first and finishSettle swapped the page in with the slide never drawn, so
+    // the page sat a third across, then snapped. Started from a frame, the slide is always seen, only later.
+    settleToken = io.schedule(() => {
+      if (!settling) return;
+      settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
+    });
   }
 
   // THE single exit path — every ending (normal lift, cancel, heal, force-
@@ -556,11 +563,16 @@ export function usePagerGesture(scrollRef, pager, ensurePeeks = null) {
       },
       reducedMotion: () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      // a frame's token is { raf } so cancelScheduled never mistakes it for a timer's id (rel6: a settle can be
+      // waiting on either)
       schedule: (fn, ms) => {
         if (ms) return setTimeout(fn, ms);
-        return (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(fn) : setTimeout(fn, 0);
+        return (typeof requestAnimationFrame === 'function') ? { raf: requestAnimationFrame(fn) } : setTimeout(fn, 0);
       },
-      cancelScheduled: (tok) => clearTimeout(tok),
+      cancelScheduled: (tok) => {
+        if (tok && typeof tok === 'object') { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(tok.raf); }
+        else clearTimeout(tok);
+      },
       hasSelection: () => typeof window !== 'undefined' && !!window.getSelection && !!String(window.getSelection()),
       trace: (msg) => {
         try { console.warn('[pageswipe] ' + msg); } catch (_e) { /* trace must never wedge */ }

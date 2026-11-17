@@ -376,13 +376,34 @@ async function main() {
       });
       window.__swMo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
     });
-    // When the page itself handles the lift (a loaded page can take hundreds of ms): the settle runs from there.
-    await page.evaluate(() => { window.__tEnd = null; window.addEventListener('touchend', () => { window.__tEnd = Date.now() / 1000; }, { capture: true, once: true }); });
+    // When the page itself handles the lift (a loaded page can take hundreds of ms): the settle runs from there, or
+    // (rel6) from the frame the slide starts in: the page times its settle from that frame (use-pager-gesture), and
+    // a thread busy after the lift moves it (search-landing-back: the slide still ending at +490 ms, lift +6 ms).
+    await page.evaluate(() => {
+      window.__tEnd = null; window.__tSlide = null;
+      window.addEventListener('touchend', () => { window.__tEnd = Date.now() / 1000; }, { capture: true, once: true });
+      const onSlide = (e) => {
+        if (!e.target || !e.target.classList || !e.target.classList.contains('pager-track')) return;
+        window.__tSlide = Date.now() / 1000; document.removeEventListener('transitionstart', onSlide, true);
+      };
+      document.addEventListener('transitionstart', onSlide, true);
+    });
     const tRel = wall();
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
-    const settle = settleStart(tRel, await page.evaluate(() => window.__tEnd));
+    const [tEnd, tSlide] = await page.evaluate(() => [window.__tEnd, window.__tSlide]);
+    const settle = settleStart(tRel, Math.max(tEnd || 0, tSlide || 0) || null);
     if (settle.lagMs > 300) await sleep(settle.lagMs);   // the settle started late: let it finish on camera
+    // rel6 (search-landing-next): under load the screencast can send nothing after the lift, so the newest frame was
+    // mid-slide and S1 compared the neighbour with a half-slid "settled" page (mad 20, the whole page 38 px off). A
+    // screencast sends its first frame when it starts: restart it for a frame of the settled page; none: S0 below.
+    const settledBy = settle.from + 0.36;
+    if (!frames.some((f) => f.t >= settledBy)) {
+      await cdp.send('Page.stopScreencast');
+      await cdp.send('Page.startScreencast', { format: 'png', maxWidth: W, maxHeight: H, everyNthFrame: 1 });
+      for (let w = 0; w < 40 && !frames.some((f) => f.t >= settledBy); w++) await sleep(50);
+    }
+    const settledSeen = frames.some((f) => f.t >= settledBy);
     await cdp.send('Page.stopScreencast');
     cdp.off('Page.screencastFrame', onFrame);
     // Frames arrive out of order under load; every reading below (release, settled, after the settle) is by time.
@@ -418,13 +439,14 @@ async function main() {
     r.releaseDx = r.release >= 0 ? frames[r.release].dx : null; if (nudged) r.nudged = true;
     const relDone = r.releaseDx === dx;
     need(relDone, `S0 ${label} x${throttle}: no frame of the finished drag before the lift (the walk's camera, not the page: release frame at dx ${r.releaseDx} of ${dx})`);
-    if (relDone) need(r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
-    need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms${r.endLagMs ? `; lift handled +${r.endLagMs} ms late` : ''})`);
+    need(settledSeen, `S0 ${label} x${throttle}: no frame of the settled page after the lift, even from a restarted screencast (the walk's camera, not the page)`);
+    if (relDone && settledSeen) need(r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
+    if (settledSeen) need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms${r.endLagMs ? `; lift handled +${r.endLagMs} ms late` : ''})`);
     need(r.inkRatio == null || r.inkRatio >= LIMITS.inkRatio, `S3 ${label} x${throttle}: a drag frame showed a blank or half-built neighbour (ink ratio ${r.inkRatio})`);
     need(!domDiff, `S4 ${label} x${throttle}: the neighbour at release is not the page it becomes (${domDiff})`);
     // rel4: an S0/S1/S2 keeps its frames even without --shots (in the temp dir; the path is printed), so a gate's
     // finding comes with pictures.
-    if (!relDone || !(r.drag && r.drag.mad <= LIMITS.dragMad) || r.settleJump > LIMITS.settleJump) {
+    if (!relDone || !settledSeen || !(r.drag && r.drag.mad <= LIMITS.dragMad) || r.settleJump > LIMITS.settleJump) {
       const dir = join(SHOTS || join(tmpdir(), 'vot-e2e-tabs-fail-' + process.pid), `fail-${label}-x${throttle}`); mkdirSync(dir, { recursive: true });
       console.log(`[swipe] ${label} x${throttle}: frames kept in ${dir}`);
       frames.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(3, '0')}_${Math.round((f.t - tRel) * 1000)}ms${i === r.release ? '_release' : ''}${i === r.settleJumpIdx ? '_jump' : ''}.png`), Buffer.from(f.url.split(',')[1], 'base64')));

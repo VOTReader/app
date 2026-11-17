@@ -227,7 +227,10 @@ describe('createPagerGesture controller', () => {
     g.start(startEv(300, 100));
     g.move(moveEv(250, 100, 0));
     g.move(moveEv(120, 100, 40));
-    g.end(); // settle timer runs synchronously → finishSettle(committed)
+    g.end();
+    // rel6: the settle's clock starts at the first frame of the slide (one rAF), before the commit; nothing after it.
+    expect(rafs.length).toBe(1);
+    rafs.shift()();   // the frame → the settle timer runs synchronously → finishSettle(committed)
     expect(calls.commits).toEqual(['next']);
     expect(g.isSettling()).toBe(false);
     // Parked + de-promoted IN the finishSettle call itself:
@@ -635,5 +638,44 @@ describe('fling after a pause (s04.3)', () => {
   });
   it('a lift that comes well after the last move zeroes the velocity (no commit)', () => {
     expect(flick(1300)).toEqual([]);
+  });
+});
+
+describe('the settle clock starts at the first frame of the slide (rel6)', () => {
+  it('a frame held back by a busy thread delays the swap; the slide still gets its full time after that frame', () => {
+    const rafs = [], timers = [];
+    const { io, calls, track } = makeIO({ schedule: (fn, ms) => { (ms ? timers : rafs).push({ fn, ms }); return ms ? 5 : { raf: 1 }; } });
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40));
+    g.end();
+    expect(track.style.transform).toMatch(/translateX\(-/);   // the slide is set...
+    expect(timers.filter((t) => t.ms !== 3000)).toEqual([]);  // ...but no swap timer runs before it is drawn
+    expect(calls.commits).toEqual([]);
+    rafs.shift().fn();                                         // the first frame (however late)
+    const settle = timers.filter((t) => t.ms !== 3000);
+    expect(settle.map((t) => t.ms)).toEqual([300]);
+    expect(calls.commits).toEqual([]);
+    settle[0].fn();
+    expect(calls.commits).toEqual(['next']);
+    expect(g.isSettling()).toBe(false);
+  });
+
+  it('dispose() while waiting for that frame cancels it: no commit after unmount', () => {
+    const rafs = [], cancelled = [];
+    const { io, calls } = makeIO({
+      schedule: (fn, ms) => { if (ms) return 9; rafs.push(fn); return { raf: 4 }; },
+      cancelScheduled: (tok) => cancelled.push(tok),
+    });
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40));
+    g.end();
+    g.dispose();
+    expect(cancelled).toContainEqual({ raf: 4 });
+    rafs.forEach((f) => f());   // a frame that fires anyway finds the settle gone
+    expect(calls.commits).toEqual([]);
   });
 });
