@@ -115,7 +115,7 @@ function WeekAudio({ plan, from, tracksOf }) {
  *   onEdit?: () => void }} props
  *   onEdit (2310): a custom plan's "Change what's in it" (the builder on its picks; what is read stays read)
  */
-function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver, onEdit }) {
+export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver, onEdit }) {
   const st = runStatus(run, now);
   const def = planDef(run.plan);
   const paces = paceChoices(def, run);

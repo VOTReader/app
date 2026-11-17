@@ -3438,6 +3438,12 @@
     .plans-hub { padding-bottom: 32px; }
     .plans-hub, .plan-sheet, .plan-daydone, .plan-strip, .plan-end { --pl-ui: var(--font-ui); }
     .plan-bar-title { flex: 1; }
+    .plan-bar-title.is-long { font-size: var(--ts-headline); line-height: var(--lh-headline); }
+    :is(.plan-bar-title.is-long, .vot-large-text .plan-bar-title) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }   /* 0430: wraps, two lines, before Manage goes */
+    /* 0430: at large text beside Manage the title had a few letters ('Volu… and…'): it takes its own row under back and Manage */
+    .vot-large-text .top-nav:has(> .plan-manage-btn) { flex-wrap: wrap; }
+    .vot-large-text .top-nav:has(> .plan-manage-btn) > .bar-back { margin-right: auto; }
+    .vot-large-text .top-nav:has(> .plan-manage-btn) > .plan-bar-title { order: 1; flex-basis: 100%; -webkit-line-clamp: 3; padding: 0 var(--sp-2) var(--sp-1); }
     .top-nav .plan-gear { display: flex; }
     .plan-list, .plan-items, .plan-road, .plan-days-list, .plan-sched, .plan-choices { margin: 0; padding: 0; list-style: none; }
     .plan-list > li + li .root-row, .plan-road > li + li .root-row, .plan-choices > li + li .root-row { border-top: 1px solid var(--border); }
@@ -3454,7 +3460,7 @@
     .plan-run-row { min-height: 72px; }
     .plan-state b { color: var(--gold); font-weight: 400; }
     .plan-list .root-row-sub, .plan-choices .root-row-sub { font-style: normal; font-family: var(--pl-ui); font-size: var(--fs-14); }   /* U rule 5: facts upright */
-    .plan-find-row :is(.root-row-title, .root-row-sub) { white-space: normal; }   /* a plan's name whole: 'Volumes and Scriptures in a year' (2320 five-second test) */
+    .plan-list :is(.root-row-title, .root-row-sub) { white-space: normal; }   /* 2320/0430: every plan row's name and status whole, wrapped, never cut ('Volumes and Scriptures in a y…', '· 6 …') */
     .plan-find-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.35; text-align: right; }
     .plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
     .plan-empty-text { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
@@ -3595,7 +3601,6 @@
        behind has Catch up under its text. */
     .plan-run-li { display: flex; flex-wrap: wrap; align-items: center; }
     .plan-run-li > .plan-run-row { flex: 1 1 0; min-width: 0; }
-    .plan-run-li > .plan-chev { flex: none; margin-right: var(--sp-3); }
     .plan-run-li.is-behind { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
     .plan-run-li.is-behind > .plan-run-row { grid-column: 1; grid-row: 1; }
     .plan-run-li.is-behind > .plan-manage-link { grid-column: 2; grid-row: 1; }
@@ -3616,10 +3621,8 @@
     .vot-large-text .plan-run-li { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
     .vot-large-text .plan-run-li > .plan-run-row { grid-column: 1 / -1; grid-row: 1; }
     .vot-large-text .plan-run-li > .plan-manage-link { grid-column: 2; grid-row: 2; min-height: var(--tap); margin-bottom: var(--sp-2); }
-    .vot-large-text .plan-run-li > .plan-chev { display: none; }
     .vot-large-text .plan-run-li.is-behind > .plan-catchup-btn { grid-column: 1; grid-row: 2; margin: 0 var(--sp-2) var(--sp-3) var(--sp-3); }
     .plan-catchup-btn { border: 1px solid var(--gold-border); color: var(--gold); }
-    .plan-state[data-status="behind"] { white-space: normal; }   /* the whole phrase, finish date and all */
     /* 0130: a row is more than its button (Manage, Catch up), so the line between rows belongs to the row. */
     .plan-list > li + li { border-top: 1px solid var(--border); }
     .plan-list > li + li > .root-row { border-top: 0; }

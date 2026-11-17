@@ -5,8 +5,9 @@
    list, a plan's preview, the plan's own page, its whole schedule, a
    finished plan, the builder. Back pops a view; at the list it leaves.
    The top bar is back, the view's title and one gear (U rule 11): on a
-   plan's own page "Manage" (the gear and the word, 2235: Corbin 11-16 "a
-   way to cancel the plan, change it"), which opens Manage plan; on every
+   plan's own page and its schedule (0430) "Manage" (the gear and the word,
+   2235: Corbin 11-16 "a way to cancel the plan, change it"), which opens
+   Manage plan; on every
    other view the app's gear (Quick settings, GEAR1), so a page never shows
    two gears. Stop and Start over are one tap each with Undo (a toast); a
    stopped plan is kept under Past plans, where its page offers Continue
@@ -28,7 +29,7 @@ import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBarTitle, GEAR, countOf } from '../components/PlanBits.jsx';
 import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
 import { PlanPreview, draftRun } from './PlanPreview.jsx';
-import { PlanPage } from './PlanPage.jsx';
+import { PlanPage, PlanSettings } from './PlanPage.jsx';
 import { PlanSchedule, DaySheet } from './PlanSchedule.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
 
@@ -190,6 +191,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   let title = 'Reading plans';
   let gear = false;
   let body = null;
+  /** @type {any} */ let sheet = null;
   const v = /** @type {any} */ (top || { v: 'list' });
   const run = v.id ? runOf(v.id) : null;
   if ((v.v === 'plan' || v.v === 'schedule' || v.v === 'finished' || v.v === 'stopped') && !run) {
@@ -204,6 +206,17 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   } else if (v.v === 'schedule' && run) {
     title = runName(run, null) + ' · Schedule';
     body = <PlanSchedule run={run} now={now} tab={v.tab} at={v.at} onRead={(day, k) => readDay(run, day, k)} noteOf={(d) => planNoteOf(run, d)} />;
+    // 0430: the plan page's own Manage here too (readers saw only the app's gear), the same sheet over the schedule;
+    // what leaves the schedule (Start over, Change what's in it) goes from the plan page, so Back never lands on the old run.
+    if (run.status !== 'stopped' && run.status !== 'finished' && !runStatus(run, now).finished) {
+      gear = true;
+      sheet = settings ? (
+        <PlanSettings run={run} now={now} tracksOf={planTracks} onClose={() => setSettings(false)}
+          onStartOver={() => { setSettings(false); popPlanView(); startOver(run); }}
+          onEdit={run.plan === 'custom' ? () => { setSettings(false); popPlanView(); setBuildStep(1); pushPlanView({ v: 'build', edit: run.id }); } : undefined}
+          onStopped={(prev) => { setSettings(false); stopped(prev); }} />
+      ) : null;
+    }
   } else if ((v.v === 'plan' || v.v === 'finished') && run && (run.status === 'finished' || runStatus(run, now).finished)) {
     title = runName(run, null);
     body = <PlanFinished run={run} onFind={() => { planNavToList(); setFindFocus((n) => n + 1); }}
@@ -263,6 +276,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
       rightExtras: gear ? <button type="button" className="plan-manage-btn" title="Manage plan" aria-label="Manage plan" onClick={() => setSettings(true)}>{GEAR}<span aria-hidden="true">Manage</span></button> : null,
     })}>
       {body}
+      {sheet}
       {sheetRun && daySheet != null ? <DaySheet run={sheetRun} day={daySheet} now={now} onClose={() => setDaySheet(null)} onRead={(day, k) => readDay(sheetRun, day, k)} /> : null}
     </ScreenLayout>
   );

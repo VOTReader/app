@@ -162,7 +162,8 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
     return (
       <div className="upnext-row upnext-offer upnext-plan" data-plan={r.id}>
         <button type="button" className="upnext-go" onClick={open}>
-          <span className="upnext-text"><span className="upnext-title">{'You finished ' + r.name}</span></span>
+          {/* 0430: the eyebrow says what this is, as every other plan card on Home does (a reader took it for not a plan). */}
+          <span className="upnext-text"><span className="upnext-eyebrow">Plan finished</span><span className="upnext-title">{'You finished ' + r.name}</span></span>
           <span className="upnext-chev" aria-hidden="true">›</span>
         </button>
         <button type="button" className="upnext-x" aria-label="Dismiss" title="Dismiss" onClick={() => {
