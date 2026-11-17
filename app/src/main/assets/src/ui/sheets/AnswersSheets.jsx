@@ -55,13 +55,14 @@ export function AnsSheet({ label, head, tall, viewer, onClose, children }) {
 
 /**
  * O1: the twelve questions (ours), each opening its topic.
- * @param {{ byId: Map<string, any>, meta: any, onOpenTopic: Function, onClose: () => void, tall?: boolean }} props
+ * @param {{ byId: Map<string, any>, meta: any, onOpenTopic: Function, onSurprise?: () => void, onClose: () => void, tall?: boolean }} props
  */
-export function MoreQuestionsSheet({ byId, meta, onOpenTopic, onClose, tall }) {
-  // WA2 (a-more): the question is the sheet's title; the rows sit in one inset card
+export function MoreQuestionsSheet({ byId, meta, onOpenTopic, onSurprise, onClose, tall }) {
+  // WA2 (a-more): the question is the sheet's title; the rows sit in one inset card. 0125 A: Surprise me is its first row.
   return (
     <AnsSheet label="Start with a question" tall={tall} onClose={onClose} head={<h2 className="ans-sh-t">What does The Lord say about…</h2>}>
       <div className="ans-box is-inset">
+        {onSurprise ? <AnsRow icon="shuffle" title="Surprise me" sub="A passage from anywhere in Answers" onClick={() => { onClose(); onSurprise(); }} /> : null}
         {ANSWERS_QUESTIONS.map(([q, id]) => {
           const e = byId.get(id);
           if (!e) return null;

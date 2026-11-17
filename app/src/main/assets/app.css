@@ -8793,7 +8793,7 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-landing .ans-tab:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
 .ans-landing .ans-tab[aria-selected=true]{border-radius:var(--r-chip);background:var(--surface-3);box-shadow:0 0 0 3px var(--surface-1) inset;color:var(--text-1)}
 .ans-landing .ans-tab[aria-selected=true]::after,:is(.ans-landing,.ans-hero) :is(.ans-az-key[aria-current=true],.ans-az-strip)::after{display:none}
-.ans-landing .ans-az-strip{top:52px;gap:var(--sp-2);margin:0 calc(-1 * var(--sp-4));padding:0 var(--sp-4) 4px;border:0;background:var(--bg)}
+.ans-landing .ans-az-strip{top:0;gap:var(--sp-2);margin:0 calc(-1 * var(--sp-4));padding:0 var(--sp-4) 4px;border:0;background:var(--bg)}
 :is(.ans-landing,.ans-hero) .ans-az-key{isolation:isolate;min-width:44px;height:var(--tap);padding:0 12px;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-1)}
 :is(.ans-landing,.ans-hero) .ans-az-key::before{content:"";position:absolute;inset:5px 0;z-index:-1;border-radius:var(--r-pill);background:var(--surface-1)}
 .ans-landing .ans-az-strip:not(.ans-jump-strip) .ans-az-key{padding:0}
@@ -8801,7 +8801,7 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 :is(.ans-landing,.ans-hero) .ans-az-key[aria-current=true]{color:var(--accent)}
 :is(.ans-landing,.ans-hero) .ans-az-key[aria-current=true]::before{background:var(--accent-soft)}
 .ans-landing .ans-az-head{position:static;padding:20px 0 var(--sp-2);border:0;background:none}
-.ans-landing :is([data-az],[data-jump]){scroll-margin-top:104px}
+.ans-landing :is([data-az],[data-jump]){scroll-margin-top:52px}
 .ans-landing .ans-sechead{margin:22px 0 var(--sp-2)}
 .ans-landing :is(.ans-count,.ans-note){font-family:var(--font-ui);font-size:var(--ts-meta);font-style:normal;color:var(--text-2)}
 .ans-landing .ans-note{margin:10px 0 var(--sp-2)}
@@ -8815,6 +8815,27 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-box .ans-tablet:nth-child(5n){border-bottom:0}
 .ans-box .ans-tablet .ans-num{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:.08em;color:var(--accent)}
 .ans-box .ans-tablet .ans-row-title{font-size:var(--ts-body);font-weight:var(--fw-name)}
+/* 0125 (Answers made plain): three questions as plain links in one running line (inline text, no flex box around it:
+   10-21 phone rules), then More questions; Browse with A-Z at its right; the tablet says what it opens; the thirteen
+   groups open in place to their topics' plain names. */
+.ans-qs{margin:12px 0 0;font-family:var(--font-serif);font-size:var(--ts-value);line-height:2;color:var(--text-2)}
+.ans-q{position:relative;display:inline;margin:0 .45em 0 0;padding:0;border:0;background:none;color:var(--text-1);font:inherit;white-space:nowrap;text-decoration:underline;text-decoration-color:var(--hairline);text-underline-offset:4px;cursor:pointer}
+.ans-q::before{content:"";position:absolute;inset:-10px -3px}
+.ans-q.is-more{margin:0;color:var(--accent);font-family:var(--font-ui);font-size:var(--ts-meta);font-weight:600;text-decoration:none}
+.ans-landing .ans-browse-head{margin-top:28px}
+.ans-head-link{position:relative;min-height:var(--tap);padding:0 2px;color:var(--accent);font-family:var(--font-ui);font-size:var(--ts-meta);font-weight:600}
+.ans-box .ans-tablet .ans-row-sub{display:inline-flex;align-items:center;gap:2px;margin-top:2px}
+.ans-groups .ans-group{border-bottom:1px solid var(--hairline)}
+.ans-groups .ans-group:last-child{border-bottom:0}
+.ans-groups .ans-group-row{width:100%;border-bottom:0}
+.ans-group.is-open>.ans-group-row .ans-row-title{color:var(--accent)}
+.ans-group-topics{margin:0;padding:0 0 var(--sp-2);list-style:none}
+.ans-group-topic{display:block;width:100%;min-height:var(--tap);padding:10px 16px 10px 28px;text-align:left;color:var(--text-1);font-family:var(--font-serif);font-size:var(--ts-body);line-height:1.35}
+.ans-group-topic:active{background:var(--gold-faint)}
+.ans-group-topic .ans-read{margin-left:6px}
+.ans-group-all{margin:2px 0 0 28px}
+.ans-icon-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--text-1)}
+.ans-icon-row>svg:first-child{flex:none;color:var(--accent)}
 .ans-landing.is-asking .ans-hero-c{display:none}
 .ans-bar-field{position:relative;flex:1;min-width:0;margin:0 var(--sp-4) 0 4px}
 .ans-bar-field .ans-search-input{display:block;width:100%;height:var(--tap);padding:0 44px 0 16px;border:0;border-radius:var(--r-pill);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-control);outline:none;-webkit-appearance:none}

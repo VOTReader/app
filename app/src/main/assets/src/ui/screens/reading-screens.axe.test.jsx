@@ -458,9 +458,11 @@ describe('axe — Answers browse screens', () => {
     await clean();
   });
 
-  it('the landing\'s A-Z tab', async () => {
+  it('the landing in A-Z (0125: a mode of the landing) and with a group open', async () => {
     render(<AnswersHome {...base} />);
-    act(() => { fireEvent.click(document.querySelector('#ans-tab-az')); });
+    act(() => { fireEvent.click(document.querySelector('.ans-group-row')); });
+    await clean();
+    act(() => { fireEvent.click([...document.querySelectorAll('.ans-head-link')].find((b) => b.textContent === 'A–Z')); });
     await clean();
   });
 

@@ -31,11 +31,11 @@
 
 import { h, Fragment } from '../jsx-h.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle } from '../../utils/answers-shelves.js';
-import { ANSWERS_SIDEBAR, ANSWERS_FD_INDEX_ID, ANSWERS_FD_INDEX_TEXT, ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU, answersSiteOrder } from '../../utils/answers-site.js';
+import { ANSWERS_SIDEBAR, ANSWERS_FD_INDEX_ID, ANSWERS_FD_INDEX_TEXT, answersSiteOrder } from '../../utils/answers-site.js';
 import {
-  NBSP, SEP, pl, ANSWERS_QUESTIONS, ANSWERS_AZ_KEYS, ANSWERS_TAGLINE, answersRowSub, answersSizeWords, answersBrowseShelves,
+  NBSP, SEP, pl, ANSWERS_QUESTIONS, ANSWERS_AZ_KEYS, ANSWERS_TAGLINE, answersSizeWords, answersBrowseShelves,
   answersPlaceOf, answersAZGroups, answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
-  answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, ANSWERS_TSTL_HEAD,
+  answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, answersMinWords, ANSWERS_OTHER_LABEL,
   ANSWERS_BAR_TITLE, answersBarTitleFit,
 } from '../../utils/answers-browse.js';
 import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
@@ -49,8 +49,10 @@ import { answersFromSearch, setAnswersFromSearch } from '../../utils/answers-fro
 
 /** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | null} AnswersSheetState */
 
-let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), all: false };
-export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, all: false }; setAnswersFromSearch(null); }
+/* 0125: the open group (one at a time), the page's scroll and, in A-Z, the scroll it was entered from: Back from a
+   topic finds the landing as it was left. */
+let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), all: false, open: /** @type {string | null} */ (null), scroll: 0, azFrom: 0 };
+export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, all: false, open: null, scroll: 0, azFrom: 0 }; setAnswersFromSearch(null); }
 /** Search's "Or ask" row: the landing opens holding the words typed in Search, and its Back returns there. @param {string} q */
 export function openAnswersLandingFromSearch(q) {
   resetAnswersLanding();
@@ -303,23 +305,20 @@ function Results({ entries, results, titleOnly, query, onOpenTopic, onSearchLibr
   );
 }
 
-/** Contents (f01, f02): the site's sidebar in its order. A memo, so typing in the field above never re-renders it. */
-const Contents = React.memo(/** @param {any} props */ function Contents(props) {
-  const { loaded, byId, shelves, meta, isRead, site, onOpenTopic, onOpenGroup, setSheet } = props;
-  const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
-  const { cur, atEnd, onStripScroll, jump } = useJumpStrip(rootRef, stripRef, 'data-jump', 'cmd');
-  const openTopic = (id) => onOpenTopic(id, null, 'Answers');
+/**
+ * 0125 B, Browse: one list, one pattern (the hub's comparison with the site, Corbin 11-17 "easily comprehensible ...
+ * intuitive"). Start here (the site's Main Page; Continue once a reading path is under way), the Ten Commandments
+ * tablets (each opens its sheet, where the commandment's own words live), then the thirteen groups, each opening IN
+ * PLACE to its topics' plain names (one open at a time; tap again closes), then the False Doctrines index, Charts
+ * and videos, Saved answers. A memo, so typing in the field above never re-renders it.
+ */
+const Browse = React.memo(/** @param {any} props */ function Browse(props) {
+  const { loaded, byId, shelves, meta, isRead, site, path, open, setOpen, onOpenTopic, setSheet, onOpenMedia, onOpenSaved, mediaLabel, savedLabel } = props;
+  const openTopic = (/** @type {string} */ id, from = '') => onOpenTopic(id, null, from || 'Answers');
   const openSheet = (s) => { if (loaded) setSheet(s); };
-  const sub = (e) => (
-    <>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>
-  );
   const cmdShelves = shelves.commandments;
-  const cmdTotal = cmdShelves.reduce((a, s) => a + s.topics.length, 0);
-  const groupTotal = shelves.groups.reduce((a, s) => a + s.topics.length, 0);
   const fdEntry = byId.get(ANSWERS_FD_INDEX_ID) || null;
   const fdMeta = meta && meta[ANSWERS_FD_INDEX_ID];
-  const tstlHead = shelves.groups.length ? shelves.groups[0].label.replace(/^\d+\.\s*/, '') : ANSWERS_TSTL_HEAD;
 
   const tablets = ANSWERS_COMMANDMENTS.map((c, i) => {
     const s = cmdShelves[i];
@@ -330,47 +329,68 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
       <button key={c.n} type="button" className="ans-tablet" aria-haspopup="dialog" aria-label={label} onClick={() => openSheet({ kind: 'cmd', n: c.n })}>
         <span className="ans-num">{c.numeral}</span>
         <span className="ans-row-title">{c.label}{read ? <ReadMark bare /> : null}</span>
+        {/* 0125 (a): the tablet says what it opens */}
+        {loaded ? <span className="ans-row-sub">{pl(n, 'topic')}<Chev /></span> : null}
       </button>
     );
   });
 
-  // ANS1: the Main Page is the Start here card above, so neither the strip nor the list offers it again
-  const parts = [['cmd', 'Ten Commandments']].concat(loaded ? [['other', 'Other topics'], ['tstl', 'Thus Says The Lord']] : [],
-    loaded && (shelves.index || fdEntry) ? [['fd', 'False doctrines']] : []);
+  // The thirteen: the site's Other Topics, then its twelve numbered groups by our short names.
+  const groups = loaded
+    ? [{ key: 'other', title: ANSWERS_OTHER_LABEL, topics: shelves.otherTopics }].concat(shelves.groups.map((g) => ({ key: String(g.num), title: g.short, topics: g.topics })))
+    : [];
   return (
-    <div role="tabpanel" id="ans-panel-c" aria-labelledby="ans-tab-c" ref={rootRef}>
-      {/* WA1 (a-contents): the parts as a pinned strip under the Contents | A-Z switch */}
-      <nav className={'ans-az-strip ans-jump-strip' + (atEnd ? ' is-end' : '')} aria-label="Jump to a part" ref={stripRef} onScroll={onStripScroll}>
-        {parts.map(([k, t]) => <button key={k} type="button" className="ans-az-key" aria-current={cur === k ? 'true' : undefined} onClick={() => jump(k)}>{t}</button>)}
-      </nav>
-      <div className="ans-sechead" data-jump="cmd"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic')}</span> : null}</div>
+    <div className="ans-browse">
+      {path ? (
+        <div className="ans-box">
+          <AnsRow className="ans-start-row" title={path.title} sub={path.sub} onClick={() => openTopic(path.id)} />
+        </div>
+      ) : null}
+      <div className="ans-sechead"><h2 className="ans-h2">The Ten Commandments</h2></div>
       <div className="ans-tablets ans-box">{tablets}</div>
       {loaded ? (
         <>
-          <div className="ans-sechead" data-jump="other"><h2 className="ans-h2">Other Topics</h2><span className="ans-count">{pl(shelves.otherTopics.length, 'topic')}</span></div>
-          <div className="ans-box">{shelves.otherTopics.map((e) => (
-            <AnsRow key={e.id} title={<LeadTitle title={e.title} />}
-              sub={shelves.other && shelves.other.notInMenu.includes(e) ? <>{answersRowSub(e, meta && meta[e.id])}{SEP}<em>{ANSWERS_NOT_IN_MENU}</em>{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</> : sub(e)}
-              onClick={() => openTopic(e.id)} />
-          ))}</div>
-          <div className="ans-sechead" data-jump="tstl"><h2 className="ans-h2">{tstlHead}</h2><span className="ans-count">{pl(groupTotal, 'topic')}</span></div>
-          <p className="ans-note">{ANSWERS_GROUP_NOTE}</p>
-          <div className="ans-box">{shelves.groups.map((g) => {
-            const r = g.topics.filter((e) => isRead(e.id)).length;
+          <div className="ans-sechead"><h2 className="ans-h2">Topics</h2></div>
+          <div className="ans-box ans-groups">{groups.map((g) => {
+            const on = open === g.key;
+            const read = g.topics.filter((e) => isRead(e.id)).length;
+            const first = g.topics.find((e) => !isRead(e.id));
+            const start = read && first ? first : g.topics[0];
             return (
-              <AnsRow key={g.n} title={g.short}
-                sub={pl(g.topics.length, 'topic') + (r ? SEP + r + NBSP + 'read' : '')}
-                label={`${g.short}. ${pl(g.topics.length, 'topic').replace(NBSP, ' ')}${r ? `, ${r} read` : ''}`}
-                onClick={() => onOpenGroup && onOpenGroup(String(g.num))} />
+              <div key={g.key} className={'ans-group' + (on ? ' is-open' : '')} data-group={g.key}>
+                <button type="button" className="ans-row ans-group-row" aria-expanded={on} aria-controls={'ans-g-' + g.key} onClick={() => setOpen(on ? null : g.key)}>
+                  <span className="ans-row-body"><span className="ans-row-title">{g.title}{g.topics.length && read === g.topics.length ? <ReadMark bare /> : null}</span></span>
+                  <Chev dir={on ? 'up' : 'down'} />
+                </button>
+                {on ? (
+                  <ul className="ans-group-topics" id={'ans-g-' + g.key} aria-label={g.title}>
+                    {g.topics.map((e) => (
+                      <li key={e.id}>
+                        <button type="button" className="ans-group-topic" onClick={() => openTopic(e.id, g.title)}>
+                          <span className="ans-topic-name"><LeadTitle title={e.title} />{isRead(e.id) ? <ReadMark bare /> : null}</span>
+                        </button>
+                      </li>
+                    ))}
+                    {g.topics.length > 1 && start ? (
+                      <li><button type="button" className="ans-textbtn ans-group-all" onClick={() => openTopic(start.id, g.title)}>{`Read all ${g.topics.length} in order`}<Chev /></button></li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </div>
             );
           })}</div>
-          {shelves.index ? <div className="ans-sechead" data-jump="fd"><h2 className="ans-h2">{shelves.index.label}</h2></div> : null}
-          {fdEntry ? (
-            // The same sentence before the sidecar lands, less its count, so the row keeps its lines (10-22 sweep,
-            // Discovery views 6: at 360 px it grew a line, 76 -> 93 px, when the count arrived)
-            <div className="ans-box" data-jump={shelves.index ? undefined : 'fd'}><AnsRow title={ANSWERS_FD_INDEX_TEXT} sub={(fdMeta ? pl(answersTopSections(fdMeta).length, 'category') : 'Categories') + ', each answered by The Truth'}
-              onClick={() => openTopic(ANSWERS_FD_INDEX_ID)} /></div>
-          ) : null}
+          <div className="ans-box ans-more-rows">
+            {fdEntry ? (
+              <AnsRow title={ANSWERS_FD_INDEX_TEXT} sub={(fdMeta ? pl(answersTopSections(fdMeta).length, 'category') : 'Categories') + ', each answered by The Truth'}
+                onClick={() => openTopic(ANSWERS_FD_INDEX_ID)} />
+            ) : null}
+            <button type="button" className="ans-row ans-icon-row" onClick={() => onOpenMedia && onOpenMedia()} aria-label={mediaLabel}>
+              <UiIcon name="film" size="sm" /><span className="ans-row-body"><span className="ans-row-title">Charts and videos</span></span><Chev />
+            </button>
+            <button type="button" className="ans-row ans-icon-row" onClick={() => onOpenSaved && onOpenSaved()} aria-label={savedLabel}>
+              <UiIcon name="star" size="sm" /><span className="ans-row-body"><span className="ans-row-title">Saved answers</span></span><Chev />
+            </button>
+          </div>
           {site ? (
             <p className="ans-credit">
               {'From ' + answersDomain(site.site)}<br />{'Captured ' + site.capturedAt}<br />
@@ -390,7 +410,7 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
  *   onOpenSaved?: () => void, onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void }} props
  */
 export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
-  onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef }) {
+  onOpenTopic, onOpenGroup: _openGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef }) {
   const meta = useAnswersMeta();
   const loaded = Array.isArray(entries) && entries.length > 0;
   const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
@@ -398,12 +418,15 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const [query, setQuery] = React.useState(_landing.query);
   const [tab, setTab] = React.useState(_landing.tab);
   const [sheet, setSheet] = React.useState(/** @type {AnswersSheetState} */ (_landing.sheet));
+  const [open, setOpen] = React.useState(_landing.open);
   const [focused, setFocused] = React.useState(false);
   const [recent, setRecent] = React.useState(readRecent);
-  React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; }, [query, tab, sheet]);
+  React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; _landing.open = open; }, [query, tab, sheet, open]);
   const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
-  const tabCRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
-  const tabAzRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const pageRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const browseRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const leaveAZ = React.useCallback(() => { setTab('contents'); }, []);
+  const scrollerOf = () => (pageRef.current && pageRef.current.closest ? /** @type {HTMLElement | null} */ (pageRef.current.closest('.screen-scroll')) : null);
   const placeholder = usePlaceholder(inputRef);
   const ts2 = answersLayoutClass(fontScale, false).includes('ans-ts2');
 
@@ -444,13 +467,14 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   // Opened from Search's "Or ask" with his words still in the box, Back goes straight back to Search (PL-SEARCH 2).
   const carried = answersFromSearch();
   const backClears = !!query && !(carried !== null && query.trim() === carried);
+  const azBack = tab === 'az' && !backClears;
   React.useEffect(() => {
-    if (!backClears) return undefined;
-    const fn = () => { setQuery(''); return true; };
+    if (!backClears && !azBack) return undefined;
+    const fn = () => { if (backClears) setQuery(''); else leaveAZ(); return true; };
     window.__screenBack = fn;
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
-  }, [backClears]);
-  const handleNavBack = () => { if (backClears) setQuery(''); else onBack(); };
+  }, [backClears, azBack, leaveAZ]);
+  const handleNavBack = () => { if (backClears) setQuery(''); else if (azBack) leaveAZ(); else onBack(); };
   const closeSheet = React.useCallback(() => setSheet(null), []);
   const openTopic = (id, anchor, from, section, find) => (find ? onOpenTopic(id, anchor || null, from || 'Answers', section || null, find) : onOpenTopic(id, anchor || null, from || 'Answers'));
   const chip = (id) => openTopic(id, null, 'Answers');
@@ -465,39 +489,57 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
     if (t) openTopic(at.id, t.paragraphs[at.index].text, 'Answers');
   };
 
-  // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start.
+  // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start. 0125 B/E: a row,
+  // "Start here", the site's Main Page called what it is to a reader (its page says "Introduction").
   let path = null;
   if (loaded && main) {
     const st = pathOn ? answersPathState(list, isRead, pathLast) : { kind: 'start', entry: main, n: 0 };
     const topics = order.length - 1;
-    // WA1 (a-land): a "Start here" card; the label says which way the path stands
     if (st.kind === 'continue') {
-      path = { k: 'Continue', title: <LeadTitle title={st.entry.title} />, sub: st.n + NBSP + 'of ' + topics + NBSP + 'topics' + SEP + 'in the site’s order', id: st.entry.id };
+      path = { title: <>{'Continue: '}<LeadTitle title={st.entry.title} /></>, sub: st.n + NBSP + 'of ' + topics + NBSP + 'topics' + SEP + 'in the site’s order', id: st.entry.id };
     } else if (st.kind === 'again') {
-      path = { k: 'Start again', title: 'Main Page', sub: 'in the site’s order', id: main.id };
+      path = { title: 'Start again', sub: 'introduction' + SEP + 'in the site’s order', id: main.id };
     } else {
-      path = { k: 'Start here', title: 'Main Page', sub: answersSizeWords(main, meta && meta[main.id]), id: main.id };
+      const m = meta && meta[main.id];
+      path = { title: 'Start here', sub: 'introduction' + (m ? SEP + answersMinWords(m) : ''), id: main.id };
     }
   }
 
   const openSheet = (s) => { if (loaded) setSheet(s); };
   const cmdShelf = sheet && sheet.kind === 'cmd' ? shelves.commandments.find((s) => s.num === sheet.n) : null;
-  const contents = <Contents loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} site={site}
-    onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} setSheet={setSheet} />;
+  const mediaLabel = 'Charts and videos' + (media ? ', ' + answersMediaSummary(media) : '');
+  const savedLabel = 'Saved answers' + (savedSum ? ', ' + savedSum : '');
+  const browse = <Browse loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} site={site} path={path} open={open} setOpen={setOpen}
+    onOpenTopic={onOpenTopic} setSheet={setSheet} onOpenMedia={onOpenMedia} onOpenSaved={onOpenSaved} mediaLabel={mediaLabel} savedLabel={savedLabel} />;
 
-  // A saved A–Z tab waits for the corpus: until then Contents shows, so it is the selected tab.
+  // A saved A–Z waits for the corpus: until then the groups show.
   const az = tab === 'az' && loaded;
-  const onTabKey = (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      const next = az ? 'contents' : 'az';
-      setTab(next);
-      // focus follows the selection (nightly 11-01 #4): a screen reader then reads the tab now selected. A–Z is
-      // selected only once the corpus is in (az above): before that, Contents stays selected and keeps the focus.
-      const el = (next === 'az' && loaded ? tabAzRef : tabCRef).current;
-      if (el) el.focus();
-    }
+  /* 0125 (b): A–Z is a mode of the landing. The Browse head's link enters it (at its head); Back, or "By group",
+     leaves it at the scroll it was entered from. */
+  const enterAZ = () => {
+    const sc = scrollerOf();
+    _landing.azFrom = sc ? sc.scrollTop : 0;
+    setTab('az');
   };
+  const azWas = React.useRef(az);
+  React.useLayoutEffect(() => {
+    if (azWas.current === az) return;
+    azWas.current = az;
+    const sc = scrollerOf();
+    if (!sc) return;
+    if (az) { const head = browseRef.current; if (head) sc.scrollTop = Math.max(0, sc.scrollTop + head.getBoundingClientRect().top - sc.getBoundingClientRect().top); }
+    else sc.scrollTop = _landing.azFrom;
+  }, [az]);
+  // The page's scroll, kept for Back from a topic and put back once the lists are in.
+  const restored = React.useRef(false);
+  React.useLayoutEffect(() => {
+    const sc = scrollerOf();
+    if (!sc) return undefined;
+    if (loaded && !restored.current) { restored.current = true; if (_landing.scroll > 0) sc.scrollTop = _landing.scroll; }
+    const keep = () => { _landing.scroll = sc.scrollTop; };
+    sc.addEventListener('scroll', keep, { passive: true });
+    return () => sc.removeEventListener('scroll', keep);
+  }, [loaded]);
 
   /* WA1 (a-query): asking takes over the top bar. The field moves there with the first letter and comes back when it
      empties; a field that had the caret keeps it across the move (hadFocus), at the end of the words. */
@@ -531,9 +573,9 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
       navChildren={LibraryNav({ onBack: handleNavBack, backLabel: backClears ? 'Answers' : carried !== null ? 'Search' : 'Home', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange,
         hide: asking ? ['settings', 'history', 'search', 'theme'] : undefined,
         leftExtras: asking ? field : <BarTitle /> })}>
-      <div className={'ans-page ans-landing' + (isQuery || recentMode ? ' is-query' : '') + (asking ? ' is-asking' : '')}>
+      <div className={'ans-page ans-landing' + (isQuery || recentMode ? ' is-query' : '') + (asking ? ' is-asking' : '')} ref={pageRef}>
         <div className="ans-landing-a">
-          {/* WA1 (a-land): the hero centred; About lives at the foot of Contents */}
+          {/* WA1 (a-land): the hero centred; About lives at the foot of Browse */}
           <div className="ans-hero-c">
             <p className="ans-label">Topics &amp; Doctrines</p>
             <h1 className="ans-display"><span className="ans-line">Answers Only</span> <span className="ans-line">God Can Give</span></h1>
@@ -543,13 +585,15 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
             {asking ? null : field}
             {asking || recentMode ? null : (
               <>
-                {/* ANS1: the chips finish this sentence; when the field cannot hold it, it stands above them */}
+                {/* ANS1: the questions finish this sentence; when the field cannot hold it, it stands above them */}
                 {placeholder === ANSWERS_ASK_LEAD ? null : <p className="ans-ask-lead">{ANSWERS_ASK_LEAD}</p>}
-                <div className="ans-chips">
-                  {ANSWERS_QUESTIONS.slice(0, 6).filter(([qq]) => !/holidays/.test(qq)).map(([qq, id]) => <button key={id} type="button" className="ans-chip" onClick={() => chip(id)}>{qq}</button>)}
-                  <button type="button" className="ans-chip is-more" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'more' })}>More questions</button>
-                  <button type="button" className="ans-chip is-surprise" disabled={!loaded} onClick={surprise}><AnsIcon name="shuffle" />Surprise me</button>
-                </div>
+                {/* 0125 A: three questions as plain links in one running line, then More questions (Surprise me is its sheet's first row) */}
+                <p className="ans-qs">
+                  {ANSWERS_QUESTIONS.slice(0, 6).filter(([qq]) => !/holidays/.test(qq)).slice(0, 3).map(([qq, id]) => (
+                    <React.Fragment key={id}><button type="button" className="ans-q" onClick={() => chip(id)}>{qq}</button>{' '}</React.Fragment>
+                  ))}
+                  <button type="button" className="ans-q is-more" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'more' })}>More questions</button>
+                </p>
               </>
             )}
           </section>
@@ -568,36 +612,20 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
                 </button>
               ))}
             </div>
-          ) : (
-            <>
-              {path ? (
-                <button type="button" className="ans-start" onClick={() => openTopic(path.id)}>
-                  <span className="ans-row-body"><span className="ans-k">{path.k}</span><span className="ans-row-title">{path.title}</span><span className="ans-row-sub">{path.sub}</span></span><Chev />
-                </button>
-              ) : null}
-              {/* WA1 (a-land, a-media, a-saved): both doors always on the landing */}
-              <div className="ans-two">
-                <button type="button" className="ans-tile-btn" onClick={() => onOpenMedia && onOpenMedia()} aria-label={'Charts and videos' + (media ? ', ' + answersMediaSummary(media) : '')}><UiIcon name="film" size="sm" />Charts and videos</button>
-                <button type="button" className="ans-tile-btn" onClick={() => onOpenSaved && onOpenSaved()} aria-label={'Saved answers' + (savedSum ? ', ' + savedSum : '')}><UiIcon name="star" size="sm" />Saved answers</button>
-              </div>
-            </>
-          )}
+          ) : null}
         </div>
-        <div className="ans-landing-b">
-          <div className="ans-tabs" role="tablist" aria-label="Browse Answers">
-            <button ref={tabCRef} type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={!az}
-              tabIndex={az ? -1 : 0} onClick={() => setTab('contents')} onKeyDown={onTabKey}>Contents</button>
-            <button ref={tabAzRef} type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={az}
-              tabIndex={az ? 0 : -1} onClick={() => setTab('az')} onKeyDown={onTabKey}>A–Z</button>
+        <div className="ans-landing-b" ref={browseRef}>
+          {/* 0125 A: Browse, and A-Z as a link at its right (A-Z is a mode of the landing; Back leaves it) */}
+          <div className="ans-sechead ans-browse-head">
+            <h2 className="ans-h2">{az ? 'All topics, A–Z' : 'Browse'}</h2>
+            {loaded ? (az
+              ? <button type="button" className="ans-head-link" onClick={leaveAZ}>By group</button>
+              : <button type="button" className="ans-head-link" onClick={enterAZ}>A–Z</button>) : null}
           </div>
-          {az ? (
-            <div role="tabpanel" id="ans-panel-az" aria-labelledby="ans-tab-az">
-              <AZPanel entries={list} meta={meta} isRead={isRead} onOpenTopic={openTopic} />
-            </div>
-          ) : contents}
+          {az ? <div id="ans-panel-az"><AZPanel entries={list} meta={meta} isRead={isRead} onOpenTopic={openTopic} /></div> : browse}
         </div>
       </div>
-      {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onClose={closeSheet} tall={ts2} /> : null}
+      {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onSurprise={surprise} onClose={closeSheet} tall={ts2} /> : null}
       {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onStep={(n) => openSheet({ kind: 'cmd', n })} onClose={closeSheet} tall={ts2} /> : null}
       {sheet && sheet.kind === 'about' && site ? <AboutSheet site={site} onOpenTopic={openTopic} onClose={closeSheet} /> : null}
     </ScreenLayout>

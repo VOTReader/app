@@ -48,97 +48,119 @@ const texts = (sel, root = document) => [...root.querySelectorAll(sel)].map((n) 
 const NB = (s) => s.replace(/\u00a0/g, ' ').replace(/ {2,}/g, ' ');
 const field = () => screen.getByLabelText('Search Answers');
 
-describe('AnswersHome — the landing (f01, f02)', () => {
-  it('lists the site\'s contents in its sidebar order, with nothing of the retired subjects', () => {
+describe('AnswersHome — the landing (0125: ask, then browse)', () => {
+  it('Browse: Start here, the tablets, the thirteen groups closed, then the index, Charts and videos, Saved answers', () => {
     render(<AnswersHome {...base} />);
     const panel = document.querySelector('.ans-landing-b');
-    expect(texts('.ans-sechead .ans-h2', panel)).toEqual(['The Ten Commandments', 'Other Topics', 'Thus Says The Lord...', 'Index of False Doctrines Within the Churches of Men']);
-    expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics', '16 topics', '85 topics']);
+    expect(texts('.ans-sechead .ans-h2', panel)).toEqual(['Browse', 'The Ten Commandments', 'Topics']);
+    expect(screen.getByRole('button', { name: 'A–Z' }).closest('.ans-browse-head')).toBeTruthy();
     expect(texts('.ans-tablet .ans-num')).toEqual(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']);
-    // ANS1: the Main Page is the Start here card, not a Contents row: the list starts at The Ten Commandments
-    expect(panel.querySelector('.ans-sechead .ans-h2').textContent).toBe('The Ten Commandments');
-    expect(texts('.ans-row .ans-row-title', panel)).not.toContain('Main Page');
-    // WA1 (a-az): group numbers dropped; the twelve groups are the rows that count topics
-    const groups = [...panel.querySelectorAll('.ans-row')].filter((r) => /^\d+ topics?/.test(NB((r.querySelector('.ans-row-sub') || { textContent: '' }).textContent)));
-    expect(groups.map((r) => r.querySelector('.ans-row-title').textContent)).toEqual(['Signs of this generation', 'Prophets, witnesses & gifts',
+    // the tablet says what it opens
+    expect(NB(document.querySelectorAll('.ans-tablet .ans-row-sub')[1].textContent)).toBe('3 topics');
+    // the thirteen: the site's Other Topics, then its twelve numbered groups by our short names; no counts, all closed
+    expect(texts('.ans-group-row .ans-row-title', panel)).toEqual(['Other Topics', 'Signs of this generation', 'Prophets, witnesses & gifts',
       'The nations', 'The churches', 'Scripture & doctrine', 'Holy Days, cross & resurrection', 'Forgiveness to salvation', 'The end & the Kingdom',
       'Warfare, sin, death & judgment', 'The walk of faith', 'Body, marriage & family', 'People of the Bible & creation']);
-    expect(groups[4].getAttribute('aria-label')).toBe('Scripture & doctrine. 9 topics, 3 read');
-    expect(screen.getByText('The site numbers these groups; the short names are ours.')).toBeTruthy();
-    expect(screen.getByText('Not in the site’s menu').closest('.ans-row').textContent).toContain('Come Out and Fight Against Me');
-    expect(document.body.textContent).not.toMatch(/Most spoken of|Browse by subject|Every Topic, A–Z|The End of This Age/);
-  });
-
-  it('subs come from the shared words: size, minutes, media, "✓ Read" in words', () => {
-    render(<AnswersHome {...base} />);
-    const row = (t) => [...document.querySelectorAll('.ans-row')].find((r) => r.querySelector('.ans-row-title').textContent === t);
-    expect(NB(row('The Volumes of Truth').querySelector('.ans-row-sub').textContent)).toBe('39 passages · 38 min · video · audio · Read');
-    expect(NB(row('False Doctrines Within the Churches (Index)').querySelector('.ans-row-sub').textContent)).toBe('46 categories, each answered by The Truth');
+    expect(panel.querySelectorAll('.ans-group-row .ans-row-sub').length).toBe(0);
+    expect([...panel.querySelectorAll('.ans-group-row')].every((b) => b.getAttribute('aria-expanded') === 'false')).toBe(true);
+    expect(panel.querySelector('.ans-group-topics')).toBeNull();
+    expect(texts('.ans-more-rows .ans-row-title', panel)).toEqual(['False Doctrines Within the Churches (Index)', 'Charts and videos', 'Saved answers']);
+    expect(NB(panel.querySelector('.ans-more-rows .ans-row-sub').textContent)).toBe('46 categories, each answered by The Truth');
     expect(NB(screen.getByRole('button', { name: /^Charts and videos/ }).getAttribute('aria-label'))).toBe('Charts and videos, 2 charts, 4 videos, 11 playlists and more');
-    expect(document.body.textContent).not.toMatch(/\b0 passages/);
+    // the site's Main Page is Start here, once; no tabs, no jump chips, no Start here card
+    expect(texts('.ans-row-title', panel)).not.toContain('Main Page');
+    expect(document.querySelector('[role="tab"], .ans-jump-strip, .ans-start, .ans-two')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Most spoken of|Browse by subject|Every Topic, A–Z|The End of This Age|short names are ours|Not in the site’s menu/);
   });
 
-  // 10-22 sweep, Discovery views 6: before the sidecar lands every row keeps a sub line, so the list does not
-  // reflow when it arrives; the index's row says the same sentence less its count (it grew a line at 360 px).
-  it('before the sidecar: every row keeps its sub line, and the index says its sentence without the count', () => {
-    delete window.ANSWERS_META;
-    render(<AnswersHome {...base} />);
-    const rows = [...document.querySelectorAll('.ans-row')];
-    expect(rows.length).toBeGreaterThan(20);
-    const fd = rows.find((r) => r.querySelector('.ans-row-title').textContent === 'False Doctrines Within the Churches (Index)');
-    expect(NB(fd.querySelector('.ans-row-sub').textContent)).toBe('Categories, each answered by The Truth');
-    // every topic row (Charts & videos is a tool row: its one-line sub fits inside the row's 76 px floor, measured)
-    for (const r of rows.filter((x) => !x.textContent.startsWith('Charts'))) expect(r.querySelector('.ans-row-sub'), r.textContent).toBeTruthy();
+  it('a group opens in place to its topics\' plain names, one at a time; Read all N in order is its last line', () => {
+    const onOpenTopic = vi.fn(); const onOpenGroup = vi.fn();
+    render(<AnswersHome {...base} onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} />);
+    const row = (t) => screen.getByText(t, { selector: '.ans-group-row .ans-row-title' }).closest('button');
+    fireEvent.click(row('Scripture & doctrine'));
+    expect(row('Scripture & doctrine').getAttribute('aria-expanded')).toBe('true');
+    const list = document.getElementById(row('Scripture & doctrine').getAttribute('aria-controls'));
+    expect(list.querySelectorAll('.ans-group-topic').length).toBe(9);
+    expect(list.querySelectorAll('.ans-group-topic .ans-read').length).toBe(3);          // the read ticks kept
+    expect(list.querySelector('.ans-group-topic .ans-lead')).toBeTruthy();              // "Regarding" dimmed
+    expect(list.querySelector('.ans-group-topic .ans-row-sub')).toBeNull();             // plain names, no counts
+    fireEvent.click(list.querySelector('.ans-group-topic'));
+    expect(onOpenTopic).toHaveBeenLastCalledWith(expect.any(String), null, 'Scripture & doctrine');
+    fireEvent.click(within(list).getByText('Read all 9 in order'));
+    const [first] = onOpenTopic.mock.calls[onOpenTopic.mock.calls.length - 1];
+    expect(READ.has(first)).toBe(false);                                                 // some read: the first one not read
+    fireEvent.click(row('The nations'));
+    expect(document.querySelectorAll('.ans-group-topics').length).toBe(1);
+    expect(row('Scripture & doctrine').getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(row('The nations'));
+    expect(document.querySelector('.ans-group-topics')).toBeNull();
+    expect(onOpenGroup).not.toHaveBeenCalled();                                          // the group screen stays for deep links only
   });
 
-  it('the reading path: Continue in the site\'s order, the start, or nothing read when it is off', () => {
+  it('the open group and the page\'s scroll come back from a topic; entering from Home starts afresh', () => {
+    window.ScreenLayout = ({ navChildren, children }) => <div className="screen-scroll">{navChildren}{children}</div>;
+    let top = 0;
+    const scrollTop = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    Object.defineProperty(Element.prototype, 'scrollTop', { configurable: true, get: () => top, set: (v) => { top = v; } });
+    try {
+      const first = render(<AnswersHome {...base} />);
+      fireEvent.click(screen.getByText('The churches', { selector: '.ans-group-row .ans-row-title' }));
+      top = 900;
+      act(() => { document.querySelector('.screen-scroll').dispatchEvent(new Event('scroll')); });
+      first.unmount();
+      top = 0;
+      const second = render(<AnswersHome {...base} />);
+      expect(screen.getByText('The churches', { selector: '.ans-group-row .ans-row-title' }).closest('button').getAttribute('aria-expanded')).toBe('true');
+      expect(top).toBe(900);
+      second.unmount();
+      resetAnswersLanding();
+      top = 0;
+      render(<AnswersHome {...base} />);
+      expect(document.querySelector('.ans-group-topics')).toBeNull();
+      expect(top).toBe(0);
+    } finally {
+      if (scrollTop) Object.defineProperty(Element.prototype, 'scrollTop', scrollTop);
+    }
+  });
+
+  it('the reading path is the first row: Continue in the site\'s order, Start here, or nothing read when it is off', () => {
     const first = render(<AnswersHome {...base} />);
-    const path = () => document.querySelector('.ans-start');
-    expect(path().querySelector('.ans-k').textContent).toBe('Continue');
-    expect(path().querySelector('.ans-row-title').textContent).toBe('Regarding Faith');
+    const path = () => document.querySelector('.ans-start-row');
+    expect(path().querySelector('.ans-row-title').textContent).toBe('Continue: Regarding Faith');
     expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('95 of 120 topics · in the site’s order');
     first.unmount();
     const second = render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
-    expect(path().querySelector('.ans-k').textContent).toBe('Start here');
-    expect(path().querySelector('.ans-row-title').textContent).toBe('Main Page');
-    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · 12 min');
+    expect(path().querySelector('.ans-row-title').textContent).toBe('Start here');
+    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('introduction · 12 min');
     second.unmount();
     render(<AnswersHome {...base} pathOn={false} />);
-    expect(path().querySelector('.ans-k').textContent).toBe('Start here');
+    expect(path().querySelector('.ans-row-title').textContent).toBe('Start here');
     expect(document.querySelector('.ans-read')).toBeNull();
   });
 
-  // ANS1: the Answer of the day is gone; its Surprise me is a chip at the end of the question chips
-  it('Surprise me ends the chips and opens a quote paragraph on its own words', () => {
+  it('three questions in one running line, then More questions; Surprise me is the sheet\'s first row', () => {
     const onOpenTopic = vi.fn();
     render(<AnswersHome {...base} onOpenTopic={onOpenTopic} />);
-    expect(document.querySelector('.ans-daily')).toBeNull();
+    const line = document.querySelector('.ans-ask .ans-qs');
+    expect(line.tagName).toBe('P');                                                      // inline text, no flex box (10-21)
+    expect(texts('.ans-q', line)).toEqual(['…the Sabbath?', '…the Trinity?', '…hell?', 'More questions']);
+    expect(document.querySelector('.ans-ask .ans-chip')).toBeNull();
+    fireEvent.click(screen.getByText('…the Trinity?'));
+    expect(onOpenTopic).toHaveBeenLastCalledWith('regarding-the-trinity', null, 'Answers');
     expect(document.body.textContent).not.toMatch(/Answer of the day|Read in context/);
-    const chips = [...document.querySelectorAll('.ans-ask .ans-chip')];
-    expect(chips.slice(-2).map((c) => c.textContent)).toEqual(['More questions', 'Surprise me']);
-    const s = chips[chips.length - 1];
-    expect(s.classList.contains('is-more')).toBe(false);
-    expect(s.querySelector('.ans-ico')).toBeTruthy();
-    fireEvent.click(s);
-    expect(onOpenTopic).toHaveBeenCalledTimes(1);
-    const [id, para, from] = onOpenTopic.mock.calls[0];
+    fireEvent.click(screen.getByText('More questions'));
+    const rows = [...screen.getByRole('dialog').querySelectorAll('.ans-row')];
+    expect(rows.length).toBe(13);
+    expect(rows[0].querySelector('.ans-row-title').textContent).toBe('Surprise me');
+    fireEvent.click(rows[0]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const [id, para, from] = onOpenTopic.mock.calls[onOpenTopic.mock.calls.length - 1];
     const e = ANSWERS.find((x) => x.id === id);
     expect(e.paragraphs.some((p) => p.text === para && p.align === 'justify')).toBe(true);
     expect(from).toBe('Answers');
   });
 
-  // ANS1: "Main Page" is offered once on the landing, by the Start here card
-  it('Main Page once: the Start here card, not the jump strip or the Contents list', () => {
-    render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
-    expect(texts('.ans-jump-strip .ans-az-key')[0]).toBe('Ten Commandments');
-    expect(texts('.ans-jump-strip .ans-az-key')).not.toContain('Main Page');
-    const landing = document.querySelector('.ans-landing');
-    const offers = [...landing.querySelectorAll('button')].filter((b) => /^Main Page$/.test((b.querySelector('.ans-row-title') || b).textContent.trim()));
-    expect(offers).toHaveLength(1);
-    expect(offers[0].classList.contains('ans-start')).toBe(true);
-  });
-
-  // ANS1: the chips finish "What does The Lord say about…"; when the field falls back, the words stand above them
+  // ANS1: the questions finish "What does The Lord say about…"; when the field falls back, the words stand above them
   it('the lead-in line shows exactly when the field falls back to "Search Answers…"', () => {
     const proto = HTMLCanvasElement.prototype;
     const had = proto.getContext;
@@ -148,7 +170,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
       const r = render(<AnswersHome {...base} />);
       const out = { ph: field().getAttribute('placeholder'), lead: document.querySelector('.ans-ask-lead') };
       const next = out.lead ? out.lead.nextElementSibling : null;
-      out.beforeChips = !!(next && next.classList.contains('ans-chips'));
+      out.beforeQs = !!(next && next.classList.contains('ans-qs'));
       out.text = out.lead ? out.lead.textContent : null;
       r.unmount();
       return out;
@@ -158,7 +180,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
       const narrow = run(150);
       expect(narrow.ph).toBe('Search Answers…');
       expect(narrow.text).toBe('What does The Lord say about…');
-      expect(narrow.beforeChips).toBe(true);
+      expect(narrow.beforeQs).toBe(true);
       const wide = run(600);
       expect(wide.ph).toBe('What does The Lord say about…');
       expect(wide.lead).toBeNull();
@@ -200,53 +222,58 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(document.body.textContent).not.toMatch(/Answers Only God Can …/);
   });
 
-  it('while answers.js loads, the head, title, tagline, chips and tablets paint; the path and the day wait', () => {
+  it('while answers.js loads, the head, title, tagline, questions and tablets paint; the path, groups and A–Z wait', () => {
     window.ANSWERS_META = undefined;
     render(<AnswersHome {...base} entries={null} site={null} />);
     expect(document.querySelector('h1').textContent).toBe('Answers Only God Can Give');
     expect(document.querySelector('.ans-lede').textContent).toBe(SITE.tagline);
-    expect(document.querySelectorAll('.ans-chip').length).toBe(7);
-    expect(document.querySelector('.ans-chip.is-surprise').disabled).toBe(true);
+    expect(document.querySelectorAll('.ans-q').length).toBe(4);
     expect(document.querySelectorAll('.ans-tablet').length).toBe(10);
-    expect(document.querySelector('.ans-start')).toBeNull();
+    expect(document.querySelector('.ans-start-row, .ans-group-row')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'A–Z' })).toBeNull();
   });
 
-  it('a chip, a group and Charts & videos open where they say', () => {
-    const onOpenTopic = vi.fn(); const onOpenGroup = vi.fn(); const onOpenMedia = vi.fn();
-    render(<AnswersHome {...base} onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} onOpenMedia={onOpenMedia} />);
-    fireEvent.click(screen.getByText('…the Trinity?'));
-    expect(onOpenTopic).toHaveBeenCalledWith('regarding-the-trinity', null, 'Answers');
-    fireEvent.click(screen.getByText('Scripture & doctrine').closest('button'));
-    expect(onOpenGroup).toHaveBeenCalledWith('5');
+  // 10-22 sweep, Discovery views 6: before the sidecar lands the index's row says its sentence less its count
+  it('before the sidecar, the index row says its sentence without the count', () => {
+    delete window.ANSWERS_META;
+    render(<AnswersHome {...base} />);
+    const fd = [...document.querySelectorAll('.ans-row')].find((r) => r.querySelector('.ans-row-title').textContent === 'False Doctrines Within the Churches (Index)');
+    expect(NB(fd.querySelector('.ans-row-sub').textContent)).toBe('Categories, each answered by The Truth');
+  });
+
+  it('Charts and videos and Saved answers open where they say', () => {
+    const onOpenMedia = vi.fn(); const onOpenSaved = vi.fn();
+    render(<AnswersHome {...base} onOpenMedia={onOpenMedia} onOpenSaved={onOpenSaved} />);
     fireEvent.click(screen.getByText('Charts and videos').closest('button'));
     expect(onOpenMedia).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Saved answers').closest('button'));
+    expect(onOpenSaved).toHaveBeenCalled();
     expect(layoutClass).toContain('ans-wide');
   });
 });
 
-describe('AnswersHome — the tabs (nightly 11-01 #4)', () => {
-  it('an arrow key moves focus with the selection, so the focused tab is the selected one', () => {
-    render(<AnswersHome {...base} />);
-    const c = document.getElementById('ans-tab-c');
-    const az = document.getElementById('ans-tab-az');
-    c.focus();
-    fireEvent.keyDown(c, { key: 'ArrowRight' });
-    expect(az.getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(az);
-    fireEvent.keyDown(az, { key: 'ArrowLeft' });
-    expect(c.getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(c);
-  });
-
-  it('before the corpus is in, Contents stays the selected tab and keeps the focus', () => {
-    render(<AnswersHome {...base} entries={[]} />);
-    const c = document.getElementById('ans-tab-c');
-    const az = document.getElementById('ans-tab-az');
-    c.focus();
-    fireEvent.keyDown(c, { key: 'ArrowRight' });
-    expect(az.getAttribute('aria-selected')).toBe('false');
-    expect(c.getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(c);
+describe('AnswersHome — A–Z is a mode of the landing (0125 b)', () => {
+  it('the Browse head\'s A–Z enters it; Back and By group leave it, and Back then leaves the screen', () => {
+    const onBack = vi.fn();
+    render(<AnswersHome {...base} onBack={onBack} />);
+    fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
+    expect(document.querySelector('.ans-browse-head .ans-h2').textContent).toBe('All topics, A–Z');
+    expect(document.querySelectorAll('#ans-panel-az .ans-row').length).toBe(121);
+    let r;
+    act(() => { r = window.__screenBack(); });
+    expect(r).toBe(true);
+    expect(document.querySelector('.ans-browse-head .ans-h2').textContent).toBe('Browse');
+    expect(onBack).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
+    fireEvent.click(screen.getByTestId('nav-back'));                                     // the bar's back leaves A–Z first
+    expect(document.querySelector('.ans-group-row')).toBeTruthy();
+    expect(onBack).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
+    fireEvent.click(screen.getByRole('button', { name: 'By group' }));
+    expect(document.querySelector('.ans-group-row')).toBeTruthy();
+    expect(window.__screenBack == null).toBe(true);
+    fireEvent.click(screen.getByTestId('nav-back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -295,7 +322,7 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
   it('the open sheet survives a round trip to a topic (U5)', () => {
     const first = render(<AnswersHome {...base} />);
     fireEvent.click(screen.getByText('More questions'));
-    expect(screen.getByRole('dialog').querySelectorAll('.ans-row').length).toBe(12);
+    expect(screen.getByRole('dialog').querySelectorAll('.ans-row').length).toBe(13);   // Surprise me, then the twelve
     first.unmount();
     render(<AnswersHome {...base} />);
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Start with a question');
@@ -465,7 +492,7 @@ describe('AnswersHome — opened from the Or ask row of Search (PL-SEARCH 2)', (
 describe('AnswersHome — A–Z (f05)', () => {
   it('files all 121 topics under their letters, with a 27-key strip and the empty letters off', () => {
     render(<AnswersHome {...base} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'A–Z' }));
+    fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
     const panel = document.getElementById('ans-panel-az');
     expect(panel.querySelectorAll('.ans-row').length).toBe(121);
     const letters = texts('.ans-az-letter', panel);
@@ -486,7 +513,7 @@ describe('AnswersHome — A–Z (f05)', () => {
     Element.prototype.scrollIntoView = into;
     try {
       render(<AnswersHome {...base} />);
-      fireEvent.click(screen.getByRole('tab', { name: 'A–Z' }));
+      fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
       const scroller = document.querySelector('.screen-scroll');
       Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 5000 });
       Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 800 });
@@ -519,14 +546,16 @@ describe('AnswersHome — A–Z (f05)', () => {
     }
   });
 
-  it('a saved A–Z tab, while answers.js loads, leaves Contents the selected tab', () => {
+  it('a saved A–Z, while answers.js loads, leaves the groups showing', () => {
     const first = render(<AnswersHome {...base} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'A–Z' }));
-    first.unmount();                                                // the tab is kept for the next visit
-    render(<AnswersHome {...base} entries={null} />);
-    expect(screen.getByRole('tab', { name: 'Contents' }).getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByRole('tab', { name: 'A–Z' }).getAttribute('aria-selected')).toBe('false');
-    expect(document.getElementById('ans-panel-c')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'A–Z' }));
+    first.unmount();                                                // the mode is kept for the next visit
+    const second = render(<AnswersHome {...base} entries={null} />);
+    expect(document.querySelector('.ans-browse-head .ans-h2').textContent).toBe('Browse');
+    expect(document.getElementById('ans-panel-az')).toBeNull();
+    second.unmount();
+    render(<AnswersHome {...base} />);
+    expect(document.getElementById('ans-panel-az')).toBeTruthy();
   });
 });
 
