@@ -294,6 +294,22 @@ try {
     await sleep(200);
   }
   need(backupPath, 'no backup file was downloaded');
+  // rel17: Chrome on Windows renames the download first and writes its Zone.Identifier
+  // (Mark-of-the-Web) after; that write moves the mtime, and a File B picked before it throws
+  // NotReadableError on every read (the app then said 'could not be read'). Hand B a settled
+  // file: the mark is on (win32, when Chrome writes one) and the mtime has held for 500 ms.
+  {
+    const tSettle = Date.now();
+    let last = statSync(backupPath).mtimeMs, since = Date.now(), marked = process.platform !== 'win32';
+    while (Date.now() - tSettle < 10000) {
+      await sleep(50);
+      if (!marked) marked = existsSync(backupPath + ':Zone.Identifier');
+      const m = statSync(backupPath).mtimeMs;
+      if (m !== last) { last = m; since = Date.now(); }
+      if (marked && Date.now() - since >= 500) break;
+    }
+    note(`download settled in ${Date.now() - tSettle} ms${process.platform === 'win32' ? (marked ? ' (Zone.Identifier on)' : ' (no Zone.Identifier after 10 s)') : ''}`);
+  }
   const bytes = readFileSync(backupPath);
   note(`backup ${backupPath.split(/[\\/]/).pop()} ${bytes.length} B sha256 ${sha256(bytes).slice(0, 16)}...`);
   if (shotsDir) await A.page.screenshot({ path: join(shotsDir, 'b2-A-exported.png') });
@@ -301,6 +317,8 @@ try {
 
   // ── B: another clean profile, Import through the UI, compare ──
   const B = await freshProfile('B');
+  // A beside failure names its error: the app's backupWarn lines (name + message) from B.
+  B.page.on('console', async (m) => { if (m.type() !== 'warning' && m.type() !== 'error') return; let det; try { det = (await Promise.all(m.args().map((h) => h.evaluate((e) => (e && typeof e.name === 'string' && 'message' in e ? e.name + ': ' + e.message : typeof e === 'string' ? e : JSON.stringify(e)))))).join(' | '); } catch (_e) { det = m.text(); } console.log('  [B console ' + m.type() + '] ' + det); });
   await openYourData(B.page);
   const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Restore from a backup')]);
   await chooser.accept([backupPath]);
