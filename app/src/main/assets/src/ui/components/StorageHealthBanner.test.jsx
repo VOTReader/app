@@ -107,7 +107,7 @@ describe('StorageHealthBanner — E5 storage-slow (degraded)', () => {
     expect(banner).not.toBeNull();
     expect(banner.className).toContain('sh-banner-amber');
     expect(banner.textContent).toContain('Storage is slow to load');
-    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x')).toBeNull();
   });
 
   it('is OUTRANKED by a real CRITICAL quota banner (degraded never masks it)', () => {
@@ -173,12 +173,12 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
 
   it('shows "Back up" button', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.WARNING, remaining: 30e6 });
-    expect(container.querySelector('.sh-banner-btn').textContent).toBe('Back up');
+    expect(container.querySelector('.sh-banner .ui-btn').textContent).toBe('Back up');
   });
 
   it('is NOT dismissable', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.WARNING, remaining: 30e6 });
-    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x')).toBeNull();
   });
 
   it('Export button calls onNavigateSettings', () => {
@@ -187,14 +187,14 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
       { tier: StorageHealth.TIER.WARNING, remaining: 30e6 },
       { onNavigateSettings: spy },
     );
-    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn')).click();
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner .ui-btn')).click();
     expect(spy).toHaveBeenCalledOnce();
   });
 
   it('Back up now asks for Your data, where the backup button is (PL-SETTINGS 2)', () => {
     delete (/** @type {any} */ (window)).__votOpenYourData;
     const { container } = renderBanner({ tier: StorageHealth.TIER.CRITICAL, remaining: 1e6 });
-    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn')).click();
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner .ui-btn')).click();
     expect(/** @type {any} */ (window).__votOpenYourData).toBe(true);
     delete (/** @type {any} */ (window)).__votOpenYourData;
   });
@@ -247,7 +247,7 @@ describe('StorageHealthBanner — scenario 7 (critical)', () => {
 
   it('is NOT dismissable', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.CRITICAL, remaining: 5e6 });
-    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x')).toBeNull();
   });
 
   it('write-failed takes priority over critical-quota', () => {
@@ -275,7 +275,7 @@ describe('StorageHealthBanner — scenario 8 (private mode)', () => {
 
   it('is NOT dismissable', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.CRITICAL, privateModeLikely: true });
-    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x')).toBeNull();
   });
 
   it('private mode takes priority over critical-quota text', () => {
@@ -305,7 +305,7 @@ describe('StorageHealthBanner - a database saved by a newer VOTReader (v04-03)',
     expect(banner.textContent).toMatch(/nothing (on this device )?has been lost/i);
     expect(banner.textContent).toMatch(/won't be saved/);
     expect(banner.textContent).not.toMatch(/saved automatically/);
-    expect(container.querySelector('.sh-banner-dismiss'), 'not dismissable: it stays true all session').toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x'), 'not dismissable: it stays true all session').toBeNull();
   });
 
   /* n6-14 (sweep 2): on the web there is nothing to install - a reload fetches the
@@ -419,7 +419,7 @@ describe('StorageHealthBanner — data-missing (automatic snapshot)', () => {
     expect(banner.textContent).toContain('55 highlights, 6 notes, 3 links, 627 read marks');
     expect(banner.textContent).toContain('now 96 read marks');
     expect(banner.textContent).toContain('keeps everything you have made since');
-    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn-primary')).click();
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner .ui-btn.is-primary')).click();
     expect(restoreMissing).toHaveBeenCalled();
     delete /** @type {any} */ (globalThis).DataSafety;
   });
@@ -428,7 +428,7 @@ describe('StorageHealthBanner — data-missing (automatic snapshot)', () => {
   it('a Restore that throws says so, and the banner stays up', async () => {
     /** @type {any} */ (globalThis).DataSafety = { restoreMissing: vi.fn(() => Promise.reject(new Error('quota'))) };
     const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, dataMissing: finding });
-    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn-primary')).click();
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner .ui-btn.is-primary')).click();
     await new Promise((r) => setTimeout(r, 0));
     expect(document.getElementById('vot-toast-restore').textContent).toMatch(/could not run.*unchanged/i);
     expect(container.querySelector('.sh-banner')).not.toBeNull();
@@ -474,7 +474,7 @@ describe('StorageHealthBanner - W8: the library was changed in another tab', () 
     expect(text).toMatch(/changed in another tab/);
     expect(text).toMatch(/won't be saved/);
     expect(buttons(container).some((b) => /Reload/.test(b))).toBe(true);
-    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+    expect(container.querySelector('.sh-banner .ui-notice-x')).toBeNull();
   });
 
   it('"changing": says it is being changed there', () => {

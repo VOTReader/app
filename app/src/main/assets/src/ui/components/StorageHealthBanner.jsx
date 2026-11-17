@@ -64,8 +64,7 @@ export function StorageHealthBanner({ onNavigateSettings }) {
   return (
     <div ref={ref} className={`sh-banner sh-banner-${scenario.style}`}>
       <Notice tone={tone} icon={scenario.icon} title={split[0]} text={split[1]}
-        actions={scenario.buttons.map((btn) => ({ label: btn.label, onClick: btn.onClick, kind: btn.kind || (btn.primary ? 'primary' : 'secondary'),
-          className: 'sh-banner-btn' + (btn.primary ? ' sh-banner-btn-primary' : '') }))}
+        actions={scenario.buttons.map((btn) => ({ label: btn.label, onClick: btn.onClick, kind: btn.kind || (btn.primary ? 'primary' : 'secondary') }))}
         onDismiss={scenario.dismissable ? () => StorageHealth.dismissScenario(scenario.id) : undefined} />
     </div>
   );

@@ -107,7 +107,7 @@ export function OfflineLibraryBanner() {
     // WS6 (mock sy-notices): the one notice style, Retry at its right, the x only while it can go.
     <div className="sh-banner sh-banner-gold offline-library-banner" ref={ref}>
       <Notice icon="dl" inline title={view.lead.replace(/\.$/, '')} text={view.detail}
-        actions={view.retry ? [{ label: 'Retry', onClick: () => { OfflineLibrary.retry(); }, className: 'sh-banner-btn sh-banner-btn-primary' }] : []}
+        actions={view.retry ? [{ label: 'Retry', onClick: () => { OfflineLibrary.retry(); } }] : []}
         onDismiss={view.close ? () => OfflineLibrary.dismiss() : undefined} />
     </div>
   );

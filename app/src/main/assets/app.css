@@ -153,40 +153,11 @@
          layout room (useTopStrip: body.offline-strip-open + --offline-strip-h); each holds one W1 Notice. z-index 101 > nav 100. */
       .sh-banner { position: fixed; top: var(--dock-nav-bottom); left: 0; right: 0; z-index: 101; padding: var(--sp-2) var(--sp-3); background: var(--bg); }
       .sh-banner .ui-notice { margin: 0; box-shadow: var(--shadow-float); }
-      /* B5: the offline-library notice (OfflineLibraryBanner) is news, not an
-         alarm. It sits just UNDER the top nav, at .chapter-nav-sticky's offset,
-         so the nav stays usable while it shows; the storage banners keep the
-         very top. Design: Codex mockup variant B (b5-mockups.html).
-         b5l (2026-09-23): and it takes layout space, as variant B drew it. The
-         component sets body.offline-strip-open + --offline-strip-h; the rule
-         below opens that much room under the page's nav (not under the tabs
-         overview's, which covers the strip), and .chapter-nav-sticky moves
-         below it. Fixed and unspaced it hid the top 44 px of every page. In
-         flow it casts no shadow, and min-height holds the one-row states
-         (incomplete, downloading, complete) at one height so the page does
-         not jump between them. */
-      .sh-banner.offline-library-banner {
-        top: var(--dock-nav-bottom);
-        padding-top: 0.5rem;
-        /* b5c: a 44px control + this padding (0.5rem top, 0.6rem bottom) + the 1.5px border */
-        min-height: calc(44px + 1.1rem + 1.5px);
-        box-shadow: none;
-      }
-      /* b5c (2026-09-24, Codex critique of the built b5l strip): its two controls take a
-         finger. Retry was 53x25.6 px, and the X's 44x44 ::after overlay reached 4.3 px into
-         Retry, so a tap near their boundary could dismiss the warning instead of retrying.
-         Both are real 44px boxes now, 8px apart; the strip grows to the ~62px the mockup drew
-         and holds that height when it has no controls (downloading, complete). Scoped here:
-         the storage banners keep their compact form. */
-      .sh-banner.offline-library-banner .sh-banner-actions { gap: 8px; }
-      .sh-banner.offline-library-banner .sh-banner-btn {
-        min-height: 44px; padding: 0 0.9rem;
-        display: inline-flex; align-items: center; justify-content: center;
-      }
-      .sh-banner.offline-library-banner .ui-notice-x {
-        width: 44px; height: 44px; flex: 0 0 44px; padding: 0;
-        display: grid; place-items: center;
-      }
+      /* B5/b5l: the offline-library notice sits under the nav and takes layout room (useTopStrip). It holds one height
+         across its states (missing + Retry, downloading, complete), so the page under it does not jump when Retry is
+         tapped: the notice's own padding (12px x2) around a small kit button, plus the strip's padding. Its Retry and x
+         are the Notice's own kit parts (38px button with a 44px press, 44px x). */
+      .sh-banner.offline-library-banner { min-height: calc(var(--btn-h-sm) + 24px + 2 * var(--sp-2)); }
       body.offline-strip-open :not(.tabs-overview-layer) > .screen-layout > .top-nav { margin-bottom: var(--offline-strip-h, 0px); }
       /* ═══ end WS6 notices ═══ */
 
@@ -3348,6 +3319,12 @@
     .ui-notice .ui-btn:not(.is-primary):not(.is-text) { background: var(--surface-2); }
     .ui-notice-x { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin: -8px -10px -8px -6px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
     .ui-notice-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* Large text: an inline notice's buttons drop to their own row under the text (the x stays beside the title), or at
+       text 2.0 on 360 px they squeeze the title to a sliver and cover its end ('Offline library incomp|Retry'). */
+    .vot-large-text .ui-notice.is-inline { flex-wrap: wrap; align-items: flex-start; }
+    .vot-large-text .ui-notice.is-inline > .ui-notice-text { flex: 1 1 calc(100% - var(--icon-chip) - var(--tap) - 2 * var(--sp-3)); }
+    .vot-large-text .ui-notice.is-inline > .ui-notice-x { order: 1; }
+    .vot-large-text .ui-notice.is-inline > .ui-btn { order: 2; margin-left: calc(var(--icon-chip) + var(--sp-3)); }
     /* The one confirm (ConfirmStrip.jsx): the question and its lines, then Cancel (an outlined button) and the act. It wraps,
        so at large text the buttons drop under the words instead of squeezing them. is-card: its own surface card. */
     .ui-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 10px 12px; font-family: var(--font-ui); text-align: left; }

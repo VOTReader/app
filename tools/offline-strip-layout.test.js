@@ -28,7 +28,8 @@ function blocks(selector) {
 const top = (b) => (/(?:^|[\s;{])top:\s*([^;]+);/.exec(b || '') || [])[1];
 
 describe('the offline-library strip takes layout space (b5l)', () => {
-  const strip = top(blocks('.sh-banner.offline-library-banner')[0]);
+  // banner trim (2026-11-17): the offline strip takes its top from the shared .sh-banner rule (it repeated it before).
+  const strip = top(blocks('.sh-banner.offline-library-banner')[0]) || top(blocks('.sh-banner')[0]);
 
   it('sits flush under the nav: its 44px buttons + its padding (pinned in px), no border since the UI pass (W1)', () => {
     // The chrome-pin block at the end of app.css freezes the nav's padding in px at every text
@@ -64,29 +65,37 @@ describe('the offline-library strip takes layout space (b5l)', () => {
   });
 });
 
-/* b5c (2026-09-24): Codex's critique of the built b5l strip (lanes/docs/out/b5l-codex-critique.md) measured
-   Retry at 53x25.6 px and the X's 44x44 ::after overlay reaching 4.3 px into Retry. The strip's controls are
-   real 44px boxes now; the real-browser measurement is in the commit message, this pins the CSS. */
-describe("the offline-library strip's controls take a finger (b5c)", () => {
+/* b5c (2026-09-24) asked for real 44px controls on the strip: Retry was 53x25.6 px and the X's overlay reached into
+   it. Both are the Notice's own kit parts now (banner trim, 2026-11-17): a small kit button (38px, its ::after takes the
+   press to 44) and the 44px x. This pins that no private sizing comes back, and that the strip holds one height. */
+describe("the offline-library strip's controls are the kit's (b5c, banner trim)", () => {
   const S = '.sh-banner.offline-library-banner';
 
-  it('Retry is at least 44px tall', () => {
-    expect(blocks(S + ' .sh-banner-btn')[0] || '').toMatch(/min-height:\s*44px/);
+  it('no private button or x sizing: the retired .sh-banner-btn / .sh-banner-actions rules stay gone', () => {
+    expect(CSS).not.toMatch(/\.sh-banner-(btn|actions)\b/);
+    expect(blocks(S + ' .ui-notice-x')).toEqual([]);
   });
 
-  it('the X is a real 44x44 box, and its overlay (which reached into Retry) is off', () => {
-    const x = blocks(S + ' .ui-notice-x')[0] || '';
-    expect(x).toMatch(/width:\s*44px/);
-    expect(x).toMatch(/height:\s*44px/);
-    // WS6: the x is the Notice's own 44px button now; there is no ::after overlay to switch off.
+  it("the kit's small button presses at 44px and the x is a 44px box", () => {
+    expect(CSS).toMatch(/--tap:\s*44px/);
+    expect(CSS).toMatch(/--btn-h-sm:\s*38px/);
+    expect(blocks('.ui-btn.is-small::after')[0] || '').toMatch(/inset:\s*-3px 0/);
+    expect(blocks('.ui-notice-x')[0] || '').toMatch(/width:\s*var\(--tap\);\s*height:\s*var\(--tap\)/);
   });
 
-  it('the two sit at least 8px apart', () => {
-    const gap = /gap:\s*(\d+)px/.exec(blocks(S + ' .sh-banner-actions')[0] || '');
-    expect(gap && Number(gap[1])).toBeGreaterThanOrEqual(8);
+  it('the strip holds the height it has with Retry in every state (small button + notice padding + strip padding)', () => {
+    expect(blocks(S)[0] || '').toMatch(/min-height:\s*calc\(var\(--btn-h-sm\) \+ 24px \+ 2 \* var\(--sp-2\)\)/);
   });
+});
 
-  it('the strip holds one height whether or not it shows controls (44px control + padding + border)', () => {
-    expect(blocks(S)[0] || '').toMatch(/min-height:\s*calc\(44px \+ 1\.1rem \+ 1\.5px\)/);
+/* banner trim (2026-11-17): at text 2.0 on 360 px the inline notice kept Retry and the x on the title's row and
+   squeezed 'Offline library incomplete' to a column Retry covered (title spilled 72 px). At large text its buttons wrap
+   to their own row under the text; the x stays beside the title. */
+describe('an inline notice at large text puts its buttons on their own row', () => {
+  it('wraps, keeps the x on the first row and moves the buttons after it', () => {
+    expect(blocks('.vot-large-text .ui-notice.is-inline')[0] || '').toMatch(/flex-wrap:\s*wrap/);
+    expect(blocks('.vot-large-text .ui-notice.is-inline > .ui-notice-x')[0] || '').toMatch(/order:\s*1/);
+    expect(blocks('.vot-large-text .ui-notice.is-inline > .ui-btn')[0] || '').toMatch(/order:\s*2/);
+    expect(blocks('.vot-large-text .ui-notice.is-inline > .ui-notice-text')[0] || '').toMatch(/flex:\s*1 1 calc\(100% - /);
   });
 });
