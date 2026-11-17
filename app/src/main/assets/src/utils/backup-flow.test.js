@@ -524,6 +524,81 @@ describe('Verify a Backup', () => {
   });
 });
 
+// rel17 (2026-11-17): a good backup was called corrupt. On Windows, Chrome writes the
+// download's Zone.Identifier after the final rename; that moves the file's mtime, and the
+// File the page picked before it then throws NotReadableError on every read. The bytes
+// are fine. Each web read site says so, and nothing reaches stored data.
+describe('a file that cannot be read is not called corrupt (NotReadableError)', () => {
+  const UNREADABLE = 'This file could not be read. It may have changed or moved. Pick it again.';
+  const notReadable = () => new DOMException('The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.', 'NotReadableError');
+  /** A picked file whose reads succeed `okReads` times, then throw NotReadableError (Blink's stale snapshot). */
+  function staleFile(real, okReads) {
+    let reads = 0;
+    const read = (p) => (reads++ < okReads ? p() : Promise.reject(notReadable()));
+    const wrap = (blob) => ({
+      size: blob.size,
+      slice: (a, b) => wrap(blob.slice(a, b)),
+      arrayBuffer: () => read(() => blob.arrayBuffer()),
+      text: () => read(() => blob.text()),
+    });
+    return wrap(real);
+  }
+  const nothingStored = () => {
+    expect(ctx.confirmImport).not.toHaveBeenCalled();
+    expect(globalThis.applyV3).not.toHaveBeenCalled();
+    expect(globalThis.applyImportPayload).not.toHaveBeenCalled();
+    expect(globalThis.__freezePersistState).not.toHaveBeenCalled();
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalled();
+    expect(localStorage.getItem('vot-restore-inflight')).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
+  };
+
+  it('Import: the first 8 bytes (the sniff), the container read, and a legacy text read', async () => {
+    const v3 = await votbakFile();
+    const legacy = fileOf([JSON.stringify(LEGACY)], 'old.json');
+    for (const [what, file] of [
+      ['sniff', staleFile(v3, 0)],                 // :930, the head slice
+      ['container', staleFile(v3, 1)],             // :755, readContainer after a good sniff
+      ['legacy text', staleFile(legacy, 1)],       // :930, file.text() after a good sniff
+    ]) {
+      toasts.length = 0;
+      bridge.pickImportFile.mockResolvedValue(file);
+      await createBackupFlow(ctx).importPersonalData();
+      await settle();
+      expect(lastToast(), what).toBe(UNREADABLE);
+      expect(toasts.join(' '), what).not.toContain('corrupt');
+      nothingStored();
+    }
+    vi.advanceTimersByTime(10000);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('Verify: the sniff, the container read, and a legacy text read', async () => {
+    const v3 = await votbakFile();
+    const legacy = fileOf([JSON.stringify(LEGACY)], 'old.json');
+    const flow = createBackupFlow(ctx);
+    for (const [what, file] of [
+      ['sniff', staleFile(v3, 0)],                 // the outer catch
+      ['container', staleFile(v3, 1)],             // verify container read
+      ['legacy text', staleFile(legacy, 1)],       // verify legacy parse
+    ]) {
+      bridge.pickImportFile.mockResolvedValue(file);
+      await flow.verifyBackupFile();
+      await settle();
+      const report = ctx.setVerifyReport.mock.calls.at(-1)[0];
+      expect(report.message, what).toBe(UNREADABLE);
+      nothingStored();
+    }
+  });
+
+  it('a real parse failure is still called corrupt', async () => {
+    bridge.pickImportFile.mockResolvedValue(fileOf(['{not json'], 'x.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(lastToast()).toBe('This backup file is corrupt or incomplete and could not be read.');
+  });
+});
+
 // W10 (sweep 2026-10-13): a backup from a newer build was called "not a VOTReader
 // backup", which tells a reader holding a good backup to throw it away; and a
 // JSON file stamped v3 went to the v1/v2 applier, which read its media list as

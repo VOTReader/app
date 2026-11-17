@@ -52,6 +52,13 @@ const MANIFEST_MAX_BYTES = 16 * 1024 * 1024;
 // path, Verify on the web) is refused, as StorageManager.kt's MAX_IMPORT_SIZE is on Android ('too_large').
 const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
 const IMPORT_TOO_LARGE_TEXT = 'That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?';
+// A File the page picked is a snapshot: if the file on disk changes after the pick, every read
+// throws NotReadableError. On Windows that is what Chrome's own Mark-of-the-Web write does to a
+// fresh download (it lands after the rename, later under load). The bytes are fine; reading
+// again works. Never call that file corrupt.
+const FILE_CHANGED_TEXT = 'This file could not be read. It may have changed or moved. Pick it again.';
+/** @param {any} e  @param {string} fallback */
+const unreadableOr = (e, fallback) => (e && e.name === 'NotReadableError' ? FILE_CHANGED_TEXT : fallback);
 const VERIFY_TOO_LARGE_TEXT = 'That file is too large to be a VOTReader backup (over 50 MB).';
 
 /**
@@ -752,7 +759,7 @@ export function createBackupFlow(ctx) {
       try { read = await readContainer(file); }
       catch (e) {
         backupWarn('v3 container read failed', e);
-        _showToast('This backup file is corrupt or incomplete and could not be read.');
+        _showToast(unreadableOr(e, 'This backup file is corrupt or incomplete and could not be read.'));
         return;
       }
       const { manifest, entries } = read;
@@ -927,7 +934,7 @@ export function createBackupFlow(ctx) {
         // exception text (may embed a fragment of the malformed file).
         backupWarn('import failed', e);
         hideToast(_TOAST_ID);
-        _showToast('This backup file is corrupt or incomplete and could not be read.');
+        _showToast(unreadableOr(e, 'This backup file is corrupt or incomplete and could not be read.'));
       }
     })();
   };
@@ -1042,7 +1049,7 @@ export function createBackupFlow(ctx) {
           // as integrity 'truncated' with the frames that DID read, which is
           // the honest input to the report below.
           try { read = await readContainer(file); }
-          catch (e) { backupWarn('verify container read failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          catch (e) { backupWarn('verify container read failed', e); _verifyFail(unreadableOr(e, 'This backup file is corrupt or incomplete and could not be read.')); return; }
           if (!_checkEnvelope(read.manifest)) return;
           _report(read.manifest, read.integrity, 'v3', {
             count: read.entries.length,
@@ -1052,13 +1059,13 @@ export function createBackupFlow(ctx) {
           if (file.size > IMPORT_MAX_BYTES) { _verifyFail(VERIFY_TOO_LARGE_TEXT); return; }
           let parsed;
           try { parsed = JSON.parse(await file.text()); }
-          catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail(unreadableOr(e, 'This backup file is corrupt or incomplete and could not be read.')); return; }
           if (!_checkEnvelope(parsed, true)) return;
           _report(parsed, 'absent', 'legacy');
         }
       } catch (e) {
         backupWarn('verify failed', e);
-        _verifyFail('This backup file is corrupt or incomplete and could not be read.');
+        _verifyFail(unreadableOr(e, 'This backup file is corrupt or incomplete and could not be read.'));
       }
     })();
   };
