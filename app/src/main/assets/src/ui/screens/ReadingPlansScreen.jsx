@@ -60,7 +60,7 @@ export function finishedLine(r) {
 
 /**
  * @param {{ runs: any[], finished: any[], now: Date, lettersReady: boolean,
- *   onOpenPlan: (id: string, opt?: { catchUp?: boolean }) => void, onOpenFinished: (id: string) => void, onPreview: (planId: string) => void,
+ *   onOpenPlan: (id: string, opt?: { catchUp?: boolean, manage?: boolean }) => void, onOpenFinished: (id: string) => void, onPreview: (planId: string) => void,
  *   onBuild: () => void, findFocus?: number }} props
  *   finished: the past plans, finished and stopped (2235), newest first
  *   findFocus: bumped by "Find the next plan" (the finish page) to bring Find a plan into view
@@ -95,12 +95,15 @@ export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPl
                     <span className="root-row-title">{name}</span>
                     <span className="root-row-sub plan-state" data-status={line.paused ? 'paused' : line.behind ? 'behind' : undefined}>{line.lead ? <b>{line.lead}</b> : null}{line.lead && line.rest ? ' · ' : ''}{line.rest}</span>
                   </span>
-                  {line.behind ? null : CHEVRON}
                 </button>
                 {line.behind ? (
                   <button type="button" className="ui-btn is-small plan-catchup-btn" aria-label={'Catch up: ' + name}
                     onClick={() => onOpenPlan(run.id, { catchUp: true })}>Catch up</button>
                 ) : null}
+                {/* 0130: the way to change, pause or stop it, in a word (readers could not tell from a bare chevron). */}
+                {line.paused ? CHEVRON : (
+                  <button type="button" className="plan-manage-link" aria-label={'Manage ' + name} onClick={() => onOpenPlan(run.id, { manage: true })}>Manage<span aria-hidden="true">{' ›'}</span></button>
+                )}
               </li>
             );
           })}

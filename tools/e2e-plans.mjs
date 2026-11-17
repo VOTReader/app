@@ -84,6 +84,9 @@ try {
         card: card ? Math.round(card.getBoundingClientRect().height) : 0,
         rows: rows.map((r) => Math.round(r.getBoundingClientRect().height)),
         eyebrows: rows.map((r) => (r.querySelector('.upnext-eyebrow') || r).textContent.trim()),
+        // 0130: the eyebrow row's width, the status's own width and Manage's (px): Manage sits beside the status when they fit
+        widths: rows.map((r) => { const h = r.querySelector('.upnext-head'); if (!h) return null; const w = (el) => { if (!el) return 0; const g = document.createRange(); g.selectNodeContents(el); return Math.round(g.getBoundingClientRect().width); };
+          const cs = getComputedStyle(h); return { row: Math.round(h.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), gap: parseFloat(cs.columnGap) || 0, status: w(h.firstElementChild), manage: w(h.querySelector('.upnext-manage')) }; }),
       };
     });
     await shot('home-' + name);
@@ -109,7 +112,7 @@ try {
     }));
     await shot('list');
     const leads = out.list.rows.map((r) => r.replace(/^[^:]+: /, '').split(' · ')[0]);
-    need(JSON.stringify(leads) === JSON.stringify(['On track', 'Done today', '1 day behind', '3 days behind', 'Paused', leads[5], 'On track']) && /^Starts /.test(leads[5]),
+    need(JSON.stringify(leads) === JSON.stringify(['On track', 'Done today', '1 day behind', '3 days behind', 'Paused', leads[5], 'On track']) && /^Not started$/.test(leads[5]),
       `L leads: ${JSON.stringify(leads)}`);
     need(out.list.catchUp.length === 2, `L Catch up buttons: ${JSON.stringify(out.list.catchUp)}`);
     need(out.list.past.length === 2 && out.list.past.some((s) => /^Stopped /.test(s)), `L Past plans: ${JSON.stringify(out.list.past)}`);

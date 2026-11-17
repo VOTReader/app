@@ -207,7 +207,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
           <button type="button" className="root-row" onClick={() => { saveRun(catchUp(run, new Date())); onClose(); }}>
             <span className="root-row-text">
               <span className="root-row-title">Keep my daily amount</span>
-              <span className="root-row-sub">{'Same reading each day · the finish moves to ' + shortDate(st.projected)}</span>
+              <span className="root-row-sub">{'Same reading each day · still finishes ' + shortDate(st.projected)}</span>
             </span>
           </button>
         </li>

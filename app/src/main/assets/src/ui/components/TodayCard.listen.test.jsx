@@ -31,9 +31,10 @@ describe('PlanListen', () => {
     globalThis.AudioLibraryStore = { getPlaybackRate: () => rate, getVersion: () => ver, subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); } };
     try {
       render(<PlanListen pill refs={REFS} tracksOf={tracksOf} label="Listen" onListen={() => {}} />);
-      expect(screen.getByRole('button', { name: 'Listen, about 9 min' }).textContent).toBe('9 min');
+      // hub 01:19: the pill says Listen; the minutes are in its name (the card's 'N min left' is the reading's length)
+      expect(screen.getByRole('button', { name: 'Listen, about 9 min' }).textContent).toBe('Listen');
       act(() => { rate = 0.75; ver++; subs.forEach((cb) => cb()); });
-      expect(screen.getByRole('button').textContent).toBe('19 min');
+      expect(screen.getByRole('button').getAttribute('aria-label')).toBe('Listen, about 19 min');
     } finally { delete globalThis.AudioLibraryStore; }
   });
 

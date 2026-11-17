@@ -433,7 +433,7 @@ export function buildScreenRoutes({
     startPlanSession(planId, runStatus(run, new Date()).day, next ? next.bid + ':' + next.cid : undefined);
   };
   // 2235: Home's "N days behind" opens the plan page on Catch up.
-  const openPlanPage = (/** @type {string} */ planId, /** @type {{ catchUp?: boolean } | undefined} */ o) => { openPlanNav([{ v: 'list' }, { v: 'plan', id: planId, ...(o && o.catchUp ? { catchUp: true } : {}) }]); goReadingPlans(); };
+  const openPlanPage = (/** @type {string} */ planId, /** @type {{ catchUp?: boolean, manage?: boolean } | undefined} */ o) => { openPlanNav([{ v: 'list' }, { v: 'plan', id: planId, ...(o && o.catchUp ? { catchUp: true } : {}), ...(o && o.manage ? { manage: true } : {}) }]); goReadingPlans(); };
   // mw18 S6: the recordings of a plan's coming days, saved to the phone from Plan details (the same tracks Listen plays).
   const planTracks = (refs) => AudioPlayer.portionTracks(planPortion((Array.isArray(refs) ? refs : []).filter(Boolean)));
   function planPortion(list) {

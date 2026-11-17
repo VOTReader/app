@@ -33,7 +33,7 @@ const base = (o) => ({ readingPlans: [], isRead: () => false, onPlansMoved: vi.f
 const runs = () => ReadingPlanStore.active();
 const barTitle = () => document.querySelector('.plan-bar-title').textContent;
 /** The running plan's row on the list (its aria-label starts with the name and the state). */
-const openRow = (name = 'Bible in a Year') => fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + name + ': (On track|Done today|Starts|Paused|[0-9]+ days? behind)') }));
+const openRow = (name = 'Bible in a Year') => fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + name + ': (On track|Done today|Not started|Paused|[0-9]+ days? behind)') }));
 const lateRun = () => {
   let run = startCatalogPlan('bible-year', null, daysAgo(4));
   for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
@@ -67,8 +67,10 @@ describe('Reading plans: the list (3.1)', () => {
     ReadingPlanStore.put(b);
     ReadingPlanStore.put({ ...a, updated: Date.now() });   // a save keeps its place
     render(<PlansHub {...base()} />);
-    const rows = within(screen.getByRole('list', { name: 'Your plans' })).getAllByRole('button');
+    const rows = [...screen.getByRole('list', { name: 'Your plans' }).querySelectorAll('.plan-run-row')];
     expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Bible in a Year: On track · Today: Genesis 1-3 · 0 of 3', 'Psalms: Paused · Day 1 of 30']);
+    // 0130: a running plan's way to change or stop it is the word Manage; a paused one has its chevron (Resume is on its page)
+    expect([...document.querySelectorAll('.plan-manage-link')].map((b) => b.getAttribute('aria-label'))).toEqual(['Manage Bible in a Year']);
     expect(rows[1].querySelector('.plan-state b').textContent).toBe('Paused');
   });
 });
@@ -113,7 +115,7 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(run.start).toBe(tomorrowKey());
     expect(runStatus(run, new Date()).total).toBe(90);
     expect(runStatus(run, new Date()).notStarted).toBe(true);
-    expect(document.querySelector('.plan-status').textContent).toMatch(/^Starts tomorrow · finishes /);
+    expect(document.querySelector('.plan-status').textContent).toMatch(/^Not started · starts tomorrow · finishes /);
     fireEvent.click(screen.getByRole('button', { name: 'Start today instead' }));
     expect(runs()[0].start).toBe(todayKey(new Date()));
   });
@@ -168,6 +170,8 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
     expect(within(sheet).getByText(said)).toBeTruthy();
     expect(within(sheet).getByRole('button', { name: /^Read two days today/ })).toBeTruthy();
     expect(within(sheet).getByRole('button', { name: /^Finish on time/ })).toBeTruthy();
+    // what stays, under a head that already says when it finishes (2320 five-second test: 'the finish moves to' read as a change)
+    expect(within(sheet).getByRole('button', { name: /^Keep my daily amount/ }).textContent).toBe('Keep my daily amountSame reading each day · still finishes ' + said.replace(/^.* finishes /, ''));
     act(() => { fireEvent.click(within(sheet).getByRole('button', { name: /^Keep my daily amount/ })); });
     expect(document.querySelector('.plan-status b').textContent).toBe('On track');
     // the dates that went unread stay on the week strip as history
@@ -233,6 +237,21 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
     expect(within(screen.getByRole('list', { name: 'The road' })).getAllByRole('button').length).toBe(66);
     fireEvent.click(screen.getByRole('button', { name: 'Exodus: 0 of 40 read' }));
     expect(barTitle()).toBe('Bible in a Year · Schedule');
+  });
+
+  it("0130: the list's 'Manage ›' opens the plan on its Manage sheet, once; the schedule says the plan's status", () => {
+    const run = markDay(startCatalogPlan('bible-year', null, daysAgo(3)), 0, true, daysAgo(3));
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Bible in a Year' }));
+    expect(barTitle()).toBe('Bible in a Year');
+    expect(screen.getByRole('dialog', { name: 'Manage plan' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Stop plan' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog', { name: 'Manage plan' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Whole schedule' }));
+    expect(document.querySelector('.plan-sched-status').textContent).toMatch(/behind · finishes /);
+    act(() => { window.history.back(); });
   });
 
   it('Manage plan: Stop is one tap with Undo; a stopped plan is kept under Past plans with Continue (2235)', () => {
@@ -543,6 +562,37 @@ describe('changing a custom plan after it starts (2310)', () => {
     act(() => { document.getElementById('vot-toast-plan-manage').querySelector('.vot-undo-btn').click(); });
     expect(ReadingPlanStore.all().map((r) => [r.id, r.status])).toEqual([[run.id, 'running']]);
     expect(ReadingPlanStore.get(run.id)).toEqual(run);
+  });
+
+  it('Save changes with only the name changed: the same run renamed, with Undo; with nothing changed: nothing saved, no toast', () => {
+    const spec = builderSpec({ picks: [{ t: 'b', bid: 'ruth', ch: null }, { t: 'b', bid: 'jonah', ch: null }], order: 'picked', share: 'side',
+      goal: { mode: 'items', n: 2 }, weekdays: Array(7).fill(true), name: 'Two short books' }, null);
+    const run = tickItem(newRun(spec, daysAgo(1)), 'ruth:1', todayKey(daysAgo(1)), 1);
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    const change = () => {
+      openRow('Two short books');
+      fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Change what’s in it' }));
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
+    };
+    change();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Plan name' }), { target: { value: 'Ruth and Jonah' } });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
+    expect(ReadingPlanStore.all().map((r) => [r.id, r.name, r.status])).toEqual([[run.id, 'Ruth and Jonah', 'running']]);
+    const toast = document.getElementById('vot-toast-plan-manage');
+    expect(toast.textContent).toMatch(/^Renamed Ruth and Jonah/);
+    act(() => { toast.querySelector('.vot-undo-btn').click(); });
+    expect(ReadingPlanStore.all().map((r) => [r.id, r.name, r.status])).toEqual([[run.id, 'Two short books', 'running']]);
+    expect(ReadingPlanStore.get(run.id).ticks).toEqual(run.ticks);
+    // nothing changed
+    const before = JSON.stringify(ReadingPlanStore.all());
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Change what’s in it' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
+    expect(JSON.stringify(ReadingPlanStore.all())).toBe(before);
+    expect(document.querySelector('#vot-toast-plan-manage.show')).toBeNull();
   });
 
   it('a catalog plan has no Change what is in it (Start over instead)', () => {

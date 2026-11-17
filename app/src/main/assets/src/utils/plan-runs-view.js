@@ -92,7 +92,8 @@ export function planStatus(run, now, st = runStatus(run, now)) {
   if (run.status === 'stopped') return { key: 'stopped', text: run.stopped ? 'Stopped ' + finishDate(run.stopped, now) : 'Stopped', behind: 0 };
   if (st.finished) return { key: 'finished', text: 'Finished', behind: 0 };
   if (st.paused) return { key: 'paused', text: 'Paused', behind: 0 };
-  if (st.notStarted) return { key: 'starts', text: startsText(run.start, now), behind: 0 };
+  // 0130: a plan not started says so, then when it starts ("Not started · starts Sat Nov 21").
+  if (st.notStarted) { const s = startsText(run.start, now); return { key: 'starts', text: 'Not started · ' + s.charAt(0).toLowerCase() + s.slice(1), behind: 0 }; }
   if (st.behind > 0) return { key: 'behind', text: daysWord(st.behind) + ' behind · finishes ' + finishDate(st.projected, now), behind: st.behind };
   if (st.doneToday) return { key: 'done', text: 'Done today', behind: 0 };
   return { key: 'ontrack', text: 'On track', behind: 0 };

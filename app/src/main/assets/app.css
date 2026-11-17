@@ -2994,6 +2994,11 @@
        beside Read and Listen. */
     .upnext-plan { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0.1rem 0.6rem; align-items:center; padding-top:0.6rem; padding-bottom:0.6rem; }
     .upnext-plan > .upnext-eyebrow { grid-column:1 / -1; }
+    /* 0130: the eyebrow row: the status, then "Manage ›" at its right end; the word drops under the status when the row is full. */
+    .upnext-plan > .upnext-head { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:baseline; gap:0 var(--sp-2); min-width:0; }
+    .upnext-head > .upnext-eyebrow:first-child { min-width:0; }
+    .upnext-head > .upnext-manage { position:relative; margin:0 0 0 auto; padding:0; border:0; background:none; color:var(--text-2); text-transform:none; letter-spacing:0; white-space:nowrap; cursor:pointer; }
+    .upnext-manage::after { content:''; position:absolute; inset:-10px -8px; }
     .upnext-text { display:flex; flex-direction:column; flex:1; min-width:0; }
     .upnext-eyebrow { font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); text-transform:uppercase; color:var(--accent); line-height:var(--lh-label); }
     .upnext-title { margin-top:2px; color:var(--text-1); font-size:var(--ts-headline); font-weight:600; line-height:var(--lh-headline); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -3449,6 +3454,7 @@
     .plan-run-row { min-height: 72px; }
     .plan-state b { color: var(--gold); font-weight: 400; }
     .plan-list .root-row-sub, .plan-choices .root-row-sub { font-style: normal; font-family: var(--pl-ui); font-size: var(--fs-14); }   /* U rule 5: facts upright */
+    .plan-find-row :is(.root-row-title, .root-row-sub) { white-space: normal; }   /* a plan's name whole: 'Volumes and Scriptures in a year' (2320 five-second test) */
     .plan-find-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.35; text-align: right; }
     .plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
     .plan-empty-text { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
@@ -3585,9 +3591,19 @@
     .top-nav .plan-manage-btn { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 12px 0 9px; border: 1px solid var(--gold-border); border-radius: var(--r-pill); background: none; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); letter-spacing: 0.02em; cursor: pointer; flex-shrink: 0; }
     .top-nav .plan-manage-btn svg { width: 18px; height: 18px; stroke-width: 1.7; }
     @media (hover: hover) { .top-nav .plan-manage-btn:hover { background: var(--surface-1); } }
-    .plan-run-li.is-behind { display: flex; align-items: center; }
-    .plan-run-li.is-behind > .plan-run-row { flex: 1 1 auto; min-width: 0; }
-    .plan-run-li.is-behind > .plan-catchup-btn { flex: none; margin: 0 var(--sp-3) 0 4px; }
+    /* 0130: each running plan's row: the plan (a tap opens its page), then "Manage ›" (its Manage sheet); a plan
+       behind has Catch up under its text. */
+    .plan-run-li { display: flex; flex-wrap: wrap; align-items: center; }
+    .plan-run-li > .plan-run-row { flex: 1 1 0; min-width: 0; }
+    .plan-run-li > .plan-chev { flex: none; margin-right: var(--sp-3); }
+    .plan-run-li.is-behind { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .plan-run-li.is-behind > .plan-run-row { grid-column: 1; grid-row: 1; }
+    .plan-run-li.is-behind > .plan-manage-link { grid-column: 2; grid-row: 1; }
+    .plan-run-li > .plan-catchup-btn { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin: -6px var(--sp-3) var(--sp-3) calc(var(--sp-3) + 46px + 12px); }   /* under the text: the ring, then its gap */
+    .plan-manage-link { position: relative; flex: none; align-self: stretch; margin: 0 var(--sp-3) 0 0; padding: 0 2px; border: 0; background: none; color: var(--gold); font-family: var(--font-ui); font-size: var(--ts-meta); white-space: nowrap; cursor: pointer; }
+    .plan-sched-status { margin: 0 0 10px; color: var(--gold); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    /* 0130: Pause, Start over and Stop drawn as buttons (outlined) at the sheet's foot; Resume stays the solid one. */
+    .plan-sheet-actions .ui-btn:not(.is-primary) { background: none; border: 1px solid var(--gold-border); }
     /* 2310: at large text a fact tile's word ('chapters', 'reading') is wider than a third of the phone: one tile a row, number beside its words */
     .vot-large-text :is(.plan-facts, .prg-tiles) { grid-template-columns: minmax(0, 1fr); }
     .vot-large-text :is(.plan-fact, .prg-tile) { display: flex; flex-direction: row; align-items: baseline; gap: 0 10px; }
@@ -3595,13 +3611,18 @@
     .plan-date { max-width: 100%; min-width: 0; }
     .vot-large-text .plan-opt { flex-direction: column; align-items: stretch; gap: 6px; }   /* label over its choices: the choices get the sheet's width */
     .vot-large-text .plan-opt-label { width: auto; }
-    .vot-large-text .plan-run-li.is-behind { flex-wrap: wrap; }   /* 2310: Catch up drops under the row, the name keeps its width */
-    .vot-large-text .plan-run-li.is-behind > .plan-catchup-btn { flex: 1 1 100%; margin: 0 var(--sp-3) var(--sp-3); }
+    .vot-large-text .plan-run-li.is-behind > .plan-catchup-btn { justify-self: stretch; margin: 0 var(--sp-3) var(--sp-3); }   /* 2310: Catch up full width under the row */
+    /* 0130: at large text the plan's name and status keep the row's width; Manage goes under them (beside Catch up when behind). */
+    .vot-large-text .plan-run-li { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .vot-large-text .plan-run-li > .plan-run-row { grid-column: 1 / -1; grid-row: 1; }
+    .vot-large-text .plan-run-li > .plan-manage-link { grid-column: 2; grid-row: 2; min-height: var(--tap); margin-bottom: var(--sp-2); }
+    .vot-large-text .plan-run-li > .plan-chev { display: none; }
+    .vot-large-text .plan-run-li.is-behind > .plan-catchup-btn { grid-column: 1; grid-row: 2; margin: 0 var(--sp-2) var(--sp-3) var(--sp-3); }
     .plan-catchup-btn { border: 1px solid var(--gold-border); color: var(--gold); }
     .plan-state[data-status="behind"] { white-space: normal; }   /* the whole phrase, finish date and all */
-    .plan-list > li.is-behind + li .root-row { border-top: 0; }
-    .plan-list > li + li.is-behind, .plan-list > li.is-behind + li { border-top: 1px solid var(--border); }
-    .plan-list > li + li.is-behind > .root-row { border-top: 0; }
+    /* 0130: a row is more than its button (Manage, Catch up), so the line between rows belongs to the row. */
+    .plan-list > li + li { border-top: 1px solid var(--border); }
+    .plan-list > li + li > .root-row { border-top: 0; }
     .plan-status { margin-top: 2px; }
     .plan-status b { color: var(--gold); font-weight: 500; }
     .plan-progress-text .plan-catchup-btn { margin-top: 10px; }

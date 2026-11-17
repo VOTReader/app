@@ -15,10 +15,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * @typedef {{ v: 'list' } | { v: 'preview', plan: string, opt?: any, again?: string } | { v: 'plan', id: string, sheet?: number, catchUp?: boolean }
+ * @typedef {{ v: 'list' } | { v: 'preview', plan: string, opt?: any, again?: string } | { v: 'plan', id: string, sheet?: number, catchUp?: boolean, manage?: boolean }
  *   | { v: 'schedule', id: string, tab?: 'ahead' | 'read', at?: number, preview?: any }
  *   | { v: 'finished', id: string } | { v: 'stopped', id: string } | { v: 'build', edit?: string }} PlanView
  *   plan.catchUp: open on the Catch up sheet (Home's and the list's "N days behind", 2235)
+ *   plan.manage: open on the Manage sheet (Home's and the list's "Manage ›", 0130), once
  */
 
 /** @type {PlanView[]} */

@@ -134,7 +134,8 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
     if (edit) {
       const out = editRun(edit, spec, new Date());
       if (out) for (const r of out) saveRun(r);
-      if (out && out.length === 2 && onEdited) onEdited(edit, out[1]);
+      // a new run, or the same run renamed: either way the toast can put it back (nothing changed: nothing saved, no toast)
+      if (out && onEdited) onEdited(edit, out[out.length - 1]);
       onStep(0);
       return;
     }

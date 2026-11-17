@@ -28,16 +28,18 @@ describe('TodayCard (the up-next card)', () => {
     expect(onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 49 }, 'bible-year');
     const listen = screen.getByRole('button', { name: 'Listen to Genesis 47-50' });
     expect(listen.className).toBe('upnext-pill');
+    expect(listen.textContent).toBe('Listen');   // not a bare '18 min' beside '15 min left' (2320 five-second test)
     fireEvent.click(listen);
     expect(onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 49 }, { bid: 'genesis', cid: 50 }], 'bible-year');
   });
 
-  it('a day read through is one row: "Done today · tomorrow ..." and Read ahead, no pills', () => {
+  it('a day read through is one row: "Done today", tomorrow\'s reading on its own line, and Read ahead, no pills', () => {
     const onRead = vi.fn();
     const { container } = render(<TodayCard rows={[row({ done: true, tomorrow: 'Exodus 1-4', next: { bid: 'exodus', cid: 1 }, again: { bid: 'genesis', cid: 47 } })]}
       onRead={onRead} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
     expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
-    expect(screen.getByText('Done today · tomorrow Exodus 1-4')).toBeTruthy();
+    expect(container.querySelector('.upnext-title').textContent).toBe('Done today');
+    expect(container.querySelector('.upnext-sub').textContent).toBe('Tomorrow: Exodus 1-4');
     fireEvent.click(screen.getByRole('button', { name: 'Read ahead' }));
     expect(onRead).toHaveBeenLastCalledWith({ bid: 'exodus', cid: 1 }, 'bible-year');
     expect(screen.queryByRole('button', { name: /Listen|^Read Genesis/ })).toBeNull();
@@ -73,7 +75,7 @@ describe('TodayCard (the up-next card)', () => {
     // 2310: the eyebrow is the status, the title the first day's reading (it said 'Today' over 'Starts ...').
     expect(container.querySelector('[data-plan="n"] .upnext-eyebrow').textContent).toBe('Starts tomorrow');
     expect(container.querySelector('[data-plan="n"] .upnext-title').textContent).toBe('Genesis 47-50');
-    expect(container.querySelector('.upnext-paused').textContent).toBe('Psalms · PausedResume');
+    expect(container.querySelector('.upnext-paused').textContent).toBe('Psalms · PausedResume plan');
     expect(screen.getByRole('button', { name: 'Resume Psalms' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^Read / })).toBeNull();
   });
@@ -86,6 +88,15 @@ describe('TodayCard (the up-next card)', () => {
     fireEvent.click(screen.getByRole('button', { name: '3 days behind · finishes Nov 14. Catch up' }));
     expect(onOpenPlan).toHaveBeenCalledWith('bible-year', { catchUp: true });
     expect(screen.getByRole('button', { name: /^Read / })).toBeTruthy();
+  });
+
+  it("0130: 'Manage ›' ends the eyebrow and opens the plan on Manage; the behind status keeps Catch up without a chevron", () => {
+    const onOpenPlan = vi.fn();
+    const { container } = render(<TodayCard rows={[row({ status: { key: 'behind', text: '3 days behind · finishes Nov 14', behind: 3 } })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    expect(container.querySelector('.upnext-status-btn').textContent).toBe('3 days behind · finishes Nov 14');
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Bible in a Year' }));
+    expect(onOpenPlan).toHaveBeenCalledWith('bible-year', { manage: true });
+    expect(container.querySelector('.upnext-manage').textContent).toBe('Manage ›');
   });
 
   it('a plan just finished keeps a row until it is opened or dismissed (plans2 3.7)', () => {

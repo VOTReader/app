@@ -42,7 +42,7 @@ describe('plan runs the shipping build (dc31d3e27) wrote, opened by this build',
     const said = Object.fromEntries(Object.entries(byState()).map(([k, r]) => [k, planStatus(r, NOW).text]));
     expect(said).toEqual({
       ontrack: 'On track', donetoday: 'Done today', missed1: '1 day behind · finishes Nov 11, 2027', missed3: '3 days behind · finishes Nov 10, 2027',
-      paused: 'Paused', notstarted: 'Starts Fri Nov 20', finished: 'Finished', stopped: 'Stopped Nov 10', custom: 'On track',
+      paused: 'Paused', notstarted: 'Not started · starts Fri Nov 20', finished: 'Finished', stopped: 'Stopped Nov 10', custom: 'On track',
     });
     // runRow carries the same status to Home's card
     expect(runRow(byState().missed3, NOW).status.text).toBe(said.missed3);

@@ -18,7 +18,7 @@
 
 import { schedule, itemsLabel, markDay, dayNum, todayKey, dateOf, monthCells } from '../../data/plan-engine.js';
 import { bookTitle } from '../../data/plan-catalog.js';
-import { saveRun } from '../../utils/plan-runs-view.js';
+import { saveRun, planStatus } from '../../utils/plan-runs-view.js';
 import { PlanSheet, PlanTick, dayDate, minText, WEEK_LETTERS } from '../components/PlanBits.jsx';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -141,6 +141,8 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
   const pick = (/** @type {'ahead' | 'read'} */ t) => { setShown(t); if (onTab) onTab(t); };
   return (
     <div className="root-screen plans-hub plan-schedule">
+      {/* 0130: the plan's one status, the same words as Home, the list and the plan page. */}
+      {preview ? null : <p className="plan-sched-status">{planStatus(run, now).text}</p>}
       {preview ? null : (
         <div className="ui-seg plan-seg" role="tablist" aria-label="Schedule">
           <button type="button" role="tab" aria-selected={shown === 'ahead'} className="ui-seg-item" onClick={() => pick('ahead')}>Coming up</button>

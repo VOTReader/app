@@ -124,7 +124,8 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen, 
   if (pill) {
     return (
       <button type="button" className="upnext-pill" aria-label={name} disabled={disabled} onClick={onListen}>
-        {PLAY_ICON}<span aria-hidden="true">{minutes ? minutes + ' min' : 'Listen'}</span>
+        {/* says what it does: a bare '18 min' beside '15 min left' read as two lengths for one reading (2320 five-second test) */}
+        {PLAY_ICON}<span aria-hidden="true">Listen</span>
       </button>
     );
   }
@@ -138,7 +139,7 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen, 
 /**
  * One plan's row. A tap on its text opens the plan's own page.
  * @param {{ r: TodayRow, many: boolean, onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
- *   onOpenPlan?: (planId: string, opt?: { catchUp?: boolean }) => void, onOpenPlans: () => void, tracksOf?: (refs: any[]) => any[], now: Date }} props
+ *   onOpenPlan?: (planId: string, opt?: { catchUp?: boolean, manage?: boolean }) => void, onOpenPlans: () => void, tracksOf?: (refs: any[]) => any[], now: Date }} props
  */
 function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf, now }) {
   const open = () => (onOpenPlan ? onOpenPlan(r.id) : onOpenPlans());
@@ -153,7 +154,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
           const store = /** @type {any} */ (globalThis).ReadingPlanStore;
           const run = store && typeof store.get === 'function' ? store.get(r.id) : null;
           if (run) saveRun(resumeRun(run, new Date()));
-        }}>Resume</button>
+        }}>Resume plan</button>
       </div>
     );
   }
@@ -182,19 +183,28 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
   const doneToday = !r.loading && r.done;
   const ready = !r.loading && !r.done && !r.notStarted && !!r.next;
   const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? (r.label || startsText(r.start || '', now))
-    : doneToday ? 'Done today' + (r.tomorrow ? ' · tomorrow ' + r.tomorrow : '') : r.label;
+    : doneToday ? 'Done today' : r.label;
+  // A day read through: tomorrow's reading on the line "N min left" holds on a day not read, so it shows whole (hub 01:15).
+  const sub = ready && (r.minutesLeft || r.minutes) ? (r.minutesLeft || r.minutes) + ' min left' : doneToday && r.tomorrow ? 'Tomorrow: ' + r.tomorrow : '';
   return (
     <div className="upnext-row upnext-plan" data-plan={r.id}>
-      {behind && onOpenPlan ? (
-        <button type="button" className="upnext-eyebrow upnext-status-btn" onClick={() => onOpenPlan(r.id, { catchUp: true })}
-          aria-label={(many ? r.name + ': ' : '') + st.text + '. Catch up'}>{eyebrow}<span aria-hidden="true">{' ›'}</span></button>
-      ) : <span className="upnext-eyebrow">{eyebrow}</span>}
+      <div className="upnext-head">
+        {behind && onOpenPlan ? (
+          <button type="button" className="upnext-eyebrow upnext-status-btn" onClick={() => onOpenPlan(r.id, { catchUp: true })}
+            aria-label={(many ? r.name + ': ' : '') + st.text + '. Catch up'}>{eyebrow}</button>
+        ) : <span className="upnext-eyebrow">{eyebrow}</span>}
+        {/* 0130: the way to pause, change or stop the plan, in a word: the plan page on its Manage sheet. The status
+            keeps its tap to Catch up; this is the row's one chevron. */}
+        {onOpenPlan && !r.loading ? (
+          <button type="button" className="upnext-eyebrow upnext-manage" aria-label={'Manage ' + r.name} onClick={() => onOpenPlan(r.id, { manage: true })}>Manage<span aria-hidden="true">{' ›'}</span></button>
+        ) : null}
+      </div>
       {r.loading ? (
         <div className="upnext-text"><span className="upnext-title">{title}</span></div>
       ) : (
-        <button type="button" className="upnext-text upnext-open" onClick={open} aria-label={'Open ' + r.name + ': ' + title}>
+        <button type="button" className="upnext-text upnext-open" onClick={open} aria-label={'Open ' + r.name + ': ' + title + (doneToday && sub ? ', ' + sub : '')}>
           <span className="upnext-title">{title}</span>
-          {ready && (r.minutesLeft || r.minutes) ? <span className="upnext-sub">{(r.minutesLeft || r.minutes) + ' min left'}</span> : null}
+          {sub ? <span className="upnext-sub">{sub}</span> : null}
         </button>
       )}
       {ready ? (
@@ -215,7 +225,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
  * (Home's Continue row) as the last row. Draws nothing when it would be empty.
  * A paused plan is one line with Resume (2235); more than TODAY_MAX_ROWS plans end in "+N more", which opens Reading plans.
  * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
- *   onOpenPlans: () => void, onOpenPlan?: (planId: string, opt?: { catchUp?: boolean }) => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
+ *   onOpenPlans: () => void, onOpenPlan?: (planId: string, opt?: { catchUp?: boolean, manage?: boolean }) => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
  *   offerStart?: boolean, onHideOffer?: () => void, tracksOf?: (refs: any[]) => any[], children?: any }} props
  *   markAsReadEnabled / onEnableMarkAsRead: no longer drawn (plans2: a plan's reads count with Mark as read off)
  */

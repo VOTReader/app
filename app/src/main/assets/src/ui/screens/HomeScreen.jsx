@@ -89,7 +89,7 @@ const SHUFFLE_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
  *   onSearch: () => void, onScriptureWeb?: () => void, historyEnabled?: boolean, searchEnabled?: boolean, history?: any[],
  *   onContinue?: (entry: any) => void, onStartHere?: () => void, translation?: string, readingPlans?: any,
  *   isRead?: any, markAsReadEnabled?: boolean, onPlanRead?: (next: any, planId: string) => void, onPlanListen?: (items: any[], name: string) => void,
- *   onOpenPlan?: (planId: string, opt?: { catchUp?: boolean }) => void,
+ *   onOpenPlan?: (planId: string, opt?: { catchUp?: boolean, manage?: boolean }) => void,
  *   planTracks?: any, onOpenPlans?: () => void, onPlansMoved?: (left: any[]) => void, onEnableMarkAsRead?: () => void }} props
  */
 export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onScriptureWeb, historyEnabled, searchEnabled, history, onContinue, onStartHere, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onOpenPlan, onPlansMoved, onEnableMarkAsRead }) {

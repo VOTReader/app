@@ -132,7 +132,10 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   const [daySheet, setDaySheet] = React.useState(/** @type {number | null} */ (top && top.v === 'plan' && typeof /** @type {any} */ (top).sheet === 'number' ? /** @type {any} */ (top).sheet : null));
   const [buildStep, setBuildStep] = React.useState(/** @type {1 | 2} */ (1));
   const started = React.useRef(/** @type {string | null} */ (null));
-  React.useEffect(() => { setSettings(false); setDaySheet(top && top.v === 'plan' && typeof /** @type {any} */ (top).sheet === 'number' ? /** @type {any} */ (top).sheet : null); }, [top]);
+  // 0130: "Manage ›" (Home, the list) opens the plan on its Manage sheet, once: coming back to this view from the
+  // schedule leaves the sheet shut.
+  const manageShown = React.useRef(/** @type {WeakSet<object>} */ (new WeakSet()));
+  React.useEffect(() => { const m = !!(top && top.v === 'plan' && /** @type {any} */ (top).manage && !manageShown.current.has(top)); if (m) manageShown.current.add(top); setSettings(m); setDaySheet(top && top.v === 'plan' && typeof /** @type {any} */ (top).sheet === 'number' ? /** @type {any} */ (top).sheet : null); }, [top]);
   // The phone's Back (and Escape) pops a view before it leaves Reading plans: the screen's own back level
   // (window.__screenBack, as Notes' notebooks do; a sheet open on top is the modal registry's and closes first).
   // The builder holds its own steps.
@@ -173,10 +176,12 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   };
 
   // 2310: a changed plan is a new run; the toast's Undo removes it and puts the plan back exactly as it was.
+  // Only its name changed: the same run renamed, and Undo puts the old name back.
   const edited = (/** @type {any} */ prev, /** @type {any} */ fresh) => {
-    showUndoToast(MANAGE_TOAST, 'Changed ' + runName(fresh, null), () => {
+    const renamed = fresh.id === prev.id;
+    showUndoToast(MANAGE_TOAST, (renamed ? 'Renamed ' : 'Changed ') + runName(fresh, null), () => {
       const s = _store();
-      if (s && typeof s.remove === 'function') s.remove(fresh.id);
+      if (!renamed && s && typeof s.remove === 'function') s.remove(fresh.id);
       saveRun(prev);
       replacePlanView({ v: 'plan', id: prev.id });
     });
@@ -241,7 +246,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   } else {
     body = (
       <ReadingPlansScreen runs={runs} finished={finished} now={now} lettersReady={lettersReady} findFocus={findFocus}
-        onOpenPlan={(id, o) => pushPlanView({ v: 'plan', id, ...(o && o.catchUp ? { catchUp: true } : {}) })}
+        onOpenPlan={(id, o) => pushPlanView({ v: 'plan', id, ...(o && o.catchUp ? { catchUp: true } : {}), ...(o && o.manage ? { manage: true } : {}) })}
         onOpenFinished={(id) => { const r = runOf(id); pushPlanView({ v: r && r.status === 'stopped' ? 'stopped' : 'finished', id }); }}
         onPreview={(plan) => pushPlanView({ v: 'preview', plan, opt: planDef(plan) && plan === 'collection' ? { volKey: 'one' } : undefined })}
         onBuild={() => { setBuildStep(1); pushPlanView({ v: 'build' }); }} />
