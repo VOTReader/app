@@ -895,7 +895,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     if (storageInfo.persistable) return { line: 'Ask the browser to keep your data safe from automatic cleanup.', pill: null };
     // No lever here (installed app / Android APK / a Chromium browser that auto-decided / Safari): the data still
     // lives on this device; the honest guidance is to keep a backup.
-    return { line: 'Your data is saved on this device. Back up regularly to keep it safe.', pill: 'Saved' };
+    // The pill names where the data is, not a protection: this row cannot see whether anything backs it up.
+    return { line: 'Your data is saved on this device. Back up regularly to keep it safe.', pill: 'On this device' };
   })();
   const showProtectButton = storageInfo.status === 'ready' && storageInfo.persistable;
 
