@@ -45,7 +45,6 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { HistoryStore } from '../stores/history-store.js';
-import { showUndoToast } from '../utils/toast.js';
 import { COL_BY_KEY, colLetterArr } from '../data/scripture-resolution.js';
 
 /**
@@ -161,19 +160,4 @@ export function useHistory(historyEnabled) {
   // a day's repeats into one row itself, so nobody is asked to clean their own trail. The store's
   // pruneDay stays for its own tests and for any future import-time repair; no screen reaches it.
   return { readHistory, addToHistory, clearHistory };
-}
-
-/**
- * Remove one History row: its place's visits on the row's calendar day (the screen folds a day's repeats into one
- * row), then offer "Removed from history · Undo", which puts each visit back at its old place (0610).
- * @param {{ key: string, ts: number }} entry the row's (newest) visit
- * @returns {void}
- */
-export function removeHistoryRow(entry) {
-  if (!entry || !entry.key || typeof entry.ts !== 'number') return;
-  const d = new Date(entry.ts);
-  const from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const to = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
-  const gone = HistoryStore.removeVisits(entry.key, from, to);
-  if (gone.length) showUndoToast('vot-toast-history-removed', 'Removed from history', () => HistoryStore.restoreVisits(gone));
 }
