@@ -1809,7 +1809,7 @@
       .dl-queue.is-failed-only { margin:var(--sp-3) 0; }
       .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-4); margin:var(--sp-2) 0; padding:var(--sp-3) var(--card-pad); border-radius:var(--r-card); background:var(--surface-1); box-shadow:inset 3px 0 0 var(--dl-brick); }
       .dl-unsent p { flex:1 1 12em; margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
-      .dl-cancel-ask { margin-top:var(--sp-3); }
+      .ui-confirm.dl-cancel-ask { margin-top:var(--sp-3); padding:0; }
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
@@ -3356,6 +3356,8 @@
     .ui-confirm-line { margin: 2px 0 0; color: var(--text-2); font-size: var(--ts-meta); line-height: 1.45; }
     .ui-confirm-line.is-warn { color: var(--tone-danger); }
     .ui-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); margin-left: auto; }
+    /* Two buttons that do not fit side by side stack, each the full width, so neither floats alone at the right. */
+    .ui-confirm-actions > .ui-btn { flex: 1 0 auto; }
     @media (hover:hover) {
       .upnext-pill:hover { background:var(--surface-3); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }
