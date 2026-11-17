@@ -6,7 +6,7 @@
    (journal entry, settings nuke) and the still-instant tab close.
 
    The kit's one confirm (.ui-confirm, app.css "one confirm"): the question,
-   any lines under it, then Cancel (a text button) and the act (a danger
+   any lines under it, then Cancel (an outlined button) and the act (a danger
    button, or the primary one for a go). It wraps: at large text the two
    buttons drop under the words instead of squeezing them. `card` draws it
    as its own surface card (a strip that stands alone in a list).
@@ -71,7 +71,7 @@ export function ConfirmStrip({ question, yesLabel, cancelLabel = 'Cancel', act =
         ))}
       </div>
       <div className="ui-confirm-actions">
-        <button ref={cancelRef} type="button" className="ui-btn is-small is-text ui-confirm-cancel" onClick={onCancel}>{cancelLabel}</button>
+        <button ref={cancelRef} type="button" className="ui-btn is-small is-outline ui-confirm-cancel" onClick={onCancel}>{cancelLabel}</button>
         <button type="button" disabled={disabled} onClick={onConfirm}
           className={'ui-btn is-small ui-confirm-yes ' + (act === 'go' ? 'is-primary' : 'is-danger')}>{yesLabel || 'Yes, delete'}</button>
       </div>

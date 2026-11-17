@@ -135,7 +135,7 @@ export function DownloadStrip({ off, name = '', onMakeRoom }) {
         <button type="button" className="ui-btn is-small" onClick={() => setAsking(true)} aria-expanded={asking}>{canPause ? 'Cancel' : 'Cancel all'}</button>
       </div>
       {asking ? (
-        <ConfirmStrip className="dl-cancel-ask" label="Cancel downloads" back={false} focus={false} act="go"
+        <ConfirmStrip card className="dl-cancel-ask" label="Cancel downloads" back={false} focus={false}
           question={'Cancel ' + (n === 1 ? 'this download' : 'all ' + n.toLocaleString('en-US') + ' downloads') + '?'}
           lines={['What is already on this phone stays.']}
           cancelLabel="Keep downloading" yesLabel="Cancel downloads" onCancel={() => setAsking(false)} onConfirm={stop} />

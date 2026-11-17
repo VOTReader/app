@@ -1809,7 +1809,8 @@
       .dl-queue.is-failed-only { margin:var(--sp-3) 0; }
       .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-4); margin:var(--sp-2) 0; padding:var(--sp-3) var(--card-pad); border-radius:var(--r-card); background:var(--surface-1); box-shadow:inset 3px 0 0 var(--dl-brick); }
       .dl-unsent p { flex:1 1 12em; margin:0; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
-      .ui-confirm.dl-cancel-ask { margin-top:var(--sp-3); padding:0; }
+      .ui-confirm.dl-cancel-ask { margin-top:var(--sp-3); background:var(--surface-2); }
+      .ui-confirm.dl-cancel-ask .ui-btn.is-danger { background:var(--surface-3); }
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
@@ -3277,6 +3278,7 @@
     .ui-btn.is-primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
     .ui-btn.is-primary svg { color: var(--accent-ink); }
     .ui-btn.is-text { background: none; color: var(--text-2); }
+    .ui-btn.is-outline { background: none; color: var(--text-1); box-shadow: inset 0 0 0 1px var(--text-3); }
     .ui-btn.is-small { position: relative; min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; font-size: var(--ts-value); }
     .ui-btn.is-small::after { content: ''; position: absolute; inset: -3px 0; }
     .ui-btn.is-small svg { width: var(--icon-sm); height: var(--icon-sm); }
@@ -3346,11 +3348,12 @@
     .ui-notice .ui-btn:not(.is-primary):not(.is-text) { background: var(--surface-2); }
     .ui-notice-x { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin: -8px -10px -8px -6px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
     .ui-notice-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    /* The one confirm (ConfirmStrip.jsx): the question and its lines, then Cancel (a text button) and the act. It wraps,
+    /* The one confirm (ConfirmStrip.jsx): the question and its lines, then Cancel (an outlined button) and the act. It wraps,
        so at large text the buttons drop under the words instead of squeezing them. is-card: its own surface card. */
     .ui-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 10px 12px; font-family: var(--font-ui); text-align: left; }
     .ui-confirm.is-card { flex-basis: 100%; padding: 12px 14px; border-radius: var(--r-card); background: var(--surface-1); }
-    .ui-confirm.is-card .ui-btn:not(.is-primary):not(.is-text) { background: var(--surface-2); }
+    .ui-confirm.is-card { box-shadow: inset 0 0 0 1px var(--hairline); }
+    .ui-confirm.is-card .ui-btn:not(.is-primary):not(.is-text):not(.is-outline) { background: var(--surface-2); }
     .ui-confirm-text { flex: 1 1 12em; min-width: 0; }
     .ui-confirm-q { margin: 0; color: var(--text-1); font-size: var(--ts-body); font-weight: 500; line-height: 1.4; text-wrap: pretty; }
     .ui-confirm-line { margin: 2px 0 0; color: var(--text-2); font-size: var(--ts-meta); line-height: 1.45; }
@@ -3360,8 +3363,6 @@
     .ui-confirm-actions > .ui-btn { flex: 1 0 auto; max-width: 100%; }
     /* x2.0 at 360: 'Cancel downloads' alone is wider than its card; it wraps inside the card instead of running past it. */
     .vot-large-text .ui-confirm-actions > .ui-btn { white-space: normal; text-align: center; padding-block: 6px; }
-    /* The bookmark popover is on --bg3: text-2 there is 4.49:1 in light, so its Cancel takes text-1. */
-    .bkm-popover .ui-confirm-cancel { color: var(--text-1); }
     @media (hover:hover) {
       .upnext-pill:hover { background:var(--surface-3); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }

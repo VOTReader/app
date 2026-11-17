@@ -160,7 +160,7 @@ describe('K3 -- kept rows, the Remove all strip, Find kept', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
     const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
     expect(strip.className).toBe('ui-confirm is-card');
-    expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('ui-btn is-small is-text ui-confirm-cancel');
+    expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('ui-btn is-small is-outline ui-confirm-cancel');
     const go = within(strip).getByRole('button', { name: 'Yes, remove all' });
     expect(go.className).toBe('ui-btn is-small ui-confirm-yes is-danger');
     expect(go.className).not.toContain('songs-shuffle');

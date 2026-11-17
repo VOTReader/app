@@ -126,7 +126,7 @@ describe('ConfirmStrip as the one confirm', () => {
   it('draws Cancel as a text button and the act as danger, or primary for a go', () => {
     const { container, rerender } = render(<ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />);
     const [cancel, yes] = Array.from(container.querySelectorAll('button'));
-    expect(cancel.className).toBe('ui-btn is-small is-text ui-confirm-cancel');
+    expect(cancel.className).toBe('ui-btn is-small is-outline ui-confirm-cancel');
     expect(yes.className).toBe('ui-btn is-small ui-confirm-yes is-danger');
     rerender(<ConfirmStrip question="Q?" act="go" onCancel={() => {}} onConfirm={() => {}} />);
     expect(container.querySelectorAll('button')[1].className).toBe('ui-btn is-small ui-confirm-yes is-primary');
