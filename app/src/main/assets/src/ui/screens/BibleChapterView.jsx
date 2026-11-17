@@ -5,7 +5,6 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer, AUDIO_TOAST_ID } from '../../utils/audio-player.js';
 import { showToast } from '../../utils/toast.js';
-import { TranslationPill } from '../components/TranslationPill.jsx';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
@@ -24,7 +23,7 @@ import { BgDrawContext } from '../components/bg-draw.js';
 let pickedOver = '';
 
 export function BibleChapterView(props) {
-  const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert: inertProp = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null, bibleAudioFor = null } = props;
+  const { book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert: inertProp = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, bibleAudioFor = null } = props;
   // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
   const bgDraw = React.useContext(BgDrawContext);
   const inert = inertProp || !!bgDraw;
@@ -34,7 +33,7 @@ export function BibleChapterView(props) {
   // (utils/audio-text-edition.js). The snapshot is a string, so the clock's
   // ticks do not re-render the chapter; only a change of recording does.
   const recording = React.useSyncExternalStore(AudioPlayer.subscribe, () => recordingTranslationFor(AudioPlayer, book.id));
-  // FIXC: a translation the reader picks here (the pill, or the ⋯ menu's "Bible translation", which says so with
+  // FIXC: a translation the reader picks here (the ⋯ menu's "Bible translation", which says so with
   // vot:translation-pick) is shown at once, though this book's recording is loaded or a search showed the KJV: the
   // pick did nothing while either held the page. It holds while that recording stays loaded, from chapter to chapter.
   const [visit, setVisit] = React.useState(/** @type {{ key: string, ed: string, verse: number } | null} */ (null));
@@ -192,7 +191,7 @@ export function BibleChapterView(props) {
   // switched to NKJV the moment the swipe settled; a same-book peek still
   // resolves to the recording's edition, "to match the recording" line and all.
   // TABS2: this page's own props with only the chapter swapped (see LetterView's _letterPeek), so the page under the
-  // finger is drawn as the page it becomes: its Listen pill, translation pill, mark-as-read and end cards. A chapter of
+  // finger is drawn as the page it becomes: its Listen pill, recording line, mark-as-read and end cards. A chapter of
   // another book gets that book's own recording and edges (BIBLE_BOOK_LIST order; the far edge is not drawn this deep).
   const _versesPeek = (bk, ch) => {
     const same = bk.id === book.id;
@@ -310,8 +309,13 @@ export function BibleChapterView(props) {
               {/* r-bible (W2h): "John 3" is the title; the chapter's headings are the italic line under it (tap it to
                   hide it; the book's subtitle stands in). */}
               <div className="hero-eyebrow">The Scriptures of Truth</div>
+              {/* Corbin 11-16: no translation picker in a chapter's header. The recording's edition says itself here and
+                  offers the one tap back (as the search visit's row does); picking any other stays in the ⋯ menu. */}
               {recordingTextShown && (
-                <div className="hero-audio-text" role="status">{translationLabel(translation)} text, to match the recording</div>
+                <div className="hero-audio-row">
+                  <div className="hero-audio-text" role="status">{translationLabel(translation)} text, to match the recording</div>
+                  <button type="button" className="hero-audio-own" onClick={inert ? undefined : pickOwn}>Read in {translationLabel(readerTranslation)}</button>
+                </div>
               )}
               <h1 className="hero-title">{book.title} {chapter.num}</h1>
               {titleText ? (titleIsTappable ? (
@@ -336,12 +340,12 @@ export function BibleChapterView(props) {
                   playBibleBook still branches on shape for it.) Mirrors the
                   letter hero pill; inert peeks keep it (same
                   pointer-events:none contract). */}
-              <div className="rd-hero-row">
-                {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+              {/* Corbin 11-16: "just the listen button and music one" (a chapter has no song pill; a letter's has both). */}
+              {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+                <div className="rd-hero-row">
                   <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
-                )}
-                <TranslationPill translation={shownTranslation} short onTranslation={typeof onTranslation === 'function' ? (v) => { pickOwn(); onTranslation(v); } : null} />
-              </div>
+                </div>
+              )}
               {/* A02.2: plain Matthew and the Matthew Study Bible did not know about each other. The plain chapter
                   opens the same chapter with its study notes (a peek keeps the line, inert, as it keeps Listen). */}
               {onStudyNotes && (

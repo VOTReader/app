@@ -127,22 +127,15 @@ describe('BibleChapterView — the KJV for this visit (idea A)', () => {
   });
 });
 
-/* FIXC (REVIEW-readers 3): a translation picked from the pill during a KJV visit did nothing (the visit held the page,
-   and picking the reader's own edition changed no setting). A pick ends the visit and shows what was picked. */
+/* FIXC (REVIEW-readers 3): a translation picked during a KJV visit did nothing (the visit held the page, and picking
+   the reader's own edition changed no setting). A pick ends the visit and shows what was picked. Corbin 11-16: the
+   chapter header carries no translation picker (only Listen); picking is the ⋯ menu's "Bible translation". */
 describe('BibleChapterView — a translation picked during the visit shows at once', () => {
-  it('the pill: picking NKJV (the reader\'s own) leaves the KJV visit', () => {
-    const onTranslation = vi.fn();
-    render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }, { onTranslation }));
-    expect(verse(13)).toContain('Thou shalt not kill.');
-    fireEvent.click(document.querySelector('.rd-trans-pill'));
-    const nkjv = [...document.querySelectorAll('[role="radio"]')].find((b) => {
-      const c = b.querySelector('.select-sheet-option-code');
-      return c && c.textContent === 'NKJV';
-    });
-    fireEvent.click(nkjv);
-    expect(onTranslation).toHaveBeenCalledWith('nkjv');
-    expect(verse(13)).toContain('You shall not murder.');
-    expect(row()).toBeNull();
+  it('the header has no translation picker, with or without a writer', () => {
+    render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }, { onTranslation: vi.fn() }));
+    expect(document.querySelector('.hero .rd-trans-pill')).toBeNull();
+    expect(document.querySelector('.hero [aria-haspopup="dialog"]')).toBeNull();
+    expect(document.querySelector('.hero').textContent).not.toMatch(/NKJV|KJV/);
   });
 
   it('the ⋯ menu\'s "Bible translation" (vot:translation-pick) leaves it too', () => {

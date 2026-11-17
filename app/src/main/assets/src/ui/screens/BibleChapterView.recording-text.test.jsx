@@ -9,7 +9,7 @@
    could free the edition under the mounted chapter. The chapter now holds the
    edition while it shows it, and the line waits for the text. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act, screen } from '@testing-library/react';
+import { render, cleanup, act, screen, fireEvent } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 
@@ -154,6 +154,30 @@ describe('BibleChapterView — the edition switch is announced (RC.12)', () => {
 /* FIXC (REVIEW-readers 3): with the book's recording loaded, a translation picked from the pill or the ⋯ menu did
    nothing: the words followed the voice whatever was picked. The pick now shows, while that recording stays loaded. */
 describe('BibleChapterView — a translation picked over a loaded recording shows at once', () => {
+  it('the hero line\'s "Read in NKJV" returns to the reader\'s own edition, setting untouched', async () => {
+    // its own book: a pick holds per book and recording for the module's life, and the ⋯ test below picks John's
+    const MARK = { id: 'mark', title: 'Mark', chapters: [{ num: 1, title: 'Ch 1', sections: [{ heading: null, verses: [
+      { n: 1, text: 'The beginning (nkjv)' },
+    ] }] }] };
+    const markView = () => (
+      <BibleChapterView book={MARK} chapter={MARK.chapters[0]} translation="nkjv" theme="dark"
+        markAsReadEnabled={false} onNavigate={() => {}} />
+    );
+    const { rerender } = render(markView());
+    globalThis.BIBLE_KJV = { mark: { 1: [{ n: 1, text: 'The beginning (kjv)' }] } };
+    _translationLoaded.kjv = true;
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(screen.getByText('The beginning (kjv)')).toBeTruthy();
+    const back = document.querySelector('.hero-audio-own');
+    expect(back.textContent).toBe('Read in NKJV');
+    expect(document.querySelector('.rd-trans-pill')).toBeNull();   // Corbin 11-16: no picker in the header
+    act(() => { fireEvent.click(back); });
+    rerender(markView());
+    expect(screen.getByText('The beginning (nkjv)')).toBeTruthy();
+    expect(banner()).toBeNull();
+    expect(document.getElementById('vot-toast-audio').textContent).toBe('Back to the NKJV text.');
+  });
+
   it('the ⋯ menu\'s pick (vot:translation-pick): the reader\'s edition replaces the recording\'s, and says so', async () => {
     const { rerender } = render(view());
     await landKjv();

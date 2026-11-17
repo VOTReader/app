@@ -2671,12 +2671,16 @@
     }
     .visit-ed-solo { padding-top: 0; }
     .visit-ed-note { flex: 1 1 auto; min-width: 0; font-family: var(--font-body); font-style: italic; font-size: var(--fs-14); color: var(--cream-muted); }
-    .visit-ed-btn {
+    .visit-ed-btn, .hero-audio-own {
       flex: 0 0 auto; margin-left: auto; min-height: 44px; padding: 0 0 0 8px; pointer-events: auto;
       background: none; border: none; cursor: pointer;
       font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold);
     }
-    @media (hover: hover) { .visit-ed-btn:hover { color: var(--gold-bright); } }
+    @media (hover: hover) { .visit-ed-btn:hover, .hero-audio-own:hover { color: var(--gold-bright); } }
+    /* Corbin 11-16: a recording's edition line in a chapter's hero, with the one tap back (no picker in the header) */
+    .hero-audio-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 12px; margin: -0.45rem 0 0.7rem; }
+    .hero-audio-row > .hero-audio-text { margin: 0; }
+    .hero-audio-own { margin-left: 0; padding: 0 4px; pointer-events: inherit; }   /* a swipe peek stays inert */
     /* ── The mini title band (search200 UX B10 item 1, mockup
        ux/mockups/1-sticky-title/PICK.png) ── a landing mid-letter named no
        letter: the hero sat above, out of sight. Once it has scrolled up under
@@ -6401,7 +6405,6 @@
     button.rd-hero-sub { cursor: pointer; }
     .rd-hero-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
     .rd-hero-row > * { margin-top: 0 !important; margin-bottom: 0 !important; }
-    .rd-hero-row .rd-trans-pill { min-height: 40px; }
     .rd-study-switch { margin: var(--sp-4) 0 0; text-align: left; }
     .rd-study-label { margin: 0 0 var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
     .rd-study-switch .ui-seg { width: 100%; }
