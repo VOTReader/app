@@ -6,6 +6,7 @@
       finished and the stopped plan.
    C  Catch up from the list opens the plan page on the Catch up sheet with its three ways forward.
    M  Manage plan (the bar's Manage): Pause, Start over, Stop; Stop is one tap and the toast's Undo puts it back.
+   G  the Schedule's Manage (0430): the same sheet over the schedule; Back shuts it, then goes to the plan page.
    S  a new plan starts at zero (0245, Corbin 11-17): a reader with Genesis 1-50 read starts Bible in a Year; the preview has
       no Already read row, the run holds no tick, Home's card says Day 1 with Genesis 1-3, and a read of Genesis 1 ticks it today.
    Run: node tools/e2e-plans.mjs [--home-only] [--shots DIR] [--json FILE]   (after npm run build; ~40 s)
@@ -27,7 +28,7 @@ const W = 412, H = 915;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [];
 const need = (ok, msg) => { if (!ok) fails.push(msg); };
-const out = { home: {}, list: null, catchUp: null, manage: null, start: null };
+const out = { home: {}, list: null, catchUp: null, manage: null, schedule: null, start: null };
 
 const { server, url } = await serveOwnTree();
 const profile = join(tmpdir(), 'vot-plans-' + process.pid);
@@ -76,7 +77,7 @@ try {
   console.error('[plans] boot'); await boot(); console.error('[plans] booted');
   // H: Home's card, one seeding per case
   const homeCases = { ontrack: ['ontrack'], behind: ['missed3'], donetoday: ['donetoday'], notstarted: ['notstarted'], paused: ['paused'],
-    two: ['ontrack', 'missed3'], ontrackPaused: ['ontrack', 'paused'] };
+    two: ['ontrack', 'missed3'], ontrackPaused: ['ontrack', 'paused'], finished: ['finished'] };
   for (const [name, states] of Object.entries(homeCases)) {
     await seed(states);
     out.home[name] = await page.evaluate(() => {
@@ -100,6 +101,7 @@ try {
     need(/^On track · Day /.test(h.ontrack.eyebrows[0] || ''), `H on track eyebrow: ${h.ontrack.eyebrows[0]}`);
     need(/^3 days behind · finishes /.test(h.behind.eyebrows[0] || ''), `H behind eyebrow: ${h.behind.eyebrows[0]}`);
     need(h.paused.rows.length === 1 && /Paused/.test(h.paused.eyebrows[0]) && h.paused.rows[0] < h.ontrack.rows[0], `H paused line: ${JSON.stringify(h.paused)}`);
+    need(h.finished.rows.length === 1 && h.finished.eyebrows[0] === 'Plan finished', `H finished eyebrow (0430): ${JSON.stringify(h.finished)}`);
 
     // L: the list with every state
     await seed(['ontrack', 'donetoday', 'missed1', 'missed3', 'paused', 'notstarted', 'custom', 'finished', 'stopped']);
@@ -111,6 +113,10 @@ try {
       rows: [...document.querySelectorAll('.plan-run-row')].map((b) => b.getAttribute('aria-label')),
       catchUp: [...document.querySelectorAll('.plan-catchup-btn')].map((b) => b.getAttribute('aria-label')),
       past: [...document.querySelectorAll('[aria-label="Past plans"] .root-row-sub')].map((s) => s.textContent),
+      // 0430: each running row's Manage, its height, and any name or status cut short (the list wraps, never cuts)
+      manage: [...document.querySelectorAll('.plan-run-li')].map((li) => !!li.querySelector('.plan-manage-link')),
+      heights: [...document.querySelectorAll('.plan-run-li')].map((li) => Math.round(li.getBoundingClientRect().height)),
+      cut: [...document.querySelectorAll('.plan-list :is(.root-row-title, .root-row-sub)')].filter((e) => e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis' && getComputedStyle(e).whiteSpace === 'nowrap').map((e) => e.textContent),
     }));
     await shot('list');
     const leads = out.list.rows.map((r) => r.replace(/^[^:]+: /, '').split(' · ')[0]);
@@ -118,6 +124,8 @@ try {
       `L leads: ${JSON.stringify(leads)}`);
     need(out.list.catchUp.length === 2, `L Catch up buttons: ${JSON.stringify(out.list.catchUp)}`);
     need(out.list.past.length === 2 && out.list.past.some((s) => /^Stopped /.test(s)), `L Past plans: ${JSON.stringify(out.list.past)}`);
+    need(out.list.manage.length === 7 && out.list.manage.every(Boolean), `L Manage on every row, paused too (0430): ${JSON.stringify(out.list.manage)}`);
+    need(out.list.cut.length === 0, `L cut short (0430): ${JSON.stringify(out.list.cut)}`);
 
     // C: Catch up from the list
     await page.evaluate(() => [...document.querySelectorAll('.plan-catchup-btn')][1].click());
@@ -151,6 +159,33 @@ try {
     need(JSON.stringify(actions) === JSON.stringify(['Pause plan', 'Start over', 'Stop plan']), `M actions: ${JSON.stringify(actions)}`);
     need(afterStop.status === 'stopped' && afterStop.list && /^Stopped Three|^Stopped Bible in a Year/.test(afterStop.toast), `M stop: ${JSON.stringify(afterStop)}`);
     need(undone.status === 'running' && undone.rows === 7, `M undo: ${JSON.stringify(undone)}`);
+
+    // G: the Schedule's Manage (0430): the same sheet over the schedule; Back shuts it, then goes to the plan page
+    await page.evaluate(() => document.querySelector('.plan-run-row').click());
+    await clickText(/^Whole schedule$/);
+    await page.waitForFunction(() => / · Schedule$/.test((document.querySelector('.plan-bar-title') || {}).textContent || ''));
+    const bar = () => page.evaluate(() => {
+      const t = document.querySelector('.plan-bar-title'); const m = document.querySelector('.plan-manage-btn');
+      const lh = t ? parseFloat(getComputedStyle(t).lineHeight) || 1 : 1;
+      return { title: t ? t.textContent : null, lines: t ? Math.round(t.getBoundingClientRect().height / lh) : 0, titleW: t ? Math.round(t.getBoundingClientRect().width) : 0,
+        manageW: m ? Math.round(m.getBoundingClientRect().width) : 0, sheet: !!document.getElementById('plan-settings') };
+    });
+    const sched = await bar();
+    await clickText(/^Manage plan$/);
+    await page.waitForSelector('#plan-settings');
+    const open = await bar();
+    await shot('schedule-manage');
+    await page.keyboard.press('Escape');
+    await sleep(600);
+    const shut = await bar();
+    await page.keyboard.press('Escape');
+    await sleep(600);
+    const backTo = await bar();
+    out.schedule = { sched, open, shut, backTo };
+    need(sched.manageW > 0 && !sched.sheet, `G schedule bar: ${JSON.stringify(sched)}`);
+    need(open.sheet && open.title === sched.title, `G Manage over the schedule: ${JSON.stringify(open)}`);
+    need(!shut.sheet && shut.title === sched.title, `G Back shuts the sheet: ${JSON.stringify(shut)}`);
+    need(!backTo.sheet && backTo.title === sched.title.replace(/ · Schedule$/, ''), `G Back again, the plan page: ${JSON.stringify(backTo)}`);
 
     // S: a new plan starts at zero, whatever was read before (0245). Genesis 1-50 go in the read record, no plans.
     await page.evaluate(async () => {
@@ -216,6 +251,6 @@ try {
 }
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
 console.log(JSON.stringify(out.home));
-if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage, start: out.start }));
+if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage, schedule: out.schedule, start: out.start }));
 if (fails.length) { console.log(fails.length + ' finding(s):\n' + fails.map((f) => '  ' + f).join('\n') + '\nFAIL'); process.exit(HOME_ONLY ? 0 : 1); }
 console.log('PASS');
