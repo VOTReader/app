@@ -11,7 +11,10 @@
  *   - in plain words: the subject without its "type(scope):" head, without the lane's work id ("up1 - ", "ds5 B3 - ")
  *     and without a trailing id in brackets ("(mw18 C9)");
  *   - a commit may say it better itself: a body line `What's new: <words>` replaces its subject (one line each, any
- *     number), and `What's new: none` keeps it out.
+ *     number), and `What's new: none` keeps it out;
+ *   - a release may say it as a whole: a commit with `What's new (release): <words>` lines (a long branch landing at
+ *     once, vot-ui 2026-11-16: 343 commits of work-in-progress subjects) makes those lines the release's whole list,
+ *     in place of every commit's own lines in the same range. Items already published are kept as before.
  *
  * Output: { generated, since, items: [{ t, text }] }, newest first, at most MAX_ITEMS. `t` is the commit time (epoch
  * ms); the app shows the items newer than the last ones it showed (or, the first time, newer than `since`).
@@ -57,6 +60,16 @@ export function linesOf(message) {
   return s ? [s] : [];
 }
 
+/**
+ * A commit's `What's new (release):` lines: when any commit in a range has them, they are the range's whole list.
+ * @param {string} message
+ * @returns {string[]}
+ */
+export function releaseLinesOf(message) {
+  const text = String(message || '').replace(/\r\n/g, '\n');
+  return [...text.matchAll(/^What's new \(release\):\s*(.+?)\s*$/gim)].map((m) => sentence(m[1])).filter(Boolean);
+}
+
 /** The subject without the lane's work id at its head or a bracketed id at its end. @param {string} s */
 export function stripIds(s) {
   let out = s.trim();
@@ -83,7 +96,13 @@ function sentence(s) {
 export function buildItems(commits, prev = []) {
   /** @type {{ t: number, text: string }[]} */
   const fresh = [];
-  for (const c of commits) for (const text of linesOf(c.message)) fresh.push({ t: Number(c.t) || 0, text });
+  const release = commits.filter((c) => releaseLinesOf(c.message).length);
+  // A release that says it as a whole: its lines alone, newest first in the order written (each a millisecond apart).
+  if (release.length) {
+    for (const c of release) releaseLinesOf(c.message).forEach((text, i) => fresh.push({ t: (Number(c.t) || 0) - i, text }));
+  } else {
+    for (const c of commits) for (const text of linesOf(c.message)) fresh.push({ t: Number(c.t) || 0, text });
+  }
   const all = [...fresh, ...(Array.isArray(prev) ? prev : [])].filter((i) => i && typeof i.text === 'string' && Number.isFinite(i.t));
   all.sort((a, b) => b.t - a.t);
   const seen = new Set();

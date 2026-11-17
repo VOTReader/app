@@ -1,6 +1,6 @@
 /* up1: the "What's new" list is built from a release's commits, in plain words (tools/whats-new.mjs). */
 import { describe, it, expect } from 'vitest';
-import { linesOf, stripIds, buildItems, MAX_ITEMS } from './whats-new.mjs';
+import { linesOf, releaseLinesOf, stripIds, buildItems, MAX_ITEMS } from './whats-new.mjs';
 
 describe('linesOf: feat and fix only, internal scopes and review rounds left out', () => {
   it('keeps what a reader would notice', () => {
@@ -66,5 +66,26 @@ describe('buildItems', () => {
     const many = Array.from({ length: MAX_ITEMS + 20 }, (_, i) => ({ t: i, message: `feat(x): change number ${i} here` }));
     expect(buildItems(many).length).toBe(MAX_ITEMS);
     expect(buildItems([], /** @type {any} */ ([null, { t: 'x', text: 'a' }, { t: 1 }, { t: 2, text: 'Kept.' }]))).toEqual([{ t: 2, text: 'Kept.' }]);
+  });
+});
+
+describe("a release that says it as a whole: What's new (release)", () => {
+  const branch = [
+    { t: 1000, message: 'fix(kit): kit chevrons' },
+    { t: 2000, message: 'feat(search): result groups follow the order' },
+    { t: 3000, message: "Merge main into the branch\n\nWhat's new: a line of its own" },
+    { t: 4000, message: "feat(app): the release list\n\nWhat's new (release): a new look throughout\nWhat's new (release): settings you can find\n" },
+  ];
+  it('reads the release lines in plain sentences', () => {
+    expect(releaseLinesOf(branch[3].message)).toEqual(['A new look throughout.', 'Settings you can find.']);
+    expect(releaseLinesOf(branch[0].message)).toEqual([]);
+    expect(linesOf(branch[3].message)).toEqual(['The release list.']);   // the plain rule never reads the release lines
+  });
+  it("its lines are the range's whole list, in the order written, and what was published stays", () => {
+    const items = buildItems(branch, [{ t: 10, text: 'Published before.' }]);
+    expect(items.map((i) => i.text)).toEqual(['A new look throughout.', 'Settings you can find.', 'Published before.']);
+  });
+  it('without one, every commit speaks for itself as before', () => {
+    expect(buildItems(branch.slice(0, 3)).map((i) => i.text)).toEqual(['A line of its own.', 'Result groups follow the order.', 'Kit chevrons.']);
   });
 });
