@@ -160,21 +160,35 @@ try {
       window.StateStore.set({ ...st, readItems });
       await window.StateStore.whenSaved();
     });
-    await seed([]);
+    // no plans (not seed(): after L the app reboots on the Library tab, where seed's wait for Home never ends)
+    await page.evaluate(async () => { window.ReadingPlanStore.replaceAll([]); await window.ReadingPlanStore.whenSaved(); });
+    await boot();
+    console.error('[plans] S seeded');
     const marks = await page.evaluate(() => Object.keys((window.StateStore.get() || {}).readItems || {}).filter((k) => /^v1:genesis:/.test(k)).length);
     await clickText(/^Library$/, '.tabbar-tab, button');
     await clickText(/^Reading plans/);
-    await clickText(/^Bible in a Year: Genesis/);
-    await page.waitForSelector('.plan-preview');
+    // the hub may still be settling (the Volumes load re-renders it): tap the row until the preview is up, at most 3 times
+    const hits = [];
+    for (let i = 0; i < 3 && !(await page.$('.plan-preview')); i++) {
+      hits.push(await page.evaluate(() => { const el = [...document.querySelectorAll('button')].find((b) => b.getClientRects().length > 0 && /^Bible in a Year: Genesis/.test(b.getAttribute('aria-label') || b.textContent.trim()));
+        if (!el) return null; el.scrollIntoView({ block: 'center' }); el.click(); return el.className; }));
+      await page.waitForSelector('.plan-preview', { timeout: 4000 }).catch(() => {});
+    }
+    if (!(await page.$('.plan-preview'))) throw new Error('S: the preview did not open, taps hit ' + JSON.stringify(hits));
+    if (hits.length > 1) console.error('[plans] S preview opened on tap', hits.length, JSON.stringify(hits));
     const preview = await page.evaluate(() => ({
       already: /Already read|Count my|read already/.test(document.querySelector('.plan-preview').textContent),
       week: [...document.querySelectorAll('[aria-label="Your first week"] .plan-day-portion')].map((e) => e.textContent),
     }));
     await shot('start-preview');
+    console.error('[plans] S preview', JSON.stringify(preview), 'hits', JSON.stringify(hits));
     await clickText(/^Start plan$/);
-    await sleep(500);
-    const run = await page.evaluate(() => { const r = window.ReadingPlanStore.active()[0]; return r ? { plan: r.plan, ticks: Object.keys(r.ticks || {}).length, credited: r.credited || 0 } : null; });
-    await boot();
+    await page.waitForFunction(() => window.ReadingPlanStore.active().length === 1);
+    console.error('[plans] S started');
+    const run = await page.evaluate(async () => { await window.ReadingPlanStore.whenSaved(); const r = window.ReadingPlanStore.active()[0]; return { plan: r.plan, ticks: Object.keys(r.ticks || {}).length, credited: r.credited || 0 }; });
+    await boot();   // a fresh boot reopens the tab it left (Library): Home is the Read tab's root
+    if (!(await page.$('.home-root'))) await clickText(/^Read$/, '.tabbar-tab, button');
+    console.error('[plans] S rebooted, home-root', !!(await page.$('.home-root')));
     await page.waitForFunction(() => !!document.querySelector('.upnext [data-plan]'));
     await sleep(500);
     const home = await page.evaluate(() => { const r = document.querySelector('.upnext [data-plan]'); return { eyebrow: (r.querySelector('.upnext-eyebrow') || r).textContent.trim(), text: r.textContent }; });
