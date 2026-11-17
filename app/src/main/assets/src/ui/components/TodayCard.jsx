@@ -187,7 +187,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
     <div className="upnext-row upnext-plan" data-plan={r.id}>
       {behind && onOpenPlan ? (
         <button type="button" className="upnext-eyebrow upnext-status-btn" onClick={() => onOpenPlan(r.id, { catchUp: true })}
-          aria-label={(many ? r.name + ': ' : '') + st.text + '. Catch up'}>{eyebrow}<span aria-hidden="true"> ›</span></button>
+          aria-label={(many ? r.name + ': ' : '') + st.text + '. Catch up'}>{eyebrow}<span aria-hidden="true">{' ›'}</span></button>
       ) : <span className="upnext-eyebrow">{eyebrow}</span>}
       {r.loading ? (
         <div className="upnext-text"><span className="upnext-title">{title}</span></div>
