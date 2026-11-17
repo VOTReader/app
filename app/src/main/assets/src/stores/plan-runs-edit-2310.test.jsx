@@ -105,6 +105,22 @@ describe('the plan keeps its pace, pause, start and reminder', () => {
     expect(st.total - st.day).toBe(6);
   });
 
+  it('a length counts the days read on the plan, wherever the new chapters go (refuter: Bible order put them first)', () => {
+    // John, 30 days, 10 read one a day: 20 days left, finishing on the old target
+    const john = (pace) => builderSpec({ picks: [{ t: 'b', bid: 'john', ch: null }], order: 'picked', share: 'side', goal: pace, weekdays: Array(7).fill(true) }, null);
+    let run = newRun(john({ mode: 'days', n: 30 }), daysAgo(10));
+    for (let i = 0; i < 10; i++) run = tickItem(run, 'john:' + (i + 1), todayKey(daysAgo(10 - i)), 1);
+    const target = run.target;
+    const first = builderSpec({ picks: [{ t: 'b', bid: 'john', ch: null }, { t: 'b', bid: 'genesis', ch: [1, 2, 3] }], order: 'canonical', share: 'side', goal: { mode: 'days', n: 30 }, weekdays: Array(7).fill(true) }, null);
+    const fresh = replaceContents(run, first, NOW);
+    expect(fresh.tracks[0].items[0].k).toBe('genesis:1');
+    expect(Object.keys(fresh.ticks).length).toBe(10);
+    expect(fresh.target).toBe(target);
+    // appended after the read ones, the same
+    const after = replaceContents(run, builderSpec({ picks: [{ t: 'b', bid: 'john', ch: null }, { t: 'b', bid: 'acts', ch: [1, 2] }], order: 'picked', share: 'side', goal: { mode: 'days', n: 30 }, weekdays: Array(7).fill(true) }, null), NOW);
+    expect(after.target).toBe(target);
+  });
+
   it('a Finish by date stays the date', () => {
     const by = dateOf(dayNum('2026-11-16') + 9);
     const run = readFirst(newRun(spec(genesis(20), { mode: 'by', date: by }), daysAgo(3)), 3);

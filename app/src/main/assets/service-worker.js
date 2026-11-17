@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-45346171f9';
+const CACHE_VERSION = 'v1.0.2-1b6506d274';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -319,9 +319,9 @@ const ASSET_INTEGRITY = {
   './': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './dist/app.min.css': '593fa8c9efde94992c14afa4726ad47bf6540d7182fe0f84527582efc9766416',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '87c7421bcf4ea24ba953f84faa7b453bb271f331ddedcceea2c3ca9a1f1d566c',
+  './dist/bundle-b.js': 'fdff93a3e3281616be65cfe11344dd8fe7c5fcb5b179f876226d08060aa1e967',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': '9420b9c39d11a856618c5102c775ec5a0dcf158b865dfe0ed52e3f7d48ee5ead',
+  './dist/bundle-d.js': 'c8f4d7fa96867b22793bd2621ad0fb2cd25fd6defbc77d67b32a74ef6a7a1638',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './index.html': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './manifest.json': 'e1c7daf263bec90aeffc1236ebffe6374859459cb2674259053a4fbc12525d31',

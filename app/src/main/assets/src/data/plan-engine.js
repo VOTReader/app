@@ -696,7 +696,13 @@ export function replaceContents(run, spec, now) {
   if (run.autoAudio === false) next.autoAudio = false;
   if (carried) {
     next = finishIfDone(next, todayKey(now));
-    if (next.status !== 'finished' && next.pace) next = changePace(next, next.pace, now);
+    // A length counts the days the reader has read on the OLD run (its days done), never the new cut's: added books
+    // put before the read ones, or more each day, would otherwise give the read days back (refuter 2310).
+    const pace = next.pace;
+    if (next.status !== 'finished' && pace && pace.mode === 'days') {
+      const left = next.tracks.flatMap((t) => t.items).filter((it) => !(it.k in ticks));
+      next = changePace(next, pace, now, lengthDays(next, Math.max(1, Math.floor(Number(pace.n) || 1)), runStatus(run, now).day, left));
+    } else if (next.status !== 'finished' && pace) next = changePace(next, pace, now);
   }
   if (next.status !== 'finished' && (run.status === 'paused' || run.paused)) next = pauseRun(next, now);
   return next;
