@@ -484,7 +484,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
         </>)}
 
         {planRows.length || finishedPlans.length ? section('prg-h-plans', 'Reading plans', <>
-          {planRows.map((r) => barRow(r.id, r.name, (r.finished ? 'Complete' : 'Day ' + (r.day + 1) + ' of ' + r.totalDays),
+          {planRows.map((r) => barRow(r.id, r.name, r.status.text,
             r.itemsTotal ? Math.round(r.itemsDone * 100 / r.itemsTotal) : 0, r.counts))}
           {finishedPlans.map((r) => (
             <ListRow key={r.id} className="prg-history-row" noLead title={runName(r, null)} meta={finishedLine(r)} />

@@ -528,7 +528,9 @@ describe('MyProgressScreen — reading plans', () => {
     const { container } = renderScreen({ historyEnabled: false });
     const sec = container.querySelector('[aria-labelledby="prg-h-plans"]');
     expect(sec.textContent).toContain('Bible in a Year');
-    expect(sec.textContent).toMatch(/Day 1 of 365.*1 of 1,189 chapters/);
+    // 2310: the plan's one status (planStatus), not 'Day N of M'.
+    expect(sec.querySelector('.prg-row-tally').textContent).toBe('On track');
+    expect(sec.textContent).toMatch(/On track.*1 of 1,189 chapters/);
     expect(sec.querySelector('.prg-history-row').textContent).toMatch(/Proverbs in 31 days.*Started .* · finished .* · 1 day/);
     // Proverbs 1-31 sit in both plans: 1,189 chapters in all, proverbs:1 read once.
     expect(sec.querySelector('.ui-label-aside').textContent).toBe('1 of 1,189 read');

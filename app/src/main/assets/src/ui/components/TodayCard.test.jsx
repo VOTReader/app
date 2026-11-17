@@ -68,9 +68,11 @@ describe('TodayCard (the up-next card)', () => {
   it('a paused plan is one quiet line with Resume, after the running ones; one not started says when it starts (2235)', () => {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     const key = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
-    const { container } = render(<TodayCard rows={[row({ id: 'p', name: 'Psalms', paused: true }), row({ id: 'n', notStarted: true, start: key })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
+    const { container } = render(<TodayCard rows={[row({ id: 'p', name: 'Psalms', paused: true }), row({ id: 'n', notStarted: true, start: key, status: { key: 'starts', text: 'Starts tomorrow', behind: 0 } })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
     expect([...container.querySelectorAll('[data-plan]')].map((el) => el.getAttribute('data-plan'))).toEqual(['n', 'p']);
-    expect(screen.getByText('Starts tomorrow')).toBeTruthy();
+    // 2310: the eyebrow is the status, the title the first day's reading (it said 'Today' over 'Starts ...').
+    expect(container.querySelector('[data-plan="n"] .upnext-eyebrow').textContent).toBe('Starts tomorrow');
+    expect(container.querySelector('[data-plan="n"] .upnext-title').textContent).toBe('Genesis 47-50');
     expect(container.querySelector('.upnext-paused').textContent).toBe('Psalms · PausedResume');
     expect(screen.getByRole('button', { name: 'Resume Psalms' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^Read / })).toBeNull();

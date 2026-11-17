@@ -3449,7 +3449,6 @@
     .plan-run-row { min-height: 72px; }
     .plan-state b { color: var(--gold); font-weight: 400; }
     .plan-list .root-row-sub, .plan-choices .root-row-sub { font-style: normal; font-family: var(--pl-ui); font-size: var(--fs-14); }   /* U rule 5: facts upright */
-    .plan-tag { flex: none; padding: 2px 10px; border: 1px solid var(--gold-border); border-radius: 999px; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-12); letter-spacing: 0.08em; }
     .plan-find-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.35; text-align: right; }
     .plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
     .plan-empty-text { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
@@ -5326,7 +5325,8 @@
     .prg-days-axis { display: flex; justify-content: space-between; margin-top: var(--sp-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-2); }
     .prg-row { position: relative; display: flex; flex-direction: column; padding: 12px var(--card-pad) 13px; }
     .prg-row + .prg-row::before, .prg-row + .ui-row::before { content: ""; position: absolute; top: 0; left: var(--card-pad); right: 0; height: 1px; background: var(--hairline); }
-    .prg-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+    .prg-row-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 var(--sp-3); }
+    .prg-row-tally { margin-left: auto; text-align: right; }
     .prg-row-label { min-width: 0; font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); }
     .prg-row .ui-progress { margin-top: var(--sp-2); background: var(--surface-3); }
     .prg-fact .ui-row-title, .prg-history-row.is-one .ui-row-title { font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; }

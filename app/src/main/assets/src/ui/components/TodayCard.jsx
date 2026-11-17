@@ -176,11 +176,12 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
   // 2235: the plan's one status, in the words every plan surface uses; behind is the way to Catch up.
   const st = r.status || { key: '', text: '', behind: 0 };
   const behind = !r.loading && st.key === 'behind';
-  const eyebrow = behind ? [many ? r.name : '', st.text].filter(Boolean).join(' · ')
+  // 2310: a plan not started yet says so in the eyebrow (its status), and the title names its first day's reading.
+  const eyebrow = behind || st.key === 'starts' ? [many ? r.name : '', st.text].filter(Boolean).join(' · ')
     : [many ? r.name : (st.key === 'ontrack' ? 'On track' : 'Today'), many && st.key === 'ontrack' ? 'On track' : dayText].filter(Boolean).join(' · ');
   const doneToday = !r.loading && r.done;
   const ready = !r.loading && !r.done && !r.notStarted && !!r.next;
-  const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? startsText(r.start || '', now)
+  const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? (r.label || startsText(r.start || '', now))
     : doneToday ? 'Done today' + (r.tomorrow ? ' · tomorrow ' + r.tomorrow : '') : r.label;
   return (
     <div className="upnext-row upnext-plan" data-plan={r.id}>
