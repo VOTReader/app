@@ -14,9 +14,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AnswersPara, AnswersTopic } from './AnswersTopic.jsx';
-import { answersParaPlan, answersPlainOf, answersHeroMeta, answersFoldable, answersTocRows } from '../../utils/answers-topic.js';
+import { answersParaPlan, answersPlainOf, answersHeroMeta, answersFoldable, answersTocRows, answersEyebrow, answersRunTitle } from '../../utils/answers-topic.js';
 import { applyDOMHighlights } from '../../renderer/annotation-engine.jsx';
-import { answersShelfByKey } from '../../utils/answers-browse.js';
+import { answersShelfByKey, answersPlaceOf, answersSizeWords } from '../../utils/answers-browse.js';
 import { answersSiteShelfOf } from '../../utils/answers-site.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
@@ -195,13 +195,65 @@ describe('AnswersTopic — the hero\'s "Loading contents…" ends', () => {
 });
 
 describe('AnswersTopic — hero words (f07)', () => {
-  it('reads the meta line in words; a page of links says "N links", never "0 passages"', () => {
+  it('reads the meta line in words; a page of links says where the answer is, never "0 passages"', () => {
     const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
     expect(NB(answersHeroMeta(byId.get('regarding-the-holy-days-of-god'), M['regarding-the-holy-days-of-god'])))
       .toBe('31 min · 15 parts');   // 0125 D: no media in the line
-    expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('6 links');
+    expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('Answered in 1 study and 5 topics');   // 0125 E
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
       .toMatch(/^12 min( · \d+ parts)?$/);
+  });
+});
+
+describe('AnswersTopic — 0125 E: the site’s navigation words, said plainly', () => {
+  const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
+  it('the Main Page is "Start here" in rows and "Introduction" in its eyebrow; Official website kept', () => {
+    const mp = byId.get('answers-main-page');
+    expect(NB(answersEyebrow(A, mp).text)).toBe('Official website · Introduction');
+    expect(answersRunTitle(mp)).toBe('Start here');
+    expect(answersPlaceOf(A, 'answers-main-page')).toBe('Start here');
+  });
+  it('"See left column for all topics / Opens Contents" is one row, "Browse all topics", and opens the landing', () => {
+    const mp = byId.get('answers-main-page');
+    const i = mp.paragraphs.findIndex((p) => /See left column for all topics/.test(p.text));
+    expect(i).toBeGreaterThanOrEqual(0);
+    const plan = answersParaPlan(mp, M[mp.id], i);
+    expect(plan.kind).toBe('linkrow');
+    expect(plan.title).toBe('Browse all topics');
+    const el = para(mp, i, M[mp.id]);
+    expect(el.textContent).not.toMatch(/left column|Opens Contents/);
+    expect(el.querySelector('a[data-ans="contents"]').textContent).toBe('Browse all topics');
+    expect(el.hasAttribute('data-sub')).toBe(false);
+    expect(mp.paragraphs[i].text).toMatch(/See left column for all topics/);   // the stored line is the site's, unchanged
+  });
+  it('the Trinity page: the heading says what the list is, the study is a card first, then 5 plain rows', () => {
+    const e = byId.get('regarding-the-trinity'), m = M[e.id];
+    expect(answersParaPlan(e, m, 0)).toMatchObject({ kind: 'sh', title: 'The Lord’s answer is in these' });
+    const h = para(e, 0, m);
+    expect(h.tagName).toBe('H2');
+    expect(h.textContent).toBe('The Lord’s answer is in these');
+    expect(e.paragraphs[0].text).toBe('**See:**');
+    const card = para(e, 1, m);
+    expect(card.classList.contains('is-card')).toBe(true);
+    expect(card.getAttribute('data-sub')).toBe('Study');
+    for (let i = 2; i < e.paragraphs.length; i++) {
+      cleanup();
+      const r = para(e, i, m);
+      expect(r.classList.contains('is-plain')).toBe(true);
+      expect(r.classList.contains('is-card')).toBe(false);
+    }
+    expect(NB(answersSizeWords(e, m))).toBe('Answered in 1 study and 5 topics');
+  });
+  it('no other page has a "See:" heading or a card row (the meta is built from link kinds, not this one id)', () => {
+    for (const e of A) {
+      if (e.id === 'regarding-the-trinity') continue;
+      const m = M[e.id] || {};
+      for (let i = 0; i < e.paragraphs.length; i++) {
+        const plan = answersParaPlan(e, m, i);
+        if (plan.kind === 'sh') expect(plan.title).toBeUndefined();
+        expect(!!plan.card).toBe(false);
+      }
+    }
   });
 });
 

@@ -102,7 +102,7 @@ describe('on the real corpus', () => {
     expect(answersShelfByKey(A, '13')).toBeNull();
   });
   it('a topic\'s place in the words a row uses', () => {
-    expect(answersPlaceOf(A, 'answers-main-page')).toBe('Main Page');
+    expect(answersPlaceOf(A, 'answers-main-page')).toBe('Start here');   // 0125 E
     expect(answersPlaceOf(A, 'false-doctrines-within-the-churches-of-men-regarding')).toBe('False Doctrines index');
     expect(answersPlaceOf(A, 'god-speaks-about-the-sabbath')).toBe('The Fourth Commandment');
     expect(show(answersPlaceOf(A, answersShelfByKey(A, '5').topics[0].id))).toBe('Scripture & doctrine');

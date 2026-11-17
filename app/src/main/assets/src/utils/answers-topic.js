@@ -46,7 +46,8 @@ export function answersFoldable(meta) {
  */
 export function answersEyebrow(entries, entry) {
   const id = entry && entry.id;
-  if (id === ANSWERS_MAIN_PAGE_ID) return { text: 'Official website' + SEP + 'Main Page', shelf: null };
+  // 0125 E: the site's Main Page is "Start here" in rows; its own eyebrow says what it is
+  if (id === ANSWERS_MAIN_PAGE_ID) return { text: 'Official website' + SEP + 'Introduction', shelf: null };
   const s = answersSiteShelfOf(entries, id);
   if (!s) return { text: ANSWERS_OTHER_LABEL, shelf: null };
   if (s.kind === 'other') return { text: ANSWERS_OTHER_LABEL, shelf: s };
@@ -98,9 +99,21 @@ export function answersHeroMeta(entry, meta) {
   // 0125 D: ONE quiet line, "22 min · 7 parts"; the videos and downloads keep their rows where the site has them
   if (entry.id === ANSWERS_FD_INDEX_ID) return pl(top, 'category');
   const size = answersSizeWords(entry, meta, { minutes: false });
-  if (/links?$/.test(size)) return size;
+  if (/^Answered in|links?$/.test(size)) return size;
   return answersMinWords(meta) + (top >= 2 ? SEP + pl(top, 'part') : '');
 }
+
+/** 0125 E: the "**See:**" line that opens a page of links (the site's word; the app draws its heading). */
+export function answersIsSeeHead(entry, i) {
+  const p = entry && entry.paragraphs && entry.paragraphs[i];
+  return !!p && String(p.text || '').trim() === '**See:**';
+}
+
+/** 0125 E: the heading the app draws for the "**See:**" line. */
+export const ANSWERS_SEE_HEAD = 'The Lord’s answer is in these';
+
+/** 0125 E: the row the Main Page's "See left column for all topics" line becomes. */
+export const ANSWERS_BROWSE_ALL = 'Browse all topics';
 
 /**
  * The hero's contents line (3 sections or more): the first names within 60 characters, skipping one
@@ -210,7 +223,7 @@ export function answersTocRowAt(rows, index) {
 /** The running head's name for a page: its short title; the two still-long ones get the app's names. */
 export function answersRunTitle(entry) {
   if (!entry) return '';
-  if (entry.id === ANSWERS_MAIN_PAGE_ID) return 'Main Page';
+  if (entry.id === ANSWERS_MAIN_PAGE_ID) return 'Start here';
   if (entry.id === ANSWERS_FD_INDEX_ID) return 'False Doctrines';
   return answersShortTitle(entry.title);
 }
@@ -476,7 +489,8 @@ export function answersParaPlan(entry, meta, i) {
   if (trimmed === '✦') return { kind: 'orn' };
   if (trimmed === '~' || trimmed === '†') return { kind: 'orn', minor: true };
   const sec = meta ? (meta.sections || []).find((s) => s.at === i && !s.synthetic) : null;
-  if (sec) return { kind: 'sh', section: sec };
+  // 0125 E: the site's "See:" over a page of links is drawn as what the list is (the stored line is unchanged)
+  if (sec) return answersIsSeeHead(entry, i) ? { kind: 'sh', section: sec, title: ANSWERS_SEE_HEAD } : { kind: 'sh', section: sec };
   if (isDateHead(t)) return { kind: 'metarow' };
   // "• **_Also see:_** …": the lead is raw 5..14, the link's words follow the closing "_**" (17)
   if (t.toLowerCase().startsWith('• **_also see:_**')) return { kind: 'alsosee', lead: t.slice(5, 14), restAt: 17 };
@@ -489,7 +503,8 @@ export function answersParaPlan(entry, meta, i) {
   const plain = chars.filter((c) => c.c !== '\n').map((c) => c.c).join('');
   const pre = bulletPrefix(plain);
   const contents = links.find((l) => l.kind === 'contents');
-  if (contents && pre) return { kind: 'linkrow', icon: 'list', sub: 'Opens Contents', sr: pre, from: rawAfter(t, chars, 2), L: contents };
+  // 0125 E: "See left column for all topics / Opens Contents" -> "Browse all topics" (the stored line is unchanged)
+  if (contents && pre) return { kind: 'linkrow', icon: 'list', sub: '', title: ANSWERS_BROWSE_ALL, sr: pre, from: rawAfter(t, chars, 2), L: contents };
   const real = links.filter((l) => l.kind !== 'contents');
   if (t.startsWith('• ') && real.length === 1) {
     const L = real[0];
@@ -503,7 +518,8 @@ export function answersParaPlan(entry, meta, i) {
         const dl = (meta.media || []).some((m) => m.at === i && m.kind === 'download');
         return { kind: 'linkrow', icon: dl ? 'download' : 'doc', sub: dl ? 'Dropbox' : 'PDF', sr: pre, from: L0, L, ext: true };
       }
-      return { kind: 'bulletlink', L, sr: pre, from: L0 };
+      // 0125 E: on a page of links the study comes first and largest, as a card
+      return { kind: 'bulletlink', L, sr: pre, from: L0, card: L.kind === 'study' && answersIsSeeHead(entry, 0) };
     }
   }
   return { kind: 'p' };

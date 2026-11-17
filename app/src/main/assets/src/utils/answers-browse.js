@@ -106,6 +106,25 @@ export function answersLinkCount(meta) {
   return n;
 }
 
+/**
+ * 0125 E: a page that is only a "See:" list says where the answer is, by its links' kinds:
+ * "Answered in 1 study and 5 topics". '' when a link is of another kind (the plain "6 links" stays).
+ * @param {any} meta
+ */
+export function answersSeeMeta(meta) {
+  let studies = 0, topics = 0, other = 0;
+  for (const a of Object.values((meta && meta.links) || {})) {
+    for (const l of /** @type {any[]} */ (a || [])) {
+      if (l.kind === 'study') studies++; else if (l.kind === 'topic') topics++; else other++;
+    }
+  }
+  if (other || !(studies + topics)) return '';
+  const w = [];
+  if (studies) w.push(studies === 1 ? '1' + NBSP + 'study' : studies + NBSP + 'studies');
+  if (topics) w.push(pl(topics, 'topic'));
+  return 'Answered in ' + w.join(' and ');
+}
+
 /** The dated letters a page of letters holds (a page with no source lines). */
 export function answersLetterCount(entry) {
   let n = 0;
@@ -124,7 +143,7 @@ export function answersMinWords(meta) {
 }
 
 /**
- * A topic's size: "12 passages · 12 min", "46 categories", "3 letters · 4 min", "6 links", "3 min".
+ * A topic's size: "12 passages · 12 min", "46 categories", "3 letters · 4 min", "Answered in 1 study and 5 topics", "3 min".
  * @param {any} entry
  * @param {any} meta its sidecar (null before answers-meta.js lands)
  * @param {{ minutes?: boolean }} [opts]
@@ -138,7 +157,7 @@ export function answersSizeWords(entry, meta, opts) {
   const d = answersLetterCount(entry);
   if (d) return pl(d, 'letter') + (minutes ? SEP + min : '');
   const L = answersLinkCount(meta);
-  if (L) return pl(L, 'link');
+  if (L) return answersSeeMeta(meta) || pl(L, 'link');
   return meta ? min : '';
 }
 
@@ -196,7 +215,7 @@ export const ANSWERS_TSTL_HEAD = 'Thus Says The Lord...';
  */
 export function answersPlaceOf(entries, id) {
   if (id === ANSWERS_FD_INDEX_ID) return ANSWERS_FD_INDEX_SHORT;
-  if (id === ANSWERS_MAIN_PAGE_ID) return 'Main Page';
+  if (id === ANSWERS_MAIN_PAGE_ID) return 'Start here'; // 0125 E
   const s = answersSiteShelfOf(entries, id);
   if (!s) return ANSWERS_OTHER_LABEL;
   if (s.kind === 'commandment') return `The ${ANSWERS_COMMANDMENTS[/** @type {number} */ (s.num) - 1].ordinal} Commandment`;
@@ -433,7 +452,7 @@ export function answersMediaIndex(entries, metaAll) {
 
 /** The short name a media item's topic goes by on the media page. */
 export function answersMediaPlace(entries, id, shortTitle) {
-  if (id === ANSWERS_MAIN_PAGE_ID) return 'Main Page';
+  if (id === ANSWERS_MAIN_PAGE_ID) return 'Start here'; // 0125 E
   if (id === ANSWERS_FD_INDEX_ID) return ANSWERS_FD_INDEX_SHORT;
   const e = (entries || []).find((x) => x && x.id === id);
   return e ? shortTitle(e.title) : '';

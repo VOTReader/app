@@ -189,7 +189,7 @@ const Para = React.memo(/**
       return (
         <>
           <H className={'letter-para ans-sh' + (plan.section.level === 2 ? ' is-h3' : '') + (first ? ' is-first' : '') + pulse}
-            id={plan.section.anchor} tabIndex={-1} data-ans-sec={secIdx == null ? undefined : secIdx} {...hl}>{S(nodes({}))}</H>
+            id={plan.section.anchor} tabIndex={-1} data-ans-sec={secIdx == null ? undefined : secIdx} {...hl}>{S(plan.title || nodes({}))}</H>
           <Figures meta={meta} i={i} />
         </>
       );
@@ -248,9 +248,11 @@ const Para = React.memo(/**
     }
     case 'linkrow':
       return (
-        <p className={'letter-para ans-linkrow' + pulse} data-sub={plan.sub} {...hl}>{S(<>
+        <p className={'letter-para ans-linkrow' + pulse} data-sub={plan.sub || undefined} {...hl}>{S(<>
           <span className="ans-disc" aria-hidden="true"><AnsIcon name={plan.icon} /></span>
-          <span className="ans-linkrow-t"><span className="sr-only">{plan.sr}</span>{nodes({ from: plan.from, noExt: true, wrapLink: plan.L.kind === 'contents' ? { kind: 'contents' } : null })}</span>
+          <span className="ans-linkrow-t"><span className="sr-only">{plan.sr}</span>{plan.title
+            ? <a className="letter-link-ref" href="#" data-ans="contents" data-p={i}><span className="ans-tb">{plan.title}</span></a>
+            : nodes({ from: plan.from, noExt: true, wrapLink: plan.L.kind === 'contents' ? { kind: 'contents' } : null })}</span>
           {plan.ext ? <AnsIcon name="ext" /> : <Chev />}
         </>)}</p>
       );
@@ -260,7 +262,7 @@ const Para = React.memo(/**
       let ns = answersInline(raw, pm, { from: plan.from, noExt: true });
       if (target) ns = leadLinkNodes(ns, target.title);
       return (
-        <p className={'letter-para ans-linkrow is-plain' + pulse} data-sub={answersLinkSub(L, byId, metaAll) || undefined} {...hl}>{S(<>
+        <p className={'letter-para ans-linkrow is-plain' + (plan.card ? ' is-card' : '') + pulse} data-sub={answersLinkSub(L, byId, metaAll) || undefined} {...hl}>{S(<>
           <span className="ans-linkrow-t"><span className="sr-only">{plan.sr}</span>{renderNodes(ns, i, 'b')}</span>
           {L.kind === 'external' ? <AnsIcon name="ext" /> : <Chev />}
         </>)}</p>
@@ -896,7 +898,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
           </div>,
         );
       }
-      if (sn && sn.ret) rows.push(<KRow key="ret" kicker="Return to:" title="Main Page" onClick={() => nav.go(sn.ret)} />);
+      if (sn && sn.ret) rows.push(<KRow key="ret" kicker="Return to:" title="Start here" onClick={() => nav.go(sn.ret)} />);
       const ext = fd && meta && meta.siteNav && meta.siteNav.proceed && meta.siteNav.proceed.kind === 'external' ? meta.siteNav.proceed : null;
       if (ext) rows.push(<KRow key="x" kicker="Proceed to:" title={ext.title} href={ext.url} />);
       const shelf = answersSiteShelfOf(entries, entry.id);
@@ -907,7 +909,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
         step.push(<button key="g" type="button" className="ans-tile-btn" aria-label={'All answers: ' + answersPlaceOf(entries, entry.id) + ', ' + pl(n, 'topic').replace(NBSP, ' ')} onClick={() => onShelf(shelf)}><AnsIcon name="list" />All answers</button>);
       }
       if (step.length) rows.push(<div key="st" className="ans-two ans-end-step">{step}</div>);
-      if (!main && !fd && !step.length) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
+      if (!main && !fd && !step.length) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Start here<Chev /></a>);
       parts.push(
         <nav key="nav" className="ans-foot-nav" aria-labelledby={'ans-nav-' + entry.id}>
           <h2 className="ans-foot-k" id={'ans-nav-' + entry.id}>Keep reading</h2>

@@ -48,7 +48,7 @@
   L.wtlb = function () { return S([/Prophetic Letters/, /Words To Live By: Part One/, /Introduction/]); };
   L.garden = function () { return S([/Prophetic Letters/, /A Return to The Garden/]); };
   L.bible = function () { return S([/The Holy Bible/, /^Gospels/, /ChaptersMark/, /^1The Baptism/]); };
-  L.answers = function () { return S([/Topics & Doctrines/, /^Main Page/]); };
+  L.answers = function () { return S([/Topics & Doctrines/, /^Start here/]); };   // 0125 B/E: the Main Page row is "Start here"
   L.studies = function () { return S([/Study Editions/, /Purity - Bible/, function () { return w.click(/^\s*1/) ; }]); };
   L.matthewStudy = function () { return S([/Study Editions/, /New Tes/, function () { return w.click(/^\s*1/); }]); };
   L.audioLib = function () { return S([/Audio Readings/, /♪The Volumes of Truth/]); };

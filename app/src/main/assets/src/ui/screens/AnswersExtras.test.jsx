@@ -78,7 +78,7 @@ describe('Saved answers (O5)', () => {
     render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={noop} />);
     expect(screen.getByText('No saved answers yet')).toBeTruthy();
     expect(screen.getByText('Hold a line in any answer and pick a colour. It is kept here and with your highlights.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Open the Main Page' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open Start here' })).toBeTruthy();
     expect(document.querySelector('.ans-saved-note')).toBeNull();
     act(() => s.set({ 'wtlb:there-is-no-other:5': [mark('g2', 0, 'there is no other')] }));
     expect(NB(document.querySelector('.ans-saved-note').textContent)).toMatch(/^1 highlight in 1 topic, in the site’s order/);

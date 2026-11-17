@@ -8679,6 +8679,9 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 .ans-linkrow.is-plain>.ans-linkrow-t{grid-column:1;grid-row:1;line-height:1.35}
 .ans-linkrow.is-plain[data-sub]::after{grid-column:1;grid-row:2;margin-top:2px;line-height:1.45}
 .ans-linkrow.is-plain>:is(.ans-chev,.ans-ico){grid-column:2;grid-row:1/span 2;align-self:center}
+/* 0125 E: a page of links leads with its study, first and largest: a surface card (the kit's .ui-card look), serif title */
+.ans-reading .ans-linkrow.is-card{margin:0 0 12px;padding:var(--card-pad);border:0;border-radius:var(--r-card);background:var(--surface-1);min-height:88px}
+.ans-linkrow.is-card>.ans-linkrow-t{font-family:var(--font-serif);font-size:var(--ts-sheet);font-weight:700}
 
 /* R2. Previous row: its 14px chevron sits in the kicker ("‹ Previous"), so the title starts on the Next row's line */
 .ans-kick{margin-right:2px} /* its size: A2 */

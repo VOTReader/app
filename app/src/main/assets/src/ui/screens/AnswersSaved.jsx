@@ -64,7 +64,7 @@ export function AnswersSaved({ entries, fontScale, onBack, onSearch, onHistory, 
         {/* WA2 (a-saved, a-saved0): one quiet line, then a card per topic; nothing saved: how, and a door */}
         {sum ? <p className="ans-saved-note">{sum + ', in the site’s order. They also sit with your other highlights in the Library.'}</p> : (
           <EmptyState icon="star" title="No saved answers yet" text="Hold a line in any answer and pick a colour. It is kept here and with your highlights."
-            action={{ label: 'Open the Main Page', onClick: () => onOpenTopic(ANSWERS_MAIN_PAGE_ID, null, 'Saved answers') }} />
+            action={{ label: 'Open Start here', onClick: () => onOpenTopic(ANSWERS_MAIN_PAGE_ID, null, 'Saved answers') }} />
         )}
         {sum ? null : <button type="button" className="ans-textbtn ans-saved-surprise" onClick={surprise}>Surprise me</button>}
         {saved.topics.map((t) => {

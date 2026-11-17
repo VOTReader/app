@@ -573,7 +573,7 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
     const titles = texts('.ans-row .ans-row-title');
     expect(titles[0]).toBe('Regarding the Mistranslation and Misinterpretation of the Scriptures');
     expect(titles[4]).toBe('Regarding The Trinity');
-    expect(NB([...document.querySelectorAll('.ans-row .ans-row-sub')][4].textContent)).toBe('6 links');
+    expect(NB([...document.querySelectorAll('.ans-row .ans-row-sub')][4].textContent)).toBe('Answered in 1 study and 5 topics');   // 0125 E
     fireEvent.click(screen.getByText('Read all 9 in order'));
     expect(onOpenTopic).toHaveBeenCalledWith('regarding-adding-to-or-taking-away-from-the-word-of-god', null, 'Scripture & doctrine');
     expect(navProps.backLabel).toBe('Answers');
