@@ -16,8 +16,9 @@
        row and the card drift apart, which is the whole point of the
        shared chip helper. */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, within } from '@testing-library/react';
+import ReactDOM from 'react-dom';
 import { HistoryScreen } from './HistoryScreen.jsx';
 import { HistoryEntryCard } from '../components/HistoryEntryCard.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
@@ -607,5 +608,39 @@ describe('HistoryScreen — a broad search in a long history', () => {
     for (const q of ['p', 'ps', 'psa', 'psal']) type(q);
     // Building one visit's text reads bookTitle twice; the 100 drawn cards read it again.
     expect(reads - before).toBeLessThanOrEqual(2 * LONG.length + 4 * 100 * 2);
+  });
+});
+
+describe('HistoryScreen — remove one row (0610)', () => {
+  const HISTORY = [
+    chapter('psalms', 'Psalms', 23, today(5), 'The Lord Is My Shepherd'),
+    chapter('psalms', 'Psalms', 23, today(20), 'The Lord Is My Shepherd'),
+    letter('the-wide-path', 'The Wide Path', 1, today(60)),
+  ];
+  beforeEach(() => { globalThis.ReactDOM = ReactDOM; });
+  afterEach(() => { delete globalThis.ReactDOM; });
+  const removeBtns = () => [...document.querySelectorAll('.history-entry-card .ui-row-remove, .ui-row.history-entry-card button[aria-label^="Remove "]')];
+
+  it('each row has a Remove button; the confirm names the row and hands the row (its key and day) to onRemoveVisit', () => {
+    setupGlobals();
+    const onRemoveVisit = vi.fn();
+    renderScreen(HISTORY, { onRemoveVisit });
+    const btns = [...document.querySelectorAll('button[aria-label^="Remove "][aria-label$=" from history"]')];
+    expect(btns.map((b) => b.getAttribute('aria-label'))).toEqual(['Remove The Lord Is My Shepherd from history', 'Remove The Wide Path from history']);
+    fireEvent.click(btns[0]);
+    expect(onRemoveVisit).not.toHaveBeenCalled();                     // a confirm first, as Search's recents
+    const sheet = document.querySelector('[role="dialog"]');
+    expect(sheet.textContent).toContain('The Lord Is My Shepherd');
+    expect(sheet.textContent).toContain('2 visits');
+    fireEvent.click(within(sheet).getByText('Remove'));
+    expect(onRemoveVisit).toHaveBeenCalledTimes(1);
+    expect(onRemoveVisit.mock.calls[0][0]).toMatchObject({ key: 'ch:psalms:23', ts: HISTORY[0].ts });
+  });
+
+  it('no Remove buttons when the route offers no remove', () => {
+    setupGlobals();
+    renderScreen(HISTORY);
+    expect(document.querySelectorAll('button[aria-label$=" from history"]').length).toBe(0);
+    expect(removeBtns().length).toBe(0);
   });
 });

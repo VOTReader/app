@@ -162,6 +162,51 @@ export const HistoryStore = extendStore(
     },
 
     /**
+     * Remove one place's visits inside [from, to) (0610: remove one History row, a place on one day).
+     * Returns what went, each with its index, for restoreVisits (empty while the store is still loading).
+     * @param {string} key
+     * @param {number} from
+     * @param {number} to
+     * @returns {{ index: number, entry: HistoryEntry }[]}
+     */
+    removeVisits(key, from, to) {
+      if (this._shouldDefer('removeVisits', key, from, to)) return [];
+      /** @type {{ index: number, entry: HistoryEntry }[]} */
+      const gone = [];
+      /** @type {HistoryEntry[]} */
+      const keep = [];
+      this._load().forEach((e, index) => {
+        const ts = (e && e.ts) || 0;
+        if (e && typeof e === 'object' && _historyKey(e) === key && ts >= from && ts < to) gone.push({ index, entry: e });
+        else keep.push(e);
+      });
+      if (!gone.length) return gone;
+      this._cache = keep;
+      this._save();
+      this._bump();
+      return gone;
+    },
+
+    /**
+     * Put back what removeVisits took, each visit at its old index. A visit already there is not doubled.
+     * @param {{ index: number, entry: HistoryEntry }[]} gone
+     * @returns {void}
+     */
+    restoreVisits(gone) {
+      if (!Array.isArray(gone) || !gone.length) return;
+      if (this._shouldDefer('restoreVisits', gone)) return;
+      const data = this._load().slice();
+      const has = (en) => data.some((e) => e && e.ts === en.ts && _historyKey(e) === _historyKey(en));
+      for (const { index, entry } of gone.slice().sort((a, b) => a.index - b.index)) {
+        if (!entry || has(entry)) continue;
+        data.splice(Math.min(index, data.length), 0, entry);
+      }
+      this._cache = data.slice(0, 2000);
+      this._save();
+      this._bump();
+    },
+
+    /**
      * Replace the full array. Used by the import path (W2.6).
      * @param {HistoryEntry[]} entries
      * @returns {void}

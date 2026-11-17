@@ -467,3 +467,28 @@ describe('HistoryStore — a visit made before the store loads keeps its time (d
     }
   });
 });
+
+describe('HistoryStore — removeVisits / restoreVisits (0610: remove one row)', () => {
+  it('removes only that key inside the range, returns what went with its places, and restore puts it back exactly', () => {
+    const D = new Date(2026, 10, 17, 12).getTime();
+    HistoryStore.setAll([
+      { type: 'chapter', bookId: 'psalms', chapterNum: 23, key: 'ch:psalms:23', ts: D + 3000 },
+      { type: 'chapter', bookId: 'psalms', chapterNum: 1, key: 'ch:psalms:1', ts: D + 2000 },
+      { type: 'chapter', bookId: 'psalms', chapterNum: 23, key: 'ch:psalms:23', ts: D + 1000 },
+      { type: 'chapter', bookId: 'psalms', chapterNum: 23, key: 'ch:psalms:23', ts: D - 86400000 },
+    ]);
+    const before = JSON.parse(JSON.stringify(HistoryStore.list()));
+    const gone = HistoryStore.removeVisits('ch:psalms:23', D - 3600000, D + 3600000);
+    expect(gone.map((g) => g.index)).toEqual([0, 2]);
+    expect(HistoryStore.list().map((e) => e.ts)).toEqual([D + 2000, D - 86400000]);   // the day before stays
+    HistoryStore.restoreVisits(gone);
+    expect(JSON.parse(JSON.stringify(HistoryStore.list()))).toEqual(before);
+    HistoryStore.restoreVisits(gone);                                                 // twice: nothing doubled
+    expect(HistoryStore.list().length).toBe(4);
+  });
+  it('a key with no visit in the range removes nothing', () => {
+    HistoryStore.setAll([{ type: 'chapter', bookId: 'psalms', chapterNum: 1, key: 'ch:psalms:1', ts: 5 }]);
+    expect(HistoryStore.removeVisits('ch:psalms:2', 0, 10)).toEqual([]);
+    expect(HistoryStore.list().length).toBe(1);
+  });
+});

@@ -20,6 +20,7 @@ import { ActionSheet } from '../components/SelectField.jsx';
 import { _bookmarkSourcePlace, _bookmarkSourceNumber } from '../../utils/bookmark-source.js';
 import { ListRow, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+import { removeBookmarkWithUndo } from '../../utils/annotation-undo.js';
 
 /* The bundle-d slots, guarded so that rendering this screen alone (a test,
    or a host without bundle-d's slots) degrades to the raw key rather
@@ -222,7 +223,7 @@ export function BookmarksScreen(props) {
           </label>
         </ActionSheet>
         <ActionSheet open={!!deleting} onClose={closeDelete} title="Delete this bookmark?" portal
-          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) BookmarkStore.remove(deleting.id); } }}>
+          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) removeBookmarkWithUndo(deleting.id); } }}>
           {deleting ? bookmarkWords(deleting, srcLabel(deleting.hlKey)).name + ' is removed from your bookmarks.' : null}
         </ActionSheet>
       </div>

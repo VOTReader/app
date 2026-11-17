@@ -27,6 +27,7 @@
 
 import { _bookmarkSourceEndpoint, _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 import { WhatsNewSheet } from './WhatsNewSheet.jsx';
+import { removeBookmarkWithUndo } from '../../utils/annotation-undo.js';
 
 export function AppShellSheets({
   // Selection toolbar handlers
@@ -348,7 +349,7 @@ export function AppShellSheets({
             setBookmarkCreatePending(null);
           }}
           onDelete={(editId) => {
-            if (editId && typeof BookmarkStore !== 'undefined') BookmarkStore.remove(editId);
+            if (editId) removeBookmarkWithUndo(editId);
             setBookmarkCreatePending(null);
           }}
           onOpen={(editId) => {

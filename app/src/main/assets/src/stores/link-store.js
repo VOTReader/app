@@ -227,6 +227,24 @@ export const LinkStore = extendStore(
     },
 
     /**
+     * Put a deleted link back, the same record at its old index (0610: Undo after a delete).
+     * No-op when the record has no id or its id is already in the list.
+     * @param {Link} link
+     * @param {number} index
+     * @returns {void}
+     */
+    restore(link, index) {
+      if (!link || !link.id) return;
+      if (this._shouldDefer('restore', link, index)) return;
+      const data = this._load();
+      if (data.some(l => l && l.id === link.id)) return;
+      const at = Math.max(0, Math.min(Number.isFinite(index) ? index : data.length, data.length));
+      data.splice(at, 0, link);
+      this._save();
+      this._bump();
+    },
+
+    /**
      * Delete a link by id. Idempotent.
      * @param {string} linkId
      * @returns {void}

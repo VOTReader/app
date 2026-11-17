@@ -8,7 +8,7 @@
 import { timeAgo } from '../../utils/dates.js';
 import { ListRow } from './UiParts.jsx';
 
-export function HistoryEntryCard({ entry, onSelect, chip = null }) {
+export function HistoryEntryCard({ entry, onSelect, chip = null, onRemove = null }) {
   const isLetter = entry.type === 'letter';
   const isStudy = entry.type === 'study-chapter';
   const num = isLetter ? entry.letterNum : entry.chapterNum;
@@ -40,6 +40,7 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
   const meta = parts.length ? parts.flatMap((p, i) => (i ? [' \xB7 ', p] : [p])) : null;
   return (
     <ListRow noLead className="history-entry-card" title={title || fallback} meta={meta}
-      value={timeAgo(entry.ts)} onClick={() => onSelect(entry)} chevron={false} />
+      value={timeAgo(entry.ts)} onClick={() => onSelect(entry)} chevron={false}
+      remove={onRemove ? { label: 'Remove ' + (title || fallback) + ' from history', onClick: () => onRemove(title || fallback) } : null} />
   );
 }

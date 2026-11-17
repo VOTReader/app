@@ -636,3 +636,42 @@ describe('TourController — the letter Listen stop seeks to the first lit claus
   });
 });
 
+
+describe('TourController — Skip goes back where the tour began (0610)', () => {
+  const toReader = () => { for (let i = 0; i < 6 && TourController.getState().step.enter !== 'openLetter'; i++) TourController.next(); };
+  it('started from the Home strip: Skip at a reader stop lands on Home, not the reader', () => {
+    const n = nav();
+    TourController.attachNav(n);
+    TourController.start('prompt');
+    toReader();
+    expect(TourController.getState().step.enter).toBe('openLetter');
+    n.goHome.mockClear();
+    TourController.skip();
+    expect(TourController.getState().active).toBe(false);
+    expect(n.goHome).toHaveBeenCalledTimes(1);
+    expect(n.openSettingsData).not.toHaveBeenCalled();
+  });
+  it('started from Settings: Skip goes back to Settings', () => {
+    const n = nav();
+    TourController.attachNav(n);
+    TourController.start('settings');
+    toReader();
+    TourController.skip();
+    expect(n.openSettingsData).toHaveBeenCalledTimes(1);
+  });
+  it('Done on the closing card stays where the tour ends (no going back)', () => {
+    const n = nav();
+    TourController.attachNav(n);
+    TourController.start('settings');
+    const calls = () => Object.values(n).map((f) => f.mock.calls.length).join(',');
+    let atLast = null;
+    for (let i = 0; i < 80 && TourController.getState().active; i++) {
+      const st = TourController.getState();
+      if (st.step.id === 'done') atLast = calls();
+      TourController.next();
+    }
+    expect(TourController.getState().active).toBe(false);
+    expect(atLast).not.toBeNull();
+    expect(calls()).toBe(atLast);                      // Done itself goes nowhere
+  });
+});

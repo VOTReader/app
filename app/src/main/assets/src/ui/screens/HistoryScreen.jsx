@@ -42,7 +42,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onStartReading, onClearHistory }) {
+export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onStartReading, onClearHistory, onRemoveVisit }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -267,7 +267,8 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
         {dOpen && (
           <div className="ui-group">
             {dg.entries.map((entry, i) => (
-              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)} />
+              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)}
+                onRemove={onRemoveVisit ? (title) => setRemoving({ entry, title, day: dayLabel(year, month, dg.day) }) : null} />
             ))}
           </div>
         )}
@@ -277,6 +278,8 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [clearing, setClearing] = React.useState(false);
+  // 0610: one row out (as Search's recents): a confirm naming it, then the route removes it and offers Undo.
+  const [removing, setRemoving] = React.useState(/** @type {{ entry: any, title: string, day: string } | null} */ (null));
   const menuActions = onClearHistory ? [{ id: 'clear', icon: 'trash', label: 'Clear history', danger: true,
     onSelect: () => { setMenuOpen(false); setClearing(true); } }] : [];
 
@@ -365,6 +368,10 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
       <ActionSheet open={clearing} onClose={() => setClearing(false)} title="Clear history?" portal
         confirm={{ label: 'Clear history', danger: true, onConfirm: () => { setClearing(false); onClearHistory(); } }}>
         Every visit is removed from this phone. Your notes, highlights and read marks stay.
+      </ActionSheet>
+      <ActionSheet open={!!removing} onClose={() => setRemoving(null)} title="Remove from history?" portal
+        confirm={{ label: 'Remove', danger: true, onConfirm: () => { const r = removing; setRemoving(null); if (r && onRemoveVisit) onRemoveVisit(r.entry); } }}>
+        {removing ? removing.title + ' is removed from ' + removing.day + ' (' + countOf(removing.entry.visits || 1, 'visit') + '). Your notes, highlights and read marks stay.' : null}
       </ActionSheet>
     </ScreenLayout>
   );

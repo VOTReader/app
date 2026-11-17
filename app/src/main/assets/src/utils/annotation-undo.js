@@ -42,6 +42,32 @@ export function offerUndoAdded(groupId, text) {
   showUndoToast('vot-toast-mark-added', text || 'Highlighted', () => _ann().removeGroup(groupId));
 }
 
+/** Delete a bookmark and offer "Bookmark deleted · Undo": the same record back at its old place (0610).
+ * @param {string} id */
+export function removeBookmarkWithUndo(id) {
+  const store = /** @type {any} */ (globalThis).BookmarkStore;
+  if (!store || !id) return;
+  const all = store.all() || [];
+  const index = all.findIndex((b) => !!b && b.id === id);
+  if (index < 0) return;
+  const rec = all[index];
+  store.remove(id);
+  showUndoToast('vot-toast-bookmark-removed', 'Bookmark deleted', () => store.restore(rec, index));
+}
+
+/** Delete a link and offer "Link removed · Undo": the same record back at its old index (0610).
+ * @param {string} id */
+export function removeLinkWithUndo(id) {
+  const store = /** @type {any} */ (globalThis).LinkStore;
+  if (!store || !id) return;
+  const all = store.all() || [];
+  const index = all.findIndex((l) => !!l && l.id === id);
+  if (index < 0) return;
+  const rec = all[index];
+  store.remove(id);
+  showUndoToast('vot-toast-link-removed', 'Link removed', () => (typeof store.restore === 'function' ? store.restore(rec, index) : store.add(rec)));
+}
+
 /** "Link removed · Undo". @param {any} link */
 export function offerUndoLinkRemoved(link) {
   const store = /** @type {any} */ (globalThis).LinkStore;
