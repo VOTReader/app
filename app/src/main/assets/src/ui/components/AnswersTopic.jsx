@@ -364,6 +364,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   sheetRef.current = sheet;
   const [layoutEl, setLayoutEl] = React.useState(/** @type {Element | null} */ (null));
   const runRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const runNameRef = React.useRef(/** @type {HTMLElement | null} */ (null));   // the running head's visible name (fitted below)
 
   React.useEffect(() => { setSheet(null); setCur(0); setShown(false); setFoldOn(readFold(entry.id)); setOpenSecs(new Set()); }, [entry.id]);
 
@@ -662,8 +663,8 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     'aria-label': 'Contents: ' + short + ', section ' + curRow.num + ' ' + curRow.title, onClick: () => setSheet({ kind: 'contents' }),
   } : { className: 'ans-runhead' + (shown ? '' : ' is-hidden'), ref: runRef },
   <span className="ans-runhead-text">
-    {btn ? <span className="ans-runhead-s"><span className="ans-runhead-num">{curRow.num}</span> <span className="ans-runhead-sec">{curRow.title}</span></span> : null}
-    <span className="ans-runhead-t">{btn ? short + NBSP + '·' + NBSP : short}</span>
+    {btn ? <span className="ans-runhead-s"><span className="ans-runhead-num">{curRow.num}</span> <span className="ans-runhead-sec" ref={runNameRef} /></span> : null}
+    <span className="ans-runhead-t" key={btn ? 't-sec' : 't-name'} ref={btn ? null : runNameRef}>{btn ? short + NBSP + '·' + NBSP : null}</span>
   </span>,
   btn ? <AnsIcon name="down" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
 
@@ -691,6 +692,35 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, [layoutEl, shown, ready, btn]);
+
+  /* ans4: between the bar's buttons the head is about 108 px at 360, and a section name cut by letters read 'Answer…'.
+     The visible name (the section, or the page's own name under two sections) goes on one line at 18 px when it fits,
+     else two lines at 16 px, else at 14 px; past that it ends on a whole word + '…', never inside a word. The button's aria-label keeps
+     the whole name. The text is set here, not by React, so the fit owns it. */
+  const runName = btn ? curRow.title : short;
+  React.useLayoutEffect(() => {
+    const rh = runRef.current, el = runNameRef.current;
+    if (!rh || !el) return undefined;
+    const fitName = () => {
+      const box = /** @type {HTMLElement} */ (el.closest('.ans-runhead-s') || el);   // the block that wraps (the name span is inline)
+      const over = () => box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1;
+      rh.classList.remove('is-two', 'is-small');
+      el.textContent = runName;
+      if (!over()) return;
+      rh.classList.add('is-two');
+      if (!over()) return;
+      rh.classList.add('is-small');   // 14 px, and a lone word too long for the box may break at a hyphen
+      const words = String(runName).split(/\s+/);
+      while (over() && words.length > 1) {
+        words.pop();
+        while (words.length > 1 && /^(a|an|the|of|and|or|to|in|on|for|with|by|is)$/i.test(words[words.length - 1])) words.pop();   // never 'The…'
+        el.textContent = words.join(' ').replace(/[\s,;:·–—-]+$/, '') + '…';
+      }
+    };
+    fitName();
+    window.addEventListener('resize', fitName);
+    return () => window.removeEventListener('resize', fitName);
+  }, [layoutEl, shown, ready, btn, runName]);
 
   const top = meta ? answersTopSections(meta).length : 0;
   const passages = answersPassageCount(entry);

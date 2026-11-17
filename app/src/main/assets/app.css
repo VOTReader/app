@@ -8851,6 +8851,15 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-runhead{font-size:var(--fsc-18)}
 .ans-runhead .ans-runhead-s{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ans-bar-title{font-size:var(--fsc-18);text-overflow:clip}
+/* ans4: the head's visible name wraps instead of being cut by letters (it read 'Answer…' at 360): one line at 18 px when it
+   fits, else two at 16 px (is-two), then at 14 px (is-small), past that a whole word + '…' (AnswersTopic fits it). Under two sections the page's own
+   name is the visible one. */
+.ans-runhead .ans-runhead-text{display:block;height:auto;max-height:none;min-width:0}
+.ans-runhead .ans-runhead-s,.ans-runhead-text:not(:has(.ans-runhead-s)) .ans-runhead-t{display:block;white-space:normal;overflow:hidden;text-overflow:clip;overflow-wrap:normal;line-height:22px;max-height:22px}
+.ans-runhead.is-two{font-size:var(--fsc-16)}
+.ans-runhead.is-two :is(.ans-runhead-s,.ans-runhead-t){line-height:19px;max-height:38px}
+.ans-runhead.is-small{font-size:var(--fsc-14)}
+.ans-runhead.is-small :is(.ans-runhead-s,.ans-runhead-t){line-height:17px;max-height:34px;hyphens:auto}
 /* ── WA2 answers (AnswersSheets.jsx, AnswersContents.jsx: a-onpage, a-cmd, a-more, a-card, a-about; mock v2 answers.html, WA2-answers 2026-11-11) ──
    Every Answers sheet: grab bar, then × | title | count on one row; rows in one inset card. */
 .ans-sheet .ans-sheet-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 -10px 4px;padding:0;border:0;background:inherit}
