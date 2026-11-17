@@ -556,7 +556,7 @@ describe('usePagerGesture (React wiring)', () => {
       fire(el, 'touchmove', 700, 100);
       fire(el, 'touchmove', 100, 100);
       fire(el, 'touchend', 100, 100);
-      vi.advanceTimersByTime(350); // settle timeout → finishSettle → onNext
+      vi.advanceTimersByTime(650); // no slide end in jsdom: the 600 ms fallback → finishSettle → onNext
       expect(onNext).toHaveBeenCalledTimes(1);
       expect(onPrev).not.toHaveBeenCalled();
     } finally {
@@ -593,7 +593,7 @@ describe('usePagerGesture (React wiring)', () => {
       fire(el, 'touchmove', 700, 100);
       fire(el, 'touchmove', 100, 100);
       fire(el, 'touchend', 100, 100);
-      vi.advanceTimersByTime(350); // settle timer → finishSettle → commit
+      vi.advanceTimersByTime(650); // no slide end in jsdom: the 600 ms fallback → finishSettle → commit
       expect(flushSync).toHaveBeenCalledTimes(1);
       expect(onNext).toHaveBeenCalledTimes(1);        // navigation ran INSIDE flushSync
       for (const fn of Object.values(applies)) expect(fn).toHaveBeenCalledTimes(1);
@@ -655,7 +655,7 @@ describe('the settle clock starts at the first frame of the slide (rel6)', () =>
     expect(calls.commits).toEqual([]);
     rafs.shift().fn();                                         // the first frame (however late)
     const settle = timers.filter((t) => t.ms !== 3000);
-    expect(settle.map((t) => t.ms)).toEqual([300]);
+    expect(settle.map((t) => t.ms)).toEqual([600]);   // a committed slide: the fallback for an end that never shows
     expect(calls.commits).toEqual([]);
     settle[0].fn();
     expect(calls.commits).toEqual(['next']);
@@ -676,8 +676,8 @@ describe('the settle clock starts at the first frame of the slide (rel6)', () =>
       expect(calls.commits).toEqual([]);
       expect(g.isSettling()).toBe(true);
       rafs.splice(0).forEach((f) => f());        // shown: the first frame draws the slide
-      vi.advanceTimersByTime(299);
-      expect(calls.commits).toEqual([]);         // the slide gets its full 300 ms from that frame
+      vi.advanceTimersByTime(599);
+      expect(calls.commits).toEqual([]);         // the slide gets its full fallback from that frame
       vi.advanceTimersByTime(1);
       expect(calls.commits).toEqual(['next']);
       expect(g.isSettling()).toBe(false);
@@ -702,5 +702,136 @@ describe('the settle clock starts at the first frame of the slide (rel6)', () =>
     expect(cancelled).toContainEqual({ raf: 4 });
     rafs.forEach((f) => f());   // a frame that fires anyway finds the settle gone
     expect(calls.commits).toEqual([]);
+  });
+});
+
+describe('a committed settle swaps after the slide is drawn at its end (rel10 e2e-tabs)', () => {
+  // rel10: the 300 ms timer committed (flushSync + scroll restore, 194 ms of forced layout under x4) while the slide's
+  // last frames were still to be drawn, so the last drawn frame (1 px short) stayed up through the commit. Now the
+  // swap waits for the track's own transitionend and then two frames (the end event is dispatched in the end frame
+  // before that frame's rAF callbacks, so one frame would still run before the end picture is painted).
+  function makeTrackIO() {
+    const rafs = [], timers = [], cancelled = [];
+    const listeners = {};
+    const out = makeIO({
+      schedule: (fn, ms) => {
+        if (ms) { const t = { fn, ms, id: timers.length + 100 }; timers.push(t); return t.id; }
+        rafs.push(fn); return { raf: rafs.length };
+      },
+      cancelScheduled: (tok) => cancelled.push(tok),
+    });
+    const track = out.track;
+    track.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+    track.removeEventListener = (type, fn) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); };
+    const fireEnd = (type, ev) => (listeners[type] || []).slice().forEach((f) => f(ev));
+    const frame = () => rafs.splice(0).forEach((f) => f());
+    const settleTimers = () => timers.filter((t) => t.ms !== 3000);
+    return { ...out, rafs, timers, cancelled, listeners, fireEnd, frame, settleTimers };
+  }
+  const swipeNext = (g) => {
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40));
+    g.end();
+  };
+  const swipeBackShort = (g) => {   // 20 px: below every commit bar, springs back
+    g.start(startEv(300, 100));
+    g.move(moveEv(290, 100, 0));
+    g.move(moveEv(280, 100, 400));
+    g.end();
+  };
+
+  it('transitionend of the track, then two frames, then one commit; the fallback timer never commits twice', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();                                       // the first frame of the slide
+    expect(t.settleTimers().map((x) => x.ms)).toEqual([600]);
+    t.fireEnd('transitionend', { target: t.track, propertyName: 'transform' });
+    expect(t.calls.commits).toEqual([]);             // the end frame is not painted yet
+    t.frame();                                       // the end frame (its rAF step)
+    expect(t.calls.commits).toEqual([]);
+    t.frame();                                       // the next frame: the end picture is on screen
+    expect(t.calls.commits).toEqual(['next']);
+    expect(g.isSettling()).toBe(false);
+    expect(t.listeners.transitionend).toEqual([]);   // listener gone
+    t.settleTimers().forEach((x) => x.fn());         // a fallback that fires anyway
+    expect(t.calls.commits).toEqual(['next']);
+  });
+
+  it('a child element ending its own transition does not end the slide', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();
+    t.fireEnd('transitionend', { target: { style: {} }, propertyName: 'transform' });
+    t.fireEnd('transitionend', { target: t.track, propertyName: 'opacity' });
+    t.frame(); t.frame();
+    expect(t.calls.commits).toEqual([]);
+    expect(g.isSettling()).toBe(true);
+  });
+
+  it('a slide that never reports its end still settles on the 600 ms fallback', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();
+    t.settleTimers()[0].fn();
+    expect(t.calls.commits).toEqual(['next']);
+    expect(g.isSettling()).toBe(false);
+    expect(t.listeners.transitionend).toEqual([]);
+  });
+
+  it('a cancelled slide (transitioncancel) settles the same way', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();
+    t.fireEnd('transitioncancel', { target: t.track, propertyName: 'transform' });
+    t.frame(); t.frame();
+    expect(t.calls.commits).toEqual(['next']);
+  });
+
+  it('a spring-back keeps the 300 ms timer (no commit, and a 0 px spring has no end event)', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeBackShort(g);
+    t.frame();
+    expect(t.settleTimers().map((x) => x.ms)).toEqual([300]);
+    t.settleTimers()[0].fn();
+    expect(g.isSettling()).toBe(false);
+    expect(t.calls.commits).toEqual([]);
+  });
+
+  it('a stale timer from an earlier settle never ends a later one', () => {
+    const t = makeTrackIO();
+    /** @type {any} */ (t.io).cancelScheduled = undefined; // a host that cannot cancel: the settle id must hold alone
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();
+    const first = t.settleTimers()[0];
+    t.fireEnd('transitionend', { target: t.track, propertyName: 'transform' });
+    t.frame(); t.frame();
+    expect(t.calls.commits).toEqual(['next']);
+    swipeNext(g);                                    // the next turn, settling again
+    expect(g.isSettling()).toBe(true);
+    first.fn();                                      // the first turn's fallback fires late
+    expect(t.calls.commits).toEqual(['next']);       // ...and ends nothing
+    expect(g.isSettling()).toBe(true);
+  });
+
+  it('dispose() mid-slide drops the end listener and cancels the fallback: no commit after unmount', () => {
+    const t = makeTrackIO();
+    const g = createPagerGesture(t.io);
+    swipeNext(g);
+    t.frame();
+    const fb = t.settleTimers()[0];
+    g.dispose();
+    expect(t.listeners.transitionend).toEqual([]);
+    expect(t.cancelled).toContain(fb.id);
+    t.fireEnd('transitionend', { target: t.track, propertyName: 'transform' });
+    t.frame(); t.frame();
+    fb.fn();
+    expect(t.calls.commits).toEqual([]);
   });
 });

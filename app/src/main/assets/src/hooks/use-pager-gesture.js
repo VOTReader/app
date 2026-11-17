@@ -59,7 +59,10 @@ import { placePeek } from '../ui/components/pager-preview.jsx';
 // Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
 const SLOP = 8;
 // Settle animation: a decelerate curve ≈ Android FastOutSlowInInterpolator.
-const SETTLE_MS = 300;            // ≥ the CSS transition (280ms) + a small buffer
+const SETTLE_MS = 300;            // a spring-back: ≥ the CSS transition (280ms) + a small buffer
+// A committed slide swaps on its own transitionend (+2 frames, see beginSettle); this is only the fallback for a slide
+// whose end never shows (no transition ran, element hidden). Longer than the slide so it does not win under load.
+const SETTLE_FALLBACK_MS = 600;
 const SETTLE_TRANSITION = 'transform 0.28s cubic-bezier(0.2, 0, 0, 1)';
 
 /**
@@ -212,6 +215,9 @@ export function createPagerGesture(io) {
   let s = null;          // active gesture, or null
   let settling = false;  // true while a settle animation is running
   let settleToken = null; // pending settle timer (cancelled on dispose)
+  let settleFrameToken = null; // pending frame after the slide's end (cancelled on dispose)
+  let settleId = 0;       // which settle a callback belongs to: a stale one never ends a later settle
+  let stopSlideEnd = null; // removes the track's transitionend listener
   let watchdogToken = null; // pending zombie check (re-armed per event)
 
   const trace = (msg) => { try { if (io.trace) io.trace(msg); } catch (_e) { /* trace must never wedge */ } };
@@ -315,9 +321,18 @@ export function createPagerGesture(io) {
     }
   }
 
+  function clearSettleWaits() {
+    if (stopSlideEnd) { try { stopSlideEnd(); } catch (_e) { /* a gone track */ } stopSlideEnd = null; }
+    for (const tok of [settleToken, settleFrameToken]) {
+      if (tok != null && io.cancelScheduled) io.cancelScheduled(tok);
+    }
+    settleToken = null;
+    settleFrameToken = null;
+  }
+
   function finishSettle(committed, dir) {
     settling = false;
-    settleToken = null;
+    clearSettleWaits();
     const tr = io.getTrack();
     const pk = io.getPeek(dir);
     // Snap the track back to its rest position (transform: none).
@@ -376,10 +391,40 @@ export function createPagerGesture(io) {
     // not at the lift. A main thread busy right after the lift (a letter turning while it plays) held the frame
     // ~360 ms: the 300 ms timer fired first and finishSettle swapped the page in with the slide never drawn, so
     // the page sat a third across, then snapped. Started from a frame, the slide is always seen, only later.
+    const id = ++settleId;
+    const live = () => settling && id === settleId;
+    const done = () => { if (live()) finishSettle(committed, dir); };
+    // rel10 (gate e2e-tabs S2): the commit is a long task (flushSync render + scroll restore: 194 ms of forced layout
+    // under x4). Run from the timer it landed before the slide's last frames were drawn, so the last DRAWN frame (1 px
+    // short) stayed up through it. A committed slide now swaps after its own end is on screen: the track's
+    // transitionend comes in the end frame before that frame's rAF callbacks (one frame would still run before the
+    // paint), so wait two frames; the peek then sits at 0, the same picture the commit reveals.
+    if (committed) listenForSlideEnd(id, done);
     settleToken = io.schedule(() => {
-      if (!settling) return;
-      settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
+      if (!live()) return;
+      settleToken = io.schedule(done, committed ? SETTLE_FALLBACK_MS : SETTLE_MS);
     });
+  }
+
+  function listenForSlideEnd(id, done) {
+    const tr = io.getTrack();
+    if (!tr || typeof tr.addEventListener !== 'function') return;
+    const onEnd = (e) => {
+      if (e && e.target && e.target !== tr) return;                                  // a child's own transition
+      if (e && e.propertyName && e.propertyName !== 'transform') return;
+      if (!settling || id !== settleId) return;
+      if (stopSlideEnd) { stopSlideEnd(); stopSlideEnd = null; }
+      settleFrameToken = io.schedule(() => {
+        if (!settling || id !== settleId) return;
+        settleFrameToken = io.schedule(done);
+      });
+    };
+    tr.addEventListener('transitionend', onEnd);
+    tr.addEventListener('transitioncancel', onEnd);
+    stopSlideEnd = () => {
+      tr.removeEventListener('transitionend', onEnd);
+      tr.removeEventListener('transitioncancel', onEnd);
+    };
   }
 
   // THE single exit path — every ending (normal lift, cancel, heal, force-
@@ -506,8 +551,7 @@ export function createPagerGesture(io) {
     // that was mid-flight when the screen changed (e.g. a boundary commit that
     // remounts a different screen type) can't fire its commit twice.
     dispose() {
-      if (settleToken != null && io.cancelScheduled) io.cancelScheduled(settleToken);
-      settleToken = null;
+      clearSettleWaits();
       settling = false;
       disarmWatchdog();
       s = null;
