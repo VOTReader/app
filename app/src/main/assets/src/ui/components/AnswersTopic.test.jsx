@@ -168,7 +168,7 @@ describe('AnswersTopic — the hero\'s "Loading contents…" ends', () => {
     cleanup();
     expect(hero({ meta: null, metaAll: null, metaFailed: true })).toBeNull();
     cleanup();
-    expect(hero({ meta: M[E.id], metaAll: M }).split(String.fromCharCode(160)).join(' ')).toContain('26 passages');
+    expect(hero({ meta: M[E.id], metaAll: M }).split(String.fromCharCode(160)).join(' ')).toBe('31 min · 15 parts');   // 0125 D: one quiet line
   });
 
   it('the sidecars are tried once more 3 s after a load that left none, then reported failed', async () => {
@@ -198,10 +198,10 @@ describe('AnswersTopic — hero words (f07)', () => {
   it('reads the meta line in words; a page of links says "N links", never "0 passages"', () => {
     const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
     expect(NB(answersHeroMeta(byId.get('regarding-the-holy-days-of-god'), M['regarding-the-holy-days-of-god'])))
-      .toBe('26 passages · 31 min · 2 playlists · 1 video · audio · PDF · 2 charts');
+      .toBe('31 min · 15 parts');   // 0125 D: no media in the line
     expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('6 links');
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
-      .toBe('12 passages · 12 min · 2 videos · downloads · YouTube channel');
+      .toMatch(/^12 min( · \d+ parts)?$/);
   });
 });
 

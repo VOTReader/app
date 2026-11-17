@@ -94,14 +94,12 @@ function pageMedia(meta) {
  */
 export function answersHeroMeta(entry, meta) {
   if (!meta) return '';
-  const fd = entry.id === ANSWERS_FD_INDEX_ID;
   const top = answersTopSections(meta).length;
-  const size = fd ? pl(top, 'category') : answersSizeWords(entry, meta, { minutes: false });
-  const parts = [size];
-  if (!/link$|links$/.test(size) && !/min$/.test(size)) parts.push(answersMinWords(meta));
-  if (!fd && top === 2) parts.push(pl(top, 'section')); // WA1 (a-topic): 3 or more are counted by the sections strip
-  const pos = (m) => (m.at === 'end' ? 1e9 : m.at);
-  return parts.concat(mediaWords(pageMedia(meta).slice().sort((a, b) => pos(a) - pos(b)))).filter(Boolean).join(SEP);
+  // 0125 D: ONE quiet line, "22 min · 7 parts"; the videos and downloads keep their rows where the site has them
+  if (entry.id === ANSWERS_FD_INDEX_ID) return pl(top, 'category');
+  const size = answersSizeWords(entry, meta, { minutes: false });
+  if (/links?$/.test(size)) return size;
+  return answersMinWords(meta) + (top >= 2 ? SEP + pl(top, 'part') : '');
 }
 
 /**

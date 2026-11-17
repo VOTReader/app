@@ -31,7 +31,7 @@ import { SEP, NBSP, pl, isDateHead, answersRowSub, answersPlaceOf, answersLeadSp
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
-  answersEyebrow, answersLongTitle, answersHeroMeta, answersContentsLine, answersTocRows, answersTocRowAt,
+  answersEyebrow, answersLongTitle, answersHeroMeta, answersTocRows, answersTocRowAt,
   answersRunTitle, answersFootOrder, answersRelated, answersFootMedia, answersMediaKindSub, answersMediaLabel,
   answersLinkSub, answersInline, answersParaMeta, answersParaPlan, answersFdLines, answersChars, answersFoldable,
   answersNoteRange, answersNoteLabel,
@@ -293,10 +293,10 @@ function closesPassage(entry, meta, i) {
  * @param {{ entry: any, entries: any[] | null, meta: any, pending: boolean, heroRef: any, onEyebrow: (shelf: any) => void,
  *   onContents: () => void, h1: any, rows?: any[], onSection?: (k: number) => void }} props
  */
-function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1, rows, onSection }) {
+function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1 }) {
   const eb = entries ? answersEyebrow(entries, entry) : null;
-  const cl = meta ? answersContentsLine(entry, meta) : null;
   const n = meta ? answersTopSections(meta).length : 0;
+  const line = meta ? answersHeroMeta(entry, meta) : '';
   return (
     <>
       {entry.id === ANSWERS_MAIN_PAGE_ID ? <img className="ans-banner" src="answers-banner.jpg" alt="Answers Only God Can Give" width="1200" height="304" /> : null}
@@ -305,15 +305,11 @@ function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h
           ? <a className="ans-eyebrow ans-label" href="#" onClick={(e) => { e.preventDefault(); onEyebrow(eb.shelf); }}>{eb.text}<Chev /></a>
           : <p className="ans-label">{eb.text}</p>) : null}
         {h1 || <h1 className={'ans-display' + (answersLongTitle(entry) ? ' is-long' : '')}>{entry.title}</h1>}
-        {/* no line once the sidecars are in without this topic's row, or could not load */}
-        {meta ? <p className="ans-meta">{answersHeroMeta(entry, meta)}</p> : pending ? <p className="ans-meta"><em>Loading contents…</em></p> : null}
-        {/* WA1 (a-topic): the sections as a strip under the title; the first chip opens "On this page" */}
-        {cl ? (
-          <nav className="ans-az-strip ans-jump-strip ans-sec-strip" aria-label="Sections">
-            <button type="button" className="ans-az-key ans-contents-line" aria-haspopup="dialog" aria-current="true" onClick={onContents}><AnsIcon name="list" />{pl(n, 'section')}</button>
-            {(rows || []).map((r, k) => <button key={k} type="button" className="ans-az-key" onClick={() => onSection(k)}>{r.title}</button>)}
-          </nav>
-        ) : null}
+        {/* no line once the sidecars are in without this topic's row, or could not load. 0125 D: one quiet line,
+            "22 min · 7 parts", that opens the parts (the row of part chips is gone; the bar's parts button stays). */}
+        {meta ? (n >= 2
+          ? <button type="button" className="ans-meta ans-contents-line" aria-haspopup="dialog" onClick={onContents}>{line}<Chev dir="down" /></button>
+          : <p className="ans-meta">{line}</p>) : pending ? <p className="ans-meta"><em>Loading contents…</em></p> : null}
       </header>
     </>
   );
@@ -493,6 +489,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       landFrameRef.current = requestAnimationFrame(() => { landFrameRef.current = 0; pinRef.current = Date.now() + 900; setShown(true); go(); });
     });
   };
+  const jumpRef = React.useRef(/** @type {(k: number) => void} */ (() => {}));
   const jumpRow = (/** @type {number} */ k) => {
     const r = rows[k];
     if (!r) { setSheet(null); return; }
@@ -502,6 +499,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       act.jump(r.at, { pulse: false, el: root && /** @type {HTMLElement | null} */ (root.querySelector('[data-ans-sec="' + k + '"]')) });
     });
   };
+  jumpRef.current = jumpRow;
   const jumpExcerpt = (/** @type {number} */ srcAt) => {
     let i = srcAt - 1;
     while (i > 0 && !closesPassage(entry, meta, i - 1)) i--;
@@ -578,6 +576,9 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     const start = main ? 1 : 0;
     const end = Math.min(tcAt, ps.length);
     const secAt = new Map(rows.map((r, k) => [r.at, k]));
+    // 0125 D: the parts (top sections, the Trumpet Call aside) by the paragraph each starts at
+    const parts = rows.map((r, k) => ({ r, k })).filter((x) => x.r.level === 1 && !x.r.trumpet);
+    const partAt = new Map(parts.map((x, p) => [x.r.at, p]));
     const synth = new Map(((meta && meta.sections) || []).filter((s) => s.synthetic).map((s) => [s.at, s]));
     const metaKey = meta ? ':m' : ':p';
     /** @type {any[]} */
@@ -599,6 +600,12 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     };
     for (let i = start; i < end; i++) {
       const k = secAt.has(i) ? /** @type {number} */ (secAt.get(i)) : null;
+      const p = partAt.has(i) ? /** @type {number} */ (partAt.get(i)) : 0;
+      if (p > 0) {
+        flush();
+        const prev = parts[p - 1], next = parts[p];
+        out.push(<PartFoot key={'pf' + i} n={p} of={parts.length} name={prev.r.title} onNext={() => jumpRef.current(next.k)} />);
+      }
       if (k != null && folded) flush();
       const s = synth.get(i);
       const first = i === start;
@@ -700,7 +707,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
         ) : null}
         <div className="ans-topic-main" ref={mainRef} data-copy-key={'wtlb:' + entry.id} data-mark-entry={'wtlb:' + entry.id + ':'}
           data-mark-blocks={entry.paragraphs.length} onClick={(e) => onTap(e, null)} onKeyDown={(e) => onTap(e, null)}>
-          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} rows={rows} onSection={jumpRow} />
+          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} />
           <div className="ans-reading">{body}</div>
           {/* Reading-end sentinel: end of body text, before the foot. */}
           <div className="reading-end" />
@@ -734,6 +741,16 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
         <NoteSheet entry={entry} meta={meta} state={sheet} onTap={onTap} onClose={() => setSheet(null)}
           onBack={() => setSheet(sheet.back)} onShow={(at) => landAfterClose(() => act.jump(at, { pulse: true }))} />
       ) : null}
+    </div>
+  );
+}
+
+/** 0125 D: the foot of a part while reading: where the reader is, and the way on to the next part. */
+function PartFoot({ n, of, name, onNext }) {
+  return (
+    <div className="ans-part-foot">
+      <p className="ans-part-at">{'Part ' + n + ' of ' + of + SEP + name}</p>
+      <button type="button" className="ans-textbtn ans-part-next" onClick={onNext}>Next part<Chev /></button>
     </div>
   );
 }

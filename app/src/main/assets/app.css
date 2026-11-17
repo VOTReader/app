@@ -8836,6 +8836,12 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-group-all{margin:2px 0 0 28px}
 .ans-icon-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--text-1)}
 .ans-icon-row>svg:first-child{flex:none;color:var(--accent)}
+/* 0125 D: the topic's one quiet line under its title, which opens the parts; a part's foot names it and goes on */
+.ans-hero .ans-contents-line{display:inline-flex;align-items:center;gap:2px;width:auto;min-height:var(--tap);margin:2px 0 0;padding:0;border:0;background:none;color:var(--text-2);font-family:var(--font-ui);font-size:var(--ts-meta);text-align:left}
+.ans-hero .ans-contents-line .ans-chev{color:var(--text-3)}
+.ans-part-foot{margin:28px 0 4px;padding-top:12px;border-top:1px solid var(--hairline)}
+.ans-part-at{margin:0;font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);color:var(--text-2)}
+.ans-part-foot .ans-part-next{color:var(--accent)}
 .ans-landing.is-asking .ans-hero-c{display:none}
 .ans-bar-field{position:relative;flex:1;min-width:0;margin:0 var(--sp-4) 0 4px}
 .ans-bar-field .ans-search-input{display:block;width:100%;height:var(--tap);padding:0 44px 0 16px;border:0;border-radius:var(--r-pill);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-control);outline:none;-webkit-appearance:none}
