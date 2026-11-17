@@ -119,3 +119,22 @@ describe('the Studies screens and the Matthew chapter view ship in bundle-d (lz1
     }
   });
 });
+
+
+/* BUNDLE-D BUILDS NO STORE (0610, 11-17).
+   Stores live in bundle-b, which publishes each as a window global; bundle-d reads them there. A bundle-d module that
+   imports stores/*.js directly makes esbuild build a SECOND copy of that store into bundle-d: same storage key, its
+   own cache, never hydrated by the HydrationGate. 6fa110502 did that with vot-history (screen-routes ->
+   hooks/use-history.js -> stores/history-store.js) and History's Remove then found nothing to remove. A store is
+   built as `<CachedStore>("vot-…", <default>, {…})`, so a store key followed by a default and an options object
+   in bundle-d means a copy. */
+describe('bundle-d builds no store of its own', () => {
+  it('no "vot-…" store is constructed in dist/bundle-d.js, and bundle-b still constructs them', () => {
+    const ctor = /[\w$]+\("vot-[a-z0-9-]+",(?:\[\]|\{\}|null|[\w$]+),\{/g;
+    const d = readFileSync(resolve(DIST, 'bundle-d.js'), 'utf-8');
+    const b = readFileSync(resolve(DIST, 'bundle-b.js'), 'utf-8');
+    const inD = (d.match(ctor) || []).map((m) => m.match(/"vot-[a-z0-9-]+"/)[0]);
+    expect(inD, 'bundle-d.js builds its own copy of these stores (import the window global instead)').toEqual([]);
+    expect((b.match(ctor) || []).length, 'the pattern no longer finds bundle-b\'s stores: update it').toBeGreaterThan(5);
+  });
+});

@@ -236,12 +236,15 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const scrollerTopRef = React.useRef(0);
   // The target's scroller itself, for the same reason: the docked card's scroll-padding lives on it.
   const scrollerRef = React.useRef(/** @type {HTMLElement|null} */ (null));
+  // Bottom room a ringed (not docked) stop gave its list so its row can scroll up to the start (the frame loop sets it).
+  const roomRef = React.useRef(0);
   const descId = 'tour-desc';
   React.useEffect(() => {
     if (!active || !st.ready) return undefined;
     setRect(null); setMissing(false);
     let raf = 0, stopped = false, scrolled = false, lastScroll = 0, seenTop = null;
     const started = Date.now();
+    roomRef.current = 0;
     // lastBar starts undefined, never null: the first reading of a stop must reach state even when
     // it is "no bar", or the bar the previous stop's playback raised would dock this stop's card
     // 70 px too high (e2e-tour, the Bible stop after Listen, 2026-09-04).
@@ -347,6 +350,17 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         // A docked stop scrolls an out-of-reach target to the TOP of its scroller: centring it in a
         // viewport whose bottom the card owns can land it right back under the card.
         const block = off ? (docked ? 'start' : 'center') : (!docked && !fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > startTop + 1 ? 'start' : null);
+        /* A row near the end of its list cannot scroll to the start: the list runs out first, and the card, with room on
+           neither side, sits over the ring (the Settings stop's Surprise Me row at 320x640 once its summary took two lines,
+           rel13). The list then gets the card's height as bottom room, as a docked card's scroller does, and the
+           re-scroll below brings the row up. */
+        if (block === 'start' && sc && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1) {
+          const need = Math.ceil(ch + CARD_GAP + CARD_EDGE);
+          if (roomRef.current < need) {
+            const had = parseFloat(getComputedStyle(sc).paddingBottom) || 0; // never less than the list's own bottom room
+            roomRef.current = need; sc.style.paddingBottom = Math.max(need, had + (padOnRef.current === sc ? 0 : need)) + 'px'; padOnRef.current = sc; lastScroll = 0;
+          }
+        }
         if (!scrolled || (block && (now - started < RESCROLL_WINDOW_MS || shifted) && now - lastScroll >= RESCROLL_EVERY_MS)) {
           scrolled = true; lastScroll = now;
           try { el.scrollIntoView({ block: block || 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
@@ -405,6 +419,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const dockPadRef = React.useRef(0);
   const padOnRef = React.useRef(/** @type {HTMLElement|null} */ (null));
   React.useEffect(() => {
+    if (active && !(dockPadRef.current > 0) && roomRef.current > 0) return; // the ringed stop's own bottom room (the frame loop's)
     const s = active && dockPadRef.current > 0 ? scrollerRef.current : null;
     const prev = padOnRef.current;
     if (prev && prev !== s) { prev.style.scrollPaddingBottom = ''; prev.style.paddingBottom = ''; padOnRef.current = null; }

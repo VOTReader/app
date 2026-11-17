@@ -349,7 +349,16 @@ export const TourController = {
     goTo(prevIndex(state.index));
   },
 
-  skip() { if (state.active) end(); },
+  /** Skip (and Escape, Android Back, the welcome card's Not now): end, then go back where the tour began, Home
+      for the Home strip, Settings for Settings' Help (0610: a Skip from a reader stop used to leave you in the reader).
+      Done (next() on the closing card) stays where the tour ends. */
+  skip() {
+    if (!state.active) return;
+    const from = state.from;
+    end();
+    const back = from === 'settings' ? nav.openSettingsData : nav.goHome;
+    if (typeof back === 'function') { try { back(); } catch (_e) { /* the tour is over either way */ } }
+  },
   finish() { if (state.active) end(); },
 
   /** The Home strip: 'later' snoozes it for TOUR_LATER_MS across launches; 'never' records the flag. */

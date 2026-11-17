@@ -381,3 +381,17 @@ describe('LinkStore — id generators', () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe('LinkStore — restore() (0610: Undo after a delete)', () => {
+  it('puts the same link back at its old index; a link already there is left alone', () => {
+    const mk = (id, c) => /** @type {any} */ ({ id, created: c, source: { type: 'bible', key: 'bible:genesis:1:' + c }, target: { type: 'bible', key: 'bible:exodus:1:' + c } });
+    LinkStore.replaceAll([mk('l1', 1), mk('l2', 2), mk('l3', 3)]);
+    const before = JSON.parse(JSON.stringify(LinkStore.all()));
+    const rec = LinkStore.all()[1];
+    LinkStore.remove('l2');
+    LinkStore.restore(rec, 1);
+    expect(JSON.parse(JSON.stringify(LinkStore.all()))).toEqual(before);
+    LinkStore.restore(rec, 0);
+    expect(LinkStore.all().map((l) => l.id)).toEqual(['l1', 'l2', 'l3']);
+  });
+});

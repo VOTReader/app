@@ -14,6 +14,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { relativeDate } from '../../utils/dates.js';
+import { removeBookmarkWithUndo } from '../../utils/annotation-undo.js';
 
 export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
   var useState = React.useState;
@@ -39,7 +40,7 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
   if (!popoverOpen) return null;
 
   function doDelete(bkm) {
-    BookmarkStore.remove(bkm.id);
+    removeBookmarkWithUndo(bkm.id);
     onDeleteDone && onDeleteDone();
     if (bookmarks.length <= 1) onClose();
     else setConfirmingId(null);

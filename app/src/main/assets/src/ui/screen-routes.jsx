@@ -49,6 +49,7 @@ import { runStatus } from '../data/plan-engine.js';
 import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace } from '../utils/plan-session.js';
 import { openPlanNav, keepPlanNav, planNavOnScreen } from '../utils/plan-nav.js';
 import { suppressNextHistoryPush } from '../hooks/use-history-sync.js';
+import { removeHistoryRow } from '../utils/history-undo.js';
 import { writePlanNote } from './screens/PlansHub.jsx';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
@@ -1365,6 +1366,7 @@ export function buildScreenRoutes({
         onSelect={_openHistoryEntry}
         onStartReading={() => _openFirstLetter('History')}
         onClearHistory={clearHistory}
+        onRemoveVisit={removeHistoryRow}
       />
     ),
     'library': () => _kickVot(

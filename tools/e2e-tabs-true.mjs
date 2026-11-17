@@ -154,7 +154,10 @@ async function main() {
   const { server, url } = await serveOwnTree();
   const profile = join(tmpdir(), 'vot-tabs1-' + process.pid);
   rmSync(profile, { recursive: true, force: true });
-  const launch = () => puppeteer.launch({ headless: true, userDataDir: profile, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
+  // trace 11-17 (S2 audio-letter-next, 2 of 4 runs): Chrome's GPU process collects WebGPU (Dawn) adapter info for its
+  // own metrics a while after it starts (gpu_info_collector::CollectDawnInfo, 256 ms on CrGpuMain); this walk relaunches
+  // the browser, so it landed in the letter swipe and no frame could be shown. The page ran nothing. Off: 0 such frames.
+  const launch = () => puppeteer.launch({ headless: true, userDataDir: profile, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-features=CollectWebGPUSupportMetrics'] });
   let browser = await launch();
   let page, cdp;
   const anaBrowser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
@@ -406,6 +409,17 @@ async function main() {
         for (const m of ms) if (log.length < 4000) log.push({ t, type: m.type, target: nm(m.target), attr: m.attributeName || undefined, val: m.type === 'attributes' && m.target.getAttribute ? String(m.target.getAttribute(m.attributeName)).slice(0, 80) : undefined, add: [...m.addedNodes].map(nm).slice(0, 4), rem: [...m.removedNodes].map(nm).slice(0, 4), text: m.type === 'characterData' ? String(m.target.data).slice(0, 60) : undefined });
       });
       window.__swMo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+      // read-along paints with CSS Custom Highlights, which no MutationObserver sees: log their changes too
+      // (audio-letter-next: a ~255 ms frame in the slide with no DOM change and no script).
+      if (window.Highlight && !window.__swHlPatched) {
+        window.__swHlPatched = true;
+        const wrap = (proto, names, what) => names.forEach((nm) => {
+          const orig = proto[nm]; if (typeof orig !== 'function') return;
+          proto[nm] = function (...a) { const l = window.__swMut; if (l && l.length < 4000) l.push({ t: Date.now() / 1000, type: 'highlight', target: what + '.' + nm, val: typeof a[0] === 'string' ? a[0] : (a[0] && a[0].toString ? String(a[0]).slice(0, 40) : undefined) }); return orig.apply(this, a); };
+        });
+        wrap(Highlight.prototype, ['add', 'delete', 'clear'], 'Highlight');
+        if (window.HighlightRegistry) wrap(HighlightRegistry.prototype, ['set', 'delete', 'clear'], 'HighlightRegistry');
+      }
     });
     // When the page itself handles the lift (a loaded page can take hundreds of ms): the settle runs from there, or
     // (rel6) from the frame the slide starts in: the page times its settle from that frame (use-pager-gesture), and
@@ -419,9 +433,13 @@ async function main() {
       };
       document.addEventListener('transitionstart', onSlide, true);
     });
+    // TABS_TRACE=<label> with --shots: a Chrome performance trace of that swipe's lift and settle, in the shots dir.
+    const TRACE = SHOTS && process.env.TABS_TRACE && label === process.env.TABS_TRACE;
+    if (TRACE) await page.tracing.start({ path: join(SHOTS, `trace-${label}.json`), categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'cc', 'viz', 'gpu', 'blink', 'disabled-by-default-cc.debug.scheduler.frames'] });
     const tRel = wall();
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
+    if (TRACE) await page.tracing.stop();
     const [tEnd, tSlide] = await page.evaluate(() => [window.__tEnd, window.__tSlide]);
     const settle = settleStart(tRel, Math.max(tEnd || 0, tSlide || 0) || null);
     if (settle.lagMs > 300) await sleep(settle.lagMs);   // the settle started late: let it finish on camera

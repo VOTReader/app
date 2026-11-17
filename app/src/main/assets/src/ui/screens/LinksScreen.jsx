@@ -11,6 +11,7 @@ import { UiIcon } from '../components/UiIcon.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
 import { EmptyState, Notice, UiButton } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+import { removeLinkWithUndo } from '../../utils/annotation-undo.js';
 
 export function _linkEndpointCategory(ep) {
   if (!ep) return '';
@@ -329,7 +330,7 @@ export function LinksScreen(props) {
         <LinkRowActionSheet lnk={actionTarget} onClose={closeAction} onNavigateSource={onNavigateSource}
           onNavigateTarget={onNavigateTarget} onMyWeb={onMyWeb} onDelete={setDeleting} />
         <ActionSheet open={!!deleting} onClose={closeDelete} title="Delete this link?" portal
-          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) LinkStore.remove(deleting.id); } }}>
+          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) removeLinkWithUndo(deleting.id); } }}>
           Both passages stay; only the link between them goes.
         </ActionSheet>
       </div>

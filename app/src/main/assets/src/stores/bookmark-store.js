@@ -188,6 +188,24 @@ export const BookmarkStore = extendStore(
     },
 
     /**
+     * Put a deleted bookmark back, the same record at its old index (0610: Undo after a delete).
+     * No-op when the record is invalid or its id is already in the list.
+     * @param {Bookmark | null | undefined} bookmark
+     * @param {number} index
+     * @returns {void}
+     */
+    restore(bookmark, index) {
+      if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
+      if (this._shouldDefer('restore', bookmark, index)) return;
+      var data = this._load();
+      if (data.some(function(b) { return !!b && b.id === bookmark.id; })) return;
+      var at = Math.max(0, Math.min(Number.isFinite(index) ? index : data.length, data.length));
+      data.splice(at, 0, bookmark);
+      this._save();
+      this._bump();
+    },
+
+    /**
      * Replace the entire bookmark list (W2.6 import path).
      * @param {Bookmark[] | null | undefined} data
      * @returns {void}

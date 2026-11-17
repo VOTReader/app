@@ -16,6 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { hideToast, showToast } from '../../utils/toast.js';
+import { ConfirmStrip } from './ConfirmStrip.jsx';
 
 const _noSubscribe = () => () => {};
 const _noShape = () => '';
@@ -322,22 +323,16 @@ function DownloadConfirm({ off, label, todo, count, onCancel, onGo }) {
   const known = todo.reduce((sum, t) => sum + (off.sizeOf(t.url) || 0), 0);
   const size = need ? formatBytes(need) : known ? 'at least ' + formatBytes(known) : '';
   return (
-    <div className="offline-confirm" role="group" aria-label={'Download ' + label}>
-      <p className="offline-confirm-title">{'Download ' + label + '?'}</p>
-      <p className="offline-confirm-line">{recordings + (size ? ' · ' + size : '')}</p>
-      {free > 0 ? <p className="offline-confirm-line">{'Free space on this phone: ' + formatBytes(free)}</p> : null}
-      {noRoom ? <p className="offline-confirm-warn">Not enough room: free some space on the phone first.</p> : null}
-      {/* Only where it is true (dl-rework E, defect 17): the phone app on Android 14+ downloads with the app closed. */}
-      {typeof off.runsClosed === 'function' && off.runsClosed()
-        ? <p className="offline-confirm-line">It goes on with VOTReader closed.</p>
-        : <p className="offline-confirm-line">Keep VOTReader open until it finishes.</p>}
-      <div className="offline-confirm-actions">
-        <button type="button" className="offline-confirm-cancel" onClick={onCancel}>Cancel</button>
-        <button type="button" className="offline-confirm-go" disabled={noRoom} onClick={onGo}>
-          {'Download' + (need ? ' ' + formatBytes(need) : '')}
-        </button>
-      </div>
-    </div>
+    <ConfirmStrip card label={'Download ' + label} back={false} focus={false} act="go" disabled={noRoom}
+      question={'Download ' + label + '?'}
+      lines={[
+        recordings + (size ? ' · ' + size : ''),
+        free > 0 ? 'Free space on this phone: ' + formatBytes(free) : null,
+        noRoom ? { text: 'Not enough room: free some space on the phone first.', warn: true } : null,
+        // Only where it is true (dl-rework E, defect 17): the phone app on Android 14+ downloads with the app closed.
+        typeof off.runsClosed === 'function' && off.runsClosed() ? 'It goes on with VOTReader closed.' : 'Keep VOTReader open until it finishes.',
+      ]}
+      yesLabel={'Download' + (need ? ' ' + formatBytes(need) : '')} onCancel={onCancel} onConfirm={onGo} />
   );
 }
 

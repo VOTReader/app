@@ -33,8 +33,8 @@ function renderOverview(pins) {
       MAX_TABS={999} thumbnails={null} clearAsk onClearAsk={onClearAsk}
     />,
   );
-  const question = () => document.querySelector('.ann-chip-confirm-q')?.textContent;
-  const yes = () => /** @type {HTMLButtonElement} */ (document.querySelector('.ann-chip-confirm-yes'));
+  const question = () => document.querySelector('.ui-confirm-q')?.textContent;
+  const yes = () => /** @type {HTMLButtonElement} */ (document.querySelector('.ui-confirm-yes'));
   return { onClearAll, onClearAsk, question, yes };
 }
 

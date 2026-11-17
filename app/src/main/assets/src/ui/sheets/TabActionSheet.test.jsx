@@ -49,7 +49,7 @@ describe('TabActionSheet bulk-close confirm gates', () => {
     expect(screen.getByText('Close 2 tabs after this one?')).toBeTruthy();
     // The sheet's own bottom "Cancel" option is also on screen — target the
     // ConfirmStrip's Cancel by its class.
-    fireEvent.click(document.querySelector('.ann-chip-confirm-cancel'));
+    fireEvent.click(document.querySelector('.ui-confirm-cancel'));
     expect(p.onCloseToRight).not.toHaveBeenCalled();
     expect(p.onDismiss).not.toHaveBeenCalled();
     // The plain option is back

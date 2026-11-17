@@ -172,6 +172,18 @@ async function stripOnly(browser, { width, height, label, scales }) {
     await stripGeometry(page, `${label} strip`);
     if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-strip-x${s}.png`) });
   }
+  // A tour started from Home (the strip's Show me around): Skip goes back to Home (0610).
+  await page.evaluate(() => document.documentElement.style.removeProperty('--font-scale'));
+  await sleep(300);
+  await page.evaluate(() => { const b = document.querySelector('.tour-prompt .tour-btn.primary'); if (b) b.click(); });
+  await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
+  await sleep(400);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.tour-card button')].find((x) => /leave the tour/i.test(x.getAttribute('aria-label') || '')); if (b) b.click(); });
+  await sleep(900);
+  const landed = await page.evaluate(() => ({ home: !!document.querySelector('.home-root'), card: !!document.querySelector('.tour-card') }));
+  if (landed.card || !landed.home) { errors.push(`Skip from a tour started on Home did not land on Home (${JSON.stringify(landed)})`); fail(`${label}: Skip from Home's tour did not go back to Home (${JSON.stringify(landed)})`); }
+  else ok(`${label}: Skip from Home's tour goes back to Home`);
+  if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-skip-from-home.png`) });
   await page.close();
   await context.close();
   return errors;
@@ -199,7 +211,11 @@ async function run(browser, { width, height, label, light }) {
     await sleep(400);
   };
   // GEAR1 (2026-11-12): the gear opens Quick settings, and Settings is its last row.
-  const openSettings = async () => { await clickLabel('Quick settings'); await clickLabel('Settings'); };
+  // Settings, from Home or from Settings itself: Skip (and Escape) now go back where the tour began (0610), which for
+  // a tour started from Settings is Settings, where there is no 'Quick settings' to press.
+  const onSettings = () => page.evaluate(() => [...document.querySelectorAll('button, [role="button"]')].some((b) => b.getClientRects().length > 0
+    && (b.getAttribute('aria-label') || (b.textContent || '').trim()).startsWith('Show me around')));
+  const openSettings = async () => { if (await onSettings()) return; await clickLabel('Quick settings'); await clickLabel('Settings'); };
   const facts = () => page.evaluate(() => {
     const card = document.querySelector('.tour-card');
     const ring = document.querySelector('.tour-ring');
@@ -563,6 +579,9 @@ async function run(browser, { width, height, label, light }) {
   await page.keyboard.press('Escape'); await sleep(300);
   f = await facts();
   if (f.active) fail('Escape did not skip the tour'); else ok('Escape means Skip');
+  await sleep(500);
+  if (!(await onSettings())) fail('Escape (Skip) did not go back to Settings, where this tour began'); else ok('Skip goes back to Settings, where the tour began');
+  await shot('skip-from-settings');
 
   /* LEAVING FROM THE DEMONSTRATION ITSELF. The walk above proves the tour that RUNS TO THE END
      saves nothing; a reader who leaves while the colour is on the page is the other half, and

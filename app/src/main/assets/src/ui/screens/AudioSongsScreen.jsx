@@ -21,6 +21,7 @@
 import { SongPage } from './SongPage.jsx';
 import { ReadWithMusic, readingLetters } from './ReadWithMusic.jsx';
 import { OfflineNote } from '../components/OfflineAudioControls.jsx';
+import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { ListGroup, ListRow, SectionLabel, UiButton } from '../components/UiParts.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
@@ -784,14 +785,11 @@ function SongsList({ frame, library, playingId, active, onPush }) {
         {keptList && ids.length ? (
           askingRemoveAll ? (
             // W2-05: the Downloads screen's own strip (AudioOfflineScreen), words and buttons alike.
-            <div className="offline-confirm" role="group" aria-label="Remove all kept songs">
-              <p className="offline-confirm-title">{'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone?'}</p>
-              <p className="offline-confirm-line">They can be kept again.</p>
-              <div className="offline-confirm-actions">
-                <button type="button" className="offline-confirm-cancel" onClick={() => setAskingRemoveAll(false)}>Keep them</button>
-                <button type="button" className="offline-confirm-go" onClick={() => { void keep.removeAll(); setAskingRemoveAll(false); }}>Yes, remove all</button>
-              </div>
-            </div>
+            <ConfirmStrip card label="Remove all kept songs" back={false} focus={false}
+              question={'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone?'}
+              lines={['They can be kept again.']}
+              cancelLabel="Keep them" yesLabel="Yes, remove all"
+              onCancel={() => setAskingRemoveAll(false)} onConfirm={() => { void keep.removeAll(); setAskingRemoveAll(false); }} />
           ) : (
             <button type="button" className="songs-see-all song-keep-remove-all" onClick={() => setAskingRemoveAll(true)}>Remove all from this phone</button>
           )

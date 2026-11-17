@@ -375,3 +375,28 @@ describe('BookmarkStore — damaged imports (W10)', () => {
     expect(BookmarkStore.get('b1')).toBeNull();
   });
 });
+
+describe('BookmarkStore — restore() (0610: Undo after a delete)', () => {
+  const seed = () => {
+    BookmarkStore.add({ id: 'b1', hlKey: 'bible:genesis:1:1', label: 'One', created: 1, updated: 1 });
+    BookmarkStore.add({ id: 'b2', hlKey: 'bible:genesis:1:2', label: 'Two', thought: 'why', created: 2, updated: 3 });
+    BookmarkStore.add({ id: 'b3', hlKey: 'bible:genesis:1:3', label: 'Three', created: 4, updated: 4 });
+  };
+  it('puts the same record back at its old place in the list', () => {
+    seed();
+    const before = JSON.parse(JSON.stringify(BookmarkStore.all()));
+    const rec = BookmarkStore.get('b2');
+    BookmarkStore.remove('b2');
+    BookmarkStore.restore(rec, 1);
+    expect(JSON.parse(JSON.stringify(BookmarkStore.all()))).toEqual(before);
+  });
+  it('is a no-op when the id is already there, and clamps an index past the end', () => {
+    seed();
+    BookmarkStore.restore({ id: 'b1', hlKey: 'x', label: 'dup' }, 0);
+    expect(BookmarkStore.all().map((b) => b.id)).toEqual(['b1', 'b2', 'b3']);
+    const rec = BookmarkStore.get('b3');
+    BookmarkStore.remove('b3');
+    BookmarkStore.restore(rec, 99);
+    expect(BookmarkStore.all().map((b) => b.id)).toEqual(['b1', 'b2', 'b3']);
+  });
+});

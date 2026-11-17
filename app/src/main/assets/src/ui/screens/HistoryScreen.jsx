@@ -42,7 +42,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onStartReading, onClearHistory }) {
+export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onStartReading, onClearHistory, onRemoveVisit }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -267,7 +267,8 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
         {dOpen && (
           <div className="ui-group">
             {dg.entries.map((entry, i) => (
-              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)} />
+              <HistoryEntryCard key={entry.key + ':' + entry.ts + ':' + i} entry={entry} onSelect={onSelect} chip={entryChip(entry)}
+                onRemove={onRemoveVisit ? () => onRemoveVisit(entry) : null} />
             ))}
           </div>
         )}

@@ -7,7 +7,7 @@
 
 import { relativeDate } from '../../utils/dates.js';
 import { keyTouchesVerse } from '../../utils/hl-keys.js';
-import { offerUndoLinkRemoved } from '../../utils/annotation-undo.js';
+import { removeLinkWithUndo } from '../../utils/annotation-undo.js';
 import { UiIcon } from './UiIcon.jsx';
 
 export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, onMyWeb }) {
@@ -38,7 +38,7 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, onMyWeb }) {
     other.type === 'holy-days' ? 'Holy Days' : '';
   const meta = [where, lnk.created ? relativeDate(lnk.created) : ''].filter(Boolean).join(' · ');
   const open = () => onNavigate && onNavigate(other);
-  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); offerUndoLinkRemoved(lnk); };   // A06.6
+  const doRemove = (e) => { e.stopPropagation(); removeLinkWithUndo(lnk.id); };   // A06.6; 0610: back at its old index
   return (
     <div className="link-card">
       <div className="link-card-box">

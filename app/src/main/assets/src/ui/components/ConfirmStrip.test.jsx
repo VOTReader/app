@@ -9,12 +9,12 @@
         sites at once.
 
      B) Cancel and Confirm fire independently. The two buttons share the
-        same parent .ann-chip-confirm and the same .ann-chip-confirm-btn
-        base class — a careless onClick swap during refactor would route
+        same parent .ui-confirm and the same .ui-btn.is-small
+        base classes — a careless onClick swap during refactor would route
         the wrong handler to the wrong button without any visual cue.
 
-     C) The wrapping div carries the .ann-chip-confirm class (so the
-        existing CSS continues to apply) and forwards className + style
+     C) The wrapping div carries the .ui-confirm class (the kit's one
+        confirm, app.css) and forwards className + style
         (so site-specific overrides like padding: 14px 12px on the
         BookmarkRowActionSheet, or bkm-create-edit-confirm on the edit
         sheet, keep working).
@@ -76,12 +76,12 @@ describe('ConfirmStrip', () => {
     expect(screen.getByText('My Notebook')).toBeTruthy();
   });
 
-  it('applies .ann-chip-confirm base class on the wrapping div', () => {
+  it('applies the .ui-confirm base class on the wrapping div', () => {
     const { container } = render(
       <ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />
     );
     const root = /** @type {HTMLElement} */ (container.firstChild);
-    expect(root.className).toBe('ann-chip-confirm');
+    expect(root.className).toBe('ui-confirm');
   });
 
   it('appends extra className when provided', () => {
@@ -89,8 +89,7 @@ describe('ConfirmStrip', () => {
       <ConfirmStrip question="Q?" className="my-extra" onCancel={() => {}} onConfirm={() => {}} />
     );
     const root = /** @type {HTMLElement} */ (container.firstChild);
-    expect(root.className).toContain('ann-chip-confirm');
-    expect(root.className).toContain('my-extra');
+    expect(root.className).toBe('ui-confirm my-extra');
   });
 
   it('passes through inline style', () => {
@@ -118,5 +117,53 @@ describe('ConfirmStrip focus (n185)', () => {
   it('focuses Cancel when it opens', () => {
     render(<ConfirmStrip question="Delete?" onCancel={() => {}} onConfirm={() => {}} />);
     expect(document.activeElement).toBe(screen.getByText('Cancel'));
+  });
+});
+
+/* The kit's one confirm: the Downloads boxes (Cancel downloads, the Download ask, Remove all kept songs) use it as a card
+   with lines, and keep the Back and focus they had (none). */
+describe('ConfirmStrip as the one confirm', () => {
+  it('draws Cancel as a text button and the act as danger, or primary for a go', () => {
+    const { container, rerender } = render(<ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />);
+    const [cancel, yes] = Array.from(container.querySelectorAll('button'));
+    expect(cancel.className).toBe('ui-btn is-small is-outline ui-confirm-cancel');
+    expect(yes.className).toBe('ui-btn is-small ui-confirm-yes is-danger');
+    rerender(<ConfirmStrip question="Q?" act="go" onCancel={() => {}} onConfirm={() => {}} />);
+    expect(container.querySelectorAll('button')[1].className).toBe('ui-btn is-small ui-confirm-yes is-primary');
+  });
+
+  it('card, label, lines (a warn line marked), cancelLabel and disabled', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmStrip card label="Download Volume Two" question="Download Volume Two?" act="go" disabled
+      lines={['12 recordings · 80 MB', null, { text: 'Not enough room: free some space on the phone first.', warn: true }]}
+      cancelLabel="Keep downloading" yesLabel="Download 80 MB" onCancel={() => {}} onConfirm={onConfirm} />);
+    const group = screen.getByRole('group', { name: 'Download Volume Two' });
+    expect(group.className).toBe('ui-confirm is-card');
+    const lines = Array.from(group.querySelectorAll('.ui-confirm-line'));
+    expect(lines.map((l) => l.textContent)).toEqual(['12 recordings · 80 MB', 'Not enough room: free some space on the phone first.']);
+    expect(lines.map((l) => l.className)).toEqual(['ui-confirm-line', 'ui-confirm-line is-warn']);
+    expect(screen.getByRole('button', { name: 'Keep downloading' })).toBeTruthy();
+    const go = /** @type {HTMLButtonElement} */ (screen.getByRole('button', { name: 'Download 80 MB' }));
+    expect(go.disabled).toBe(true);
+  });
+
+  it('no label: no group role', () => {
+    const { container } = render(<ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />);
+    expect(/** @type {HTMLElement} */ (container.firstChild).getAttribute('role')).toBeNull();
+  });
+
+  it('focus={false} leaves focus where it was', () => {
+    render(<ConfirmStrip question="Q?" focus={false} onCancel={() => {}} onConfirm={() => {}} />);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('back: registered for Back by default, not with back={false}', () => {
+    const reg = /** @type {any} */ (globalThis).modalRegistry;
+    const before = reg.openIds().length;
+    const a = render(<ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />);
+    expect(reg.openIds().length).toBe(before + 1);
+    a.unmount();
+    render(<ConfirmStrip question="Q?" back={false} onCancel={() => {}} onConfirm={() => {}} />);
+    expect(reg.openIds().length).toBe(before);
   });
 });
