@@ -281,7 +281,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
     <div className="plans-build plan-preview">
       <p className="root-eyebrow plan-eyebrow">{edit ? 'Change your plan · Step 2 of 2' : 'Your own plan · Step 2 of 2'}</p>
       <h1 className="plan-hero-name">{name.trim() || defaultName(picks, src)}</h1>
-      <p className="plan-about">{preview ? preview.picked + (dst && dst.itemsDone ? ' · ' + dst.itemsDone.toLocaleString('en-US') + ' read already' : '') : ''}</p>
+      <p className="plan-about">{preview ? preview.picked + (dst && dst.itemsDone ? ' · ' + dst.itemsDone.toLocaleString('en-US') + ' read so far' : '') : ''}</p>
       {facts ? (
         <div className="plan-facts" role="list" aria-label="This plan">
           <div className="plan-fact" role="listitem"><b>{minText(facts.dayMinutes)}</b><span>a day</span></div>

@@ -198,7 +198,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     body = <PlanPreview key={v.plan + (v.opt ? ':' + v.opt.volKey : '')} planId={v.plan} opt={v.opt} now={now} lettersReady={lettersReady} isRead={isRead}
       onStarted={(id) => replacePlanView({ v: 'plan', id })} onSchedule={(preview) => pushPlanView({ v: 'schedule', id: '', preview })} />;
   } else if (v.v === 'schedule' && v.preview) {
-    const draft = draftRun(v.preview.planId, v.preview.spec, isRead, now);
+    const draft = draftRun(v.preview.planId, v.preview.spec, now);
     title = (draft ? runName(draft, null) : 'Reading plans') + ' · Schedule';
     body = draft ? <PlanSchedule run={draft} now={now} preview onRead={() => {}} /> : null;
   } else if (v.v === 'schedule' && run) {

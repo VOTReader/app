@@ -22,7 +22,7 @@
 
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { BIBLE_CHAPTER_WORDS } from './plan-bible-words.js';
-import { newRun, runStatus, todayKey, resumeAt, startFrom, creditRead, totalDays, itemsWords, itemsCount, minutesFor } from './plan-engine.js';
+import { newRun, runStatus, todayKey, resumeAt, startFrom, totalDays, itemsWords, itemsCount, minutesFor } from './plan-engine.js';
 
 /** @typedef {import('./plan-engine.js').PlanItem} PlanItem */
 /** @typedef {import('./plan-engine.js').PlanTrack} PlanTrack */
@@ -208,10 +208,9 @@ export function runName(run, src) {
 /**
  * Start a catalog plan. Null when it needs the Volumes and they are not loaded.
  * @param {string} id @param {LetterSource | null} src @param {Date} now
- * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string, from?: string, startOn?: string,
- *   credit?: (bid: string, cid: string) => boolean }} [opt]
+ * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string, from?: string, startOn?: string }} [opt]
  *   from: start at this letter (n354b's Start where I am), the plan's letters before it left out; startOn: a later
- *   start date (plans2); credit: the read record, whose items of the plan are counted as read (plans2 "Count my N")
+ *   start date (plans2). A new plan starts at zero: what was read before it never counts (Corbin 11-17, 0245).
  * @returns {PlanRun | null}
  */
 export function startCatalogPlan(id, src, now, opt = {}) {
@@ -224,7 +223,6 @@ export function startCatalogPlan(id, src, now, opt = {}) {
     const col = src && src.colByKey.get(String(opt.volKey || 'one'));
     run.name = (col && (col.label || col.short)) || 'One collection';
   } else if (opt.name) run.name = opt.name;
-  if (typeof opt.credit === 'function') run = creditRead(run, opt.credit);
   return run;
 }
 
