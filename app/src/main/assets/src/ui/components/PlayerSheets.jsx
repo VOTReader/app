@@ -154,7 +154,7 @@ export function SleepSheet({ state, noun, onClose }) {
 }
 
 /**
- * @param {{ voices: { kind: 'reader'|'edition', chips: Array<{ id: string, label: string, active: boolean, select: () => void, swap: () => boolean }> },
+ * @param {{ voices: { kind: 'reader'|'edition', chips: Array<{ id: string, label: string, active: boolean, select: () => boolean | void, swap: () => boolean | 'refused' }> },
  *   title: string, noun?: string, needsConfirm: boolean, single: boolean, onClose: () => void }} props noun names what
  *   the voice is for ("Voice for this letter"): letter, chapter or recording
  */

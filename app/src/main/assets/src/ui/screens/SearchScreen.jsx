@@ -479,11 +479,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return () => sc.removeEventListener('scroll', onScroll);
   }, [suggestOpen]);
 
-  // Handle command-kind parsed results
+  // Handle command-kind parsed results. A command runs once: the box is cleared before the command acts, so
+  // reopening Search never replays a typed "/home" or "/rebuild index" (the query outlives the screen otherwise).
   React.useEffect(() => {
     if (state.parsed && state.parsed.kind === 'command') {
+      if (onQueryChange) onQueryChange('');
       // "/help" (Search help, s-slash): the empty screen is the help, its line on what to type and its shortcuts.
-      if (state.parsed.action === 'help') { onQueryChange(''); return; }
+      if (state.parsed.action === 'help') return;
       if (onCommand) onCommand(state.parsed.action);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.

@@ -106,6 +106,7 @@ beforeEach(() => {
     openExportSink: vi.fn(),
     pickImportFile: vi.fn(),
     clearGardenCache: vi.fn(),
+    nativeClearRecordings: vi.fn(),
     v3ExportOpen: vi.fn(() => { window.__onV3ExportReady('ok'); }),
     v3ImportOpen: vi.fn(() => { window.__onV3ImportReady('ok'); }),
     v3ImportBegin: vi.fn(),
@@ -605,6 +606,7 @@ describe('Clear All Personal Data', () => {
     await createBackupFlow(ctx).clearAllPersonalData();
     expect(stop).toHaveBeenCalled();
     expect(bridge.clearGardenCache).toHaveBeenCalled();
+    expect(bridge.nativeClearRecordings).toHaveBeenCalled();   // the voice memos (cacheDir/recordings) go with the rest
     expect(globalThis.indexedDB.deleteDatabase.mock.calls.map((c) => c[0]))
       .toEqual(['votreader', 'vot-journal-media', 'vot-thumbs', 'vot-search-cache', 'vot-minisearch-cache']);
     expect(localStorage.getItem('vot-state')).toBeNull();
@@ -753,6 +755,7 @@ describe('sweep v034: the safety copies go only once the library has', () => {
       clearWeeklyCopies: vi.fn(() => { order.push('clearWeeklyCopies'); return true; }),
     };
     put('DataSafety', ds);
+    bridge.nativeClearRecordings.mockImplementation(() => { order.push('clearRecordings'); });
   });
   /** deleteDatabase answering answer(name) ('onsuccess' | 'onerror', or null for no answer at all). */
   const deletes = (answer) => globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
@@ -767,7 +770,7 @@ describe('sweep v034: the safety copies go only once the library has', () => {
     await createBackupFlow(ctx).clearAllPersonalData();
     expect(order).toEqual(['beginClear',
       'delete votreader', 'delete vot-journal-media', 'delete vot-thumbs', 'delete vot-search-cache', 'delete vot-minisearch-cache',
-      'clearSnapshots', 'clearWeeklyCopies']);
+      'clearRecordings', 'clearSnapshots', 'clearWeeklyCopies']);
     expect(lastToast()).toBe('All personal data cleared. Reloading…');
   });
 
@@ -778,6 +781,13 @@ describe('sweep v034: the safety copies go only once the library has', () => {
     expect(ds.clearSnapshots).not.toHaveBeenCalled();
     expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
     expect(ds.abortClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('the voice memos go only once the library did: a library that will not delete keeps them', async () => {
+    deletes((name) => (name === 'votreader' ? 'onerror' : 'onsuccess'));
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(bridge.nativeClearRecordings).not.toHaveBeenCalled();
   });
 
   it('media that will not delete keeps the copies too; the library went, so DataSafety stays marked', async () => {

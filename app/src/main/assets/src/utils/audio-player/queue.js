@@ -51,7 +51,7 @@ import { playSongs } from './songs.js';
  * any screen showing a Listen pill has it by construction.
  *
  * @param {{ volKey: string, bookId: string, label?: string | null, chapterNum?: number | null, noResume?: boolean }} opts
- * @returns {void}
+ * @returns {boolean} true when the book started; false when there is nothing to play, or the phone refuses it offline
  */
 export function playBibleBook(opts) {
   const o = opts || /** @type {any} */ ({});
@@ -62,7 +62,7 @@ export function playBibleBook(opts) {
   // book of the same edition as the last chapter ends (_extendQueue, _booksAfter)
   // — the horizon is a book at a time, the walk is the whole edition.
   const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));
-  if (!items.length) return;
+  if (!items.length) return false;
   // Two edition SHAPES, and the branch is on the shape, not on the edition id
   // — every shipped edition (BRM, WOP, WEB) is PER-CHAPTER, carrying one
   // manifest part per chapter, so "play chapter N" is a queue POSITION. The
@@ -78,11 +78,13 @@ export function playBibleBook(opts) {
     startPartIndex: perChapter && Number.isInteger(n) && n >= 2 ? Math.min(n - 1, parts.length - 1) : 0,
     noResume: !!o.noResume,
   });
-  if (perChapter || !started) return;
+  if (!started) return false;
+  if (perChapter) return true;
   // A whole-book edition seeks INTO the book track. The chapter the reader
   // actually tapped outranks a remembered position: playCollection queued its
   // resume listener first, so this one — added second — wins the assignment.
   _seekOnMetadata(bibleChapterStart(o.volKey, o.bookId, o.chapterNum));
+  return true;
 }
 
 /**
@@ -716,7 +718,9 @@ export function addToQueue(tracks) { return _enqueue(tracks, 'end'); }
  *
  * @param {{ volKey: string, reader?: string | null, label?: string | null }} opts a Bible switch names the edition's
  *   volKey and label; a letter switch names its own volKey and the reader
- * @returns {boolean} false when nothing could be switched in place (the caller rebuilds instead)
+ * @returns {boolean | 'refused'} false when nothing could be switched in place (the caller rebuilds instead); 'refused'
+ *   when the phone cannot play the new voice offline: the notice has shown, nothing changed, and the caller must not
+ *   save the choice
  */
 export function switchVoiceInPlace(opts) {
   const o = opts || /** @type {any} */ ({});
@@ -758,7 +762,7 @@ export function switchVoiceInPlace(opts) {
     queue = q.slice(0, a).concat(run, q.slice(b + 1));
     qi = a;
   }
-  if (_offlineRefuses([queue[qi]])) { _offlineNotice(queue[qi]); return true; }
+  if (_offlineRefuses([queue[qi]])) { _offlineNotice(queue[qi]); return 'refused'; }
   _rememberOutgoingPosition();   // R8: the clock belongs to the recording leaving
   if (_source && oldVol !== o.volKey && _source.volKey === oldVol) _setSource({ ..._source, volKey: o.volKey });
   _state.qi = qi;

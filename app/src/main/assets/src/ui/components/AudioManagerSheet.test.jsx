@@ -1079,6 +1079,42 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     volKey: 'bible-brm-kjv', bookId: 'genesis', chapterNum: 2, label: 'KJV · Biblical Restoration Ministries',
   }));
 
+  it('a plan portion whose edition the phone refuses offline saves nothing and asks nothing', () => {
+    const setEdition = vi.fn();
+    window.__setBibleAudioEdition = setEdition;
+    const KJV = (id, title, n) => ({ volKey: 'bible-brm-kjv', item: { id, title }, collectionLabel: 'KJV', chapterNum: n });
+    drive(() => AudioPlayer.playPortion({ items: [KJV('genesis', 'Genesis', 2), KJV('genesis', 'Genesis', 3), KJV('exodus', 'Exodus', null)], label: 'Today' }));
+    openSheet();
+    // Refused offline: the notice has shown and nothing changed, so the sheet closes, no rebuild prompt, and the
+    // edition is not saved (a saved edition would make every later Listen pill play the refused one).
+    const refused = vi.spyOn(AudioPlayer, 'switchVoiceInPlace').mockReturnValue('refused');
+    try {
+      openVoice();
+      pickVoice(/^NKJV · Dramatized$/);
+      expect(document.querySelector('.audio-manager-voice-confirm')).toBeNull();
+      expect(setEdition).not.toHaveBeenCalled();
+    } finally {
+      refused.mockRestore();
+    }
+  });
+
+  it('a plain queue whose Bible edition the phone refuses offline saves nothing', () => {
+    const setEdition = vi.fn();
+    window.__setBibleAudioEdition = setEdition;
+    startGenesis2();
+    openSheet();
+    // Refused offline: playBibleBook has said why (its toast) and returned false, so the choice is not saved and the
+    // next Listen pill still plays the edition the listener had.
+    const refused = vi.spyOn(AudioPlayer, 'playBibleBook').mockReturnValue(false);
+    try {
+      openVoice();
+      pickVoice(/^NKJV · Dramatized$/);
+      expect(setEdition).not.toHaveBeenCalled();
+    } finally {
+      refused.mockRestore();
+    }
+  });
+
   it('names the editions by their short codes and switches the SAME chapter', () => {
     const setEdition = vi.fn();
     window.__setBibleAudioEdition = setEdition;
