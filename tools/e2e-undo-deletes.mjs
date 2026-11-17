@@ -4,8 +4,8 @@
  *
  * Walk (fresh profile, 412x915): onboarding; seed 3 bookmarks, 3 links and 4 History visits through the stores;
  * reload so they are stored. For each of Bookmarks, Links, History:
- *   U1  delete the middle item through the screen (its options or its x, then the confirm): it leaves the store,
- *       and the toast offers Undo
+ *   U1  delete the middle item through the screen (bookmarks and links: options, then the confirm; History: the row's x,
+ *       no confirm): it leaves the store, and the toast offers Undo
  *   U2  Undo: the store's list is byte-identical (JSON) to the list before the delete
  *   U3  reload: still identical
  *   U4  delete it again and let the toast go: after a reload it stays gone (the delete itself is durable)
@@ -124,11 +124,10 @@ async function main() {
         del: async () => {
           // John 3 was visited twice; its row is one, and removing it takes both visits
           const hit = await page.evaluate(() => { const row = [...document.querySelectorAll('.history-entry-card')].find((r) => /John/.test(r.textContent)); const b = row && row.querySelector('button[aria-label$=" from history"]'); if (b) b.click(); return b ? b.getAttribute('aria-label') : null; });
-          await sleep(700);
-          const sheet = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')].filter((d) => d.getClientRects().length).map((d) => d.textContent.trim().slice(0, 120)));
-          note(`history x: ${hit}; dialog: ${JSON.stringify(sheet)}`);
-          await shot('history-1b-sheet');
-          await clickText(/^Remove$/, '[role="dialog"] button');
+          // one tap, no confirm (hub 11-17): Undo is the way back
+          if (!hit) throw new Error('no Remove (x) on the John 3 History row');
+          await sleep(500);
+          if (await page.evaluate(() => [...document.querySelectorAll('[role="dialog"]')].some((d) => d.getClientRects().length))) fails.push('U1 history: a confirm sheet opened (one row needs none)');
         } },
     ];
 

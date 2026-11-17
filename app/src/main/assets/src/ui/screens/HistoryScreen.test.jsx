@@ -621,20 +621,16 @@ describe('HistoryScreen — remove one row (0610)', () => {
   afterEach(() => { delete globalThis.ReactDOM; });
   const removeBtns = () => [...document.querySelectorAll('.history-entry-card .ui-row-remove, .ui-row.history-entry-card button[aria-label^="Remove "]')];
 
-  it('each row has a Remove button; the confirm names the row and hands the row (its key and day) to onRemoveVisit', () => {
+  it('each row has a Remove button; one tap hands the row (its key and day) to onRemoveVisit, with no confirm (its Undo is the way back)', () => {
     setupGlobals();
     const onRemoveVisit = vi.fn();
     renderScreen(HISTORY, { onRemoveVisit });
     const btns = [...document.querySelectorAll('button[aria-label^="Remove "][aria-label$=" from history"]')];
     expect(btns.map((b) => b.getAttribute('aria-label'))).toEqual(['Remove The Lord Is My Shepherd from history', 'Remove The Wide Path from history']);
     fireEvent.click(btns[0]);
-    expect(onRemoveVisit).not.toHaveBeenCalled();                     // a confirm first, as Search's recents
-    const sheet = document.querySelector('[role="dialog"]');
-    expect(sheet.textContent).toContain('The Lord Is My Shepherd');
-    expect(sheet.textContent).toContain('2 visits');
-    fireEvent.click(within(sheet).getByText('Remove'));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();      // hub 11-17: five rows out is not five sheets
     expect(onRemoveVisit).toHaveBeenCalledTimes(1);
-    expect(onRemoveVisit.mock.calls[0][0]).toMatchObject({ key: 'ch:psalms:23', ts: HISTORY[0].ts });
+    expect(onRemoveVisit.mock.calls[0][0]).toMatchObject({ key: 'ch:psalms:23', ts: HISTORY[0].ts, visits: 2 });
   });
 
   it('no Remove buttons when the route offers no remove', () => {
