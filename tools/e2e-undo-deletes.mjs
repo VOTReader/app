@@ -9,7 +9,7 @@
  *   U2  Undo: the store's list is byte-identical (JSON) to the list before the delete
  *   U3  reload: still identical
  *   U4  delete it again and let the toast go: after a reload it stays gone (the delete itself is durable)
- * --out DIR writes a 412x915 picture of each list before, with the Undo toast, and after Undo.
+ * --width N (412) and --light set the frame and theme. --out DIR writes a picture of each list before, with the Undo toast, and after Undo.
  * Exit 0 PASS, 1 FAIL, 3 harness error.
  */
 import puppeteer from 'puppeteer';
@@ -19,6 +19,8 @@ import { serveOwnTree } from './e2e-read-serve.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('out', '');
+const WIDTH = Number(arg('width', '412'));
+const LIGHT = process.argv.includes('--light');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [];
 const note = (m) => console.log('  ' + m);
@@ -48,7 +50,7 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(30000);
-    await page.setViewport({ width: 412, height: 915 });
+    await page.setViewport({ width: WIDTH, height: 915 });
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     const clickText = async (re, sel = 'button, [role="button"], a') => {
@@ -97,6 +99,7 @@ async function main() {
     await clickText(/Begin Reading/);
     await clickText(/^Maybe later$/).catch(() => {});
     await loaded();
+    if (LIGHT) { await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /Switch to light theme/.test(x.getAttribute('aria-label') || '')); if (b) b.click(); }); await sleep(500); if (!(await page.evaluate(() => document.body.classList.contains('light')))) throw new Error('could not switch to the light theme'); }
     await page.evaluate((B, L, V) => {
       B.forEach((b) => window.BookmarkStore.add(b));
       L.forEach((l) => window.LinkStore.add(l));
