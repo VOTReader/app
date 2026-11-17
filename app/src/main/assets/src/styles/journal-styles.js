@@ -195,12 +195,12 @@
   R('.jrn-aud-delete svg { width: 16px; height: 16px; }');
   R('.jrn-aud-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
   // When the user taps × on an audio block, the standardized ConfirmStrip
-  // (.ann-chip-confirm base) replaces the play+body+× row. The parent
+  // (.ui-confirm base) replaces the play+body+× row. The parent
   // .jrn-embed-audio already supplies padding + border + bg, so the
   // strip's own padding + min-width are zeroed here and the question
   // text takes the warm-red contextual tint matching .jrn-block-confirm.
   R('.jrn-aud-confirm { padding: 0; min-width: 0; flex: 1; }');
-  R('.jrn-aud-confirm .ann-chip-confirm-q { color: #c75c4a; }');
+  R('.jrn-aud-confirm .ui-confirm-q { color: var(--tone-danger); }');
 
   // Viewer
   R('.jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }');
@@ -323,15 +323,15 @@
   R('.jrn-block.dragging { opacity: 0.25; }');
   R('.jrn-block.drag-flying { position: fixed; z-index: 9999; pointer-events: none; margin: 0; box-sizing: border-box; background: var(--bg2); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,0.6), 0 0 26px rgba(200,164,86,0.28); overflow: hidden; }');
   R('body.light .jrn-block.drag-flying { background: white; box-shadow: 0 18px 40px rgba(0,0,0,0.16), 0 0 22px rgba(122,92,16,0.22); }');
-  // The standardized ConfirmStrip (.ann-chip-confirm base) is rendered
+  // The standardized ConfirmStrip (.ui-confirm base) is rendered
   // with className="jrn-block-confirm" so it flips to the TOP of the
   // block (order:-1) as a warm-red banner and pushes the block's own
-  // content down rather than overlaying it. .ann-chip-confirm already
+  // content down rather than overlaying it. .ui-confirm already
   // supplies display/align/gap; this rule adds positioning + the
-  // contextual red theme; the .ann-chip-confirm-q tint matches the
+  // contextual red theme; the .ui-confirm-q tint matches the
   // banner color so the question reads as "this will delete content."
   R('.jrn-block-confirm { order: -1; align-self: stretch; padding: 8px 12px; margin: 0 0 10px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
-  R('.jrn-block-confirm .ann-chip-confirm-q { color: #c75c4a; }');
+  R('.jrn-block-confirm .ui-confirm-q { color: var(--tone-danger); }');
 
   // Triple-confirmation banner — entry deletion in the viewer
   R('.jrn-tripledel { margin: 0 18px 12px; padding: 14px 18px; background: rgba(199, 92, 74, 0.08); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 10px; }');
@@ -365,7 +365,7 @@
   // Discard confirm — warm-red banner in place of the action row (same
   // ConfirmStrip skin the block-delete confirm uses).
   R('.jrn-rec-discard-confirm { margin-top: 24px; padding: 10px 12px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
-  R('.jrn-rec-discard-confirm .ann-chip-confirm-q { color: #c75c4a; }');
+  R('.jrn-rec-discard-confirm .ui-confirm-q { color: var(--tone-danger); }');
   // Preview play / pause (round, gold-outlined)
   R('.jrn-rec-preview-actions { display: flex; justify-content: center; margin: 4px 0 6px; }');
   R('.jrn-rec-pp { width: 64px; height: 64px; border-radius: 50%; background: var(--gold); border: none; color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 6px 18px rgba(212, 183, 114, 0.35); }');

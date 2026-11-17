@@ -13,6 +13,7 @@
 
 import { formatBytes, useOnline } from './OfflineAudioControls.jsx';
 import { UiButton } from './UiParts.jsx';
+import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { countOf, formatLength } from '../../utils/download-tree.js';
 
 /** @param {any} off @param {string} name @returns {any} the store's answer, or undefined where it has no such call */
@@ -134,14 +135,10 @@ export function DownloadStrip({ off, name = '', onMakeRoom }) {
         <button type="button" className="ui-btn is-small" onClick={() => setAsking(true)} aria-expanded={asking}>{canPause ? 'Cancel' : 'Cancel all'}</button>
       </div>
       {asking ? (
-        <div className="offline-confirm dl-cancel-ask" role="group" aria-label="Cancel downloads">
-          <p className="offline-confirm-title">{'Cancel ' + (n === 1 ? 'this download' : 'all ' + n.toLocaleString('en-US') + ' downloads') + '?'}</p>
-          <p className="offline-confirm-line">What is already on this phone stays.</p>
-          <div className="offline-confirm-actions">
-            <button type="button" className="offline-confirm-cancel" onClick={() => setAsking(false)}>Keep downloading</button>
-            <button type="button" className="offline-confirm-go" onClick={stop}>Cancel downloads</button>
-          </div>
-        </div>
+        <ConfirmStrip className="dl-cancel-ask" label="Cancel downloads" back={false} focus={false} act="go"
+          question={'Cancel ' + (n === 1 ? 'this download' : 'all ' + n.toLocaleString('en-US') + ' downloads') + '?'}
+          lines={['What is already on this phone stays.']}
+          cancelLabel="Keep downloading" yesLabel="Cancel downloads" onCancel={() => setAsking(false)} onConfirm={stop} />
       ) : null}
     </div>
   );

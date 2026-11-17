@@ -476,8 +476,8 @@ function ApplySheet({ plan, groups, off, free, voice, onCancel, onApply }) {
       </div>
       {summary ? <p className="dl-sheet-summary">{summary}</p> : null}
       <div className="dl-sheet-actions">
-        <button type="button" className="offline-confirm-cancel" onClick={onCancel}>Cancel</button>
-        <button type="button" className="offline-confirm-go" onClick={onApply} data-autofocus>Apply</button>
+        <button type="button" className="ui-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="ui-btn is-primary" onClick={onApply} data-autofocus>Apply</button>
       </div>
     </Sheet>
   );
@@ -492,8 +492,8 @@ function MobileSheet({ size, onWait, onNow, onCancel }) {
     <Sheet id="dl-mobile-sheet" title={'Download ' + size + ' on mobile data?'} onClose={onCancel}>
       <p className="dl-sheet-summary">The phone is not on Wi-Fi. Waiting starts it by itself once it is.</p>
       <div className="dl-sheet-actions">
-        <button type="button" className="offline-confirm-cancel" onClick={onWait} data-autofocus>Wait for Wi-Fi</button>
-        <button type="button" className="offline-confirm-go" onClick={onNow}>Download now</button>
+        <button type="button" className="ui-btn" onClick={onWait} data-autofocus>Wait for Wi-Fi</button>
+        <button type="button" className="ui-btn is-primary" onClick={onNow}>Download now</button>
       </div>
     </Sheet>
   );

@@ -1585,9 +1585,7 @@
       .np-radio-copy strong { font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
       .np-radio-copy small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
       /* The standard ConfirmStrip, wrapped for the sheet: it supplies its own surface here. */
-      .audio-manager-voice-confirm { margin: 0.6rem 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap; border-top: 1px solid var(--hairline); }
-      .audio-manager-voice-confirm .ann-chip-confirm-q { font-size: var(--fs-14); }
-      .audio-manager-voice-confirm .ann-chip-confirm-btn { min-height: 44px; }
+      .audio-manager-voice-confirm { margin: 0.6rem 0; padding: 0.35rem 0.15rem 0; border-top: 1px solid var(--hairline); }
       /* Up next: the playing one, then the rows in one group: grip | title over meta | ×. */
       .np-upnext-now { display: flex; align-items: center; gap: 10px; padding: 10px var(--sp-3); border-radius: var(--r-card); background: var(--accent-soft); }
       .np-upnext-now-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -1652,7 +1650,7 @@
       /* A compilation in the phone app: its chip, and beside it the rows' line (item 8 follow-up). Chips in one column, lines
          in the next. The chip rules (with .audio-collection-chips, below) reach only the chip (the first child), never the line's own Download / Cancel / Retry buttons. */
       .offline-collection { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; max-width:100%; }
-      .offline-collection:has(.offline-confirm) { flex-basis:100%; }
+      .offline-collection:has(.ui-confirm) { flex-basis:100%; }
       .offline-collection.is-saved, .offline-collection.is-busy { font-size:var(--fs-12); color:var(--gold); }
       .audio-library-secondary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }
       .audio-library-secondary-action:disabled { opacity:.5; cursor:default; }
@@ -1673,17 +1671,6 @@
       .row-menu-btn:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
       .row-menu .more-menu-item:disabled { color:var(--cream-dim); cursor:default; background:none; }
       .row-menu .more-menu-item:disabled svg { color:var(--cream-dim); }
-      .offline-confirm { flex-basis:100%; margin:.4rem 0 0; padding:.8rem .9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
-      .offline-confirm-title { margin:0 0 .3rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-14); }
-      .offline-confirm-line { margin:.1rem 0; color:var(--cream-dim); font-size:var(--fs-12); }
-      .offline-confirm-warn { margin:.35rem 0 0; color:#e0897a; font-size:var(--fs-12); }
-      body.light .offline-confirm-warn { color:#9b3a2a; }
-      .offline-confirm-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; }
-      .offline-confirm-cancel, .offline-confirm-go { min-height:44px; padding:.34rem .9rem; border-radius:7px; border:1px solid var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; cursor:pointer; }
-      .offline-confirm-cancel { background:transparent; color:var(--gold); }
-      .offline-confirm-go { background:var(--gold); color:#17130a; }
-      body.light .offline-confirm-go { color:var(--bg); }
-      .offline-confirm-go:disabled { opacity:.45; cursor:default; }
       /* ── W3b listen: the Downloads screens (R/mock/v2/listen.html au-dl .. au-dlremove, 2026-11-11). The storage card,
          Choose | On this phone, the voice row, the tree as shared row cards (tri-state boxes, a chapter grid), the foot
          bar, the run card, the kept rows with a bin. Brick = marked for removal. ── */
@@ -1768,7 +1755,7 @@
       .dl-sheet-row small { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
       .dl-sheet-summary { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); text-align:center; }
       .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-4); }
-      .dl-sheet-actions > button { flex:1 1 9em; min-height:var(--btn-h); font-family:var(--font-ui); font-size:var(--ts-control); }
+      .dl-sheet-actions > .ui-btn { flex:1 1 9em; }
       /* On this phone (au-dlphone, au-dlphone0, au-dlremove): one card per part, a bin per set, its readings inside. */
       .dl-phone .ui-row-main:disabled { cursor:default; }
       .dl-kept + .dl-kept { border-top:1px solid var(--hairline); }
@@ -1826,7 +1813,7 @@
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
-      .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }
       .audio-library-search label { flex:1; min-width:0; }.audio-library-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-13); }.audio-library-search input::placeholder { color:var(--cream-dim); opacity:.75; }.audio-library-search button { min-width:44px; min-height:44px; padding:.2rem .35rem; border:0; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-10); }.audio-library-search:focus-within { border-color:var(--gold); background:rgba(200,164,86,.055); }
@@ -1968,8 +1955,8 @@
       .song-keep-restore { margin-top: .9rem; padding: .75rem .9rem; border: 1px solid var(--gold); border-radius: 10px; }
       .song-keep-restore p { margin: 0; color: var(--cream); font-size: var(--fs-16); }
       .song-keep-restore .song-keep-action { margin-top: .6rem; }
-      /* K3: the Kept list's Remove all asks in the Downloads screen's strip (.offline-confirm); only its spacing here. */
-      .songs-list-hero .offline-confirm { margin-top: .8rem; text-align: left; }
+      /* K3: the Kept list's Remove all asks in the one confirm (.ui-confirm); only its spacing here. */
+      .songs-list-hero .ui-confirm { margin-top: .8rem; }
       /* W2-02: a kept song's row leads its second line with a quiet ⤓ (its words are for screen readers). */
       .songs-row-kept { flex: none; display: inline-flex; align-items: center; color: var(--gold); }
       /* sy4-3 song votes (Corbin 2026-10-22; pictures calls/song-voting-mockups 05-08, spec lanes/design/out/sv-mock/README.md
@@ -3359,6 +3346,16 @@
     .ui-notice .ui-btn:not(.is-primary):not(.is-text) { background: var(--surface-2); }
     .ui-notice-x { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin: -8px -10px -8px -6px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
     .ui-notice-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* The one confirm (ConfirmStrip.jsx): the question and its lines, then Cancel (a text button) and the act. It wraps,
+       so at large text the buttons drop under the words instead of squeezing them. is-card: its own surface card. */
+    .ui-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 10px 12px; font-family: var(--font-ui); text-align: left; }
+    .ui-confirm.is-card { flex-basis: 100%; padding: 12px 14px; border-radius: var(--r-card); background: var(--surface-1); }
+    .ui-confirm.is-card .ui-btn:not(.is-primary):not(.is-text) { background: var(--surface-2); }
+    .ui-confirm-text { flex: 1 1 12em; min-width: 0; }
+    .ui-confirm-q { margin: 0; color: var(--text-1); font-size: var(--ts-body); font-weight: 500; line-height: 1.4; text-wrap: pretty; }
+    .ui-confirm-line { margin: 2px 0 0; color: var(--text-2); font-size: var(--ts-meta); line-height: 1.45; }
+    .ui-confirm-line.is-warn { color: var(--tone-danger); }
+    .ui-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); margin-left: auto; }
     @media (hover:hover) {
       .upnext-pill:hover { background:var(--surface-3); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }
@@ -4365,7 +4362,7 @@
     .tabs-overview-line { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:32px; margin:0 0 var(--sp-3); }
     .tabs-overview-meta { margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
     /* Close all asks where he is looking: the question stays at the top of the scrolled list (PL-SETTINGS 4). */
-    .tabs-overview > .ann-chip-confirm { position:sticky; top:0; z-index:3; margin:0 0 var(--sp-3); background:var(--bg); }
+    .tabs-overview > .ui-confirm { position:sticky; top:0; z-index:3; margin:0 0 var(--sp-3); background:var(--bg); }
     .tabs-overview-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:var(--grid-gap); width:100%; }
     @media (min-width:780px) { .tabs-overview-grid { grid-template-columns:repeat(3, 1fr); } }
     .tab-card {
@@ -4676,30 +4673,6 @@
        Tap 🎨 → chip expands to color row.
        Outside tap → dismisses entirely.
        ════════════════════════════════════════════════════════════ */
-    /* Confirm strip — replaces the chip in place. */
-    .ann-chip-confirm {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px;
-      min-width: 220px;
-    }
-    .ann-chip-confirm-q {
-      font-family: var(--font-body);
-      font-size: var(--fs-15);
-      color: var(--cream);
-      flex: 1;
-    }
-    .ann-chip-confirm-btn {
-      background: none; border: 1px solid transparent;
-      padding: 6px 10px; border-radius: 6px; min-height: 44px; min-width: 44px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s, color 0.12s;
-    }
-    .ann-chip-confirm-cancel { color: var(--cream-muted); }
-    .ann-chip-confirm-cancel:active { background: rgba(224,201,127,0.10); color: var(--cream); }
-    .ann-chip-confirm-yes { color: var(--danger); border-color: rgba(239,154,154,0.35); }
-    .ann-chip-confirm-yes:active { background: rgba(244,143,177,0.18); color: var(--accent-pink); }
     /* Color row inside the chip (replaces buttons when 🎨 is tapped). */
 
     /* ── W2e readers (mock v2 r-sel, r-mark): the reader's action sheet. The selection's bar and a
@@ -4754,7 +4727,7 @@
     /* cp2: Share held offers the website link too, in a row above the tiles. */
     .sel-link-choice { display: flex; gap: 10px; margin-bottom: 8px; }
     .sel-link-choice-cancel { flex: 0 0 auto; min-height: var(--tap); padding: 0 14px; border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
-    .rd-sheet .ann-chip-confirm { padding: 4px 0; }
+    .rd-sheet .ui-confirm { padding: 4px 0; }
     /* ── end W2e readers (r-sel, r-mark) ── */
 
     /* ── the style buttons and colour dots (NoteSheet shares them) ── */
@@ -5819,7 +5792,7 @@
     .rd-note-sheet .rd-colors { margin: 12px 1px 14px; }
     .rd-note-nb, .nb-picker-list { margin: 0 0 14px; }
     .note-edit-nb-row .ui-row-value { margin-left: auto; }
-    .note-sheet-menu .ann-chip-confirm { padding: 4px 0; }
+    .note-sheet-menu .ui-confirm { padding: 4px 0; }
     .nb-picker-row { display: flex; align-items: center; padding-right: 12px; border-top: 1px solid var(--hairline); }
     .nb-picker-none + .nb-picker-row, .nb-picker-row + .nb-picker-row { border-top: 1px solid var(--hairline); }
     .nb-picker-row-toggle { flex: 1; min-width: 0; cursor: pointer; }
