@@ -48,6 +48,9 @@ export const ANSWERS_FD_INDEX_TEXT = 'False Doctrines Within the Churches (Index
 export const ANSWERS_END_CARD = 'This ends Answers Only God Can Give - Topics';
 /** The one line every screen showing the twelve short names carries. */
 export const ANSWERS_GROUP_NOTE = 'The site numbers these groups; the short names are ours.';
+/** 0125 C: the app's name for the site's "Other Topics" (a name like the twelve groups' short names; the site's own
+    label stays in the About sheet). */
+export const ANSWERS_OTHER_LABEL = 'The Lord and His Word';
 /** What a page outside the site's menu says where it is listed. */
 export const ANSWERS_NOT_IN_MENU = 'Not in the site’s menu';
 

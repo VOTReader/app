@@ -218,7 +218,7 @@ describe('describeTab', () => {
     it('names the Answers screens, a shelf by our short name under the site\'s label', () => {
       expect(describeTab({ screen: 'answers-home' })).toEqual({ title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true });
       expect(describeTab({ screen: 'answers-group', letterId: '5' })).toEqual({ title: 'Scripture & doctrine', subtitle: '5. Thus Says The Lord...', resolved: true });
-      expect(describeTab({ screen: 'answers-group', letterId: 'other' }).title).toBe('Other Topics');
+      expect(describeTab({ screen: 'answers-group', letterId: 'other' }).title).toBe('The Lord and His Word');   // 0125 C: the app's name for the site's Other Topics
       expect(describeTab({ screen: 'answers-group', letterId: 'gone' }).title).toBe('Answers');
       expect(describeTab({ screen: 'answers-media' }).title).toBe('Charts and videos');
       expect(describeTab({ screen: 'answers-saved' })).toEqual({ title: 'Saved answers', subtitle: 'Answers Only God Can Give', resolved: true });

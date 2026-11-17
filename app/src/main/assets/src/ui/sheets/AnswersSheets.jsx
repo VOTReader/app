@@ -21,7 +21,7 @@
 
 import { h, Fragment } from '../jsx-h.js';
 import { ANSWERS_COMMANDMENTS } from '../../utils/answers-shelves.js';
-import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource, answersSisterRow } from '../../utils/answers-browse.js';
+import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource, answersSisterRow, ANSWERS_OTHER_LABEL } from '../../utils/answers-browse.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from '../components/AnswersParts.jsx';
 import { sheetReference } from '../../utils/passage-copy.js';
 
@@ -189,7 +189,10 @@ export function AboutSheet({ site, onOpenTopic, onClose }) {
       <p className="ans-credit">
         {site.copyright}<br />
         {'This is the site’s page “My wiki:About”, captured from ' + answersDomain(site.site) + ' on' + NBSP + site.capturedAt + '.'}<br />
-        The words, headings and order are the site’s. These are the app’s: the group short names, the commandment short labels (“No other gods” to “Do not covet”), the “Topics & Doctrines” and “Official website” labels, Charts & videos, the questions, Surprise me and the reading path.
+        The words, headings and order are the site’s. These are the app’s: the group short names, the commandment short labels (“No other gods” to “Do not covet”), the “Topics & Doctrines” and “Official website” labels, Charts & videos, the questions, Surprise me and the reading path.<br />
+        {/* 0125 C: the self-explanations the screens carried, here once */}
+        {'The site numbers its twelve “Thus Says The Lord...” groups; the short names are ours. The site’s “Other Topics” is called ' + ANSWERS_OTHER_LABEL + ' here.'}<br />
+        A–Z files each topic under its first main word: “Regarding The Holy Days of God” is under H.
       </p>
     </AnsSheet>
   );

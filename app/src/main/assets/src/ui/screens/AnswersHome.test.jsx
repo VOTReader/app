@@ -58,7 +58,7 @@ describe('AnswersHome — the landing (0125: ask, then browse)', () => {
     // the tablet says what it opens
     expect(NB(document.querySelectorAll('.ans-tablet .ans-row-sub')[1].textContent)).toBe('3 topics');
     // the thirteen: the site's Other Topics, then its twelve numbered groups by our short names; no counts, all closed
-    expect(texts('.ans-group-row .ans-row-title', panel)).toEqual(['Other Topics', 'Signs of this generation', 'Prophets, witnesses & gifts',
+    expect(texts('.ans-group-row .ans-row-title', panel)).toEqual(['The Lord and His Word', 'Signs of this generation', 'Prophets, witnesses & gifts',
       'The nations', 'The churches', 'Scripture & doctrine', 'Holy Days, cross & resurrection', 'Forgiveness to salvation', 'The end & the Kingdom',
       'Warfare, sin, death & judgment', 'The walk of faith', 'Body, marriage & family', 'People of the Bible & creation']);
     expect(panel.querySelectorAll('.ans-group-row .ans-row-sub').length).toBe(0);
@@ -345,6 +345,9 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     expect(d.textContent).toContain('Copyright © 2004-2024 ~ All Rights Reserved.');
     expect(d.textContent).toContain('2026-10-19');
     expect(d.textContent).toContain('The words, headings and order are the site’s.');
+    // 0125 C: the self-explanations the screens carried, said once here
+    expect(d.textContent).toContain('the short names are ours. The site’s “Other Topics” is called The Lord and His Word here.');
+    expect(d.textContent).toContain('A–Z files each topic under its first main word');
     for (const a of d.querySelectorAll('a[href^="http"]')) expect(a.getAttribute('target')).toBe('_blank');
   });
 });
@@ -565,7 +568,7 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
     render(<AnswersShelf {...base} groupKey="5" onOpenTopic={onOpenTopic} />);
     expect(document.querySelector('.ans-hero .ans-label').textContent).toBe('5. Thus Says The Lord...');
     expect(document.querySelector('h1').textContent).toBe('Scripture & doctrine');
-    expect(screen.getByText('The site numbers these groups; the short names are ours.')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('short names are ours');   // 0125 C: said once, in About
     expect(NB(document.querySelector('.ans-results-sum .ans-count').textContent)).toBe('9 topics · 3 read');
     const titles = texts('.ans-row .ans-row-title');
     expect(titles[0]).toBe('Regarding the Mistranslation and Misinterpretation of the Scriptures');
@@ -579,7 +582,7 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
   it('Other Topics: no eyebrow, its 16 topics, the page outside the menu last', () => {
     render(<AnswersShelf {...base} groupKey="other" />);
     expect(document.querySelector('.ans-hero .ans-label')).toBeNull();
-    expect(document.querySelector('h1').textContent).toBe('Other Topics');
+    expect(document.querySelector('h1').textContent).toBe('The Lord and His Word');
     const rows = document.querySelectorAll('.ans-row');
     expect(rows.length).toBe(16);
     expect(rows[15].textContent).toContain('Not in the site’s menu');

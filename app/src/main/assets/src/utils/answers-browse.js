@@ -25,7 +25,7 @@ import {
   ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersPassageCount, answersTopicEntries,
   answersSortKey, answersIndexLetter, isAttribution, isDateHead, isTrumpetSection,
 } from './answers-shelves.js';
-import { ANSWERS_FD_INDEX_ID, answersSiteShelves, answersSiteShelfOf, answersSiteOrder, answersSiteNav } from './answers-site.js';
+import { ANSWERS_FD_INDEX_ID, ANSWERS_OTHER_LABEL, answersSiteShelves, answersSiteShelfOf, answersSiteOrder, answersSiteNav } from './answers-site.js';
 
 export const NBSP = '\u00a0';
 /** The separator between the parts of a sub line, bound to the word before it (A29). */
@@ -186,7 +186,7 @@ export function shelfLabel(shelf) {
 
 /** The short names the browse screens give the index and the unnumbered shelf, and the numbered groups' shared head. */
 export const ANSWERS_FD_INDEX_SHORT = 'False Doctrines index';
-export const ANSWERS_OTHER_LABEL = 'Other Topics';
+export { ANSWERS_OTHER_LABEL };
 export const ANSWERS_TSTL_HEAD = 'Thus Says The Lord...';
 
 /**

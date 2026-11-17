@@ -18,7 +18,7 @@
 
 import { h, Fragment } from '../jsx-h.js';
 import { NBSP, SEP, pl, answersRowSub, answersShelfByKey, ANSWERS_OTHER_LABEL } from '../../utils/answers-browse.js';
-import { ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU } from '../../utils/answers-site.js';
+import { ANSWERS_NOT_IN_MENU } from '../../utils/answers-site.js';
 import { AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
 
 /**
@@ -45,7 +45,6 @@ export function AnswersShelf({ entries, groupKey, isRead: isReadRaw, pathOn = tr
         <header className="ans-hero">
           {isGroup ? <p className="ans-label">{shelf.label}</p> : null}
           <h1 className="ans-display">{title}</h1>
-          {isGroup ? <p className="ans-meta ans-note">{ANSWERS_GROUP_NOTE}</p> : null}
         </header>
         {topics.length ? (
           <div className="ans-results-sum">

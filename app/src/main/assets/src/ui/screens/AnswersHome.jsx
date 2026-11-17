@@ -167,7 +167,6 @@ function useJumpStrip(rootRef, stripRef, attr, first) {
 function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   const groups = React.useMemo(() => answersAZGroups(entries), [entries]);
   const present = new Set(groups.map((g) => g.letter));
-  const total = groups.reduce((a, g) => a + g.entries.length, 0);
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const { cur, atEnd, onStripScroll, jump } = useJumpStrip(rootRef, stripRef, 'data-az', groups.length ? groups[0].letter : '#');
@@ -179,7 +178,6 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
             aria-label={L === '#' ? 'Numbers' : undefined} onClick={() => jump(L)}>{L}</button>
         ))}
       </nav>
-      <p className="ans-note">{`${total} topics, filed under their first main word: “Regarding The Holy Days of God” is under H.`}</p>
       {groups.map((g) => (
         <section key={g.letter} data-az={g.letter} aria-labelledby={'ans-az-' + (g.letter === '#' ? 'num' : g.letter)}>
           <div className="ans-az-head">

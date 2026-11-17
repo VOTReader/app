@@ -9,7 +9,7 @@
    - scrollKeyForTab
    =================================================================== */
 
-import { ANSWERS_GROUP_SHORT } from './answers-site.js';
+import { ANSWERS_GROUP_SHORT, ANSWERS_OTHER_LABEL } from './answers-site.js';
 import { answersRetiredPlace } from './answers-retired.js';
 import { SONGS_SCREEN, decodeSongsRoute } from './songs-route.js';
 
@@ -100,7 +100,7 @@ export function describeTab(tab) {
   if (s === 'answers-group') {
     const _n = Number(tab.letterId);
     const _short = ANSWERS_GROUP_SHORT[_n];
-    if (tab.letterId === 'other') return { title: 'Other Topics', subtitle: 'Answers Only God Can Give', resolved: true };
+    if (tab.letterId === 'other') return { title: ANSWERS_OTHER_LABEL, subtitle: 'Answers Only God Can Give', resolved: true };
     return _short ? { title: _short, subtitle: _n + '. Thus Says The Lord...', resolved: true }
       : { title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
   }

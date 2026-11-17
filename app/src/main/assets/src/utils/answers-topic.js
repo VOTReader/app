@@ -19,7 +19,7 @@
 
 import { pl, SEP, NBSP, answersMinWords, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead } from './answers-browse.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle, isAttribution, isTrumpetSection } from './answers-shelves.js';
-import { ANSWERS_FD_INDEX_ID, answersSiteShelfOf } from './answers-site.js';
+import { ANSWERS_FD_INDEX_ID, ANSWERS_OTHER_LABEL, answersSiteShelfOf } from './answers-site.js';
 import { answersSource } from './answers-contents.js';
 import { splitFormatBInline } from './format-b-inline.js';
 
@@ -48,7 +48,8 @@ export function answersEyebrow(entries, entry) {
   const id = entry && entry.id;
   if (id === ANSWERS_MAIN_PAGE_ID) return { text: 'Official website' + SEP + 'Main Page', shelf: null };
   const s = answersSiteShelfOf(entries, id);
-  if (!s) return { text: 'Other Topics', shelf: null };
+  if (!s) return { text: ANSWERS_OTHER_LABEL, shelf: null };
+  if (s.kind === 'other') return { text: ANSWERS_OTHER_LABEL, shelf: s };
   if (s.kind === 'index') return { text: s.label, shelf: null };
   if (s.kind === 'commandment') return { text: 'The ' + ANSWERS_COMMANDMENTS[/** @type {number} */ (s.num) - 1].ordinal + ' Commandment', shelf: s };
   const l = String(s.label);
