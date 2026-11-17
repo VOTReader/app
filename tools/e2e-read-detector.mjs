@@ -173,8 +173,9 @@ try {
   const clickText = async (re) => {
     const hit = await page.evaluate((reSrc) => {
       const re2 = new RegExp(reSrc);
+      // its name: the aria-label when it has one (About's button says 'Begin reading', is named 'Begin Reading'), else its text
       const el = [...document.querySelectorAll('button,[role=button],[class*=tile],[class*=card],[class*=row]')]
-        .find((b) => re2.test(b.textContent) && b.textContent.length < 120);
+        .find((b) => (re2.test(b.textContent) || re2.test(b.getAttribute('aria-label') || '')) && b.textContent.length < 120);
       if (el) { el.click(); return true; }
       return false;
     }, re.source);
@@ -205,7 +206,7 @@ try {
   const HAS_TEXT = (src) => {
     const rx = new RegExp(src);
     return [...document.querySelectorAll('button,[role=button],[class*=tile],[class*=card],[class*=row]')]
-      .some((b) => rx.test(b.textContent) && b.textContent.length < 120);
+      .some((b) => (rx.test(b.textContent) || rx.test(b.getAttribute('aria-label') || '')) && b.textContent.length < 120);
   };
 
   /* ONE PATTERN PER STEP, for the wait AND the click.
