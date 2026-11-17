@@ -662,6 +662,31 @@ describe('the settle clock starts at the first frame of the slide (rel6)', () =>
     expect(g.isSettling()).toBe(false);
   });
 
+  it('a page hidden at the lift (no frame for 2 s) settles once when it is shown: one commit, nothing left pending', () => {
+    vi.useFakeTimers();
+    try {
+      const rafs = [];
+      const { io, calls } = makeIO({ schedule: (fn, ms) => (ms ? { t: setTimeout(fn, ms) } : (rafs.push(fn), { raf: rafs.length })) });
+      const g = createPagerGesture(io);
+      g.start(startEv(300, 100));
+      g.move(moveEv(250, 100, 0));
+      g.move(moveEv(120, 100, 40));
+      g.end();
+      vi.advanceTimersByTime(2000);              // hidden: no frame, so no swap, however long
+      expect(calls.commits).toEqual([]);
+      expect(g.isSettling()).toBe(true);
+      rafs.splice(0).forEach((f) => f());        // shown: the first frame draws the slide
+      vi.advanceTimersByTime(299);
+      expect(calls.commits).toEqual([]);         // the slide gets its full 300 ms from that frame
+      vi.advanceTimersByTime(1);
+      expect(calls.commits).toEqual(['next']);
+      expect(g.isSettling()).toBe(false);
+      vi.advanceTimersByTime(5000);
+      rafs.splice(0).forEach((f) => f());
+      expect(calls.commits).toEqual(['next']);   // once
+    } finally { vi.useRealTimers(); }
+  });
+
   it('dispose() while waiting for that frame cancels it: no commit after unmount', () => {
     const rafs = [], cancelled = [];
     const { io, calls } = makeIO({
