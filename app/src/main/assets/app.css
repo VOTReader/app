@@ -85,7 +85,9 @@
          restored a block whose marks were already gone. */
       .vot-toast-undo:not(.show) { pointer-events:none; }
       .vot-toast-undo .vot-undo-btn { margin-left:0.4em; background:none; border:none; padding:0 0.3em; min-height:44px; display:inline-flex; align-items:center; vertical-align:middle; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
-      body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-strong,#9a7b2e); }
+      /* rel11: --gold-strong was never defined, so light fell back to #9a7b2e: 2.80:1 on the toast's --surface-3.
+         --gold-bright (#6e520e) reads 5.11:1 there. */
+      body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-bright,#6e520e); }
 
       /* export-escape — the "Save the usual way" offer shown when the save
          picker never settles. Base .vot-toast is pointer-events:none, so an

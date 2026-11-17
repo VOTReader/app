@@ -199,7 +199,11 @@ async function run(browser, { width, height, label, light }) {
     await sleep(400);
   };
   // GEAR1 (2026-11-12): the gear opens Quick settings, and Settings is its last row.
-  const openSettings = async () => { await clickLabel('Quick settings'); await clickLabel('Settings'); };
+  // Settings, from Home or from Settings itself: Skip (and Escape) now go back where the tour began (0610), which for
+  // a tour started from Settings is Settings, where there is no 'Quick settings' to press.
+  const onSettings = () => page.evaluate(() => [...document.querySelectorAll('button, [role="button"]')].some((b) => b.getClientRects().length > 0
+    && (b.getAttribute('aria-label') || (b.textContent || '').trim()).startsWith('Show me around')));
+  const openSettings = async () => { if (await onSettings()) return; await clickLabel('Quick settings'); await clickLabel('Settings'); };
   const facts = () => page.evaluate(() => {
     const card = document.querySelector('.tour-card');
     const ring = document.querySelector('.tour-ring');
@@ -563,6 +567,8 @@ async function run(browser, { width, height, label, light }) {
   await page.keyboard.press('Escape'); await sleep(300);
   f = await facts();
   if (f.active) fail('Escape did not skip the tour'); else ok('Escape means Skip');
+  await sleep(500);
+  if (!(await onSettings())) fail('Escape (Skip) did not go back to Settings, where this tour began'); else ok('Skip goes back to Settings, where the tour began');
 
   /* LEAVING FROM THE DEMONSTRATION ITSELF. The walk above proves the tour that RUNS TO THE END
      saves nothing; a reader who leaves while the colour is on the page is the other half, and
