@@ -2962,6 +2962,7 @@
     .upnext-manage::after { content:''; position:absolute; inset:-10px -8px; }
     .upnext-text { display:flex; flex-direction:column; flex:1; min-width:0; }
     .upnext-offer.upnext-plan .upnext-title { white-space:normal; }   /* 0450: 'You finished <plan>' whole at 360 px */
+    .upnext-continue .upnext-title { white-space:normal; text-wrap:pretty; }   /* the place wraps under the name, never 'Volume One, Le…' at 360 px */
     .upnext-eyebrow { font-family:var(--font-ui); font-size:var(--ts-label); font-weight:600; letter-spacing:var(--track-label); text-transform:uppercase; color:var(--accent); line-height:var(--lh-label); }
     .upnext-title { margin-top:2px; color:var(--text-1); font-size:var(--ts-headline); font-weight:600; line-height:var(--lh-headline); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upnext-place { color:var(--text-2); font-weight:400; }

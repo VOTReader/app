@@ -304,7 +304,25 @@ try {
   await openYourData(B.page);
   const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Restore from a backup')]);
   await chooser.accept([backupPath]);
-  await B.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Restore and overwrite'), { timeout: 15000 });
+  try {
+    await B.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Restore and overwrite'), { timeout: 15000 });
+  } catch (e) {
+    // Beside-run timeouts here (rel11, rel15, rel16) never said which sub-step was lost: print what the page shows.
+    const seen = await B.page.evaluate(() => {
+      const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const txt = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+      return {
+        fileInputs: [...document.querySelectorAll('input[type=file]')].map((i) => ({ accept: i.accept, files: [...(i.files || [])].map((f) => `${f.name} ${f.size} B`) })),
+        sheets: [...document.querySelectorAll('[role=dialog], [role=alertdialog], .ui-sheet')].filter(vis).map(txt),
+        toasts: [...document.querySelectorAll('.vot-toast, [role=status], [role=alert]')].filter(vis).map(txt).filter(Boolean),
+        buttons: [...document.querySelectorAll('button')].filter(vis).map(txt).filter(Boolean).slice(0, 30),
+        heading: txt(document.querySelector('h1, h2') || document.body).slice(0, 60),
+      };
+    }).catch((err) => ({ evaluateFailed: String(err && err.message || err) }));
+    console.log('[e2e-restore-fresh] no "Restore and overwrite" after the file was chosen; the page shows: ' + JSON.stringify(seen));
+    if (shotsDir) await B.page.screenshot({ path: join(shotsDir, 'b2-B-timeout.png') }).catch(() => {});
+    throw e;
+  }
   if (shotsDir) await B.page.screenshot({ path: join(shotsDir, 'b2-B-confirm.png') });
   const reloaded = B.page.waitForNavigation({ waitUntil: 'load', timeout: 30000 });
   await click(B.page, 'Restore and overwrite');
