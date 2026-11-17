@@ -29,6 +29,7 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 import { runUpgrade } from './e2e-tabs-upgrade.mjs';
+import { inTimeOrder, settleStart } from './e2e-tabs-frames.mjs';
 
 const argv = process.argv.slice(2);
 const MEASURE = argv.includes('--measure');
@@ -91,7 +92,7 @@ const ANALYSIS = () => {
     },
     async luma(url) { const i = await load(url); return luma(px(i, 64, 64).d); },
     // swipe frames (CSS-px sized screencast jpegs): rect = the scroller's box
-    async swipe(frames, rect, dx, tRel, settleMs, masks) {
+    async swipe(frames, rect, dx, tRel, settleMs, masks, tSettle = tRel) {
       const imgs = (await Promise.all(frames.map((f) => load(f.url)))).map((i) => maskImg(i, masks));
       const R = (img, x, w) => px(img, Math.max(1, Math.round(w)), Math.round(rect.h), x, rect.y, w, rect.h).d;
       const fin = imgs[imgs.length - 1];
@@ -121,9 +122,9 @@ const ANALYSIS = () => {
       // S2: every frame from the end of the settle on is the final picture
       let jump = 0, at = null;
       for (let i = 0; i < frames.length - 1; i++) {
-        if (frames[i].t < tRel + settleMs) continue;
+        if (frames[i].t < tSettle + settleMs) continue;
         const c = cmp(R(imgs[i], rect.x, rect.w), R(fin, rect.x, rect.w)).mad;
-        if (c > jump) { jump = c; at = Math.round((frames[i].t - tRel) * 1000); }
+        if (c > jump) { jump = c; at = Math.round((frames[i].t - tRel) * 1000); r.settleJumpIdx = i; }
       }
       r.settleJump = +jump.toFixed(2); r.settleJumpAtMs = at;
       return r;
@@ -131,14 +132,14 @@ const ANALYSIS = () => {
     // TABS3: the bars outside the reading area. Top bar: frames from release on against the settled frame (the
     // drag itself does not touch it). Bottom (mini player, tab bar): every frame against the first, the mini
     // player's moving progress line aside (a mad, not a pixel count, so a 1-px line stays far under 1).
-    async bars(frames, rect, tRel, barY) {
+    async bars(frames, rect, tRel, barY, tSettle = tRel) {
       const imgs = await Promise.all(frames.map((f) => load(f.url)));
       const fin = imgs[imgs.length - 1];
       const W0 = fin.width; const top = Math.max(1, Math.round(rect.y)); const by = Math.round(barY || (rect.y + rect.h)); const bh = Math.max(1, fin.height - by);
       const T = (img) => px(img, W0, top, 0, 0, W0, top).d; const B = (img) => px(img, W0, bh, 0, by, W0, bh).d;
       let t = 0, ta = null, b = 0, ba = null;
       for (let i = 0; i < imgs.length; i++) {
-        if (frames[i].t >= tRel + 0.36) { const c = cmp(T(imgs[i]), T(fin)).mad; if (c > t) { t = c; ta = Math.round((frames[i].t - tRel) * 1000); } }
+        if (frames[i].t >= tSettle + 0.36) { const c = cmp(T(imgs[i]), T(fin)).mad; if (c > t) { t = c; ta = Math.round((frames[i].t - tRel) * 1000); } }
         // TABS4: with a recording playing, the player's clock and progress line move on by themselves; a frame is still
         // if it is the first picture or the settled one (a bar that moves or flashes is neither)
         const bi = B(imgs[i]);
@@ -353,21 +354,38 @@ async function main() {
     await sleep(250);   // hold still: the last frames before release show the finished drag
     const peekSig = await pageSig(`.screen-layout > .pager-viewport > .pager-peek-${dir} > .screen-scroll`);
     if (atRel) await atRel();   // TABS5: a look at the drawn neighbour with the finger still down
+    // With --shots, a swipe that fails S1/S2 keeps every frame and what changed in the page around release (2045).
+    if (SHOTS) await page.evaluate(() => {
+      const log = window.__swMut = [];
+      const nm = (n) => (n && n.nodeType === 1 ? n.tagName + (typeof n.className === 'string' && n.className.trim() ? '.' + n.className.trim().split(/\s+/).join('.') : '') : n && n.nodeType === 3 ? '#text' : String(n));
+      window.__swMo = new MutationObserver((ms) => {
+        const t = Date.now() / 1000;
+        for (const m of ms) if (log.length < 4000) log.push({ t, type: m.type, target: nm(m.target), attr: m.attributeName || undefined, val: m.type === 'attributes' && m.target.getAttribute ? String(m.target.getAttribute(m.attributeName)).slice(0, 80) : undefined, add: [...m.addedNodes].map(nm).slice(0, 4), rem: [...m.removedNodes].map(nm).slice(0, 4), text: m.type === 'characterData' ? String(m.target.data).slice(0, 60) : undefined });
+      });
+      window.__swMo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    });
+    // When the page itself handles the lift (a loaded page can take hundreds of ms): the settle runs from there.
+    await page.evaluate(() => { window.__tEnd = null; window.addEventListener('touchend', () => { window.__tEnd = Date.now() / 1000; }, { capture: true, once: true }); });
     const tRel = wall();
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
+    const settle = settleStart(tRel, await page.evaluate(() => window.__tEnd));
+    if (settle.lagMs > 300) await sleep(settle.lagMs);   // the settle started late: let it finish on camera
     await cdp.send('Page.stopScreencast');
     cdp.off('Page.screencastFrame', onFrame);
+    // Frames arrive out of order under load; every reading below (release, settled, after the settle) is by time.
+    frames.splice(0, frames.length, ...inTimeOrder(frames));
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const muts = SHOTS ? await page.evaluate(() => { if (window.__swMo) window.__swMo.disconnect(); const l = window.__swMut || []; window.__swMut = null; return l; }) : [];
     const liveSig = await pageSig('.screen-layout > .pager-viewport > .screen-scroll > .pager-track');
     const ov = [...ov0, ...(await overlays(rect))];
     const domDiff = sigDiff(peekSig, liveSig);
     if (domDiff && SHOTS) for (const [k, v] of [['peek', peekSig], ['page', liveSig]]) writeFileSync(join(SHOTS, `tabs2-dom-${label}-x${throttle}-${k}.txt`), v ? v.top + '\n' + v.lines.join('\n') : '-');
     // each frame's finger offset: the last move dispatched before it
     for (const f of frames) { let d = null; for (const l of log) if (l.t <= f.t) d = l.dx; f.dx = d; }
-    const r = await ana.evaluate((fr, rc, d, t, s, m) => window.__ana.swipe(fr, rc, d, t, s, m), frames, rect, dx, tRel, 0.36, ov);
+    const r = await ana.evaluate((fr, rc, d, t, s, m, ts) => window.__ana.swipe(fr, rc, d, t, s, m, ts), frames, rect, dx, tRel, 0.36, ov, settle.from);
     r.label = label; r.throttle = throttle; r.dom = domDiff || 'same'; r.top = liveSig && liveSig.top;
-    r.peeksAtTouch = peeksAtTouch; r.touchStartMs = touchStartMs;
+    r.peeksAtTouch = peeksAtTouch; r.touchStartMs = touchStartMs; r.endLagMs = settle.lagMs;
     if (ov.length) r.overlays = [...new Set(ov.map((o) => o.c))];
     // TABS3: the top bar (its hairline included) and, with sound, the mini player and tab bar: every frame against the
     // settled one (A1 / T1). The top bar's line is drawn as the new page has it from the frame of release. TABS4: the
@@ -376,7 +394,7 @@ async function main() {
     // before the finger comes down and after the settle; the tab bar below the reading area by its pixels.
     const bar = (l) => l.filter((o) => o.c === 'audio-bar').map((o) => [o.x, o.y, o.w, o.h].map(Math.round).join(','))[0] || null;
     r.miniBox = [bar(ov0), bar(ov.slice(ov0.length))];
-    r.bars = await ana.evaluate((fr, rc, t) => window.__ana.bars(fr, rc, t, null), frames, rect, tRel);
+    r.bars = await ana.evaluate((fr, rc, t, ts) => window.__ana.bars(fr, rc, t, null, ts), frames, rect, tRel, settle.from);
     if (bars) need(r.miniBox[0] === r.miniBox[1], `A1 ${label}: the mini player moved (${r.miniBox[0]} -> ${r.miniBox[1]})`);
     need(r.bars.top <= LIMITS.settleJump, `T1 ${label} x${throttle}: the top bar changed after release (mad ${r.bars.top} at +${r.bars.topAt} ms)`);
     if (bars) need(r.bars.bottom <= LIMITS.settleJump, `A1 ${label}: the mini player / tab bar moved during the swipe (mad ${r.bars.bottom} at +${r.bars.bottomAt} ms)`);
@@ -386,9 +404,15 @@ async function main() {
       savePair(`tabs2-swipe-${label}-x${throttle}-settled.png`, frames[frames.length - 1].url);
     }
     need(r.release >= 0 && r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
-    need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms)`);
+    need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms${r.endLagMs ? `; lift handled +${r.endLagMs} ms late` : ''})`);
     need(r.inkRatio == null || r.inkRatio >= LIMITS.inkRatio, `S3 ${label} x${throttle}: a drag frame showed a blank or half-built neighbour (ink ratio ${r.inkRatio})`);
     need(!domDiff, `S4 ${label} x${throttle}: the neighbour at release is not the page it becomes (${domDiff})`);
+    if (SHOTS && (!(r.release >= 0 && r.drag && r.drag.mad <= LIMITS.dragMad) || r.settleJump > LIMITS.settleJump)) {
+      const dir = join(SHOTS, `fail-${label}-x${throttle}`); mkdirSync(dir, { recursive: true });
+      frames.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(3, '0')}_${Math.round((f.t - tRel) * 1000)}ms${i === r.release ? '_release' : ''}${i === r.settleJumpIdx ? '_jump' : ''}.png`), Buffer.from(f.url.split(',')[1], 'base64')));
+      writeFileSync(join(dir, 'mutations.json'), JSON.stringify(muts.map((m) => ({ ms: Math.round((m.t - tRel) * 1000), ...m, t: undefined })), null, 1));
+      writeFileSync(join(dir, 'r.json'), JSON.stringify({ ...r, rect, overlaysAt: ov }, null, 1));
+    }
     await sleep(600);
   };
 
