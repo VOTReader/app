@@ -5995,7 +5995,9 @@
     .ws1-door { margin:0 0 var(--sp-3); }
     .ws1-more { align-self:flex-start; min-height:var(--tap); padding:0; border:0; background:none; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws1-settings .ws1-more-body { padding:0 var(--card-pad) var(--sp-3); }
-    .ws1-settings .ui-row-meta { overflow:visible; text-overflow:clip; -webkit-line-clamp:unset; }
+    /* A Settings summary is never cut, so it wraps: with the base nowrap left on, a long one ran past the card at 360
+       ('A short tour: thirteen stops, about three minu', rel12 picture 1) and under its chevron (Sharing). */
+    .ws1-settings .ui-row-meta { white-space:normal; overflow-wrap:break-word; text-wrap:pretty; overflow:visible; text-overflow:clip; -webkit-line-clamp:unset; }
     /* ── end WS1 settings (st-root, st-find, st-look, st-read) ── */
     /* ── WS2 settings (st-find rows, st-read sections, st-font, st-restored, st-arrows, st-quality, st-listen, st-auto, st-tools, st-share) ── */
     .ws2-place { display:block; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); }
