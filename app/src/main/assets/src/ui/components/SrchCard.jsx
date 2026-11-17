@@ -296,7 +296,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
           <div className="srch-card-top">
             <span className="srch-card-ref">{entry.__label}</span>
           </div>
-          {entry.__sub ? <div className="srch-card-snippet">{entry.__sub}</div> : null}
+          {entry.__sub ? <div className={'srch-card-snippet' + (entry.__quote ? ' is-quote' : '')}>{entry.__sub}</div> : null}
           {entry.__trans ? <div className="srch-card-loc">{entry.__trans}</div> : null}
           <div className="srch-direct-acts">
             <button type="button" className="ui-btn is-primary is-small srch-direct-open" onClick={() => onSelect(entry)}>{openLabel}</button>

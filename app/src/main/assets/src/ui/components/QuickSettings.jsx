@@ -59,9 +59,9 @@ const HERE = { history: 'history', 'reading-plans': 'plans', settings: 'settings
  * The block: a "Look" group (an optional `lookLead` row from the host, Text size, Theme) and a "More places" group
  * (History, Reading plans, Settings). `go(fn)` is the host's leave-the-screen wrapper (close the sheet, then act).
  * `onSettings` overrides the context's (a screen's own way to Settings).
- * @param {{ ctx: import('./MoreMenu.jsx').NavMenuValue, go: (fn: any) => () => void, lookLead?: any, onSettings?: (() => void) | null }} props
+ * @param {{ ctx: import('./MoreMenu.jsx').NavMenuValue, go: (fn: any) => () => void, lookLead?: any, onSettings?: (() => void) | null, onThemePicked?: (() => void) | null }} props
  */
-export function QuickSettingsRows({ ctx, go, lookLead = null, onSettings = null }) {
+export function QuickSettingsRows({ ctx, go, lookLead = null, onSettings = null, onThemePicked = null }) {
   const pct = scalePct(ctx.fontScale);
   const atMin = pct <= MENU_SCALE_MIN * 100, atMax = pct >= MENU_SCALE_MAX * 100;
   const theme = ctx.theme === 'light' ? 'light' : 'dark';
@@ -85,9 +85,9 @@ export function QuickSettingsRows({ ctx, go, lookLead = null, onSettings = null 
           <span className="more-menu-row-label">Theme</span>
           <span className="more-menu-seg">
             <button type="button" role="menuitemradio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'on' : ''}
-              onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); }}>Dark</button>
+              onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); if (onThemePicked) onThemePicked(); }}>Dark</button>
             <button type="button" role="menuitemradio" aria-checked={theme === 'light'} className={theme === 'light' ? 'on' : ''}
-              onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); }}>Light</button>
+              onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); if (onThemePicked) onThemePicked(); }}>Light</button>
           </span>
         </div>
       </div>

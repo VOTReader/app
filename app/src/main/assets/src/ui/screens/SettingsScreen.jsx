@@ -22,6 +22,7 @@ import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiPart
 import { ActionSheet, SelectSheet } from '../components/SelectField.jsx';
 import { SettingsNavRow, SettingsStepRow, SetRowText, DataRow, RadioRows } from '../components/SettingsRow.jsx';
 import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
+import { InstallRow } from '../components/InstallCard.jsx';
 
 /* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
 const GROUP_TITLES = {
@@ -430,7 +431,6 @@ function AboutRootRow({ onAbout }) {
 
 /* The Growth row's line (BACKLOG [30]: the sentence is the feature). The mock draws the line and the size, no bars. */
 function growthLine(samples) {
-  if (samples.length === 1) return 'How fast your data grows. First measurement recorded; the trend appears the next day you open Settings.';
   const first = samples[0];
   const delta = samples[samples.length - 1].b - first.b;
   const how = delta > 0 ? 'Grown by ' + formatBytes(delta) : delta < 0 ? 'Shrunk by ' + formatBytes(-delta) : 'Stayed level';
@@ -1271,16 +1271,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               onToggle={() => onToggle("doubleTapFullscreen")}
             />
             <SettingsRow
-              label="Scrollbar content marker"
+              label="Marks on the scrollbar"
               desc="A notch where the reading ends and the footnotes begin"
-              find="notch"
+              find="notch scrollbar content marker"
               checked={!!settings.showScrollNotch}
               onToggle={() => onToggle("showScrollNotch")}
             />
             <SettingsRow
-              label="Inline reference echoes"
-              desc="Matthew Study Bible: a pill at each extra verse range that leads back to the full note"
-              find="echo pill"
+              label="Verses shown inline (Matthew Study Bible)"
+              desc="When a study note covers several verse ranges, a small pill after each extra range leads back to the full note"
+              find="echo pill inline reference echoes"
               checked={settings.showInlineEchoes !== false}
               onToggle={() => onToggle("showInlineEchoes")}
             />
@@ -1297,17 +1297,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             {/* AOGCG (2026-10-22): off hides the path's ticks, counts and Continue and keeps what is stored (U16). */}
             <SettingsRow
-              label="Answers reading path"
+              label="Answers progress"
               desc="Ticks and Continue on the Answers screen"
+              find="answers reading path progress"
               checked={settings.answersReadingPath !== false}
               onToggle={() => onToggle("answersReadingPath")}
             />
             <SelectField
               eyebrow="Reading"
-              title="Reading streak"
-              label="Reading streak"
-              desc="A day counts after this long on one chapter or letter"
-              find="dwell time seconds"
+              title="Count a page as read after"
+              label="Count a page as read after"
+              desc="This long on one chapter or letter counts that day toward your reading streak"
+              find="dwell time seconds reading streak"
               value={settings.dwellMs || "20000"}
               options={[
                 { id: "3000",  label: "3 seconds",  desc: "Counts almost immediately" },
@@ -1687,7 +1688,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
             {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
               ? <DataRow label="Offline library" desc={<OfflineLibraryStatus />} find="offline books cache every book without a connection ready"><OfflineLibraryReady /></DataRow> : null}
-            {dataSamples.length > 0 ? (
+            {dataSamples.length > 1 ? (
               <DataRow label="Growth" desc={growthLine(dataSamples)} value={formatBytes(dataSamples[dataSamples.length - 1].b)} find="trend size grows" />
             ) : null}
             <DownloadsStorageRow />
@@ -1858,6 +1859,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
                 controller on the page the note states no number rather than a stale one. */}
             <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes'}. It points at the real buttons; you can leave at any time.</p>
+            {/* PO2 19: the one place to install (never in the reading flow); drawn only while the app can be installed. */}
+            <InstallRow />
             {/* A09.10: the group's summary promises About; this is it (the same screen Home's ⓘ opens). */}
             {typeof onAbout === 'function' ? (
               <button type="button" className="settings-help-about" onClick={onAbout}>

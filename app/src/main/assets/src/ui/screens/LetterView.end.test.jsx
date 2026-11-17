@@ -48,10 +48,10 @@ const view = (o) => render(<LetterView letter={LETTER} volKey="two" volumeLabel=
 /* U01.3: the order was text, footnotes, the install card, Previous/Next, then Related, Audio and Videos; reaching the
    next letter meant scrolling back up past them. The page now ends on Next letter. */
 describe('LetterView: the end of a letter (UX wave 3)', () => {
-  it('Related sits above Previous/Next, and nothing but the install line comes after Next', () => {
+  it('Related sits above Previous/Next, and nothing comes after Next (no install card in the reading flow, PO2 19)', () => {
     const { container } = view({});
-    const order = [...container.querySelectorAll('.related-section, .bottom-nav, .install-card-sentinel')].map((e) => e.className);
-    expect(order).toEqual(['related-section', 'bottom-nav', 'install-card-sentinel']);
+    const order = [...container.querySelectorAll('.related-section, .bottom-nav, .install-card-sentinel, .install-card')].map((e) => e.className);
+    expect(order).toEqual(['related-section', 'bottom-nav']);
   });
 
   it('Mark as read marks it; once read it says Read and Undo takes it back (U01.1)', () => {

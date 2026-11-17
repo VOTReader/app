@@ -1,0 +1,102 @@
+// @ts-nocheck — throwaway writer, run once on main (53ae2f891) to make the main-shaped store fixture.
+// Kept as .txt: it runs only on a checkout of main 53ae2f891 (copy it in as a .test.jsx there, set MAIN_STORE_OUT, run vitest on it).
+/* Writes a reader's data the way main's own code writes it (the stores' public methods, main's useSettings for the
+   settings blob), lets the app's boot steps run (hydrate, the one-time legacy-LS sweep), then dumps the IndexedDB
+   database and localStorage to OUT. vot-ui 2026-11-16, for main-store-upgrade.test.js on the merged build. */
+import 'fake-indexeddb/auto';
+import { it, vi } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { writeFileSync } from 'node:fs';
+
+vi.mock('../utils/platform-bridge.js', () => ({ PlatformBridge: { isAndroid: false, setLightStatusBar: vi.fn(), setKeepScreenOn: vi.fn() } }));
+globalThis.GARDEN_DEFAULT_TIER = 2;
+
+import { IDBAdapter } from './idb-adapter.js';
+import { hydrateAllStores, clearLegacyLs, registeredStores } from './cached-store.js';
+import { StateStore } from './state-store.js';
+import { BookmarkStore } from './bookmark-store.js';
+import { AnnotationStore } from './annotation-store.js';
+import { NoteStore } from './note-store.js';
+import { NotebookStore } from './notebook-store.js';
+import { HistoryStore } from './history-store.js';
+import { ReadingPlanStore } from './reading-plan-store.js';
+import { ReadingStatsStore } from './reading-stats-store.js';
+import { AudioLibraryStore } from './audio-library-store.js';
+import { AudioPositionsStore } from './audio-positions-store.js';
+import { LinkStore } from './link-store.js';
+import { NoteDefaultStore } from './note-default-store.js';
+import { newRun } from '../data/plan-engine.js';
+import { AUDIO_RELEASE_PREFIX } from '../utils/audio-track.js';
+import { useSettings } from '../hooks/use-settings.js';
+
+const OUT = process.env.MAIN_STORE_OUT;
+const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
+
+it('writes a main-shaped profile', async () => {
+  await hydrateAllStores();   // a first boot: every store loads (empty)
+
+  // Settings: main's own hook on a first boot, then the reader changes a few (each one marked touched).
+  const { result } = renderHook(() => useSettings({ savedSettings: {}, theme: 'light' }));
+  act(() => {
+    result.current.updateSetting('fontScale', '1.3');
+    result.current.toggleSetting('showScrollNotch');          // on -> off, a reader's own choice
+    result.current.updateSetting('dwellMs', '45000');
+    result.current.updateSetting('translation', 'kjv');
+    result.current.toggleSetting('answersReadingPath');       // on -> off
+  });
+  const settings = result.current.settings;
+  StateStore.set({
+    theme: 'light', settings,
+    readItems: { 'v1:psalms:23': 2, 'v1:volume-one:the-wide-path': 1, 'v1:matthew:5': 1 },
+    lastReadChapters: { psalms: 23, matthew: 5 }, lastReadLetterMap: { 'volume-one': 'the-wide-path' },
+    activeReadKey: 'psalms',
+    tabs: [{ id: 't1', screen: 'chapter', bookId: 'psalms', chapterNum: 23 }], activeTabIdx: 0,
+  });
+
+  // Bookmarks, highlights, notes, notebooks, links.
+  BookmarkStore.add({ id: 'bm1', hlKey: 'bible:psalms:23:1', label: 'The Lord is my shepherd', color: 'gold' });
+  BookmarkStore.add({ id: 'bm2', hlKey: 'letter:volume-one:the-wide-path:0', label: 'The Wide Path' });
+  AnnotationStore.add('bible:psalms:23:1', { id: 'a1', groupId: 'g1', kind: 'highlight', color: 'green', start: 0, end: 18, text: 'The Lord is my shep' });
+  AnnotationStore.add('letter:volume-one:the-wide-path:0', { id: 'a2', groupId: 'g2', kind: 'underline', color: 'blue', start: 4, end: 30, text: 'narrow is the way' });
+  const nb = NotebookStore.add('Psalms study');
+  NoteStore.set('g1', { body: 'Comfort in the valley.', color: 'green', notebookIds: [nb.id || nb] });
+  NoteStore.set('g2', { body: 'A note saved with No color.', color: 'blank' });
+  LinkStore.add({ id: 'l1', source: { type: 'bible', key: 'bible:psalms:23:1', label: 'Psalm 23:1' }, target: { type: 'letter', key: 'letter:volume-one:the-wide-path:0', label: 'The Wide Path' } });
+  NoteDefaultStore.set('highlight', 'green');
+
+  // History and read progress.
+  HistoryStore.add({ type: 'chapter', bookId: 'psalms', bookTitle: 'Psalms', chapterNum: 23 }, Date.UTC(2026, 10, 9, 15));
+  HistoryStore.add({ type: 'letter', letterId: 'the-wide-path', letterTitle: 'The Wide Path', letterNum: 1, volumeScreen: 'volume-one' }, Date.UTC(2026, 10, 10, 15));
+  ReadingStatsStore.recordProgress('v1:psalms:23', 6, [0, 1, 2, 3, 4, 5], [20, 20, 20, 20, 20, 20]);
+  ReadingStatsStore.recordProgress('v1:volume-one:the-wide-path', 10, [0, 1, 2, 3], [40, 40, 40, 40, 40, 40, 40, 40, 40, 40]);
+
+  // Reading plans: one running, one paused.
+  const r1 = newRun({ plan: 'psalms-30', tracks: [{ kind: 'bible', by: 'count', items: ['psalms:1', 'psalms:2', 'psalms:3'].map((k) => ({ k, w: 600 })) }], pace: { mode: 'days', n: 3 } }, at('2026-11-01'));
+  const r2 = newRun({ plan: 'letters', tracks: [{ kind: 'letters', by: 'count', items: ['volume-one:the-wide-path', 'volume-one:the-seventh-day'].map((k) => ({ k, w: 900 })) }], pace: { mode: 'days', n: 2 } }, at('2026-11-05'));
+  ReadingPlanStore.put(r1);
+  ReadingPlanStore.put({ ...r2, status: 'paused' });
+  ReadingPlanStore.noteRead('psalms', 1, at('2026-11-02'));
+
+  // Downloads / listening: a saved (kept) recording, a played one, a position.
+  const t1 = { key: 'one:the-wide-path', title: 'The Wide Path', sub: 'Volume One', url: AUDIO_RELEASE_PREFIX + 'track_1.mp3', readerCode: 'B', partLabel: null };
+  AudioLibraryStore.setSaved(t1, true);
+  AudioLibraryStore.recordPlayed(t1);
+  AudioPositionsStore.setPosition(t1, 612.34, 3600);
+
+  // A few UI keys main keeps in localStorage.
+  localStorage.setItem('vot-plan-ribbon-hidden', '2026-11-10');
+  localStorage.setItem('vot-audio-recent-open', '1');
+  localStorage.setItem('vot-notes-tab', 'notes');
+
+  for (const s of registeredStores()) await s.whenSaved();
+  await clearLegacyLs();       // the boot's one-time sweep, after hydration
+
+  const idb = {};
+  for (const name of IDBAdapter.STORE_NAMES) {
+    const all = await IDBAdapter.getAll(name);
+    if (all && Object.keys(all).length) idb[name] = all;
+  }
+  const ls = {};
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+  writeFileSync(OUT, JSON.stringify({ from: 'main 53ae2f891', dbVersion: IDBAdapter.DB_VERSION, idb, localStorage: ls }, null, 2) + '\n');
+}, 30000);

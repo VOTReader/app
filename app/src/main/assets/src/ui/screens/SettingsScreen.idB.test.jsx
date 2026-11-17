@@ -2,7 +2,7 @@
 /* SettingsScreen — id-myweb group B (2026-10-23): the find box, the copy and the small a11y pieces the
    10-22 sweep approved (s23.3, L1.8, A09.9, A09.12, s23.8, A09.10). */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, cleanup, fireEvent } from '@testing-library/react';
+import { screen, cleanup, fireEvent, act } from '@testing-library/react';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings, groupHeads, groupHead, row } from './settings-harness.jsx';
 
 beforeEach(() => { setupSettingsGlobals(); });
@@ -22,7 +22,7 @@ describe('the find box matches the start of a word (s23.3)', () => {
     expect(groupHeads()).toHaveLength(0);   // no group heads while finding
     expect(foundPlaces().length).toBeGreaterThan(0);
     expect(foundPlaces().length).toBeLessThan(all);
-    expect(row('Answers reading path')).toBeTruthy();
+    expect(row('Answers progress')).toBeTruthy();
     expect(row('Search')).toBeUndefined();
   });
 
@@ -44,6 +44,30 @@ describe('the find box matches the start of a word (s23.3)', () => {
   });
 });
 
+describe('Your data > Growth', () => {
+  const withSamples = async (samples) => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      measureUserData: () => Promise.resolve({ total: 2e6, structured: 2e6, media: 0, mediaCount: 0 }),
+      recordUserDataSample: () => Promise.resolve(samples),
+    });
+    renderSettings();
+    await act(async () => {});
+  };
+
+  it('is not drawn until two measurements exist, and never promises a later day', async () => {
+    await withSamples([{ d: '2026-11-09', b: 2e6 }]);
+    expect(row('Growth')).toBeFalsy();
+    expect(document.body.textContent).not.toMatch(/First measurement|appears the next day/);
+  });
+
+  it('is drawn from two measurements on', async () => {
+    await withSamples([{ d: '2026-11-09', b: 2e6 }, { d: '2026-11-10', b: 2.5e6 }]);
+    expect(row('Growth')).toBeTruthy();
+    expect(row('Growth').textContent).toMatch(/grown by .* across 2 measurements/i);
+  });
+});
+
 describe('small copy and a11y pieces', () => {
   it('the Scroll Speed slider speaks its unit (L1.8)', () => {
     renderSettings({ autoScroll: true, autoScrollLpm: '16' });
@@ -60,11 +84,11 @@ describe('small copy and a11y pieces', () => {
   // WS2 settings: the line is the design's short one; the live dwell time is the row's value beside it.
   it('the streak row states the live dwell time (A09.12)', () => {
     renderSettings({ dwellMs: '45000' });
-    expect(row('Reading streak').textContent).toContain('A day counts after this long on one chapter or letter');
-    expect(screen.getByRole('button', { name: 'Reading streak: 45 seconds' })).toBeTruthy();
+    expect(row('Count a page as read after').textContent).toContain('counts that day toward your reading streak');
+    expect(screen.getByRole('button', { name: 'Count a page as read after: 45 seconds' })).toBeTruthy();
     cleanup();
     renderSettings({ dwellMs: '60000' });
-    expect(screen.getByRole('button', { name: 'Reading streak: 60 seconds' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Count a page as read after: 60 seconds' })).toBeTruthy();
   });
 
   it('the Letter voice description reads as plain sentences (s23.8)', () => {
@@ -96,5 +120,22 @@ describe('Text Size reset (A01.8 / A09.11)', () => {
     const reset = screen.getByRole('button', { name: 'Reset to 100%' });
     fireEvent.click(reset);
     expect(onSetting).toHaveBeenCalledWith('fontScale', '1');
+  });
+});
+
+describe('Install VOTReader in Help (PO2 19)', () => {
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+  it('a browser that can install gets the row; one that cannot gets none', () => {
+    renderSettings({}, {});
+    expect(screen.queryByRole('button', { name: /Install VOTReader/ })).toBeNull();
+    cleanup();
+    const was = navigator.userAgent;
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => iphone });
+    try {
+      renderSettings({}, {});
+      expect(screen.getByRole('button', { name: /Install VOTReader/ })).toBeTruthy();
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => was });
+    }
   });
 });

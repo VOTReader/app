@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { InstallCard, _resetInstallCardSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
+import { InstallCard, InstallRow, _resetInstallCardSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
 import { attachInstallCapture, _resetInstallCapture } from '../../utils/install-offer.js';
 
 const UA = {
@@ -329,5 +329,48 @@ describe('InstallCard: says when it is on screen', () => {
     readItems = {};
     render(<InstallCard unitKey="genesis:1" />);
     expect(isInstallCardOnScreen(), 'no card shown').toBe(false);
+  });
+});
+
+/* PO2 19: the offer left the reading flow; Settings > Help carries the one install row. */
+describe('InstallRow: Settings > Help > Install VOTReader', () => {
+  it('shows where this browser can install, and opens the steps for it', () => {
+    const { getByRole } = render(<InstallRow />);
+    act(() => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.querySelector('.install-steps-title').textContent).toBe('Add to Home Screen');
+  });
+
+  it('shows no row in the APK, an installed app, Firefox desktop, or after an install', () => {
+    globalThis.PlatformBridge.isAndroid = true;
+    let v = render(<InstallRow />);
+    expect(v.container.querySelector('.settings-help-install')).toBeNull(); cleanup();
+    globalThis.PlatformBridge.isAndroid = false;
+    globalThis.StorageHealth._isStandalone = () => true;
+    v = render(<InstallRow />);
+    expect(v.container.querySelector('.settings-help-install')).toBeNull(); cleanup();
+    globalThis.StorageHealth._isStandalone = () => false;
+    ua = UA.firefoxDesktop;
+    v = render(<InstallRow />);
+    expect(v.container.querySelector('.settings-help-install')).toBeNull(); cleanup();
+    ua = UA.android;
+    attachInstallCapture(window);
+    v = render(<InstallRow />);
+    expect(v.container.querySelector('.settings-help-install')).not.toBeNull();
+    act(() => { window.dispatchEvent(new Event('appinstalled')); });
+    expect(v.container.querySelector('.settings-help-install')).toBeNull();
+  });
+
+  it('with the browser own prompt in hand, a tap opens that dialog', async () => {
+    ua = UA.android;
+    attachInstallCapture(window);
+    const prompt = vi.fn(() => Promise.resolve());
+    const e = new Event('beforeinstallprompt');
+    e.prompt = prompt; e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => { window.dispatchEvent(e); });
+    const { getByRole } = render(<InstallRow />);
+    await act(async () => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
   });
 });

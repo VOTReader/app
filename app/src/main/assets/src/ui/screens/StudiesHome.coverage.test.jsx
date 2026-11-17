@@ -68,7 +68,7 @@ describe('StudiesHome -- the read-along badge', () => {
     const card = rowOf('Lamb of God');
     // n6-12: a study in parts counts its recorded CHAPTERS - the row already
     // says "1 part", and "1 of 2 parts" beside it contradicted it
-    expect(card.querySelector('.ui-row-meta').textContent).toBe('1 part \u00b7 Read-along for 1 of 2 chapters');
+    expect(card.querySelector('.ui-row-meta').textContent).toBe('1 part \u00b7 Audio for 1 of 2 chapters');   // half-baked 10 (main e6a9d2638)
   });
 
   it('(n6-12) a study with no parts keeps "parts", which agrees with its row', () => {
@@ -77,20 +77,20 @@ describe('StudiesHome -- the read-along badge', () => {
     window.AUDIO_MANIFEST['study:grace-ch1'] = [['g', 'V']];
     render(<StudiesHome studies={two} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
     const card = rowOf('Grace');
-    expect(card.querySelector('.ui-row-meta').textContent).toBe('2 parts \u00b7 Read-along for 1 of 2 parts');
+    expect(card.querySelector('.ui-row-meta').textContent).toBe('2 parts \u00b7 Audio for 1 of 2 parts');
   });
 
   it('marks a study with no recording, so a listener knows before tapping', () => {
     renderHome();
     const badge = badgeOf('The Trinity');
-    expect(badge.textContent).toBe('No recording');
+    expect(badge.textContent).toBe('Text only');   // half-baked 10
   });
 
   it('gives the badge a sentence a screen reader can reach, not colour alone', () => {
     renderHome();
     const badge = badgeOf('Purity');
     expect(badge.getAttribute('title')).toMatch(/light/i);
-    expect(screen.getAllByText(/^Read-along/).length).toBe(2);
+    expect(screen.getAllByText(/^(Read-along|Audio for)/).length).toBe(2);
   });
 
   it('marks the Matthew Study Bible read-along -- its recording is a Bible edition', () => {
@@ -103,7 +103,7 @@ describe('StudiesHome -- the read-along badge', () => {
   it('says no recording rather than throwing when the manifest has not landed', () => {
     delete window.AUDIO_MANIFEST;
     renderHome();
-    expect(badgeOf('Purity').textContent).toBe('No recording');
+    expect(badgeOf('Purity').textContent).toBe('Text only');
   });
 });
 
@@ -118,7 +118,7 @@ describe('StudiesHome -- the row (second studies pass, 2026-11-12)', () => {
     const row = rowOf('Odds Chart');
     expect(row.querySelector('.ui-row-title').firstChild.textContent).toBe('Odds Chart');
     expect(row.querySelector('.sty-sub').textContent).toBe('YahuShua Fulfills Over 200 Messianic Prophecies');
-    expect(row.querySelector('.ui-row-meta').textContent).toBe('Reference \u00b7 No recording');
+    expect(row.querySelector('.ui-row-meta').textContent).toBe('Reference \u00b7 Text only');
     fireEvent.click(row);
     expect(onSelectStudy).toHaveBeenCalledWith('a');
     const locked = rowOf('Soon');

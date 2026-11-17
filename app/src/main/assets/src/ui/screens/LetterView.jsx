@@ -15,7 +15,6 @@ import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { InstallCard } from '../components/InstallCard.jsx';
 import { EndNav } from '../components/EndNav.jsx';
 import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
@@ -681,7 +680,6 @@ export function LetterView(props) {
                 : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary }
                 : letter.nextLetterExternal ? { label: 'Next ' + String(unit).toLowerCase(), title: letter.nextLetterExternal.title, href: letter.nextLetterExternal.url }
                 : null} />
-            <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
           </div>
         </div>
       </div>

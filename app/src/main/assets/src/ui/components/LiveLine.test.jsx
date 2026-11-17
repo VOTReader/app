@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { LiveLine, liveLineAt, rollOffset, rowWords } from './LiveLine.jsx';
+import { LiveLine, liveLineAt, openingLineOf, rollOffset, rowWords } from './LiveLine.jsx';
 
 // The KJV's words for the Bible card's tests; any other edition or verse answers the NKJV base it is handed.
 const { KJV } = vi.hoisted(() => ({ KJV: { 'john|1|1': 'In the beginning was the Word,', 'john|1|2': 'The same was in the beginning with God.' } }));
@@ -216,7 +216,13 @@ describe('LiveLine', () => {
     expect(screen.queryByText(/Now reading|Open the reading/)).toBeNull();
   });
 
-  it('with neither a line nor a reading to open, renders nothing', () => {
+  it('the card is drawn without a reading to open too', () => {
+    playLetter();
+    const { container } = render(<LiveLine track={current()} time={0.5} title="" onOpen={null} />);
+    expect(container.querySelector('.np-live-kicker')).not.toBeNull();
+  });
+
+  it('with the text not landed yet, is just "Open the reading", and with no reading either renders nothing', () => {
     playLetter();
     delete globalThis.colLetterArr;
     const { container } = render(<LiveLine track={current()} time={0.5} title="" onOpen={null} />);
@@ -248,6 +254,7 @@ describe('liveLineAt — a Bible chapter', () => {
   it('is the verse being read, in the edition playing, its number as the lead', () => {
     playJohn(1);
     expect(liveLineAt(current(), 3)).toBeNull();                       // before verse 1 (the chapter heading)
+    expect(openingLineOf(current(), 3)).toMatchObject({ lead: '1', now: 'In the beginning was the Word,', at: 0 });   // the card still shows verse 1 (PO2 4)
     expect(liveLineAt(current(), 6)).toMatchObject({ lead: '1', now: 'In the beginning was the Word,', key: 'bible-brm-kjv:john' });
     expect(liveLineAt(current(), 8.5).at).toBeCloseTo(0.5);   // verse 1 runs 5 s to 12 s
     expect(liveLineAt(current(), 20).now).toBe('The same was in the beginning with God.');   // verse 3 unproven: 2 holds

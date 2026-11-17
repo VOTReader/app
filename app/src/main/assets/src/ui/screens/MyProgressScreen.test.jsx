@@ -230,7 +230,7 @@ describe('MyProgressScreen — reading measurement rows', () => {
     expect(fact(container, 'Words read')).toBeNull();
     expect(fact(container, 'Reading pace')).toBeNull();
     expect(fact(container, 'Time spent reading')).toBeNull();
-    expect(fact(container, 'Re-reads')).toBeNull();
+    expect(fact(container, 'Read more than once')).toBeNull();
   });
 });
 

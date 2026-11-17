@@ -48,7 +48,10 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
     const coverage = studyCoverage(s);
     const copy = coverageCopy(coverage.state);
     const detail = studyCoverageDetail(coverage, s.parts ? 'chapters' : 'parts');
-    return <>{sizeOf(s)}{' · '}<span className="sty-cov" title={copy.title}>{detail ? copy.label + ' for ' + detail : copy.label}</span></>;
+    // Half-baked 10 (main e6a9d2638): plain words. No recording is "Text only"; a partly recorded study says how
+    // much has audio ("Audio for 14 of 16 parts"); a fully recorded one keeps its state's own word.
+    const label = coverage.state === 'no-recording' ? 'Text only' : detail ? 'Audio for ' + detail : copy.label;
+    return <>{sizeOf(s)}{' · '}<span className="sty-cov" title={copy.title}>{label}</span></>;
   };
 
   return (

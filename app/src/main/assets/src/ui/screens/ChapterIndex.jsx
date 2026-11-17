@@ -56,16 +56,13 @@ export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSea
   // "~N min", or "N% read · ~M min left" for a chapter part read (the one shared chip, keyed as the tracker records).
   const _wpm = readingChipWpm();
   const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
-  // BACKLOG [29a] / C2-C [C7]: on the Matthew study, how long a chapter's study notes run against its verses
-  // (utils/matthew-note-weight.js). The minute chip counts verses only, by design. No notes, no fact.
+  // Half-baked 8 (main aac60f2b9): on the Matthew study the fact is a plain count ("12 notes"), from the chapter's
+  // own votNotes; a chapter with none shows nothing. `noteWeights` now only marks the study index (the ratio it
+  // carried read as jargon). The minute chip counts verses only, by design.
   const noteChip = (ch) => {
-    const ratio = noteWeights ? noteWeights[ch.num] : 0;
-    if (!(ratio > 0)) return null;
-    return (
-      <span className="idx-note-chip"
-        title={`Study commentary runs ${ratio.toFixed(1)}× the length of this chapter's verse text`}
-      >{ratio.toFixed(1)}{'\xD7'} notes</span>
-    );
+    const n = noteWeights && Array.isArray(ch.votNotes) ? ch.votNotes.length : 0;
+    if (!(n > 0)) return null;
+    return <span className="idx-note-chip">{n} {n === 1 ? 'note' : 'notes'}</span>;
   };
   /** One line of facts, joined by middots; parts that are null drop out. */
   const facts = (parts) => {
@@ -78,7 +75,7 @@ export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSea
     ? <span className="sty-bm"><UiIcon name="mark" size="sm" filled /><span className="sr-only">Bookmarked</span></span>
     : null);
 
-  /** A row's facts: the bookmark mark, then "Chapter 5 · ~5 min · 3.6× notes" (null when there are none). */
+  /** A row's facts: the bookmark mark, then "Chapter 5 · ~5 min · 12 notes" (null when there are none). */
   const rowFacts = (ch) => {
     const bm = bookmark(ch), f = facts([where(ch), minChip(ch), noteChip(ch)]);
     return bm || f ? <>{bm}{f}</> : null;
@@ -91,7 +88,6 @@ export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSea
   // The card shows only once there is progress (Continue / Up next): at zero it repeated row 1 word for word and, at
   // text 2.0, pushed every chapter row off the first screen; all read ('Read again') leaves the list to speak.
   const next = step && (step.k === 'Continue' || step.k === 'Up next') ? step.ch.ch : null;
-  const hasNotes = !!noteWeights && Object.values(noteWeights).some((r) => r > 0);
 
   return (
     <ScreenLayout
@@ -106,8 +102,6 @@ export function ChapterIndex({ book, eyebrow, onSelect, onBack, backLabel, onSea
           {/* The recorded edition (null = Settings 'Off'): the book from its first chapter, auto-advance carrying
               on; a book the edition's manifest does not carry hides it. */}
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) ? <HeroListen {...bibleHero(bibleAudio, book)} /> : null}
-          {/* A02.11: a phone shows no tooltip, so the page says once what the notes fact means. */}
-          {hasNotes ? <p className="idx-note-legend">{'\xD7'} notes: how long a chapter{'’'}s study notes run, against its verses</p> : null}
         </header>
         {next ? (
           <NextCard step={step.k} title={titleOf(next) || 'Chapter ' + next.num}

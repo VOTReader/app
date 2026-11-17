@@ -269,7 +269,8 @@ export function MoreMenuBtn() {
             </button>
           </div>
           {/* The look and the doors out: the same block the gear's Quick settings sheet draws (QuickSettings.jsx, GEAR1). */}
-          <QuickSettingsRows ctx={ctx} go={go} lookLead={canPickTranslation ? (
+          {/* PO2 item 26 (main 3526b4a9a): choosing Light or Dark closes the menu, focus back on ⋯. */}
+          <QuickSettingsRows ctx={ctx} go={go} onThemePicked={() => close(true)} lookLead={canPickTranslation ? (
             <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
               <UiIcon name="book" />
               <span className="more-menu-item-text">

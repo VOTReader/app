@@ -26,16 +26,16 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
   studyAbbrev(entry.studySlug, entry.studyTitle) :
   isLetter ? (_volCol ? _volCol.label : _legacyVol) : entry.bookTitle;
   const fallback = isLetter ? `Letter ${num}` : isStudy ? `Part ${num}` : `Chapter ${num}`;
-  /* Mock v2 l-hist: one row per place (rule 12): the title, then one meta line "Volume One · Letter 1 · ~1 min ·
-     2 visits", the time at the right. An untitled row already says "Chapter 1" as its title, so it names no number
-     twice; an unresolvable collection drops out of the line instead of printing '' (or 'undefined'). A day's repeats
-     of a reading are one row (HistoryScreen folds them); "N visits" only past one. */
+  /* Mock v2 l-hist: one row per place (rule 12): the title, then one meta line "Volume One · Letter 1 · 40% read",
+     the time at the right. An untitled row already says "Chapter 1" as its title, so it names no number twice; an
+     unresolvable collection drops out of the line instead of printing '' (or 'undefined'). A day's repeats of a
+     reading are one row (HistoryScreen folds them). Half-baked 23 (main 66daf0de7): no visit count, no time estimate;
+     the chip is the tracker's "N% read" / "Read". */
   const numLabel = title ? fallback : null;
   const parts = [
     cardLabel ? <span key="l" className="history-entry-label">{cardLabel}</span> : null,
     numLabel ? <span key="n" className="history-entry-num">{numLabel}</span> : null,
     chip ? <React.Fragment key="c">{chip}</React.Fragment> : null,
-    entry.visits > 1 ? <span key="v" className="history-entry-visits">{entry.visits} visits</span> : null,
   ].filter(Boolean);
   const meta = parts.length ? parts.flatMap((p, i) => (i ? [' \xB7 ', p] : [p])) : null;
   return (
