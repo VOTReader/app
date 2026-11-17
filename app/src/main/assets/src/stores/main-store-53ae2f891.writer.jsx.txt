@@ -1,18 +1,33 @@
 // @ts-nocheck — throwaway writer, run once on main (53ae2f891) to make the main-shaped store fixture.
-// Kept as .txt: it runs only on a checkout of main 53ae2f891 (copy it in as a .test.jsx there, set MAIN_STORE_OUT, run vitest on it).
-/* Writes a reader's data the way main's own code writes it (the stores' public methods, main's useSettings for the
-   settings blob), lets the app's boot steps run (hydrate, the one-time legacy-LS sweep), then dumps the IndexedDB
-   database and localStorage to OUT. vot-ui 2026-11-16, for main-store-upgrade.test.js on the merged build. */
+// Kept as .txt beside the fixture: it runs only on a checkout of main 53ae2f891 (copy it in there as
+// src/stores/zz-main-store-writer.test.jsx, set MAIN_STORE_OUT to the fixture path, run vitest on it).
+/* Writes a reader's whole profile the way main's own code writes it, then dumps every place main keeps it:
+   - all 29 object stores of IndexedDB 'votreader' (28 stores and meta), each with a real record from the store's own
+     methods (offline-songs and meta's song keys through their own modules);
+   - the other two databases, 'vot-journal-media' (a photo, via JournalMediaStore.put) and 'vot-thumbs' (a tab
+     thumbnail, via thumb-store idbPut);
+   - every localStorage key main's code writes: the 34 on main's LS_SKIP_LIST (its own gate test proves that list is
+     every vot-* key the source hands localStorage) plus the four 'vot.' keys. A key with an exported writer is written
+     by it; a key only a screen writes gets the value that screen's setItem writes (file:line beside it);
+   - Cache Storage 'vot-offline-audio-v1': main's WebOfflineAudio downloads one recording for real (fetch faked), and
+     a second is left in a paused queue.
+   Then main's boot steps run (hydrate, the legacy sweep, the journal re-key) and everything is dumped as it stood.
+   Blobs are written as { __blob: true, type, b64 }. vot-ui 2026-11-16, for main-store-upgrade.test.jsx. */
 import 'fake-indexeddb/auto';
 import { it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { writeFileSync } from 'node:fs';
+import { Blob as NodeBlob } from 'node:buffer';
+
+// jsdom's Blob does not survive fake-indexeddb's structuredClone (it lands as {}); Node's does, as a browser's does.
+globalThis.Blob = NodeBlob;
+window.Blob = NodeBlob;
 
 vi.mock('../utils/platform-bridge.js', () => ({ PlatformBridge: { isAndroid: false, setLightStatusBar: vi.fn(), setKeepScreenOn: vi.fn() } }));
 globalThis.GARDEN_DEFAULT_TIER = 2;
 
 import { IDBAdapter } from './idb-adapter.js';
-import { hydrateAllStores, clearLegacyLs, registeredStores } from './cached-store.js';
+import { hydrateAllStores, clearLegacyLs, registeredStores, LS_SKIP_LIST } from './cached-store.js';
 import { StateStore } from './state-store.js';
 import { BookmarkStore } from './bookmark-store.js';
 import { AnnotationStore } from './annotation-store.js';
@@ -21,82 +36,240 @@ import { NotebookStore } from './notebook-store.js';
 import { HistoryStore } from './history-store.js';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { ReadingStatsStore } from './reading-stats-store.js';
+import { ReadingStreakStore } from './reading-streak-store.js';
 import { AudioLibraryStore } from './audio-library-store.js';
 import { AudioPositionsStore } from './audio-positions-store.js';
 import { LinkStore } from './link-store.js';
 import { NoteDefaultStore } from './note-default-store.js';
+import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore } from './app-flag-stores.js';
+import { RecentNavStore } from './recent-nav-store.js';
+import { ProphecyCardsStore } from './prophecy-cards-store.js';
+import { JournalStore, JournalNotebookStore } from './journal-store.js';
+import { JournalIndexStore } from './journal-index-store.js';
+import { JournalStatsStore } from './journal-stats-store.js';
+import { HomeOrderStore, DEFAULT_HOME_ORDER } from './home-order-store.js';
+import { LibraryOrderStore, DEFAULT_LIBRARY_ORDER } from './library-order-store.js';
+import { GardenPosStore } from './garden-pos-store.js';
+import { OfflineSongsStore } from './offline-songs-store.js';
+import { JournalMediaStore } from './journal-media-store.js';
+import { idbPut as thumbPut, THUMB_DB } from './thumb-store.js';
 import { newRun } from '../data/plan-engine.js';
 import { AUDIO_RELEASE_PREFIX } from '../utils/audio-track.js';
 import { useSettings } from '../hooks/use-settings.js';
+import { addRecentSearch } from '../search/recent-searches.js';
+import { writeNoteDraft } from '../utils/note-draft.js';
+import { writeAnswersPath } from '../ui/components/AnswersParts.jsx';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { WebOfflineAudio, OFFLINE_AUDIO_CACHE } from '../utils/offline-audio-web.js';
 
 const OUT = process.env.MAIN_STORE_OUT;
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
+const T0 = Date.UTC(2026, 10, 10, 15);
 
-it('writes a main-shaped profile', async () => {
+/* Cache Storage as offline-audio-web.test.js fakes it (a put reads the whole body). */
+function fakeCaches() {
+  const buckets = new Map();
+  const bucket = (name) => {
+    if (!buckets.has(name)) buckets.set(name, new Map());
+    const m = buckets.get(name);
+    const k = (r) => (typeof r === 'string' ? r : r.url);
+    return {
+      keys: async () => [...m.keys()].map((url) => ({ url })),
+      match: async (r) => { const e = m.get(k(r)); return e ? new Response(e.bytes.slice(0), { headers: e.headers }) : undefined; },
+      put: async (r, res) => { const bytes = new Uint8Array(await res.arrayBuffer()); m.set(k(r), { bytes, headers: new Headers(res.headers) }); },
+      delete: async (r) => m.delete(k(r)),
+    };
+  };
+  return { open: async (name) => bucket(name), _buckets: buckets };
+}
+const define = (obj, name, value) => Object.defineProperty(obj, name, { value, configurable: true, writable: true });
+
+async function blobJson(v) {
+  if (v instanceof Blob) return { __blob: true, type: v.type, b64: Buffer.from(await v.arrayBuffer()).toString('base64') };
+  if (Array.isArray(v)) return Promise.all(v.map(blobJson));
+  if (v && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) o[k] = await blobJson(x); return o; }
+  return v;
+}
+
+/** One database as it stands: each store's shape and every [key, value]. */
+function dumpDb(name) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(name);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const stores = [...db.objectStoreNames];
+      const out = { version: db.version, stores: {} };
+      if (!stores.length) { db.close(); resolve(out); return; }
+      const tx = db.transaction(stores, 'readonly');
+      const raw = {};
+      for (const s of stores) {
+        const os = tx.objectStore(s);
+        raw[s] = { keyPath: os.keyPath, autoIncrement: os.autoIncrement, indexes: [...os.indexNames].map((n) => { const ix = os.index(n); return { name: n, keyPath: ix.keyPath, unique: ix.unique, multiEntry: ix.multiEntry }; }), records: [] };
+        os.openCursor().onsuccess = (e) => { const c = e.target.result; if (c) { raw[s].records.push([c.key, c.value]); c.continue(); } };
+      }
+      tx.oncomplete = async () => {
+        db.close();
+        for (const [s, d] of Object.entries(raw)) out.stores[s] = { ...d, records: await blobJson(d.records) };
+        resolve(out);
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+}
+
+it('writes a main-shaped profile, every store and key', async () => {
+  // Downloads run against a fake Cache Storage and a fake relay, as main's own offline-audio-web tests do.
+  const caches = fakeCaches();
+  define(window, 'isSecureContext', true);
+  define(window, 'caches', caches);
+  define(globalThis, 'caches', caches);
+  define(globalThis, 'fetch', vi.fn(async (url, init) => (init && init.method === 'HEAD'
+    ? new Response(null, { headers: { 'Content-Length': '4000' } })
+    : new Response(new Uint8Array(4000).fill(7), { headers: { 'Content-Length': '4000' } }))));
+  define(navigator, 'serviceWorker', { controller: { scriptURL: 'https://votreader.github.io/app/service-worker.js' } });
+  define(navigator, 'storage', { estimate: async () => ({ quota: 1e9, usage: 1e6 }), persist: vi.fn(async () => true) });
+
   await hydrateAllStores();   // a first boot: every store loads (empty)
 
-  // Settings: main's own hook on a first boot, then the reader changes a few (each one marked touched).
+  // ── Settings: main's own hook on a first boot, then five changes of the reader's own.
   const { result } = renderHook(() => useSettings({ savedSettings: {}, theme: 'light' }));
   act(() => {
     result.current.updateSetting('fontScale', '1.3');
-    result.current.toggleSetting('showScrollNotch');          // on -> off, a reader's own choice
+    result.current.toggleSetting('showScrollNotch');
     result.current.updateSetting('dwellMs', '45000');
     result.current.updateSetting('translation', 'kjv');
-    result.current.toggleSetting('answersReadingPath');       // on -> off
+    result.current.toggleSetting('answersReadingPath');
   });
-  const settings = result.current.settings;
   StateStore.set({
-    theme: 'light', settings,
+    theme: 'light', settings: result.current.settings,
     readItems: { 'v1:psalms:23': 2, 'v1:volume-one:the-wide-path': 1, 'v1:matthew:5': 1 },
     lastReadChapters: { psalms: 23, matthew: 5 }, lastReadLetterMap: { 'volume-one': 'the-wide-path' },
     activeReadKey: 'psalms',
     tabs: [{ id: 't1', screen: 'chapter', bookId: 'psalms', chapterNum: 23 }], activeTabIdx: 0,
   });
 
-  // Bookmarks, highlights, notes, notebooks, links.
+  // ── Library: bookmarks, highlights, notes, notebooks, links, note default.
   BookmarkStore.add({ id: 'bm1', hlKey: 'bible:psalms:23:1', label: 'The Lord is my shepherd', color: 'gold' });
   BookmarkStore.add({ id: 'bm2', hlKey: 'letter:volume-one:the-wide-path:0', label: 'The Wide Path' });
   AnnotationStore.add('bible:psalms:23:1', { id: 'a1', groupId: 'g1', kind: 'highlight', color: 'green', start: 0, end: 18, text: 'The Lord is my shep' });
   AnnotationStore.add('letter:volume-one:the-wide-path:0', { id: 'a2', groupId: 'g2', kind: 'underline', color: 'blue', start: 4, end: 30, text: 'narrow is the way' });
   const nb = NotebookStore.add('Psalms study');
-  NoteStore.set('g1', { body: 'Comfort in the valley.', color: 'green', notebookIds: [nb.id || nb] });
+  NoteStore.set('g1', { body: 'Comfort in the valley.', color: 'green', notebookIds: [nb.id] });
   NoteStore.set('g2', { body: 'A note saved with No color.', color: 'blank' });
   LinkStore.add({ id: 'l1', source: { type: 'bible', key: 'bible:psalms:23:1', label: 'Psalm 23:1' }, target: { type: 'letter', key: 'letter:volume-one:the-wide-path:0', label: 'The Wide Path' } });
   NoteDefaultStore.set('highlight', 'green');
 
-  // History and read progress.
+  // ── Reading: history, progress, streak, plans (one running, one paused).
   HistoryStore.add({ type: 'chapter', bookId: 'psalms', bookTitle: 'Psalms', chapterNum: 23 }, Date.UTC(2026, 10, 9, 15));
-  HistoryStore.add({ type: 'letter', letterId: 'the-wide-path', letterTitle: 'The Wide Path', letterNum: 1, volumeScreen: 'volume-one' }, Date.UTC(2026, 10, 10, 15));
+  HistoryStore.add({ type: 'letter', letterId: 'the-wide-path', letterTitle: 'The Wide Path', letterNum: 1, volumeScreen: 'volume-one' }, T0);
   ReadingStatsStore.recordProgress('v1:psalms:23', 6, [0, 1, 2, 3, 4, 5], [20, 20, 20, 20, 20, 20]);
   ReadingStatsStore.recordProgress('v1:volume-one:the-wide-path', 10, [0, 1, 2, 3], [40, 40, 40, 40, 40, 40, 40, 40, 40, 40]);
-
-  // Reading plans: one running, one paused.
+  ReadingStreakStore.recordReadingDay(Date.now() - 86400000);
+  ReadingStreakStore.recordReadingDay(Date.now());
   const r1 = newRun({ plan: 'psalms-30', tracks: [{ kind: 'bible', by: 'count', items: ['psalms:1', 'psalms:2', 'psalms:3'].map((k) => ({ k, w: 600 })) }], pace: { mode: 'days', n: 3 } }, at('2026-11-01'));
   const r2 = newRun({ plan: 'letters', tracks: [{ kind: 'letters', by: 'count', items: ['volume-one:the-wide-path', 'volume-one:the-seventh-day'].map((k) => ({ k, w: 900 })) }], pace: { mode: 'days', n: 2 } }, at('2026-11-05'));
   ReadingPlanStore.put(r1);
   ReadingPlanStore.put({ ...r2, status: 'paused' });
   ReadingPlanStore.noteRead('psalms', 1, at('2026-11-02'));
 
-  // Downloads / listening: a saved (kept) recording, a played one, a position.
+  // ── App flags, recent navigations, prophecy cards, tile orders, garden place.
+  for (const f of [WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore]) f.set();
+  RecentNavStore.add({ kind: 'chapter', bookId: 'psalms', chapter: 23, label: 'Psalm 23' });
+  RecentNavStore.add({ kind: 'letter', letterId: 'the-wide-path', label: 'The Wide Path' });
+  ProphecyCardsStore.setOne('prophecy-1', true);
+  ProphecyCardsStore.setOne('prophecy-2', false);
+  HomeOrderStore.set([...DEFAULT_HOME_ORDER].reverse());
+  LibraryOrderStore.set([...DEFAULT_LIBRARY_ORDER].reverse());
+  GardenPosStore.set(4);
+
+  // ── Journal: a notebook, an entry with a photo, its index refs and stats, a mark on it; then main's re-key pass.
+  const jnb = JournalNotebookStore.add('Morning');
+  const mediaId = await JournalMediaStore.put({ blob: new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])], { type: 'image/png' }), type: 'image' });
+  const entry = JournalStore.add({ title: 'Psalm 23 this morning', blocks: [{ type: 'text', text: 'The Lord is my shepherd; I shall not want.' }, { type: 'image', mediaId }], tags: ['psalms'], notebookIds: [jnb.id], mood: 'grateful' });
+  JournalIndexStore.rebuildForEntry(entry.id, ['bible:psalms:23']);
+  JournalStatsStore.recordNewEntry(entry.created);
+  const textBlock = JournalStore.get(entry.id).blocks[0];
+  AnnotationStore.add('journal:' + entry.id + ':' + textBlock.id, { id: 'a3', groupId: 'g3', kind: 'highlight', color: 'yellow', start: 4, end: 8, text: 'Lord' });
+  JournalStore.rekeyMarks();
+
+  // ── Listening: a saved recording, a played one, a position; a kept song (bytes and its id in the library).
   const t1 = { key: 'one:the-wide-path', title: 'The Wide Path', sub: 'Volume One', url: AUDIO_RELEASE_PREFIX + 'track_1.mp3', readerCode: 'B', partLabel: null };
   AudioLibraryStore.setSaved(t1, true);
   AudioLibraryStore.recordPlayed(t1);
   AudioPositionsStore.setPosition(t1, 612.34, 3600);
+  await OfflineSongsStore.put({ id: '5a1f0c3e9b2d', blob: new Blob([new Uint8Array(64).fill(3)], { type: 'audio/mpeg' }), bytes: 64, sha256: 'ab'.repeat(32), keptAt: T0 });
+  AudioLibraryStore.setSongsKept(['5a1f0c3e9b2d'], true);
+  AudioLibraryStore.setSongSaved('5a1f0c3e9b2d', true);
+  // meta's song keys (song-catalog.js:253, song-votes.js:44-50): a catalog copy and one vote
+  await IDBAdapter.put('meta', 'songs-catalog', { schema: 1, at: T0, songs: [{ id: '5a1f0c3e9b2d', title: 'Psalm 23', family: 'f1' }] });
+  await IDBAdapter.put('meta', 'song-votes', { '5a1f0c3e9b2d': 1 });
 
-  // A few UI keys main keeps in localStorage.
-  localStorage.setItem('vot-plan-ribbon-hidden', '2026-11-10');
-  localStorage.setItem('vot-audio-recent-open', '1');
-  localStorage.setItem('vot-notes-tab', 'notes');
+  // ── Downloads: one recording downloaded for real into Cache Storage, a second left in a paused queue.
+  const d1 = { url: AUDIO_RELEASE_PREFIX + 'track_1.mp3', key: 'one:the-wide-path', title: 'The Wide Path' };
+  const d2 = { url: AUDIO_RELEASE_PREFIX + 'track_2.mp3', key: 'one:the-seventh-day', title: 'The Seventh Day' };
+  WebOfflineAudio.offlineAudioSave(JSON.stringify([d1]));
+  await vi.waitFor(async () => { if (!(await (await caches.open(OFFLINE_AUDIO_CACHE)).match(d1.url))) throw new Error('not saved'); }, { timeout: 5000 });
+  await vi.waitFor(() => { if (!JSON.parse(WebOfflineAudio.offlineAudioState()).items.length) throw new Error('index'); });
+  WebOfflineAudio.offlineAudioPause();
+  WebOfflineAudio.offlineAudioSave(JSON.stringify([d2]));
+
+  // ── Tab thumbnail (separate database).
+  await thumbPut('t1', 'data:image/jpeg;base64,/9j/4AAQSkZJRg==');
+
+  // ── localStorage keys with an exported writer.
+  addRecentSearch('shepherd');
+  writeNoteDraft('g1', 'Comfort in the valley, and');
+  writeAnswersPath('a-12');
+  DiagnosticLog.warn('test', 'a line in the ring');
+  // ── localStorage keys only a screen or a boot step writes: the value its setItem writes (main 53ae2f891 file:line).
+  const LS = {
+    'vot-audio-pos': JSON.stringify({ track: t1, t: 612.3, queue: [t1], qi: 0 }),              // audio-player/persist.js:168
+    'vot-audio-recent-open': '1',                                                          // AudioLibraryScreen.jsx:103
+    'vot-journal-draft': JSON.stringify({ v: 2, drafts: { [entry.id]: { title: 'Psalm 23 this morning', at: T0 } } }),   // JournalEditorScreen.jsx:38
+    'vot-journal-new-entry-stats': entry.id,                                               // use-journal-mutations.js:68
+    'vot-last-seen-build': 'v1.0.2-4e9c718db2',                                            // update-toast.js:212
+    'vot-whats-new-seen': String(T0),                                                      // whats-new.js:78
+    'vot-health-skip': '1',                                                                // backup-flow.js:723
+    'vot-health-progress': '1',                                                            // store-merge.js:773
+    'vot-last-export': String(T0),                                                         // backup-flow.js:101
+    'vot-weekly-copy-off': '1',                                                            // data-safety.js:873
+    'vot-auto-restore': JSON.stringify({ name: 'snap-20261110-090000.json', at: T0 }),      // data-safety.js:263
+    'vot-restored-note': JSON.stringify({ at: T0, auto: true }),                           // data-safety.js:796
+    'vot-weekly-copy-fail': JSON.stringify({ at: T0, why: 'no-space' }),                   // data-safety.js:886
+    'vot-answers-recent': JSON.stringify(['a-12', 'a-3']),                                 // AnswersHome.jsx:61
+    'vot-notes-tab': 'notebooks',                                                          // NotesIndexScreen.jsx:67
+    'vot-answers-fold': JSON.stringify({ 'a-12': ['why'] }),                               // AnswersTopic.jsx:324
+    'vot-plan-ribbon-hidden': '2026-11-10',                                                // PlanRibbon.jsx:40
+    'vot-plans-offer-hidden': '1',                                                         // HomeScreen.jsx:106
+    'vot-plan-quiet-asked': JSON.stringify([r1.id]),                                       // ReadingPlansScreen.jsx:292
+    'vot-install-offer': JSON.stringify({ state: 'dismissed', at: T0 }),                   // InstallCard.jsx:58
+    'vot-ios-pwa-welcomed': '1',                                                           // SafariFlows.jsx:74
+    'vot-tabs-hint-seen': '1',                                                             // TabsNavBtn.jsx:21
+    'vot-tour-later-at': String(T0),                                                       // tour-controller.js:357
+    'vot-scrollheal-1': '1',                                                               // use-saved-state.js:207
+    'vot-sw-spot': JSON.stringify({ cam: { x: 0.4, ppv: 12, y: 0, total: 1189 }, filters: {} }),   // ScriptureWebScreen.jsx:129
+    'vot-auto-downloads': JSON.stringify([d1.url]),                                        // auto-download.js:80
+    'vot-auto-gone': JSON.stringify([AUDIO_RELEASE_PREFIX + 'track_9.mp3']),               // auto-download.js:80
+    'vot.audioEngine': 'media',                                                            // native-audio.js:84
+  };
+  for (const [k, v] of Object.entries(LS)) localStorage.setItem(k, v);
+  // vot-restore-inflight is a marker that lives only while a restore runs (backup-flow.js:642-660): not on a
+  // resting profile, so it is left out, as on a reader's phone.
 
   for (const s of registeredStores()) await s.whenSaved();
   await clearLegacyLs();       // the boot's one-time sweep, after hydration
 
-  const idb = {};
-  for (const name of IDBAdapter.STORE_NAMES) {
-    const all = await IDBAdapter.getAll(name);
-    if (all && Object.keys(all).length) idb[name] = all;
-  }
   const ls = {};
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
-  writeFileSync(OUT, JSON.stringify({ from: 'main 53ae2f891', dbVersion: IDBAdapter.DB_VERSION, idb, localStorage: ls }, null, 2) + '\n');
-}, 30000);
+  const cacheOut = {};
+  for (const [name, m] of caches._buckets) {
+    cacheOut[name] = [...m].map(([url, e]) => ({ url, headers: Object.fromEntries(e.headers.entries()), b64: Buffer.from(e.bytes).toString('base64') }));
+  }
+  const dbs = {};
+  for (const name of ['votreader', 'vot-journal-media', THUMB_DB]) dbs[name] = await dumpDb(name);
+  writeFileSync(OUT, JSON.stringify({
+    from: 'main 53ae2f891', dbVersion: IDBAdapter.DB_VERSION, storeNames: IDBAdapter.STORE_NAMES, lsSkipList: LS_SKIP_LIST,
+    databases: dbs, localStorage: ls, caches: cacheOut,
+  }, null, 1) + '\n');
+}, 60000);

@@ -1,253 +1,748 @@
 {
-  "from": "main 53ae2f891",
-  "dbVersion": 14,
-  "idb": {
-    "vot-journal-stats": {
-      "v": {}
-    },
-    "vot-bookmarks": {
-      "v": [
-        {
-          "id": "bm1",
-          "hlKey": "bible:psalms:23:1",
-          "label": "The Lord is my shepherd",
-          "color": "gold",
-          "created": 1794882821645,
-          "updated": 1794882821645
-        },
-        {
-          "id": "bm2",
-          "hlKey": "letter:volume-one:the-wide-path:0",
-          "label": "The Wide Path",
-          "created": 1794882821645,
-          "updated": 1794882821645
-        }
-      ]
-    },
-    "vot-notebooks": {
-      "v": {
-        "list": [
-          {
-            "id": "nb_1794882821645_8w3y",
-            "name": "Psalms study",
-            "sortIndex": 0,
-            "created": 1794882821645,
-            "updated": 1794882821645
-          }
+ "from": "main 53ae2f891",
+ "dbVersion": 14,
+ "storeNames": [
+  "vot-welcomed",
+  "vot-about-seen",
+  "vot-garden-warning-acked",
+  "vot-recent-nav",
+  "vot-prophecy-cards",
+  "vot-journal",
+  "vot-journal-notebooks",
+  "vot-journal-index",
+  "vot-journal-stats",
+  "vot-bookmarks",
+  "vot-notebooks",
+  "vot-history",
+  "vot-state",
+  "vot-annotations",
+  "vot-notes",
+  "vot-links",
+  "vot-home-order",
+  "vot-note-default",
+  "vot-library-order",
+  "vot-reading-streak",
+  "vot-reading-stats",
+  "vot-garden-pos",
+  "vot-ann-hint-dismissed",
+  "vot-audio-library",
+  "vot-audio-positions",
+  "vot-tour-done",
+  "vot-reading-plans",
+  "offline-songs",
+  "meta"
+ ],
+ "lsSkipList": [
+  "vot-state",
+  "vot-audio-pos",
+  "vot-audio-recent-open",
+  "vot-recent-searches",
+  "vot-journal-draft",
+  "vot-note-draft",
+  "vot-journal-new-entry-stats",
+  "vot-restore-inflight",
+  "vot-last-seen-build",
+  "vot-whats-new-seen",
+  "vot-diag-ring",
+  "vot-health-skip",
+  "vot-health-progress",
+  "vot-last-export",
+  "vot-weekly-copy-off",
+  "vot-auto-restore",
+  "vot-restored-note",
+  "vot-ls-cleanup-done",
+  "vot-answers-path",
+  "vot-answers-recent",
+  "vot-notes-tab",
+  "vot-answers-fold",
+  "vot-plan-ribbon-hidden",
+  "vot-plans-offer-hidden",
+  "vot-plan-quiet-asked",
+  "vot-install-offer",
+  "vot-ios-pwa-welcomed",
+  "vot-tabs-hint-seen",
+  "vot-tour-later-at",
+  "vot-weekly-copy-fail",
+  "vot-scrollheal-1",
+  "vot-sw-spot",
+  "vot-auto-downloads",
+  "vot-auto-gone"
+ ],
+ "databases": {
+  "votreader": {
+   "version": 14,
+   "stores": {
+    "meta": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "migrated-v1",
+       true
+      ],
+      [
+       "song-votes",
+       {
+        "5a1f0c3e9b2d": 1
+       }
+      ],
+      [
+       "songs-catalog",
+       {
+        "schema": 1,
+        "at": 1794322800000,
+        "songs": [
+         {
+          "id": "5a1f0c3e9b2d",
+          "title": "Psalm 23",
+          "family": "f1"
+         }
         ]
-      }
-    },
-    "vot-history": {
-      "v": [
-        {
-          "type": "letter",
-          "letterId": "the-wide-path",
-          "letterTitle": "The Wide Path",
-          "letterNum": 1,
-          "volumeScreen": "volume-one",
-          "key": "lt:the-wide-path",
-          "ts": 1794322800000
-        },
-        {
-          "type": "chapter",
-          "bookId": "psalms",
-          "bookTitle": "Psalms",
-          "chapterNum": 23,
-          "key": "ch:psalms:23",
-          "ts": 1794236400000
-        }
+       }
       ]
+     ]
     },
-    "vot-state": {
-      "v": {
-        "theme": "light",
-        "settings": {
-          "showReadingDot": true,
-          "showSurpriseButton": true,
-          "markAsRead": true,
-          "touched": {
-            "fontScale": true,
-            "showScrollNotch": true,
-            "dwellMs": true,
-            "translation": true,
-            "answersReadingPath": true
-          },
-          "searchUseStopWords": true,
-          "searchCorpus": "all",
-          "keepScreenOn": true,
-          "scriptureLayout": "genre",
-          "gardenTier": 2,
-          "showSettingsGear": true,
-          "translation": "kjv",
-          "restoredNames": true,
-          "fontStyle": "classic",
-          "bibleAudio": "brm-kjv",
-          "letterReader": "auto",
-          "showChapterTitle": true,
-          "showSectionHeadings": true,
-          "showInlineEchoes": true,
-          "doubleTapFullscreen": true,
-          "fullscreenHintCount": 0,
-          "tabsEnabled": true,
-          "searchEnabled": true,
-          "historyEnabled": true,
-          "searchSynonyms": true,
-          "historyInNav": true,
-          "showBookmarkNav": true,
-          "showThemeBtn": true,
-          "compactTopBar": true,
-          "shareLink": "site",
-          "linkHighlight": false,
-          "showScrollNotch": false,
-          "answersReadingPath": false,
-          "arrowLayout": "off",
-          "fontScale": "1.3",
-          "autoScroll": false,
-          "autoScrollLpm": "16",
-          "autoScrollNext": true,
-          "autoScrollEndMs": "2500",
-          "readAlongHighlight": true,
-          "readAlongFollow": true,
-          "audioTurnPage": true,
-          "showLetterSongs": true,
-          "downloadWifiOnly": false,
-          "keepNextReady": false,
-          "skipSeconds": 10,
-          "defaultsRev": 2,
-          "dwellMs": "45000"
+    "offline-songs": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "5a1f0c3e9b2d",
+       {
+        "id": "5a1f0c3e9b2d",
+        "blob": {
+         "__blob": true,
+         "type": "audio/mpeg",
+         "b64": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw=="
         },
-        "readItems": {
-          "v1:psalms:23": 2,
-          "v1:volume-one:the-wide-path": 1,
-          "v1:matthew:5": 1
-        },
-        "lastReadChapters": {
-          "psalms": 23,
-          "matthew": 5
-        },
-        "lastReadLetterMap": {
-          "volume-one": "the-wide-path"
-        },
-        "activeReadKey": "psalms",
-        "tabs": [
-          {
-            "id": "t1",
-            "screen": "chapter",
-            "bookId": "psalms",
-            "chapterNum": 23
-          }
-        ],
-        "activeTabIdx": 0
-      }
+        "bytes": 64,
+        "sha256": "abababababababababababababababababababababababababababababababab",
+        "keptAt": 1794322800000
+       }
+      ]
+     ]
+    },
+    "vot-about-seen": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       true
+      ]
+     ]
+    },
+    "vot-ann-hint-dismissed": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       true
+      ]
+     ]
     },
     "vot-annotations": {
-      "v": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
         "bible:psalms:23:1": [
-          {
-            "id": "a1",
-            "groupId": "g1",
-            "kind": "highlight",
-            "color": "green",
-            "start": 0,
-            "end": 18,
-            "text": "The Lord is my shep",
-            "created": 1794882821645,
-            "updated": 1794882821645
-          }
+         {
+          "id": "a1",
+          "groupId": "g1",
+          "kind": "highlight",
+          "color": "green",
+          "start": 0,
+          "end": 18,
+          "text": "The Lord is my shep",
+          "created": 1794883642117,
+          "updated": 1794883642117
+         }
         ],
         "letter:volume-one:the-wide-path:0": [
-          {
-            "id": "a2",
-            "groupId": "g2",
-            "kind": "underline",
-            "color": "blue",
-            "start": 4,
-            "end": 30,
-            "text": "narrow is the way",
-            "created": 1794882821645,
-            "updated": 1794882821645
-          }
-        ]
-      }
-    },
-    "vot-notes": {
-      "v": {
-        "g1": {
-          "groupId": "g1",
-          "notebookIds": [
-            "nb_1794882821645_8w3y"
-          ],
-          "body": "Comfort in the valley.",
-          "color": "green",
-          "fullText": "",
-          "keys": [],
-          "created": 1794882821645,
-          "updated": 1794882821645
-        },
-        "g2": {
+         {
+          "id": "a2",
           "groupId": "g2",
-          "notebookIds": [],
-          "body": "A note saved with No color.",
-          "color": "blank",
-          "fullText": "",
-          "keys": [],
-          "created": 1794882821645,
-          "updated": 1794882821645
+          "kind": "underline",
+          "color": "blue",
+          "start": 4,
+          "end": 30,
+          "text": "narrow is the way",
+          "created": 1794883642117,
+          "updated": 1794883642117
+         }
+        ],
+        "journal:j_1794883642120_4by1:b_mwk3dlvs_rz7r1": [
+         {
+          "id": "a3",
+          "groupId": "g3",
+          "kind": "highlight",
+          "color": "yellow",
+          "start": 4,
+          "end": 8,
+          "text": "Lord",
+          "created": 1794883642120,
+          "updated": 1794883642120
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-audio-library": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "v": 1,
+        "saved": [
+         {
+          "key": "one:the-wide-path",
+          "title": "The Wide Path",
+          "sub": "Volume One",
+          "url": "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3",
+          "readerCode": "B",
+          "partLabel": null,
+          "savedAt": 1794883642121
+         }
+        ],
+        "recent": [
+         {
+          "key": "one:the-wide-path",
+          "title": "The Wide Path",
+          "sub": "Volume One",
+          "url": "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3",
+          "readerCode": "B",
+          "partLabel": null,
+          "savedAt": 0,
+          "playedAt": 1794883642121
+         }
+        ],
+        "rate": 1,
+        "plays": 0,
+        "completions": 0,
+        "songSaved": [
+         "5a1f0c3e9b2d"
+        ],
+        "songRecent": [],
+        "songKept": [
+         "5a1f0c3e9b2d"
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-audio-positions": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "v": 1,
+        "positions": {
+         "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3": {
+          "t": 612.3,
+          "d": 3600,
+          "at": 1794883642121
+         }
         }
-      }
+       }
+      ]
+     ]
+    },
+    "vot-bookmarks": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
+        {
+         "id": "bm1",
+         "hlKey": "bible:psalms:23:1",
+         "label": "The Lord is my shepherd",
+         "color": "gold",
+         "created": 1794883642117,
+         "updated": 1794883642117
+        },
+        {
+         "id": "bm2",
+         "hlKey": "letter:volume-one:the-wide-path:0",
+         "label": "The Wide Path",
+         "created": 1794883642117,
+         "updated": 1794883642117
+        }
+       ]
+      ]
+     ]
+    },
+    "vot-garden-pos": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "lastPage": 4
+       }
+      ]
+     ]
+    },
+    "vot-garden-warning-acked": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       true
+      ]
+     ]
+    },
+    "vot-history": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
+        {
+         "type": "letter",
+         "letterId": "the-wide-path",
+         "letterTitle": "The Wide Path",
+         "letterNum": 1,
+         "volumeScreen": "volume-one",
+         "key": "lt:the-wide-path",
+         "ts": 1794322800000
+        },
+        {
+         "type": "chapter",
+         "bookId": "psalms",
+         "bookTitle": "Psalms",
+         "chapterNum": 23,
+         "key": "ch:psalms:23",
+         "ts": 1794236400000
+        }
+       ]
+      ]
+     ]
+    },
+    "vot-home-order": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
+        "history",
+        "settings",
+        "library",
+        "songs",
+        "listening",
+        "studies",
+        "answers",
+        "scriptures",
+        "volumes"
+       ]
+      ]
+     ]
+    },
+    "vot-journal": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "list": [
+         {
+          "id": "j_1794883642120_4by1",
+          "title": "Psalm 23 this morning",
+          "blocks": [
+           {
+            "id": "b_mwk3dlvs_rz7r1",
+            "type": "text",
+            "text": "The Lord is my shepherd; I shall not want."
+           },
+           {
+            "id": "b_mwk3dlvs_ggnf2",
+            "type": "image",
+            "mediaId": "m_1794883642118_7fgxup"
+           }
+          ],
+          "mood": "grateful",
+          "tags": [
+           "psalms"
+          ],
+          "notebookIds": [
+           "jnb_1794883642118_jfvx"
+          ],
+          "pinned": false,
+          "created": 1794883642120,
+          "updated": 1794883642120
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-journal-index": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "bible:psalms:23": [
+         "j_1794883642120_4by1"
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-journal-notebooks": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "list": [
+         {
+          "id": "jnb_1794883642118_jfvx",
+          "name": "Morning",
+          "sortIndex": 0,
+          "created": 1794883642118,
+          "updated": 1794883642118
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-journal-stats": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "totalEntries": 1,
+        "currentStreak": 1,
+        "lastEntryDate": "2026-11-16",
+        "longestStreak": 1
+       }
+      ]
+     ]
+    },
+    "vot-library-order": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
+        "scripture-web",
+        "plans",
+        "progress",
+        "highlights",
+        "bookmarks",
+        "journal",
+        "links",
+        "notes"
+       ]
+      ]
+     ]
     },
     "vot-links": {
-      "v": [
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
         {
-          "id": "l1",
-          "source": {
-            "type": "bible",
-            "key": "bible:psalms:23:1",
-            "label": "Psalm 23:1"
-          },
-          "target": {
-            "type": "letter",
-            "key": "letter:volume-one:the-wide-path:0",
-            "label": "The Wide Path"
-          }
+         "id": "l1",
+         "source": {
+          "type": "bible",
+          "key": "bible:psalms:23:1",
+          "label": "Psalm 23:1"
+         },
+         "target": {
+          "type": "letter",
+          "key": "letter:volume-one:the-wide-path:0",
+          "label": "The Wide Path"
+         }
         }
+       ]
       ]
+     ]
     },
     "vot-note-default": {
-      "v": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
         "style": "highlight",
         "color": "green"
-      }
+       }
+      ]
+     ]
+    },
+    "vot-notebooks": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "list": [
+         {
+          "id": "nb_1794883642117_l98w",
+          "name": "Psalms study",
+          "sortIndex": 0,
+          "created": 1794883642117,
+          "updated": 1794883642117
+         }
+        ]
+       }
+      ]
+     ]
+    },
+    "vot-notes": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "g1": {
+         "groupId": "g1",
+         "notebookIds": [
+          "nb_1794883642117_l98w"
+         ],
+         "body": "Comfort in the valley.",
+         "color": "green",
+         "fullText": "",
+         "keys": [],
+         "created": 1794883642117,
+         "updated": 1794883642117
+        },
+        "g2": {
+         "groupId": "g2",
+         "notebookIds": [],
+         "body": "A note saved with No color.",
+         "color": "blank",
+         "fullText": "",
+         "keys": [],
+         "created": 1794883642117,
+         "updated": 1794883642117
+        }
+       }
+      ]
+     ]
+    },
+    "vot-prophecy-cards": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "prophecy-1": true,
+        "prophecy-2": false
+       }
+      ]
+     ]
+    },
+    "vot-reading-plans": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
+        {
+         "id": "p_mvy0nb40_tkce",
+         "plan": "psalms-30",
+         "created": 1793548800000,
+         "updated": 1793635200000,
+         "start": "2026-11-01",
+         "status": "running",
+         "tracks": [
+          {
+           "kind": "bible",
+           "by": "count",
+           "items": [
+            {
+             "k": "psalms:1",
+             "w": 600
+            },
+            {
+             "k": "psalms:2",
+             "w": 600
+            },
+            {
+             "k": "psalms:3",
+             "w": 600
+            }
+           ]
+          }
+         ],
+         "share": "side",
+         "weekdays": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ],
+         "segs": [
+          {
+           "day0": 0,
+           "from": [
+            0
+           ],
+           "to": [
+            3
+           ],
+           "days": 3
+          }
+         ],
+         "target": "2026-11-03",
+         "ticks": {
+          "psalms:1": "2026-11-02"
+         },
+         "pauses": [],
+         "pace": {
+          "mode": "days",
+          "n": 3
+         }
+        },
+        {
+         "id": "p_mw3qeps0_xir9",
+         "plan": "letters",
+         "created": 1793894400000,
+         "updated": 1793894400000,
+         "start": "2026-11-05",
+         "status": "paused",
+         "tracks": [
+          {
+           "kind": "letters",
+           "by": "count",
+           "items": [
+            {
+             "k": "volume-one:the-wide-path",
+             "w": 900
+            },
+            {
+             "k": "volume-one:the-seventh-day",
+             "w": 900
+            }
+           ]
+          }
+         ],
+         "share": "side",
+         "weekdays": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ],
+         "segs": [
+          {
+           "day0": 0,
+           "from": [
+            0
+           ],
+           "to": [
+            2
+           ],
+           "days": 2
+          }
+         ],
+         "target": "2026-11-06",
+         "ticks": {},
+         "pauses": [],
+         "pace": {
+          "mode": "days",
+          "n": 2
+         }
+        }
+       ]
+      ]
+     ]
     },
     "vot-reading-stats": {
-      "v": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
         "progress": {
-          "v1:psalms:23": {
-            "b": 6,
-            "c": [
-              0,
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "t": 1794882821645,
-            "tw": 120,
-            "w": 120
-          },
-          "v1:volume-one:the-wide-path": {
-            "b": 10,
-            "c": [
-              0,
-              1,
-              2,
-              3
-            ],
-            "t": 1794882821645,
-            "tw": 400,
-            "w": 160
-          }
+         "v1:psalms:23": {
+          "b": 6,
+          "c": [
+           0,
+           1,
+           2,
+           3,
+           4,
+           5
+          ],
+          "t": 1794883642117,
+          "tw": 120,
+          "w": 120
+         },
+         "v1:volume-one:the-wide-path": {
+          "b": 10,
+          "c": [
+           0,
+           1,
+           2,
+           3
+          ],
+          "t": 1794883642117,
+          "tw": 400,
+          "w": 160
+         }
         },
         "totalWordsRead": 0,
         "totalActiveMs": 0,
@@ -255,180 +750,267 @@
         "rereads": 0,
         "wordsByDay": {},
         "wpmSamples": []
-      }
+       }
+      ]
+     ]
     },
-    "vot-audio-library": {
-      "v": {
-        "v": 1,
-        "saved": [
-          {
-            "key": "one:the-wide-path",
-            "title": "The Wide Path",
-            "sub": "Volume One",
-            "url": "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3",
-            "readerCode": "B",
-            "partLabel": null,
-            "savedAt": 1794882821646
-          }
-        ],
-        "recent": [
-          {
-            "key": "one:the-wide-path",
-            "title": "The Wide Path",
-            "sub": "Volume One",
-            "url": "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3",
-            "readerCode": "B",
-            "partLabel": null,
-            "savedAt": 0,
-            "playedAt": 1794882821646
-          }
-        ],
-        "rate": 1,
-        "plays": 0,
-        "completions": 0,
-        "songSaved": [],
-        "songRecent": [],
-        "songKept": []
-      }
+    "vot-reading-streak": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "currentStreak": 2,
+        "lastReadDate": "2026-11-16",
+        "totalDays": 2,
+        "longestStreak": 2
+       }
+      ]
+     ]
     },
-    "vot-audio-positions": {
-      "v": {
-        "v": 1,
-        "positions": {
-          "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3": {
-            "t": 612.3,
-            "d": 3600,
-            "at": 1794882821646
-          }
-        }
-      }
-    },
-    "vot-reading-plans": {
-      "v": [
+    "vot-recent-nav": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       [
         {
-          "id": "p_mvy0nb40_ueo0",
-          "plan": "psalms-30",
-          "created": 1793548800000,
-          "updated": 1793635200000,
-          "start": "2026-11-01",
-          "status": "running",
-          "tracks": [
-            {
-              "kind": "bible",
-              "by": "count",
-              "items": [
-                {
-                  "k": "psalms:1",
-                  "w": 600
-                },
-                {
-                  "k": "psalms:2",
-                  "w": 600
-                },
-                {
-                  "k": "psalms:3",
-                  "w": 600
-                }
-              ]
-            }
-          ],
-          "share": "side",
-          "weekdays": [
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            true
-          ],
-          "segs": [
-            {
-              "day0": 0,
-              "from": [
-                0
-              ],
-              "to": [
-                3
-              ],
-              "days": 3
-            }
-          ],
-          "target": "2026-11-03",
-          "ticks": {
-            "psalms:1": "2026-11-02"
-          },
-          "pauses": [],
-          "pace": {
-            "mode": "days",
-            "n": 3
-          }
+         "kind": "letter",
+         "letterId": "the-wide-path",
+         "label": "The Wide Path",
+         "ts": 1794883642118
         },
         {
-          "id": "p_mw3qeps0_dnns",
-          "plan": "letters",
-          "created": 1793894400000,
-          "updated": 1793894400000,
-          "start": "2026-11-05",
-          "status": "paused",
-          "tracks": [
-            {
-              "kind": "letters",
-              "by": "count",
-              "items": [
-                {
-                  "k": "volume-one:the-wide-path",
-                  "w": 900
-                },
-                {
-                  "k": "volume-one:the-seventh-day",
-                  "w": 900
-                }
-              ]
-            }
-          ],
-          "share": "side",
-          "weekdays": [
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            true
-          ],
-          "segs": [
-            {
-              "day0": 0,
-              "from": [
-                0
-              ],
-              "to": [
-                2
-              ],
-              "days": 2
-            }
-          ],
-          "target": "2026-11-06",
-          "ticks": {},
-          "pauses": [],
-          "pace": {
-            "mode": "days",
-            "n": 2
-          }
+         "kind": "chapter",
+         "bookId": "psalms",
+         "chapter": 23,
+         "label": "Psalm 23",
+         "ts": 1794883642118
         }
+       ]
       ]
+     ]
     },
-    "meta": {
-      "migrated-v1": true
+    "vot-state": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       {
+        "theme": "light",
+        "settings": {
+         "showReadingDot": true,
+         "showSurpriseButton": true,
+         "markAsRead": true,
+         "touched": {
+          "fontScale": true,
+          "showScrollNotch": true,
+          "dwellMs": true,
+          "translation": true,
+          "answersReadingPath": true
+         },
+         "searchUseStopWords": true,
+         "searchCorpus": "all",
+         "keepScreenOn": true,
+         "scriptureLayout": "genre",
+         "gardenTier": 2,
+         "showSettingsGear": true,
+         "translation": "kjv",
+         "restoredNames": true,
+         "fontStyle": "classic",
+         "bibleAudio": "brm-kjv",
+         "letterReader": "auto",
+         "showChapterTitle": true,
+         "showSectionHeadings": true,
+         "showInlineEchoes": true,
+         "doubleTapFullscreen": true,
+         "fullscreenHintCount": 0,
+         "tabsEnabled": true,
+         "searchEnabled": true,
+         "historyEnabled": true,
+         "searchSynonyms": true,
+         "historyInNav": true,
+         "showBookmarkNav": true,
+         "showThemeBtn": true,
+         "compactTopBar": true,
+         "shareLink": "site",
+         "linkHighlight": false,
+         "showScrollNotch": false,
+         "answersReadingPath": false,
+         "arrowLayout": "off",
+         "fontScale": "1.3",
+         "autoScroll": false,
+         "autoScrollLpm": "16",
+         "autoScrollNext": true,
+         "autoScrollEndMs": "2500",
+         "readAlongHighlight": true,
+         "readAlongFollow": true,
+         "audioTurnPage": true,
+         "showLetterSongs": true,
+         "downloadWifiOnly": false,
+         "keepNextReady": false,
+         "skipSeconds": 10,
+         "defaultsRev": 2,
+         "dwellMs": "45000"
+        },
+        "readItems": {
+         "v1:psalms:23": 2,
+         "v1:volume-one:the-wide-path": 1,
+         "v1:matthew:5": 1
+        },
+        "lastReadChapters": {
+         "psalms": 23,
+         "matthew": 5
+        },
+        "lastReadLetterMap": {
+         "volume-one": "the-wide-path"
+        },
+        "activeReadKey": "psalms",
+        "tabs": [
+         {
+          "id": "t1",
+          "screen": "chapter",
+          "bookId": "psalms",
+          "chapterNum": 23
+         }
+        ],
+        "activeTabIdx": 0
+       }
+      ]
+     ]
+    },
+    "vot-tour-done": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       true
+      ]
+     ]
+    },
+    "vot-welcomed": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "v",
+       true
+      ]
+     ]
     }
+   }
   },
-  "localStorage": {
-    "vot-diag-ring": "[{\"t\":1794882821632,\"lvl\":\"W\",\"tag\":\"data-health\",\"msg\":\"database created fresh (v0 -> v14); dataLoss unreported [Mozilla/5.0]\"}]",
-    "vot-state": "{\"theme\":\"light\",\"settings\":{\"fontStyle\":\"classic\",\"fontScale\":\"1.3\"}}",
-    "vot-plan-ribbon-hidden": "2026-11-10",
-    "vot-audio-recent-open": "1",
-    "vot-notes-tab": "notes",
-    "vot-ls-cleanup-done": "1"
+  "vot-journal-media": {
+   "version": 2,
+   "stores": {
+    "import-staging": {
+     "keyPath": "id",
+     "autoIncrement": false,
+     "indexes": [],
+     "records": []
+    },
+    "media": {
+     "keyPath": "id",
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "m_1794883642118_7fgxup",
+       {
+        "blob": {
+         "__blob": true,
+         "type": "image/png",
+         "b64": "iVBORw0KGgoBAgM="
+        },
+        "type": "image",
+        "id": "m_1794883642118_7fgxup",
+        "created": 1794883642118,
+        "size": 11,
+        "mime": "image/png"
+       }
+      ]
+     ]
+    }
+   }
+  },
+  "vot-thumbs": {
+   "version": 2,
+   "stores": {
+    "thumbs": {
+     "keyPath": null,
+     "autoIncrement": false,
+     "indexes": [],
+     "records": [
+      [
+       "t1",
+       "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+      ]
+     ]
+    }
+   }
   }
+ },
+ "localStorage": {
+  "vot-diag-ring": "[{\"t\":1794883642103,\"lvl\":\"W\",\"tag\":\"data-health\",\"msg\":\"database created fresh (v0 -> v14); dataLoss unreported [Mozilla/5.0]\"}]",
+  "vot-state": "{\"theme\":\"light\",\"settings\":{\"fontStyle\":\"classic\",\"fontScale\":\"1.3\"}}",
+  "vot.journalRekey": "v1",
+  "vot.offlineAudioIndex": "[{\"url\":\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3\",\"key\":\"one:the-wide-path\",\"title\":\"The Wide Path\",\"bytes\":4000,\"savedAt\":1794883642126}]",
+  "vot.offlineAudioQueue": "{\"items\":[{\"url\":\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_2.mp3\",\"key\":\"one:the-seventh-day\",\"title\":\"The Seventh Day\",\"bytes\":0}],\"paused\":true,\"batch\":{\"done\":0,\"total\":1,\"failed\":0}}",
+  "vot-recent-searches": "[\"shepherd\"]",
+  "vot-note-draft": "{\"v\":1,\"drafts\":{\"g1\":{\"body\":\"Comfort in the valley, and\",\"ts\":1794883642180}}}",
+  "vot-answers-path": "a-12",
+  "vot-audio-pos": "{\"track\":{\"key\":\"one:the-wide-path\",\"title\":\"The Wide Path\",\"sub\":\"Volume One\",\"url\":\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3\",\"readerCode\":\"B\",\"partLabel\":null},\"t\":612.3,\"queue\":[{\"key\":\"one:the-wide-path\",\"title\":\"The Wide Path\",\"sub\":\"Volume One\",\"url\":\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3\",\"readerCode\":\"B\",\"partLabel\":null}],\"qi\":0}",
+  "vot-audio-recent-open": "1",
+  "vot-journal-draft": "{\"v\":2,\"drafts\":{\"j_1794883642120_4by1\":{\"title\":\"Psalm 23 this morning\",\"at\":1794322800000}}}",
+  "vot-journal-new-entry-stats": "j_1794883642120_4by1",
+  "vot-last-seen-build": "v1.0.2-4e9c718db2",
+  "vot-whats-new-seen": "1794322800000",
+  "vot-health-skip": "1",
+  "vot-health-progress": "1",
+  "vot-last-export": "1794322800000",
+  "vot-weekly-copy-off": "1",
+  "vot-auto-restore": "{\"name\":\"snap-20261110-090000.json\",\"at\":1794322800000}",
+  "vot-restored-note": "{\"at\":1794322800000,\"auto\":true}",
+  "vot-weekly-copy-fail": "{\"at\":1794322800000,\"why\":\"no-space\"}",
+  "vot-answers-recent": "[\"a-12\",\"a-3\"]",
+  "vot-notes-tab": "notebooks",
+  "vot-answers-fold": "{\"a-12\":[\"why\"]}",
+  "vot-plan-ribbon-hidden": "2026-11-10",
+  "vot-plans-offer-hidden": "1",
+  "vot-plan-quiet-asked": "[\"p_mvy0nb40_tkce\"]",
+  "vot-install-offer": "{\"state\":\"dismissed\",\"at\":1794322800000}",
+  "vot-ios-pwa-welcomed": "1",
+  "vot-tabs-hint-seen": "1",
+  "vot-tour-later-at": "1794322800000",
+  "vot-scrollheal-1": "1",
+  "vot-sw-spot": "{\"cam\":{\"x\":0.4,\"ppv\":12,\"y\":0,\"total\":1189},\"filters\":{}}",
+  "vot-auto-downloads": "[\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3\"]",
+  "vot-auto-gone": "[\"https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_9.mp3\"]",
+  "vot.audioEngine": "media",
+  "vot-ls-cleanup-done": "1"
+ },
+ "caches": {
+  "vot-offline-audio-v1": [
+   {
+    "url": "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_1.mp3",
+    "headers": {
+     "content-type": "audio/mpeg",
+     "x-vot-bytes": "4000",
+     "x-vot-key": "one%3Athe-wide-path",
+     "x-vot-saved-at": "1794883642126",
+     "x-vot-title": "The%20Wide%20Path"
+    },
+    "b64": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw=="
+   }
+  ]
+ }
 }
