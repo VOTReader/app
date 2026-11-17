@@ -7,6 +7,9 @@
    C  Catch up from the list opens the plan page on the Catch up sheet with its three ways forward.
    M  Manage plan (the bar's Manage): Pause, Start over, Stop; Stop is one tap and the toast's Undo puts it back.
    G  the Schedule's Manage (0430): the same sheet over the schedule; Back shuts it, then goes to the plan page.
+   T  (in M) every control on the Manage sheet takes a press 21 px from its centre each way (a 44 px target, 0450).
+   O  "Count only this plan's reading" (0450): a credited plan starts again from today with its dated reading; the toast's
+      Undo puts the stored run back byte for byte, in memory and after a reboot (what IndexedDB holds).
    S  a new plan starts at zero (0245, Corbin 11-17): a reader with Genesis 1-50 read starts Bible in a Year; the preview has
       no Already read row, the run holds no tick, Home's card says Day 1 with Genesis 1-3, and a read of Genesis 1 ticks it today.
    Run: node tools/e2e-plans.mjs [--home-only] [--shots DIR] [--json FILE]   (after npm run build; ~40 s)
@@ -28,7 +31,7 @@ const W = 412, H = 915;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fails = [];
 const need = (ok, msg) => { if (!ok) fails.push(msg); };
-const out = { home: {}, list: null, catchUp: null, manage: null, schedule: null, start: null };
+const out = { home: {}, list: null, catchUp: null, manage: null, targets: null, schedule: null, start: null, ownOnly: null };
 
 const { server, url } = await serveOwnTree();
 const profile = join(tmpdir(), 'vot-plans-' + process.pid);
@@ -148,6 +151,21 @@ try {
     await page.waitForSelector('#plan-settings');
     const actions = await page.evaluate(() => [...document.querySelectorAll('#plan-settings .plan-sheet-actions button')].map((b) => b.textContent));
     await shot('manage');
+    // T: each control's press reaches 21 px from its centre, up, down, left and right (elementFromPoint, so a ::after counts)
+    out.targets = await page.evaluate(async () => {
+      const els = [...document.querySelectorAll('#plan-settings :is(.ui-chip, .plan-day-toggle, .plan-text-btn, .plan-date, .plan-time)')];
+      const small = [];
+      for (const el of els) {
+        el.scrollIntoView({ block: 'center' });
+        await new Promise((r) => setTimeout(r, 60));
+        const b = el.getBoundingClientRect(); const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+        const miss = [[cx, cy - 21.5], [cx, cy + 21.5], [cx - 21.5, cy], [cx + 21.5, cy]].filter(([x, y]) => { const h = document.elementFromPoint(x, y); return !h || !(h === el || el.contains(h)); });
+        if (miss.length) small.push((el.getAttribute('aria-label') || el.textContent || el.className).trim() + ' ' + Math.round(b.width) + 'x' + Math.round(b.height));
+      }
+      const days = [...document.querySelectorAll('#plan-settings .plan-day-toggle')].map((e) => Math.round(e.getBoundingClientRect().left));
+      return { n: els.length, small, dayPitch: days.slice(1).map((x, i) => x - days[i]) };
+    });
+    need(out.targets.n >= 12 && out.targets.small.length === 0, `T Manage targets under 44 px: ${JSON.stringify(out.targets)}`);
     await page.evaluate(() => [...document.querySelectorAll('#plan-settings .plan-sheet-actions button')].find((b) => b.textContent === 'Stop plan').click());
     await page.waitForSelector('#vot-toast-plan-manage.show .vot-undo-btn');
     const afterStop = await page.evaluate(() => ({ toast: document.getElementById('vot-toast-plan-manage').textContent, status: window.ReadingPlanStore.get('st-missed3').status, list: !!document.querySelector('.plan-list') }));
@@ -240,6 +258,42 @@ try {
     need(run && run.plan === 'bible-year' && run.ticks === 0 && run.credited === 0, `S run: ${JSON.stringify(run)}`);
     need(/\bDay 1\b/.test(home.eyebrow) && /Genesis 1-3/.test(home.text), `S Home card: ${JSON.stringify(home)}`);
     need(JSON.stringify(today.ticks) === JSON.stringify({ 'genesis:1': today.key }), `S read after start: ${JSON.stringify(today)}`);
+
+    // O: "Count only this plan's reading" (0450)
+    await page.evaluate(async (r) => { window.ReadingPlanStore.replaceAll([r]); await window.ReadingPlanStore.whenSaved(); }, STATES.credited);
+    await boot();
+    console.error('[plans] O seeded');
+    await clickText(/^Library$/, '.tabbar-tab, button');
+    await clickText(/^Reading plans/);
+    await page.waitForSelector('.plan-run-row');
+    const stored = await page.evaluate(() => JSON.stringify(window.ReadingPlanStore.get('st-credited')));
+    await clickText(/^Manage Bible in a Year$/);
+    await page.waitForSelector('#plan-settings .plan-own-only-btn');
+    const words = await page.evaluate(() => { const b = document.querySelector('#plan-settings .plan-own-only-btn'); b.scrollIntoView({ block: 'center' }); return b.closest('.plan-opt').innerText; });
+    await sleep(500);
+    await shot('own-only-manage');
+    await page.evaluate(() => document.querySelector('#plan-settings .plan-own-only-btn').click());
+    await page.waitForSelector('#vot-toast-plan-manage.show .vot-undo-btn');
+    await sleep(500);
+    const tk = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+    const after = await page.evaluate(() => {
+      const S = window.ReadingPlanStore;
+      return { toast: document.getElementById('vot-toast-plan-manage').textContent, old: (S.get('st-credited') || {}).status,
+        active: S.active().map((r) => ({ old: r.id === 'st-credited', start: r.start, credited: r.credited || 0, ticks: Object.keys(r.ticks).length })),
+        status: (document.querySelector('.plan-status') || {}).textContent || '', sheet: !!document.getElementById('plan-settings') };
+    });
+    await shot('own-only-after');
+    await page.evaluate(() => document.querySelector('#vot-toast-plan-manage .vot-undo-btn').click());
+    await sleep(500);
+    const undoneO = await page.evaluate(async () => { await window.ReadingPlanStore.whenSaved(); return { json: JSON.stringify(window.ReadingPlanStore.get('st-credited')), n: window.ReadingPlanStore.all().length }; });
+    await boot();
+    const rebooted = await page.evaluate(() => JSON.stringify(window.ReadingPlanStore.get('st-credited')));
+    out.ownOnly = { words, after, undoneSame: undoneO.json === stored, n: undoneO.n, rebootSame: rebooted === stored };
+    need(/30 chapters you had read before this plan began count toward it\./.test(words) && /Starts the plan again from today/.test(words), `O words: ${JSON.stringify(words)}`);
+    need(after.old === 'stopped' && after.active.length === 1 && !after.active[0].old && after.active[0].credited === 0 && after.active[0].start === tk
+      && /^On track/.test(after.status) && !after.sheet && /^Started again from today/.test(after.toast), `O after the tap: ${JSON.stringify(after)}`);
+    need(undoneO.json === stored && undoneO.n === 1, `O Undo not byte for byte: ${undoneO.json === stored} n=${undoneO.n}`);
+    need(rebooted === stored, 'O after a reboot the stored run differs from before the tap');
   }
 } catch (e) {
   try { await page.screenshot({ path: join(tmpdir(), 'vot-plans-fail.png') }); console.error('[plans] failure shot', join(tmpdir(), 'vot-plans-fail.png'), await page.evaluate(() => [...document.querySelectorAll('button')].slice(0, 10).map((b) => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 24)).join(' | '))); } catch { /* no page */ }
@@ -251,6 +305,6 @@ try {
 }
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
 console.log(JSON.stringify(out.home));
-if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage, schedule: out.schedule, start: out.start }));
+if (!HOME_ONLY) console.log(JSON.stringify({ list: out.list, catchUp: out.catchUp, manage: out.manage, targets: out.targets, schedule: out.schedule, start: out.start, ownOnly: out.ownOnly }));
 if (fails.length) { console.log(fails.length + ' finding(s):\n' + fails.map((f) => '  ' + f).join('\n') + '\nFAIL'); process.exit(HOME_ONLY ? 0 : 1); }
 console.log('PASS');
