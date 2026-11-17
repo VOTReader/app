@@ -347,6 +347,19 @@ async function main() {
     // are drawn). Were they in the DOM at that moment, and how long did the touchstart take (they are drawn in it)?
     if (pre) await pre();
     const peeksAtTouch = await page.evaluate(() => document.querySelectorAll('.screen-layout > .pager-viewport > .pager-peek').length);
+    // rel7 (search-landing-next): what held the main thread around the lift, named. Long animation frames (50 ms and
+    // up) with their scripts, from the finger down to the end of the settle; kept beside the frames of a failed swipe.
+    await page.evaluate(() => {
+      const list = window.__swLoaf = [];
+      try {
+        window.__swLoafObs = new PerformanceObserver((l) => {
+          for (const e of l.getEntries()) if (list.length < 200) list.push({ t: (performance.timeOrigin + e.startTime) / 1000, dur: Math.round(e.duration), blocking: Math.round(e.blockingDuration || 0),
+            scripts: (e.scripts || []).map((x) => ({ dur: Math.round(x.duration), forcedLayout: Math.round(x.forcedStyleAndLayoutDuration || 0), invoker: x.invoker, type: x.invokerType,
+              src: String(x.sourceURL || '').split('/').pop(), fn: x.sourceFunctionName, at: x.sourceCharPosition })) });
+        });
+        window.__swLoafObs.observe({ type: 'long-animation-frame' });
+      } catch { /* no LoAF here */ }
+    });
     const t0 = Date.now();
     await touch('touchStart', x0); log.push({ t: wall(), dx: 0 });
     const touchStartMs = Date.now() - t0;
@@ -410,6 +423,7 @@ async function main() {
     frames.splice(0, frames.length, ...inTimeOrder(frames));
     if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     const muts = SHOTS ? await page.evaluate(() => { if (window.__swMo) window.__swMo.disconnect(); const l = window.__swMut || []; window.__swMut = null; return l; }) : [];
+    const loaf = await page.evaluate(() => { if (window.__swLoafObs) window.__swLoafObs.disconnect(); const l = window.__swLoaf || []; window.__swLoaf = null; return l; });
     const liveSig = await pageSig('.screen-layout > .pager-viewport > .screen-scroll > .pager-track');
     const ov = [...ov0, ...(await overlays(rect))];
     const domDiff = sigDiff(peekSig, liveSig);
@@ -452,6 +466,10 @@ async function main() {
       frames.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(3, '0')}_${Math.round((f.t - tRel) * 1000)}ms${i === r.release ? '_release' : ''}${i === r.settleJumpIdx ? '_jump' : ''}.png`), Buffer.from(f.url.split(',')[1], 'base64')));
       writeFileSync(join(dir, 'mutations.json'), JSON.stringify(muts.map((m) => ({ ms: Math.round((m.t - tRel) * 1000), ...m, t: undefined })), null, 1));
       writeFileSync(join(dir, 'r.json'), JSON.stringify({ ...r, rect, overlaysAt: ov }, null, 1));
+      const lf = loaf.map((e) => ({ ...e, ms: Math.round((e.t - tRel) * 1000), t: undefined }));
+      writeFileSync(join(dir, 'loaf.json'), JSON.stringify(lf, null, 1));
+      const worst = lf.filter((e) => e.ms > -400).sort((a, b) => b.dur - a.dur)[0];
+      if (worst) console.log(`[swipe] ${label}: longest frame near the lift ${worst.dur} ms at ${worst.ms} ms: ` + worst.scripts.sort((a, b) => b.dur - a.dur).slice(0, 3).map((x) => `${x.invoker || x.type} ${x.src}:${x.at} ${x.dur} ms`).join('; '));
     }
     await sleep(600);
   };
