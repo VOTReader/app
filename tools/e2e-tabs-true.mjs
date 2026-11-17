@@ -263,6 +263,24 @@ async function main() {
   };
   const pickTab = async (i) => { await page.evaluate((n) => document.querySelectorAll('.tabs-overview .tab-card-open')[n].click(), i); await sleep(1200); };
   const savePair = (name, dataUrl) => { if (SHOTS && dataUrl) writeFileSync(join(SHOTS, name), Buffer.from(dataUrl.split(',')[1], 'base64')); };
+  const png = (dir, name, dataUrl) => { if (dataUrl) writeFileSync(join(dir, name), Buffer.from(String(dataUrl).split(',')[1], 'base64')); };
+  // What the overview's cards are when a card check fails: each card's words and what its picture is drawn from.
+  const cardState = () => page.evaluate(() => [...document.querySelectorAll('.tabs-overview .tab-card:not(.tab-card-new)')].map((c) => {
+    const w = c.querySelector('.tab-card-thumb-wrap');
+    const img = w && w.querySelector('img');
+    return { active: c.classList.contains('active'), words: c.textContent.replace(/\s+/g, ' ').trim().slice(0, 100),
+      thumb: w ? [...w.children].map((x) => x.tagName.toLowerCase() + (x.className ? '.' + String(x.className).split(' ').join('.') : '')).join(' ') : null,
+      img: img ? { w: img.naturalWidth, h: img.naturalHeight, src: String(img.currentSrc || img.src).slice(0, 40) } : null };
+  })).catch((e) => String(e));
+  /* rel9: a failed card check (C1, C5) keeps both pictures, the side-by-side pair and the cards' state, even without
+     --shots (in the temp dir; the path is printed), as a failed swipe keeps its frames: a gate's finding comes with
+     something to look at. */
+  const keepCardFail = (tag, i, a, b, c, extra) => {
+    const dir = join(SHOTS || join(tmpdir(), 'vot-e2e-tabs-fail-' + process.pid), `fail-card-${tag}-${i}`); mkdirSync(dir, { recursive: true });
+    png(dir, 'a-' + (extra && extra.aIs || 'tab') + '.png', a); png(dir, 'b-' + (extra && extra.bIs || 'card') + '.png', b); png(dir, 'pair.png', c && c.pair);
+    writeFileSync(join(dir, 'info.json'), JSON.stringify({ tag, card: i, mad: c && c.mad, pct: c && c.pct, luma: c && c.luma, ...extra }, null, 1));
+    console.log(`[card] ${tag} card ${i}: mad ${c && c.mad}; pictures kept in ${dir}`);
+  };
   const storage = () => page.evaluate(() => new Promise((res) => {
     const rq = indexedDB.open('vot-thumbs');
     rq.onerror = () => res({ err: 'open' });
@@ -500,6 +518,7 @@ async function main() {
       const c = await ana.evaluate((a, b) => window.__ana.card(a, b), refs.dark[i], shots[i]);
       out.cards[`dark${i}`] = { mad: c.mad, pct: c.pct, luma: c.luma };
       if (i === 1) savePair('tabs1-card-dark.png', c.pair);
+      if (c.mad > LIMITS.cardMad) keepCardFail('C1-dark', i, refs.dark[i], shots[i], c, { cards: await cardState() });
       need(c.mad <= LIMITS.cardMad, `C1 dark card ${i}: differs from its tab (mad ${c.mad}, ${c.pct}% px)`);
     }
     need((out.firstFrame.dark || []).every((s) => s === 'snap' || s === 'img'), `C2 dark: first frame cards ${JSON.stringify(out.firstFrame.dark)}`);
@@ -521,6 +540,7 @@ async function main() {
       const c = await ana.evaluate((a, b) => window.__ana.card(a, b), refs.light[i], lightShots[i]);
       out.cards[`light${i}`] = { mad: c.mad, pct: c.pct, luma: c.luma };
       if (i === 1) savePair('tabs1-card-light.png', c.pair);
+      if (c.mad > LIMITS.cardMad) keepCardFail('C1-light', i, refs.light[i], lightShots[i], c, { cards: await cardState() });
       need(c.mad <= LIMITS.cardMad, `C1 light card ${i}: differs from its tab (mad ${c.mad}, ${c.pct}% px)`);
     }
 
@@ -552,6 +572,7 @@ async function main() {
     out.storage.afterClose = await storage();
     need(out.storage.afterClose.rows < out.storage.before.rows || out.storage.before.rows === 0, `C4 closing a tab left its row (${out.storage.before.rows} -> ${out.storage.afterClose.rows})`);
     const pre = await cardShots();   // C5 compares the restored cards with these (the swipes moved the tabs on)
+    const preState = await cardState();
     await closeTabs();
     await sleep(1500);
 
@@ -568,6 +589,9 @@ async function main() {
       const c = await ana.evaluate((a, b) => window.__ana.card(a, b), pre[i], rs[i]);
       out.restart.cards.push({ mad: c.mad, pct: c.pct });
       if (i === 0) savePair('tabs1-card-restart.png', c.pair);
+      if (c.mad > LIMITS.cardMad) {
+        keepCardFail('C5', i, pre[i], rs[i], c, { aIs: 'before-restart', bIs: 'restored', firstFrame: out.restart.firstFrame, before: preState, after: await cardState() });
+      }
       need(c.mad <= LIMITS.cardMad, `C5 restored card ${i}: differs from its tab (mad ${c.mad})`);
     }
     need((out.restart.firstFrame || []).every((s) => s === 'snap' || s === 'img'), `C5 first frame after restart: ${JSON.stringify(out.restart.firstFrame)}`);
