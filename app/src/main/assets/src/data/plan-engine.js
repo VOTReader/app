@@ -672,6 +672,36 @@ export function readCount(/** @type {PlanTrack[]} */ tracks, /** @type {(bid: st
   return n;
 }
 
+/**
+ * A custom plan with new contents (2310, Corbin 11-16 "change it"): a NEW run of `spec` from today (or the old run's
+ * later start), never a re-cut of the old one, so nothing stored changes shape. Every tick of an item still in the plan
+ * carries over by its key with its own date (an undated, credited tick stays undated and counted); the reminder and the
+ * download choice carry too. What is left is then cut at the plan's pace by changePace, so a length stays the whole
+ * plan's ("90 days" with 40 read leaves 50) and a Finish by date stays that date; a paused plan stays paused. Day
+ * notes are keyed by day number and stay on the old run. The caller keeps the old run, stopped, under Past plans.
+ * @param {PlanRun} run the plan as it is @param {{ plan: string, name?: string, tracks: PlanTrack[], share?: 'side' | 'serial',
+ *   weekdays?: boolean[], pace: PlanPace }} spec its new contents and choices @param {Date} now @returns {PlanRun}
+ */
+export function replaceContents(run, spec, now) {
+  const todayN = /** @type {number} */ (dayNum(todayKey(now)));
+  const startN = dayNum(run.start);
+  let next = newRun({ ...spec, startOn: startN != null && startN > todayN ? run.start : undefined }, now);
+  const keys = new Set(next.tracks.flatMap((t) => t.items.map((it) => it.k)));
+  /** @type {Record<string, string>} */ const ticks = {};
+  let carried = 0, credited = 0;
+  for (const [k, v] of Object.entries(run.ticks || {})) if (keys.has(k)) { ticks[k] = v; carried++; if (!v) credited++; }
+  next = { ...next, ticks };
+  if (credited) next.credited = credited;
+  if (run.remind) next.remind = run.remind;
+  if (run.autoAudio === false) next.autoAudio = false;
+  if (carried) {
+    next = finishIfDone(next, todayKey(now));
+    if (next.status !== 'finished' && next.pace) next = changePace(next, next.pace, now);
+  }
+  if (next.status !== 'finished' && (run.status === 'paused' || run.paused)) next = pauseRun(next, now);
+  return next;
+}
+
 /** Start today instead of a later start date: the plan's days move up with it. */
 export function startToday(run, now) {
   const st = runStatus(run, now);

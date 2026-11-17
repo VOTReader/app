@@ -15,11 +15,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { BIBLE_BOOKS } from '../../data/reading-plans.js';
-import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
+import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview, builderFromRun } from '../../data/plan-builder.js';
 import { LETTER_CHAIN, bookTitle } from '../../data/plan-catalog.js';
-import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel } from '../../data/plan-engine.js';
+import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel, replaceContents, runStatus, minutesFor } from '../../data/plan-engine.js';
 import { PlanSec, PlanDays, dayDate, minText } from '../components/PlanBits.jsx';
-import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
+import { letterSource, saveRun, shortDate, editRun } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
 
@@ -48,23 +48,28 @@ function Stepper({ label, value, min, step, unit, onChange }) {
 
 /**
  * @param {{ step: 1 | 2, onStep: (s: 0 | 1 | 2) => void, lettersReady: boolean, onStarted?: (run: any) => void,
- *   isRead?: (bid: string, cid: any) => boolean }} props
+ *   isRead?: (bid: string, cid: any) => boolean, edit?: any, onEdited?: (prev: any, fresh: any) => void }} props
  *   step 0 closes the builder (back on the Plans screen); onStarted hears the run it began; isRead (the read record)
- *   lets a plan with letters start where the reader is (n354b)
+ *   lets a plan with letters start where the reader is (n354b). edit (2310): a custom plan's run to change, the
+ *   builder opened on its picks and choices; saving makes a new run that keeps every tick (editRun) and onEdited
+ *   hears the old run and the new one (a rename or no change just closes)
  */
-export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
-  const [tab, setTab] = React.useState(/** @type {'bible' | 'letters'} */ ('bible'));
-  const [picks, setPicks] = React.useState(/** @type {Pick[]} */ ([]));
+export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edit, onEdited }) {
+  const [init] = React.useState(() => (edit ? builderFromRun(edit, lettersReady ? letterSource() : null) : null));
+  const goal0 = init ? init.goal : null;
+  const [tab, setTab] = React.useState(/** @type {'bible' | 'letters'} */ (init && init.picks.length && init.picks[0].t === 'l' ? 'letters' : 'bible'));
+  const [picks, setPicks] = React.useState(/** @type {Pick[]} */ (init ? init.picks : []));
   const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
-  const [mode, setMode] = React.useState(/** @type {'minutes' | 'items' | 'days' | 'by'} */ ('minutes'));
-  const [minutes, setMinutes] = React.useState(15);
-  const [items, setItems] = React.useState(1);
-  const [days, setDays] = React.useState(365);
-  const [by, setBy] = React.useState('');
-  const [weekdays, setWeekdays] = React.useState(ALL_WEEK);
+  const [mode, setMode] = React.useState(/** @type {'minutes' | 'items' | 'days' | 'by'} */ (goal0 ? goal0.mode : 'minutes'));
+  const [minutes, setMinutes] = React.useState(goal0 && goal0.mode === 'minutes' && goal0.n ? goal0.n : 15);
+  const [items, setItems] = React.useState(goal0 && goal0.mode === 'items' && goal0.n ? goal0.n : 1);
+  const [days, setDays] = React.useState(goal0 && goal0.mode === 'days' && goal0.n ? goal0.n : 365);
+  // a Finish by date already behind is not offered again: the reader picks a new one
+  const [by, setBy] = React.useState(goal0 && goal0.mode === 'by' && goal0.date && goal0.date >= todayKey(new Date()) ? goal0.date : '');
+  const [weekdays, setWeekdays] = React.useState(init ? init.weekdays : ALL_WEEK);
   const [order, setOrder] = React.useState(/** @type {'picked' | 'canonical'} */ ('picked'));
-  const [share, setShare] = React.useState(/** @type {'side' | 'serial'} */ ('side'));
-  const [name, setName] = React.useState('');
+  const [share, setShare] = React.useState(/** @type {'side' | 'serial'} */ (init ? init.share : 'side'));
+  const [name, setName] = React.useState(init ? init.name : '');
   // The phone's Back steps back through the builder, as the screen's Back does.
   useModalRegistry({ id: 'plan-builder', dismiss: () => onStep(step === 2 ? 1 : 0) });
 
@@ -122,10 +127,17 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
   };
 
   // n354b: the first letter of the plan, in its own order, the reader has not read (null when none of it is read)
-  const resume = step === 2 && preview && isRead ? resumeAt(spec.tracks, isRead) : null;
+  const resume = step === 2 && preview && isRead && !edit ? resumeAt(spec.tracks, isRead) : null;
   /** @param {string} [from] start at this letter, the plan's letters before it left out */
   const start = (from) => {
     if (!preview) return;
+    if (edit) {
+      const out = editRun(edit, spec, new Date());
+      if (out) for (const r of out) saveRun(r);
+      if (out && out.length === 2 && onEdited) onEdited(edit, out[1]);
+      onStep(0);
+      return;
+    }
     const run = newRun(from ? { ...spec, tracks: startFrom(spec.tracks, from) } : spec, new Date());
     saveRun(run);
     if (onStarted) onStarted(run);
@@ -136,7 +148,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
     return (
       <div className="plans-build">
         <header className="study-head">
-          <span className="root-eyebrow">Step 1 of 2</span>
+          <span className="root-eyebrow">{edit ? 'Change your plan · Step 1 of 2' : 'Step 1 of 2'}</span>
           <h1 className="study-head-title">What do you want to read?</h1>
           <p className="study-head-sub">Pick books, chapters, collections or single letters, in any mix.</p>
         </header>
@@ -255,20 +267,24 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
   // POL5: the last step is the plan's preview (PlanPreview's page): its name, three facts, the first days it will
   // read, then the choices as "Make it yours" and one Start plan with the finish under it. The first days are read
   // off the run these choices would start, so the page says what the plan will do.
-  const draft = preview ? newRun(spec, now) : null;
+  // 2310: changing a plan, the page shows the plan it would become: what is read stays read, the rest at the pace.
+  const draft = preview ? (edit ? replaceContents(edit, spec, now) : newRun(spec, now)) : null;
+  const dst = draft && edit ? runStatus(draft, now) : null;
+  const facts = preview && dst ? { ...preview, days: Math.max(0, dst.total - dst.day), dayMinutes: minutesFor(dst.perDay.words),
+    dayWords: Math.round(dst.perDay.words), finish: dst.projected } : preview;
   const first = draft ? schedule(draft, now, bookTitle).filter((d) => !d.done).slice(0, 3) : [];
   // the third fact as the preview says it: how many chapters, letters, or (a mix) readings
   const count = draft ? draft.tracks.reduce((n, t) => n + t.items.length, 0) : 0;
   const unit = mixed ? (count === 1 ? 'reading' : 'readings') : picks.some((p) => p.t === 'b') ? (count === 1 ? 'chapter' : 'chapters') : (count === 1 ? 'letter' : 'letters');
   return (
     <div className="plans-build plan-preview">
-      <p className="root-eyebrow plan-eyebrow">Your own plan · Step 2 of 2</p>
+      <p className="root-eyebrow plan-eyebrow">{edit ? 'Change your plan · Step 2 of 2' : 'Your own plan · Step 2 of 2'}</p>
       <h1 className="plan-hero-name">{name.trim() || defaultName(picks, src)}</h1>
-      <p className="plan-about">{preview ? preview.picked : ''}</p>
-      {preview ? (
+      <p className="plan-about">{preview ? preview.picked + (dst && dst.itemsDone ? ' · ' + dst.itemsDone.toLocaleString('en-US') + ' read already' : '') : ''}</p>
+      {facts ? (
         <div className="plan-facts" role="list" aria-label="This plan">
-          <div className="plan-fact" role="listitem"><b>{minText(preview.dayMinutes)}</b><span>a day</span></div>
-          <div className="plan-fact" role="listitem"><b>{preview.days.toLocaleString('en-US')}</b><span>{preview.days === 1 ? 'reading day' : 'reading days'}</span></div>
+          <div className="plan-fact" role="listitem"><b>{minText(facts.dayMinutes)}</b><span>a day</span></div>
+          <div className="plan-fact" role="listitem"><b>{facts.days.toLocaleString('en-US')}</b><span>{edit ? (facts.days === 1 ? 'reading day left' : 'reading days left') : facts.days === 1 ? 'reading day' : 'reading days'}</span></div>
           <div className="plan-fact" role="listitem"><b>{count.toLocaleString('en-US')}</b><span>{unit}</span></div>
         </div>
       ) : null}
@@ -341,11 +357,11 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
           placeholder={defaultName(picks, src)} onChange={(e) => setName(e.target.value)} />
       </section>
       <div className="plan-start">
-        <button type="button" className="ui-btn is-primary is-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>Start plan</button>
+        <button type="button" className="ui-btn is-primary is-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>{edit ? 'Save changes' : 'Start plan'}</button>
         {resume ? (
           <button type="button" className="today-link build-resume" disabled={mode === 'by' && !by} onClick={() => start(resume.k)}>{'Start where I am: ' + resume.t}</button>
         ) : null}
-        {preview ? <p className="plan-start-note">{'Finishes ' + shortDate(preview.finish) + ' · about ' + preview.dayWords.toLocaleString('en-US') + ' words a day'}</p> : null}
+        {facts ? <p className="plan-start-note">{'Finishes ' + shortDate(facts.finish) + ' · about ' + facts.dayWords.toLocaleString('en-US') + ' words a day' + (edit ? ' · what you have read stays read' : '')}</p> : null}
       </div>
     </div>
   );

@@ -172,6 +172,16 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     });
   };
 
+  // 2310: a changed plan is a new run; the toast's Undo removes it and puts the plan back exactly as it was.
+  const edited = (/** @type {any} */ prev, /** @type {any} */ fresh) => {
+    showUndoToast(MANAGE_TOAST, 'Changed ' + runName(fresh, null), () => {
+      const s = _store();
+      if (s && typeof s.remove === 'function') s.remove(fresh.id);
+      saveRun(prev);
+      replacePlanView({ v: 'plan', id: prev.id });
+    });
+  };
+
   let title = 'Reading plans';
   let gear = false;
   let body = null;
@@ -205,16 +215,21 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     body = (
       <PlanPage key={run.id} run={run} now={now} name={title} settingsOpen={settings} onSettings={setSettings} catchUpAtOpen={!!v.catchUp}
         onStartOver={() => { setSettings(false); startOver(run); }}
+        onEdit={run.plan === 'custom' ? () => { setSettings(false); setBuildStep(1); pushPlanView({ v: 'build', edit: run.id }); } : undefined}
         onRead={(day, k, span) => readDay(run, day, k, span)} onListen={onListen} tracksOf={planTracks}
         onSchedule={(at) => pushPlanView({ v: 'schedule', id: run.id, at })} onDaySheet={setDaySheet}
         onNote={note ? (day) => note(run, day) : undefined} noteOf={(d) => planNoteOf(run, d)}
         onStopped={(prev) => stopped(prev)} />
     );
   } else if (v.v === 'build') {
-    title = 'Build a plan';
-    body = (
+    // 2310: the same builder changes a custom plan (v.edit, its run id); one with letters waits for the Volumes.
+    const editing = v.edit ? runOf(v.edit) : null;
+    const waits = !!editing && !lettersReady && editing.tracks.some((/** @type {any} */ t) => t.items.some((/** @type {any} */ it) => it.t));
+    title = editing ? 'Change your plan' : 'Build a plan';
+    body = waits ? <p className="plan-opt-note">Loading the Volumes…</p> : (
       <div className="plans-screen">
-        <PlanBuilder step={buildStep} lettersReady={lettersReady} isRead={isRead}
+        <PlanBuilder key={v.edit || 'new'} step={buildStep} lettersReady={lettersReady} isRead={isRead} edit={editing || undefined}
+          onEdited={(prev, fresh) => { started.current = fresh.id; edited(prev, fresh); }}
           onStarted={(r) => { started.current = r.id; }}
           onStep={(s) => {
             if (s) { setBuildStep(s); return; }

@@ -169,6 +169,39 @@ export function builderSpec(b, src) {
   return { plan: 'custom', name: (b.name || '').trim() || defaultName(b.picks, src), tracks, share: b.share, pace: b.goal, weekdays: b.weekdays };
 }
 
+/**
+ * A custom plan's run as the builder's picks and choices (2310, edit after it starts): one pick per book or
+ * collection in the order the run reads them (order 'picked' reproduces it), `ch` / `ids` null when all of it is in.
+ * A letter whose collection is not loaded (or not in `src`) is left out, so the caller waits for the Volumes.
+ * @param {import('./plan-engine.js').PlanRun} run @param {LetterSource | null} src
+ * @returns {{ picks: Pick[], share: 'side' | 'serial', goal: PlanPace, weekdays: boolean[], name: string }}
+ */
+export function builderFromRun(run, src) {
+  /** @type {Map<string, string>} */ const volOf = new Map();
+  if (src && src.colByKey) for (const volKey of LETTER_CHAIN) { const col = src.colByKey.get(volKey); if (col && col.readKey) volOf.set(String(col.readKey), volKey); }
+  /** @type {Pick[]} */ const picks = [];
+  /** @type {Map<string, any>} */ const at = new Map();
+  for (const tr of run.tracks || []) for (const it of tr.items || []) {
+    const i = it.k.lastIndexOf(':');
+    const head = it.k.slice(0, i), tail = it.k.slice(i + 1);
+    const key = it.t ? volOf.get(head) : head;
+    if (!key) continue;
+    const pk = (it.t ? 'l:' : 'b:') + key;
+    let p = at.get(pk);
+    if (!p) { p = it.t ? { t: 'l', volKey: key, ids: [] } : { t: 'b', bid: key, ch: [] }; at.set(pk, p); picks.push(p); }
+    if (it.t) p.ids.push(tail); else p.ch.push(Number(tail));
+  }
+  for (const p of /** @type {any[]} */ (picks)) {
+    if (p.t === 'b' && p.ch.length >= chapterCount(p.bid)) p.ch = null;
+    if (p.t === 'l' && p.ids.length >= collectionItems(p.volKey, src).length) p.ids = null;
+  }
+  return {
+    picks, share: run.share === 'serial' ? 'serial' : 'side', goal: run.pace || { mode: 'days', n: Math.max(1, totalDays(run)) },
+    weekdays: Array.isArray(run.weekdays) && run.weekdays.length === 7 ? run.weekdays.map(Boolean) : [true, true, true, true, true, true, true],
+    name: run.name || '',
+  };
+}
+
 /** "2 chapters", "a chapter every 3 days", "" for none. @param {number} n per day @param {string} one @param {string} many */
 function perDay(n, one, many) {
   if (!(n > 0)) return '';

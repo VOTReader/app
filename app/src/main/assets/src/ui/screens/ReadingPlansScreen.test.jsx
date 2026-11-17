@@ -7,7 +7,8 @@ import { render, cleanup, fireEvent, screen, within, act, waitFor } from '@testi
 import { PlansHub } from './PlansHub.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
-import { tickItem, todayKey, dayItems, markDay, pauseRun, runStatus, dayNum, dateOf, monthCells, streak } from '../../data/plan-engine.js';
+import { builderSpec } from '../../data/plan-builder.js';
+import { tickItem, todayKey, dayItems, markDay, pauseRun, runStatus, dayNum, dateOf, monthCells, streak, newRun } from '../../data/plan-engine.js';
 import { usePlanReminders } from '../../utils/plan-runs-view.js';
 import { _resetPlanNavForTests } from '../../utils/plan-nav.js';
 import { _resetForTests } from '../../utils/plan-reminder.js';
@@ -507,5 +508,49 @@ describe('Reading plans: Start where I am (n354b)', () => {
     expect(screen.queryByRole('radio', { name: 'Where I am' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
     expect(runs()[0].tracks[0].items.length).toBe(3);
+  });
+});
+
+describe('changing a custom plan after it starts (2310)', () => {
+  it('Manage plan > Change what is in it: the builder opens on its picks; Save makes a new run keeping every tick, the old one stopped; Undo puts it back', () => {
+    const spec = builderSpec({ picks: [{ t: 'b', bid: 'ruth', ch: null }, { t: 'b', bid: 'jonah', ch: null }, { t: 'b', bid: 'esther', ch: null }], order: 'picked', share: 'side',
+      goal: { mode: 'items', n: 2 }, weekdays: Array(7).fill(true), name: 'Two short books' }, null);
+    let run = newRun(spec, daysAgo(2));
+    run = tickItem(tickItem(run, 'ruth:1', todayKey(daysAgo(2)), 1), 'ruth:2', todayKey(daysAgo(2)), 1);
+    run = tickItem(tickItem(run, 'ruth:3', todayKey(daysAgo(1)), 2), 'ruth:4', todayKey(daysAgo(1)), 2);
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    openRow('Two short books');
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Change what\u2019s in it' }));
+    expect(screen.getByText('Change your plan · Step 1 of 2')).toBeTruthy();
+    // its picks are in: drop Esther (none of it read)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Esther' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('list', { name: 'Your picks' }).textContent).toMatch(/Ruth.*Jonah/);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
+    expect(screen.getByText(/4 read already/)).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Plan name' }).value).toBe('Two short books');
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
+    expect(runs().length).toBe(1);
+    const fresh = runs()[0];
+    expect(fresh.id).not.toBe(run.id);
+    expect(fresh.tracks.flatMap((t) => t.items.map((it) => it.k))).toEqual(['ruth:1', 'ruth:2', 'ruth:3', 'ruth:4', 'jonah:1', 'jonah:2', 'jonah:3', 'jonah:4']);
+    expect(fresh.ticks).toEqual(run.ticks);
+    expect(ReadingPlanStore.get(run.id)).toMatchObject({ status: 'stopped', ticks: run.ticks, segs: run.segs });
+    expect(barTitle()).toBe('Two short books');
+    act(() => { document.getElementById('vot-toast-plan-manage').querySelector('.vot-undo-btn').click(); });
+    expect(ReadingPlanStore.all().map((r) => [r.id, r.status])).toEqual([[run.id, 'running']]);
+    expect(ReadingPlanStore.get(run.id)).toEqual(run);
+  });
+
+  it('a catalog plan has no Change what is in it (Start over instead)', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    expect(screen.queryByRole('button', { name: 'Change what\u2019s in it' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy();
   });
 });

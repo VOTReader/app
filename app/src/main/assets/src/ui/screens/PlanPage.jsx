@@ -111,9 +111,11 @@ function WeekAudio({ plan, from, tracksOf }) {
 
 /**
  * Manage plan (the bar's Manage). Stop and Start over are one tap each: the toast that follows has Undo (PlansHub).
- * @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: (prev: any) => void, onStartOver?: () => void }} props
+ * @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: (prev: any) => void, onStartOver?: () => void,
+ *   onEdit?: () => void }} props
+ *   onEdit (2310): a custom plan's "Change what's in it" (the builder on its picks; what is read stays read)
  */
-function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver }) {
+function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver, onEdit }) {
   const st = runStatus(run, now);
   const def = planDef(run.plan);
   const paces = paceChoices(def, run);
@@ -125,6 +127,14 @@ function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver }) {
     <PlanSheet id="plan-settings" title="Manage plan" onClose={onClose} closeLabel="Done">
       {st.finished ? null : (
         <div className="plan-opts">
+          {onEdit && run.plan === 'custom' ? (
+            <PlanOptRow label="Readings">
+              <div className="plan-opt-line">
+                <span className="plan-opt-text">{st.itemsTotal.toLocaleString('en-US') + ' in the plan · ' + st.itemsDone.toLocaleString('en-US') + ' read'}</span>
+                <button type="button" className="plan-text-btn" onClick={onEdit}>Change what’s in it</button>
+              </div>
+            </PlanOptRow>
+          ) : null}
           <PlanOptRow label="Length">
             <PlanChips label="Length" value={cur} options={paces}
               onChange={(id) => { const p = paces.find((x) => x.id === id); if (p) saveRun(changePace(run, { mode: p.mode, n: p.n }, new Date())); }} />
@@ -220,10 +230,10 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
  * @param {{ run: any, now: Date, settingsOpen: boolean, onSettings: (open: boolean) => void, catchUpAtOpen?: boolean, onStartOver?: () => void,
  *   onRead: (day: number, k?: string, span?: number) => void, onListen?: (refs: any[], name: string) => void, tracksOf?: (refs: any[]) => any[],
  *   onSchedule: (at?: number) => void, onDaySheet: (day: number) => void, onNote?: (day: number) => void, noteOf?: (day: number) => string | null,
- *   onStopped: (prev: any) => void, name: string }} props
+ *   onStopped: (prev: any) => void, name: string, onEdit?: () => void }} props
  *   catchUpAtOpen: open on Catch up (Home's and the list's "N days behind")
  */
-export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = false, onStartOver, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name }) {
+export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = false, onStartOver, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name, onEdit }) {
   const st = runStatus(run, now);
   const status = planStatus(run, now, st);
   const [adjust, setAdjust] = React.useState(() => catchUpAtOpen && status.key === 'behind');
@@ -383,7 +393,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       ) : null}
 
       {adjust && !st.finished ? <CatchUpSheet run={run} now={now} onClose={() => setAdjust(false)} onReadTwo={(day, span) => onRead(day, undefined, span)} /> : null}
-      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStartOver={onStartOver}
+      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStartOver={onStartOver} onEdit={onEdit}
         onStopped={(prev) => { onSettings(false); onStopped(prev); }} /> : null}
     </div>
   );

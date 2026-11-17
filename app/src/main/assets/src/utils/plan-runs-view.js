@@ -10,7 +10,7 @@
    this file is bundle-d), so it is read at call time, never imported.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace } from '../data/plan-engine.js';
+import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace, replaceContents } from '../data/plan-engine.js';
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
@@ -203,6 +203,25 @@ export function startOverRun(run, now) {
   if (run.autoAudio === false) fresh.autoAudio = false;
   const old = run.status === 'stopped' ? run : { ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) };
   return [old, fresh];
+}
+
+/**
+ * Save a custom plan's new contents (2310): null when nothing changed; the run renamed in place when only its name
+ * did; else [the old run as stopped, the new run] (replaceContents: the old stays under Past plans with its ticks and
+ * day notes, the new carries every tick of an item still in it). @param {PlanRun} run
+ * @param {{ plan: string, name?: string, tracks: import('../data/plan-engine.js').PlanTrack[], share?: 'side' | 'serial',
+ *   weekdays?: boolean[], pace: import('../data/plan-engine.js').PlanPace }} spec @param {Date} now
+ * @returns {null | [PlanRun] | [PlanRun, PlanRun]}
+ */
+export function editRun(run, spec, now) {
+  const fresh = replaceContents(run, spec, now);
+  const shape = (/** @type {PlanRun} */ r) => JSON.stringify([r.tracks.map((t) => [t.kind, t.by, t.items.map((it) => it.k)]), r.share, r.pace || null, r.weekdays]);
+  if (shape(fresh) === shape(run)) {
+    const name = spec.name || run.name;
+    return name === run.name ? null : [{ ...run, name, updated: now.getTime() }];
+  }
+  // stopped as stopRun stops a plan, so Past plans and Continue read it the same way
+  return [{ ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) }, fresh];
 }
 
 /**
