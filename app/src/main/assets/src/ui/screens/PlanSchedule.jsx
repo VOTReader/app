@@ -7,14 +7,16 @@
      ("Genesis finished").
    - What I've read: the days completed, newest first, with the date they
      were read and a note mark when the day has a note; above them a compact
-     month history (filled = a day completed; nothing is ever "missed").
+     month history (filled = a day completed; dashed = a reading day that
+     went unread, 2235: Corbin 11-16 "detect if day is missed"; muted, never
+     red, and the key says so under the month).
    A tap on any day opens its sheet: every item (tap to read it), Read this
    day, and Mark day as read / Not read yet. In preview mode (before a plan
    starts) the days are shown but the sheet only lists the items.
    Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { schedule, itemsLabel, markDay, dayNum, todayKey, dateOf } from '../../data/plan-engine.js';
+import { schedule, itemsLabel, markDay, dayNum, todayKey, dateOf, monthCells } from '../../data/plan-engine.js';
 import { bookTitle } from '../../data/plan-catalog.js';
 import { saveRun } from '../../utils/plan-runs-view.js';
 import { PlanSheet, PlanTick, dayDate, minText, WEEK_LETTERS } from '../components/PlanBits.jsx';
@@ -85,25 +87,33 @@ function DayRow({ d, run, onOpen, note, read }) {
   );
 }
 
-/** The compact month history: filled = a day completed. @param {{ doneOn: Set<string>, month: Date, today: string }} props */
-function MonthHistory({ doneOn, month, today }) {
+/**
+ * The compact month history: filled = a day completed, dashed = a reading day of the plan that went unread
+ * (monthCells' missed). @param {{ doneOn: Set<string>, month: Date, today: string, run: any, now: Date }} props
+ */
+function MonthHistory({ doneOn, month, today, run, now }) {
   const y = month.getFullYear(), m = month.getMonth();
   const first = /** @type {number} */ (dayNum(y + '-' + String(m + 1).padStart(2, '0') + '-01'));
   const last = new Date(y, m + 1, 0).getDate();
   const lead = ((first + 4) % 7 + 7) % 7;
+  const missed = new Set(monthCells(run, y, m, now).filter((c) => c.state === 'missed').map((c) => c.date));
   const cells = [];
   for (let i = 0; i < lead; i++) cells.push(<span key={'b' + i} className="plan-cal-blank" />);
   for (let n = 1; n <= last; n++) {
     const key = dateOf(first + n - 1);
-    cells.push(<span key={n} className="plan-cal-day" data-done={doneOn.has(key) ? '1' : undefined} data-today={key === today ? '1' : undefined}>{n}</span>);
+    const done = doneOn.has(key);
+    cells.push(<span key={n} className="plan-cal-day" data-done={done ? '1' : undefined} data-missed={!done && missed.has(n) ? '1' : undefined}
+      data-today={key === today ? '1' : undefined}>{n}</span>);
   }
+  const read = [...doneOn].filter((k) => k.startsWith(y + '-' + String(m + 1).padStart(2, '0'))).length;
   return (
-    <div className="ui-card plan-cal" role="img" aria-label={MONTHS[m] + ': ' + [...doneOn].filter((k) => k.startsWith(y + '-' + String(m + 1).padStart(2, '0'))).length + ' days read'}>
+    <div className="ui-card plan-cal" role="img" aria-label={MONTHS[m] + ': ' + read + (read === 1 ? ' day' : ' days') + ' read' + (missed.size ? ', ' + missed.size + ' missed' : '')}>
       <p className="plan-cal-name">{MONTHS[m] + ' ' + y}</p>
       <div className="plan-cal-grid" aria-hidden="true">
         {WEEK_LETTERS.map((w, i) => <span key={'w' + i} className="plan-cal-wd">{w}</span>)}
         {cells}
       </div>
+      {missed.size ? <p className="plan-cal-key" aria-hidden="true"><span className="plan-cal-day" data-done="1">1</span> read<span className="plan-cal-day" data-missed="1">1</span> missed</p> : null}
     </div>
   );
 }
@@ -150,7 +160,7 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
         </ol>
       ) : (
         <>
-          <MonthHistory doneOn={doneOn} month={new Date(now.getFullYear(), now.getMonth(), 1, 12)} today={todayKey(now)} />
+          <MonthHistory doneOn={doneOn} month={new Date(now.getFullYear(), now.getMonth(), 1, 12)} today={todayKey(now)} run={run} now={now} />
           {readDays.length ? (
             <ol className="root-list plan-sched" aria-label="What I’ve read">
               {readDays.map((d) => <DayRow key={d.day} d={d} run={run} read onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />)}

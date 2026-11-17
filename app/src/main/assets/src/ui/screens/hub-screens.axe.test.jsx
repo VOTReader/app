@@ -211,19 +211,19 @@ describe('axe — Reading plans and the plan builder', () => {
     await check();
   });
 
-  it('a plan running late: the list, its page, its settings, Adjust, the schedule and a day sheet', async () => {
+  it('a plan running late: the list (Catch up beside it), its page, Manage plan, Catch up, the schedule and a day sheet', async () => {
     plans();
     let run = startCatalogPlan('bible-year', null, daysAgo(4));
     for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
     ReadingPlanStore.put(run);
     const { getByRole, getAllByRole } = screenOf();
     await check();
-    fireEvent.click(getByRole('button', { name: /^Bible in a Year: Today/ }));   // the plan's own page
+    fireEvent.click(getByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ }));   // the plan's own page
     await check();
-    fireEvent.click(getByRole('button', { name: 'Plan settings' }));
+    fireEvent.click(getByRole('button', { name: 'Manage plan' }));
     await check();
     fireEvent.click(getByRole('button', { name: 'Done' }));
-    fireEvent.click(getByRole('button', { name: 'Adjust' }));
+    fireEvent.click(getByRole('button', { name: 'Catch up' }));
     await check();
     fireEvent.click(getByRole('button', { name: 'Cancel' }));
     fireEvent.click(getAllByRole('button', { name: 'Whole schedule' })[0]);

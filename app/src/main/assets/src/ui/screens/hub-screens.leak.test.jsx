@@ -170,8 +170,8 @@ describe('leaks — Reading plans', () => {
     for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
     ReadingPlanStore.put(run);
     await leakFree('ReadingPlansScreen', screenOf, (r) => {
-      fireEvent.click(r.getAllByRole('button', { name: /^Bible in a Year: Today/ })[0]);
-      fireEvent.click(r.getAllByRole('button', { name: 'Plan settings' })[0]);
+      fireEvent.click(r.getAllByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ })[0]);
+      fireEvent.click(r.getAllByRole('button', { name: 'Manage plan' })[0]);
     });
   });
   it('the plan builder open', async () => {

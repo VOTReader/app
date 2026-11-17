@@ -371,10 +371,10 @@ export function buildScreenRoutes({
   // plans2 3.5: a reading session, one sitting of one plan day (utils/plan-session.js). It opens the item tapped, else
   // the first not read yet, with a silent way back to where it began (a plan page keeps its place: keepPlanNav).
   const _planStore = () => (typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore && typeof ReadingPlanStore.get === 'function' ? ReadingPlanStore : null);
-  const startPlanSession = (/** @type {string} */ runId, /** @type {number} */ day, /** @type {string} */ k) => {
+  const startPlanSession = (/** @type {string} */ runId, /** @type {number} */ day, /** @type {string} */ k, span = 1) => {
     const store = _planStore();
     const run = store ? store.get(runId) : null;
-    const s = run ? beginPlanSession({ runId, day, name: runName(run, null) }) : null;
+    const s = run ? beginPlanSession({ runId, day, name: runName(run, null), days: span }) : null;
     if (!s) return;
     const first = k && s.keys.includes(k) ? k : (s.keys.find((x) => !(run.ticks && x in run.ticks)) || s.keys[0]);
     if (screen === 'reading-plans') keepPlanNav();
@@ -432,7 +432,8 @@ export function buildScreenRoutes({
     if (!run) { openPlanItem(next); return; }
     startPlanSession(planId, runStatus(run, new Date()).day, next ? next.bid + ':' + next.cid : undefined);
   };
-  const openPlanPage = (/** @type {string} */ planId) => { openPlanNav([{ v: 'list' }, { v: 'plan', id: planId }]); goReadingPlans(); };
+  // 2235: Home's "N days behind" opens the plan page on Catch up.
+  const openPlanPage = (/** @type {string} */ planId, /** @type {{ catchUp?: boolean } | undefined} */ o) => { openPlanNav([{ v: 'list' }, { v: 'plan', id: planId, ...(o && o.catchUp ? { catchUp: true } : {}) }]); goReadingPlans(); };
   // mw18 S6: the recordings of a plan's coming days, saved to the phone from Plan details (the same tracks Listen plays).
   const planTracks = (refs) => AudioPlayer.portionTracks(planPortion((Array.isArray(refs) ? refs : []).filter(Boolean)));
   function planPortion(list) {

@@ -413,7 +413,7 @@ export function sections(run, bookTitle) {
  * nothing finished ends the run of days, except today, which is still open; days the plan does not read on (its
  * weekdays off, a pause) are passed over. Never a count of what was not read.
  * @param {PlanRun} run @param {Date} now
- * @returns {{ inRow: number, weekDone: number, weekDays: number, week: { date: string, n: number, done: boolean, today: boolean }[] }}
+ * @returns {{ inRow: number, weekDone: number, weekDays: number, week: { date: string, n: number, done: boolean, today: boolean, missed: boolean, off: boolean }[] }}
  */
 export function streak(run, now) {
   const done = new Set();
@@ -430,12 +430,22 @@ export function streak(run, now) {
   const sunday = today - weekdayOf(today);
   const week = [];
   let weekDone = 0, weekDays = 0;
+  // 2235 (Corbin 11-16, "detect if day is missed"): each past date says what it was, as the month view does
+  // (monthCells): missed = a reading day of the plan with nothing of it read; off = a day the plan does not read on
+  // (its weekdays off, a pause). The status counts schedule slip (runStatus.behind); these are the dates themselves.
+  const readOn = new Set(Object.values(run.ticks || {}).filter(Boolean));
+  const known = run.known ? dayNum(run.known) : null;
+  const fin = run.status === 'finished' && run.finished ? dayNum(run.finished) : null;
+  const stop = run.status === 'stopped' && run.stopped ? dayNum(run.stopped) : null;
   for (let n = sunday; n < sunday + 7; n++) {
     const key = dateOf(n);
     const isDone = done.has(key);
     if (isDone) weekDone++;
     if (n >= startN && isReadingDay({ ...run, paused: undefined }, n)) weekDays++;
-    week.push({ date: key, n: Number(key.slice(8)), done: isDone, today: n === today });
+    const inPlan = n >= startN && (fin == null || n <= fin) && (stop == null || n < stop) && !(known != null && n < known);
+    const off = inPlan && !isReadingDay(run, n);
+    const missed = inPlan && !off && n < today && !isDone && !readOn.has(key);
+    week.push({ date: key, n: Number(key.slice(8)), done: isDone, today: n === today, missed, off });
   }
   return { inRow, weekDone, weekDays: Math.max(weekDays, weekDone), week };
 }

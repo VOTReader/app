@@ -65,13 +65,25 @@ describe('TodayCard (the up-next card)', () => {
     expect(onOpenPlan).toHaveBeenCalledWith('bible-year');
   });
 
-  it('a paused plan is not shown; one not started says when it starts, with nothing to read yet (plans2 3.9)', () => {
+  it('a paused plan is one quiet line with Resume, after the running ones; one not started says when it starts (2235)', () => {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     const key = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
-    const { container } = render(<TodayCard rows={[row({ id: 'p', paused: true }), row({ id: 'n', notStarted: true, start: key })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
-    expect(container.querySelectorAll('[data-plan]')).toHaveLength(1);
+    const { container } = render(<TodayCard rows={[row({ id: 'p', name: 'Psalms', paused: true }), row({ id: 'n', notStarted: true, start: key })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
+    expect([...container.querySelectorAll('[data-plan]')].map((el) => el.getAttribute('data-plan'))).toEqual(['n', 'p']);
     expect(screen.getByText('Starts tomorrow')).toBeTruthy();
+    expect(container.querySelector('.upnext-paused').textContent).toBe('Psalms · PausedResume');
+    expect(screen.getByRole('button', { name: 'Resume Psalms' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^Read / })).toBeNull();
+  });
+
+  it('the eyebrow is the plan\'s status: On track, or N days behind, which opens the plan on Catch up (2235)', () => {
+    const onOpenPlan = vi.fn();
+    const { container, rerender } = render(<TodayCard rows={[row({ status: { key: 'ontrack', text: 'On track', behind: 0 } })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    expect(container.querySelector('.upnext-eyebrow').textContent).toMatch(/^On track · Day /);
+    rerender(<TodayCard rows={[row({ status: { key: 'behind', text: '3 days behind · finishes Nov 14', behind: 3 } })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    fireEvent.click(screen.getByRole('button', { name: '3 days behind · finishes Nov 14. Catch up' }));
+    expect(onOpenPlan).toHaveBeenCalledWith('bible-year', { catchUp: true });
+    expect(screen.getByRole('button', { name: /^Read / })).toBeTruthy();
   });
 
   it('a plan just finished keeps a row until it is opened or dismissed (plans2 3.7)', () => {

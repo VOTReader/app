@@ -15,9 +15,10 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * @typedef {{ v: 'list' } | { v: 'preview', plan: string, opt?: any, again?: string } | { v: 'plan', id: string }
+ * @typedef {{ v: 'list' } | { v: 'preview', plan: string, opt?: any, again?: string } | { v: 'plan', id: string, sheet?: number, catchUp?: boolean }
  *   | { v: 'schedule', id: string, tab?: 'ahead' | 'read', at?: number, preview?: any }
- *   | { v: 'finished', id: string } | { v: 'build' }} PlanView
+ *   | { v: 'finished', id: string } | { v: 'stopped', id: string } | { v: 'build' }} PlanView
+ *   plan.catchUp: open on the Catch up sheet (Home's and the list's "N days behind", 2235)
  */
 
 /** @type {PlanView[]} */

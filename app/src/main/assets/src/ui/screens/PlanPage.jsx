@@ -3,29 +3,32 @@
    ═══════════════════════════════════════════════════════════════════════
    Mock plans-sheet-1 middle. Top to bottom:
    1. Progress: the ring and percent, "Day 12 of 365", "35 of 1,189 chapters
-      read", "Finishes Nov 10, 2027"; once the finish has moved, "· 4 days
-      later than planned" and Adjust (gold for a plan made with Finish by).
+      read", then the plan's one status (planStatus, 2235: the same words as
+      Home and the Plans list), "On track · finishes Nov 10, 2027", or
+      "3 days behind · finishes Nov 14" and Catch up (read two days today,
+      keep my daily amount, or finish on time).
    2. Today: the portion and the minutes left, each item with its tick (a
       tap reads it inside the plan), Start / Continue reading and Listen.
       Done today: tomorrow's portion, Read ahead (the next day's sheet),
       Write a note, Not read yet. Paused: Paused since and Resume, nothing
       else. Not started: the start date and Start today instead.
    3. This week: seven dates, filled when a day was completed, a ring on
-      today; "6 days in a row · 3 of 7 this week" (days in a row from 2 up;
-      nothing ever says a run of days ended).
+      today, a dashed ring on a reading day that went unread (2235, Corbin
+      11-16 "detect if day is missed"; muted, never red) and a faint date on
+      a day the plan does not read on; "6 days in a row · 3 of 7 this week".
    4. The road: the plan's books or collections with a bar each, the current
       one first ("35 of 50"), later ones "from Nov 17", All N inline; a tap
       opens the schedule there. Plans with one section skip it.
    5. Coming up: the next three days and Whole schedule.
-   The gear in the bar opens the plan's settings sheet: length and Finish
-   by, days, the daily reminder (Android), this week's audio, pause or
-   resume, stop. Free globals: React, ConfirmStrip.
+   Manage in the bar opens Manage plan: length and Finish by, days, the
+   daily reminder (Android), this week's audio, pause or resume, start over,
+   stop (2235: one tap, with Undo). Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runStatus, schedule, sections, streak, itemsLabel, itemsWords, minutesFor, itemKinds, dayItems, totalDays,
   catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate } from '../../data/plan-engine.js';
 import { planDef, bookTitle } from '../../data/plan-catalog.js';
-import { saveRun, stopRun, shortDate, itemRef, daysWord } from '../../utils/plan-runs-view.js';
+import { saveRun, stopRun, shortDate, itemRef, planStatus, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, isReminderTime, lastActive } from '../../utils/plan-reminder.js';
 import { canTell } from '../../utils/download-gate.js';
 import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
@@ -106,18 +109,20 @@ function WeekAudio({ plan, from, tracksOf }) {
   );
 }
 
-/** The plan's settings sheet (the gear). @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: () => void }} props */
-function PlanSettings({ run, now, tracksOf, onClose, onStopped }) {
+/**
+ * Manage plan (the bar's Manage). Stop and Start over are one tap each: the toast that follows has Undo (PlansHub).
+ * @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: (prev: any) => void, onStartOver?: () => void }} props
+ */
+function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOver }) {
   const st = runStatus(run, now);
   const def = planDef(run.plan);
   const paces = paceChoices(def, run);
   const cur = run.pace && run.pace.mode !== 'by' ? run.pace.mode + ':' + run.pace.n : '';
   const [by, setBy] = React.useState(run.pace && run.pace.mode === 'by' ? run.pace.date || '' : '');
-  const [stopping, setStopping] = React.useState(false);
   const [notify, setNotify] = React.useState(() => reminderStatus());
   const remindable = reminderSupported() && !st.finished;
   return (
-    <PlanSheet id="plan-settings" title="Plan settings" onClose={onClose} closeLabel="Done">
+    <PlanSheet id="plan-settings" title="Manage plan" onClose={onClose} closeLabel="Done">
       {st.finished ? null : (
         <div className="plan-opts">
           <PlanOptRow label="Length">
@@ -151,34 +156,48 @@ function PlanSettings({ run, now, tracksOf, onClose, onStopped }) {
           {tracksOf ? <WeekAudio plan={run} from={st.day} tracksOf={tracksOf} /> : null}
         </div>
       )}
-      {stopping ? (
-        <ConfirmStrip question={'Stop this plan? Your reading stays marked.'} yesLabel="Stop plan"
-          onCancel={() => setStopping(false)} onConfirm={() => { stopRun(run, new Date()); onStopped(); }} />
-      ) : (
-        <div className="plan-sheet-actions">
-          {st.finished ? null : st.paused
-            ? <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume plan</button>
-            : <button type="button" className="ui-btn" onClick={() => saveRun(pauseRun(run, new Date()))}>Pause plan</button>}
-          <button type="button" className="plan-text-btn plan-danger" onClick={() => setStopping(true)}>Stop plan</button>
-        </div>
-      )}
+      <div className="plan-sheet-actions">
+        {st.finished ? null : st.paused
+          ? <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume plan</button>
+          : <button type="button" className="ui-btn" onClick={() => saveRun(pauseRun(run, new Date()))}>Pause plan</button>}
+        {onStartOver ? <button type="button" className="ui-btn" onClick={onStartOver}>Start over</button> : null}
+        <button type="button" className="ui-btn plan-stop-btn" onClick={() => { const prev = run; stopRun(run, new Date()); onStopped(prev); }}>Stop plan</button>
+      </div>
+      <p className="plan-opt-note">Your reading stays marked whatever you choose here.</p>
     </PlanSheet>
   );
 }
 
-/** Adjust, when the finish has moved: two choices in plain words (3.8). @param {{ run: any, now: Date, onClose: () => void }} props */
-function AdjustSheet({ run, now, onClose }) {
+/**
+ * Catch up, when the plan is behind (2235): the status in the same words, then three ways forward in plain words:
+ * read one more day's portion today, keep the daily amount (the finish moves), or finish on time (more each day).
+ * @param {{ run: any, now: Date, onClose: () => void, onReadTwo: (day: number, span: number) => void }} props
+ */
+function CatchUpSheet({ run, now, onClose, onReadTwo }) {
   const st = runStatus(run, now);
   const spread = spreadPreview(run, now);
+  // Today's portion and the next day's, or (today's already read) the next day's alone.
+  const two = st.doneToday ? dayItems(run, st.day) : dayItems(run, st.day).concat(st.day + 1 < st.total ? dayItems(run, st.day + 1) : []);
+  const canTwo = !st.finished && (st.doneToday ? two.length > 0 : st.day + 1 < st.total);
   return (
-    <PlanSheet id="plan-adjust" title="Adjust the plan" onClose={onClose}>
-      <p className="plan-sheet-sub">{'Finishes ' + shortDate(st.projected) + ' · ' + daysWord(st.late) + ' later than planned'}</p>
+    <PlanSheet id="plan-adjust" title="Catch up" onClose={onClose}>
+      <p className="plan-sheet-sub">{planStatus(run, now, st).text}</p>
       <ul className="root-list plan-choices">
+        {canTwo ? (
+          <li>
+            <button type="button" className="root-row" onClick={() => { onClose(); onReadTwo(st.day, st.doneToday ? 1 : 2); }}>
+              <span className="root-row-text">
+                <span className="root-row-title">{st.doneToday ? 'Read one more day today' : 'Read two days today'}</span>
+                <span className="root-row-sub">{itemsLabel(two, bookTitle) + ' · about ' + minText(minutesFor(itemsWords(two))) + ' · one day closer'}</span>
+              </span>
+            </button>
+          </li>
+        ) : null}
         <li>
           <button type="button" className="root-row" onClick={() => { saveRun(catchUp(run, new Date())); onClose(); }}>
             <span className="root-row-text">
               <span className="root-row-title">Keep my daily amount</span>
-              <span className="root-row-sub">{'The finish moves to ' + shortDate(st.projected)}</span>
+              <span className="root-row-sub">{'Same reading each day · the finish moves to ' + shortDate(st.projected)}</span>
             </span>
           </button>
         </li>
@@ -198,15 +217,17 @@ function AdjustSheet({ run, now, onClose }) {
 }
 
 /**
- * @param {{ run: any, now: Date, settingsOpen: boolean, onSettings: (open: boolean) => void,
- *   onRead: (day: number, k?: string) => void, onListen?: (refs: any[], name: string) => void, tracksOf?: (refs: any[]) => any[],
+ * @param {{ run: any, now: Date, settingsOpen: boolean, onSettings: (open: boolean) => void, catchUpAtOpen?: boolean, onStartOver?: () => void,
+ *   onRead: (day: number, k?: string, span?: number) => void, onListen?: (refs: any[], name: string) => void, tracksOf?: (refs: any[]) => any[],
  *   onSchedule: (at?: number) => void, onDaySheet: (day: number) => void, onNote?: (day: number) => void, noteOf?: (day: number) => string | null,
- *   onStopped: () => void, name: string }} props
+ *   onStopped: (prev: any) => void, name: string }} props
+ *   catchUpAtOpen: open on Catch up (Home's and the list's "N days behind")
  */
-export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name }) {
-  const [adjust, setAdjust] = React.useState(false);
-  const [allRoad, setAllRoad] = React.useState(false);
+export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = false, onStartOver, onRead, onListen, tracksOf, onSchedule, onDaySheet, onNote, noteOf, onStopped, name }) {
   const st = runStatus(run, now);
+  const status = planStatus(run, now, st);
+  const [adjust, setAdjust] = React.useState(() => catchUpAtOpen && status.key === 'behind');
+  const [allRoad, setAllRoad] = React.useState(false);
   const days = schedule(run, now, bookTitle);
   const ticks = run.ticks || {};
   const unit = unitWord(run);
@@ -220,7 +241,6 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
   // The day the Today card shows (today's portion, tomorrow's once done, the first day not yet counted before the start) is not repeated here.
   const coming = days.filter((d) => !d.done && d.day > st.day).slice(0, 3);
   const listenRefs = left.map((it) => itemRef(it.k));
-  const goldLate = !!(run.pace && run.pace.mode === 'by');
   const prevDay = st.doneToday ? st.day - 1 : -1;
   const roadNoun = road.length && road.every((s) => s.key.startsWith('b:')) ? 'books' : 'parts';
 
@@ -292,12 +312,14 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
         <div className="plan-progress-text">
           <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, (st.doneToday ? st.day : st.day + 1)) + ' of ' + st.total.toLocaleString('en-US')}</p>
           <p className="plan-progress-line">{st.itemsDone.toLocaleString('en-US') + ' of ' + st.itemsTotal.toLocaleString('en-US') + ' ' + unit + ' read'}</p>
-          {st.late > 0 ? (
-            <p className={'plan-progress-line plan-late' + (goldLate ? ' is-gold' : '')}>
-              {'Finishes ' + shortDate(st.projected) + ' · ' + daysWord(st.late) + ' later than planned '}
-              <button type="button" className="plan-text-btn plan-link" onClick={() => setAdjust(true)}>Adjust</button>
-            </p>
-          ) : <p className="plan-progress-line">{(st.paused ? 'Planned to finish ' : 'Finishes ') + shortDate(st.projected)}</p>}
+          {/* 2235: the plan's one status, the same words as Home and the Plans list; behind leads to Catch up. */}
+          <p className="plan-progress-line plan-status" data-status={status.key}>
+            <b>{status.text}</b>
+            {status.key === 'behind' ? null : <span>{' · ' + (st.paused ? 'planned to finish ' : 'finishes ') + finishDate(st.projected, now)}</span>}
+          </p>
+          {status.key === 'behind' ? (
+            <button type="button" className="ui-btn is-small plan-catchup-btn" onClick={() => setAdjust(true)}>Catch up</button>
+          ) : null}
         </div>
       </div>
 
@@ -309,13 +331,15 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
           <div className="plan-week-days">
             {week.week.map((d, i) => (
               <span key={d.date} className="plan-week-day" role="img"
-                aria-label={WEEK_NAMES[i] + ' ' + d.n + (d.today ? ', today' : '') + (d.done ? ', read' : '')}>
+                aria-label={WEEK_NAMES[i] + ' ' + d.n + (d.today ? ', today' : '') + (d.done ? ', read' : d.missed ? ', missed' : d.off ? ', no reading' : '')}>
                 <span className="plan-week-letter" aria-hidden="true">{WEEK_LETTERS[i]}</span>
-                <span className="plan-week-mark" data-done={d.done ? '1' : undefined} data-today={d.today ? '1' : undefined} aria-hidden="true">{d.n}</span>
+                <span className="plan-week-mark" data-done={d.done ? '1' : undefined} data-today={d.today ? '1' : undefined}
+                  data-missed={d.missed ? '1' : undefined} data-off={d.off ? '1' : undefined} aria-hidden="true">{d.n}</span>
               </span>
             ))}
           </div>
-          <p className="plan-week-line">{[week.inRow >= 2 ? week.inRow + ' days in a row' : '', week.weekDone + ' of ' + week.weekDays + ' this week'].filter(Boolean).join(' · ')}</p>
+          <p className="plan-week-line">{[week.inRow >= 2 ? week.inRow + ' days in a row' : '', week.weekDone + ' of ' + week.weekDays + ' this week',
+            week.week.some((d) => d.missed) ? 'dashed: missed' : ''].filter(Boolean).join(' · ')}</p>
         </div>
       )}
 
@@ -358,8 +382,9 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
         </>
       ) : null}
 
-      {adjust ? <AdjustSheet run={run} now={now} onClose={() => setAdjust(false)} /> : null}
-      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStopped={() => { onSettings(false); onStopped(); }} /> : null}
+      {adjust && !st.finished ? <CatchUpSheet run={run} now={now} onClose={() => setAdjust(false)} onReadTwo={(day, span) => onRead(day, undefined, span)} /> : null}
+      {settingsOpen ? <PlanSettings run={run} now={now} tracksOf={tracksOf} onClose={() => onSettings(false)} onStartOver={onStartOver}
+        onStopped={(prev) => { onSettings(false); onStopped(prev); }} /> : null}
     </div>
   );
 }

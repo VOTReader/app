@@ -50,8 +50,8 @@ afterEach(() => { cleanup(); delete globalThis.ReadingPlanStore; delete globalTh
 const base = (o) => ({ readingPlans: [], isRead: () => false, onPlansMoved: vi.fn(), onStartSession: vi.fn(), onBack: vi.fn(), ...o });
 /** The plan's own page, then its settings sheet (the gear). */
 const openSettings = () => {
-  fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: (Today|Done today|Starts|Day )/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
+  fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: (On track|Done today|Starts|Paused|[0-9]+ days? behind)/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
 };
 const planTracks = vi.fn((refs) => refs.map((r) => ({ url: U(r.bid + '-' + r.cid), key: r.bid + ':' + r.cid, title: r.bid + ' ' + r.cid })));
 

@@ -60,6 +60,7 @@ export function plansLine(runs, now = new Date()) {
     // plans2: one phrase per state, the same as the plan's own page (paused, a later start, the day).
     if (row.paused) first += ' · paused';
     else if (row.notStarted) first += ' · starts ' + shortDate(row.start).replace(/, \d{4}$/, '');
+    else if (row.status && row.status.key === 'behind') first += ' · ' + row.status.text;   // 2235: the status's own words
     else if (!row.finished) first += ' · day ' + (row.day + 1) + ' of ' + row.totalDays;
   } catch (_e) { /* a Volumes plan before the letters load: its name alone */ }
   return runs.length > 1 ? first + ' · and ' + (runs.length - 1) + ' more' : first;

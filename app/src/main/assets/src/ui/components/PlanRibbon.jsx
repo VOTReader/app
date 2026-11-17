@@ -21,7 +21,7 @@
 import { usePlanRuns, runRow, itemRef } from '../../utils/plan-runs-view.js';
 import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, itemKinds, sections, streak } from '../../data/plan-engine.js';
 import { bookTitle, runName } from '../../data/plan-catalog.js';
-import { usePlanSession, sessionKeyOf, sessionReachedEnd, sessionNotRead, sessionNextKey, endPlanSession, planSessionHost, sessionRun, refOf } from '../../utils/plan-session.js';
+import { usePlanSession, sessionKeyOf, sessionReachedEnd, sessionNotRead, sessionNextKey, endPlanSession, planSessionHost, sessionRun, refOf, sessionItems, sessionDaysLabel } from '../../utils/plan-session.js';
 import { useNow } from './TodayCard.jsx';
 import { PlanTick } from './PlanBits.jsx';
 
@@ -60,13 +60,14 @@ export function PlanSessionStrip({ bid, cid, inert }) {
   const run = sessionRun();
   if (!k || !run) return null;
   const ticks = run.ticks || {};
-  const items = dayItems(run, s.day);
+  const items = sessionItems(run, s);
   const left = items.filter((it) => !(it.k in ticks));
   const at = s.keys.indexOf(k);
+  const days = sessionDaysLabel(s);
   return (
-    <div className="plan-strip" role="status" aria-label={s.name + ', day ' + (s.day + 1) + ': ' + (at + 1) + ' of ' + s.keys.length}>
+    <div className="plan-strip" role="status" aria-label={s.name + ', ' + days + ': ' + (at + 1) + ' of ' + s.keys.length}>
       <div className="plan-strip-line">
-        <span className="plan-strip-name">{s.name + ' · Day ' + (s.day + 1)}</span>
+        <span className="plan-strip-name">{s.name + ' · ' + days.charAt(0).toUpperCase() + days.slice(1)}</span>
         <span className="plan-strip-left">{(at + 1) + ' of ' + s.keys.length + (left.length ? ' · ' + minutesFor(itemsWords(left)) + ' min left' : '')}</span>
       </div>
       <div className="plan-strip-segs" aria-hidden="true">
@@ -176,9 +177,9 @@ function SessionEnd({ k }) {
           {'Next · ' + itemName(run, nextK) + ' →'}
         </button>
       ) : (
-        <button type="button" className="ui-btn is-primary is-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); finish(); }}>{'Finish day ' + (s.day + 1)}</button>
+        <button type="button" className="ui-btn is-primary is-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); finish(); }}>{'Finish ' + sessionDaysLabel(s)}</button>
       )}
-      {lastOne ? <p className="plan-end-note">{'Last one for today · about ' + minutesFor(itemsWords(dayItems(run, s.day).filter((it) => it.k === nextK))) + ' min'}</p> : null}
+      {lastOne ? <p className="plan-end-note">{'Last one for today · about ' + minutesFor(itemsWords(sessionItems(run, s).filter((it) => it.k === nextK))) + ' min'}</p> : null}
       <div className="plan-links plan-links-center">
         {ticked ? <button type="button" className="plan-text-btn plan-link" onClick={() => sessionNotRead(k)}>Not read yet</button> : null}
         <button type="button" className="plan-text-btn plan-link" onClick={() => { endPlanSession(); if (host) host.back(); }}>Stop for now</button>

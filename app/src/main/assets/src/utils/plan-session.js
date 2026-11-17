@@ -31,7 +31,8 @@
 import { untickItem, dayItems, tickItem, todayKey } from '../data/plan-engine.js';
 
 /**
- * @typedef {{ runId: string, day: number, keys: string[], name: string, wrote: string[], undone: string[] }} PlanSession
+ * @typedef {{ runId: string, day: number, keys: string[], name: string, wrote: string[], undone: string[], span?: number }} PlanSession
+ *   span: how many days the sitting holds, from `day` (2, "Read two days today" from Catch up, 2235; absent is 1)
  * @typedef {{ move: (ref: { bid: string, cid: any }) => void, back: () => void, markRead: (bid: string, cid: any) => void,
  *   unmarkRead: (bid: string, cid: any) => void, isRead: (bid: string, cid: any) => boolean,
  *   openPlans: (views: any[]) => void, openNote: (runId: string, day: number) => void }} PlanSessionHost
@@ -63,21 +64,34 @@ export const planSessionHost = () => _host;
 export const planSession = () => _s;
 
 /**
- * Begin a sitting of day `day` of run `runId` (the caller opens the first item).
- * @param {{ runId: string, day: number, name: string }} p
+ * Begin a sitting of day `day` of run `runId` (the caller opens the first item); `days` 2 holds the next day's
+ * portion too (Catch up's "Read two days today").
+ * @param {{ runId: string, day: number, name: string, days?: number }} p
  * @returns {PlanSession | null}
  */
-export function beginPlanSession({ runId, day, name }) {
+export function beginPlanSession({ runId, day, name, days = 1 }) {
   const s = _store();
   const run = s ? s.get(runId) : null;
   if (!run) return null;
-  const keys = dayItems(run, day).map((it) => it.k);
+  const span = Math.max(1, Math.min(2, Math.floor(days) || 1));
+  /** @type {string[]} */ const keys = [];
+  for (let d = day; d < day + span; d++) for (const it of dayItems(run, d)) keys.push(it.k);
   if (!keys.length) return null;
-  _s = { runId, day, keys, name, wrote: [], undone: [] };
+  _s = { runId, day, keys, name, wrote: [], undone: [], ...(span > 1 ? { span } : {}) };
   _shown = false;
   _bump();
   return _s;
 }
+
+/** The items of the sitting, in order (one day's, or two). @param {any} run @param {PlanSession} s */
+export function sessionItems(run, s) {
+  const out = [];
+  for (let d = s.day; d < s.day + (s.span || 1); d++) out.push(...dayItems(run, d));
+  return out;
+}
+
+/** "day 12", or "days 12–13" for a two-day sitting. @param {PlanSession} s */
+export const sessionDaysLabel = (s) => ((s.span || 1) > 1 ? 'days ' + (s.day + 1) + '–' + (s.day + (s.span || 1)) : 'day ' + (s.day + 1));
 
 export function endPlanSession() { _shown = false; if (_s) { _s = null; _bump(); } }
 

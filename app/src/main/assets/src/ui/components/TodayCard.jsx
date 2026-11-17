@@ -12,15 +12,20 @@
      - not started: "Starts tomorrow" (or the date), no buttons
      - a plan just finished: "You finished Bible in a Year ›" until its page
        is opened or the row dismissed (never dropped silently)
-     - paused plans are not shown; nothing here ever says "catch up"
+     - 2235: the row's eyebrow carries the plan's one status (planStatus, the
+       same words as the Plans list and the plan page): "On track · Day 47 of
+       365", or "3 days behind · finishes Nov 14 ›", a tap that opens the plan
+       page on Catch up. Its height is the same in every state.
+     - a paused plan is one quiet line, "Bible in a Year · Paused" and Resume
+       (2235), inside the same two-row limit
    A tap on the text opens the plan's own page. Read starts a reading
    session on the portion (screen-routes readPlanRow); Listen plays it.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { volumeSequence } from '../../data/reading-plans.js';
-import { usePlanRuns, runRow, saveRun } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, runRow, saveRun, startsText } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
-import { dayNum, todayKey, finishUnseen } from '../../data/plan-engine.js';
+import { finishUnseen, resumeRun } from '../../data/plan-engine.js';
 import { useListenMinutes } from './OfflineAudioControls.jsx';
 
 /** The Volumes in site order from the loaded corpus; [] until it is in. */
@@ -46,14 +51,6 @@ export function useTodayRows(readingPlans, isRead, onLegacyMoved) {
   const store = /** @type {any} */ (globalThis).ReadingPlanStore;
   const done = (store && typeof store.all === 'function' ? store.all() : []).filter(finishUnseen);
   return runs.map((r) => runRow(r, now)).concat(done.map((/** @type {any} */ r) => ({ ...runRow(r, now), finished: true, name: runName(r, null) })));
-}
-
-/** "Starts tomorrow" or "Starts Thu Nov 12". @param {string} start @param {Date} now */
-function startsLine(start, now) {
-  const n = dayNum(start), t = dayNum(todayKey(now));
-  if (n != null && t != null && n === t + 1) return 'Starts tomorrow';
-  const d = n == null ? null : new Date(n * 86400000);
-  return d ? 'Starts ' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()] + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()] + ' ' + d.getUTCDate() : 'Starts soon';
 }
 
 /**
@@ -97,7 +94,8 @@ export function useNow() {
 /**
  * @typedef {{ id: string, name: string, loading: boolean, label: string, done: boolean, day: number,
  *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string,
- *   todayTicked?: number, todayCount?: number, minutes?: number, minutesLeft?: number, paused?: boolean, notStarted?: boolean, start?: string }} TodayRow
+ *   todayTicked?: number, todayCount?: number, minutes?: number, minutesLeft?: number, paused?: boolean, notStarted?: boolean, start?: string,
+ *   status?: { key: string, text: string, behind: number } }} TodayRow
  */
 
 /** The most plans the card shows; the rest are on the Reading plans screen. */
@@ -140,10 +138,25 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen, 
 /**
  * One plan's row. A tap on its text opens the plan's own page.
  * @param {{ r: TodayRow, many: boolean, onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
- *   onOpenPlan?: (planId: string) => void, onOpenPlans: () => void, tracksOf?: (refs: any[]) => any[], now: Date }} props
+ *   onOpenPlan?: (planId: string, opt?: { catchUp?: boolean }) => void, onOpenPlans: () => void, tracksOf?: (refs: any[]) => any[], now: Date }} props
  */
 function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf, now }) {
   const open = () => (onOpenPlan ? onOpenPlan(r.id) : onOpenPlans());
+  if (r.paused && !r.finished) {
+    // 2235: a paused plan is one quiet line and the one way back.
+    return (
+      <div className="upnext-row upnext-paused" data-plan={r.id}>
+        <button type="button" className="upnext-go upnext-paused-open" onClick={open} aria-label={'Open ' + r.name + ': paused'}>
+          <span className="upnext-paused-text">{r.name}<span className="upnext-paused-tag"> · Paused</span></span>
+        </button>
+        <button type="button" className="upnext-textlink" aria-label={'Resume ' + r.name} onClick={() => {
+          const store = /** @type {any} */ (globalThis).ReadingPlanStore;
+          const run = store && typeof store.get === 'function' ? store.get(r.id) : null;
+          if (run) saveRun(resumeRun(run, new Date()));
+        }}>Resume</button>
+      </div>
+    );
+  }
   if (r.finished) {
     return (
       <div className="upnext-row upnext-offer upnext-plan" data-plan={r.id}>
@@ -160,14 +173,21 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
     );
   }
   const dayText = r.loading || r.notStarted ? '' : 'Day ' + (r.day + 1) + ' of ' + r.totalDays;
-  const eyebrow = [many ? r.name : 'Today', dayText].filter(Boolean).join(' · ');
+  // 2235: the plan's one status, in the words every plan surface uses; behind is the way to Catch up.
+  const st = r.status || { key: '', text: '', behind: 0 };
+  const behind = !r.loading && st.key === 'behind';
+  const eyebrow = behind ? [many ? r.name : '', st.text].filter(Boolean).join(' · ')
+    : [many ? r.name : (st.key === 'ontrack' ? 'On track' : 'Today'), many && st.key === 'ontrack' ? 'On track' : dayText].filter(Boolean).join(' · ');
   const doneToday = !r.loading && r.done;
   const ready = !r.loading && !r.done && !r.notStarted && !!r.next;
-  const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? startsLine(r.start || '', now)
+  const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? startsText(r.start || '', now)
     : doneToday ? 'Done today' + (r.tomorrow ? ' · tomorrow ' + r.tomorrow : '') : r.label;
   return (
     <div className="upnext-row upnext-plan" data-plan={r.id}>
-      <span className="upnext-eyebrow">{eyebrow}</span>
+      {behind && onOpenPlan ? (
+        <button type="button" className="upnext-eyebrow upnext-status-btn" onClick={() => onOpenPlan(r.id, { catchUp: true })}
+          aria-label={(many ? r.name + ': ' : '') + st.text + '. Catch up'}>{eyebrow}<span aria-hidden="true"> ›</span></button>
+      ) : <span className="upnext-eyebrow">{eyebrow}</span>}
       {r.loading ? (
         <div className="upnext-text"><span className="upnext-title">{title}</span></div>
       ) : (
@@ -192,23 +212,26 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
 /**
  * Home's up-next card: a row per running plan (at most TODAY_MAX_ROWS), or the offer to start one, then `children`
  * (Home's Continue row) as the last row. Draws nothing when it would be empty.
- * Paused plans are not shown (P2 3.9); more than TODAY_MAX_ROWS plans end in "+N more", which opens Reading plans.
+ * A paused plan is one line with Resume (2235); more than TODAY_MAX_ROWS plans end in "+N more", which opens Reading plans.
  * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
- *   onOpenPlans: () => void, onOpenPlan?: (planId: string) => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
+ *   onOpenPlans: () => void, onOpenPlan?: (planId: string, opt?: { catchUp?: boolean }) => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
  *   offerStart?: boolean, onHideOffer?: () => void, tracksOf?: (refs: any[]) => any[], children?: any }} props
  *   markAsReadEnabled / onEnableMarkAsRead: no longer drawn (plans2: a plan's reads count with Mark as read off)
  */
 export function TodayCard({ rows, onRead, onListen, onOpenPlans, onOpenPlan, offerStart, onHideOffer, tracksOf, children }) {
   const now = useNow();
-  const live = (rows || []).filter((r) => !r.paused || r.finished);
+  // Running plans first, then paused ones (one line each, 2235), then a finish not yet seen.
+  const all = rows || [];
+  const live = all.filter((r) => !r.paused && !r.finished).concat(all.filter((r) => r.paused && !r.finished), all.filter((r) => r.finished));
   const shown = live.slice(0, TODAY_MAX_ROWS);
   const more = live.length - shown.length;
+  const full = shown.filter((r) => !(r.paused && !r.finished)).length;
   const offer = !shown.length && !!offerStart;
   if (!shown.length && !offer && !children) return null;
   return (
     <section className="upnext" aria-label="Up next">
       {shown.map((r) => (
-        <PlanRow key={r.id} r={r} many={shown.length > 1} onRead={onRead} onListen={onListen} onOpenPlans={onOpenPlans}
+        <PlanRow key={r.id} r={r} many={full > 1} onRead={onRead} onListen={onListen} onOpenPlans={onOpenPlans}
           onOpenPlan={onOpenPlan} tracksOf={tracksOf} now={now} />
       ))}
       {more > 0 ? <button type="button" className="upnext-textlink upnext-more" onClick={onOpenPlans}>{'+' + more + ' more'}</button> : null}

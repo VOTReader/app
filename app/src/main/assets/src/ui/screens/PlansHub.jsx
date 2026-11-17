@@ -5,8 +5,12 @@
    list, a plan's preview, the plan's own page, its whole schedule, a
    finished plan, the builder. Back pops a view; at the list it leaves.
    The top bar is back, the view's title and one gear (U rule 11): on a
-   plan's own page the plan's gear (its settings sheet), on every other view
-   the app's gear (Quick settings, GEAR1), so a page never shows two gears.
+   plan's own page "Manage" (the gear and the word, 2235: Corbin 11-16 "a
+   way to cancel the plan, change it"), which opens Manage plan; on every
+   other view the app's gear (Quick settings, GEAR1), so a page never shows
+   two gears. Stop and Start over are one tap each with Undo (a toast); a
+   stopped plan is kept under Past plans, where its page offers Continue
+   and Start over.
    History and theme stay off here. Each view gets a fresh scroll (the
    layout is keyed by the view), so nothing here writes scrollTop.
    The reading session itself (the reader's strip and end panel) is started
@@ -16,7 +20,8 @@
 
 import { usePlanNav, planNavMounted, keepPlanNav, pushPlanView, replacePlanView, popPlanView, planNavToList } from '../../utils/plan-nav.js';
 import { endPlanSession } from '../../utils/plan-session.js';
-import { usePlanRuns, saveRun, shortDate } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, saveRun, shortDate, runRow, continueRun, startOverRun } from '../../utils/plan-runs-view.js';
+import { showUndoToast } from '../../utils/toast.js';
 import { runStatus, newRun, dayNum, itemKinds, againPace } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
@@ -87,10 +92,32 @@ function PlanFinished({ run, onFind, onAgain, onDone }) {
 }
 
 /**
+ * A stopped plan's page (2235): what was read stays, and the two ways back: Continue where it stopped (the stopped
+ * days become a pause, never missed) or Start over from day 1 (a new run; this one stays here).
+ * @param {{ run: any, now: Date, onContinue: () => void, onStartOver: () => void, onDone: () => void }} props
+ */
+function PlanStopped({ run, now, onContinue, onStartOver, onDone }) {
+  const st = runStatus(run, now);
+  const row = runRow(run, now);
+  return (
+    <div className="root-screen plans-hub plan-finished plan-stopped">
+      <h2 className="plan-daydone-title">{'You stopped ' + runName(run, null)}</h2>
+      <p className="plan-daydone-sub">{(run.stopped ? 'Stopped ' + shortDate(run.stopped) + ' · ' : '') + 'day ' + Math.min(st.total, st.day + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
+      <p className="plan-daydone-sub">{row.counts + ' read'}</p>
+      <button type="button" className="ui-btn is-primary is-wide" onClick={onContinue}>Continue where I stopped</button>
+      <button type="button" className="ui-btn is-wide" onClick={onStartOver}>Start over from day 1</button>
+      <div className="plan-links plan-links-center"><button type="button" className="plan-text-btn plan-link" onClick={onDone}>Done</button></div>
+    </div>
+  );
+}
+
+const MANAGE_TOAST = 'vot-toast-plan-manage';
+
+/**
  * @param {{ readingPlans?: any, isRead: (bid: string, cid: any) => boolean, onPlansMoved?: (left: any[]) => void,
  *   onBack: () => void, backLabel?: string, onSearch?: () => void, onListen?: (refs: any[], name: string) => void,
  *   planTracks?: (refs: any[]) => any[], onNote?: (entryId: string) => void,
- *   onStartSession: (runId: string, day: number, k?: string) => void }} props
+ *   onStartSession: (runId: string, day: number, k?: string, span?: number) => void }} props
  */
 export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel = 'Library', onSearch, onListen, planTracks, onNote, onStartSession }) {
   // Before the first read of the stack: an entry from outside starts at the list; a session or a note coming back keeps it.
@@ -116,22 +143,41 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
   }, [stack.length, top]);
   const store = _store();
+  // 2235: Past plans, finished and stopped, newest first (a stopped plan was hidden for good before).
+  const pastOn = (/** @type {any} */ r) => (r.status === 'finished' ? r.finished : r.stopped) || '';
   /** @type {any[]} */
   const finished = (store && typeof store.all === 'function' ? store.all() : [])
-    .filter((/** @type {any} */ r) => r.status === 'finished' && r.finished)
-    .sort((/** @type {any} */ a, /** @type {any} */ b) => (a.finished < b.finished ? 1 : a.finished > b.finished ? -1 : 0));
+    .filter((/** @type {any} */ r) => (r.status === 'finished' && r.finished) || r.status === 'stopped')
+    .sort((/** @type {any} */ a, /** @type {any} */ b) => (pastOn(a) < pastOn(b) ? 1 : pastOn(a) > pastOn(b) ? -1 : 0));
   const runOf = (/** @type {string} */ id) => (store ? store.get(id) : null);
   const back = () => { if (!popPlanView()) onBack(); };
-  /** @param {any} run @param {number} day @param {string} [k] */
-  const readDay = (run, day, k) => onStartSession(run.id, day, k);
+  /** @param {any} run @param {number} day @param {string} [k] @param {number} [span] */
+  const readDay = (run, day, k, span) => (span ? onStartSession(run.id, day, k, span) : onStartSession(run.id, day, k));
   const note = onNote ? (/** @type {any} */ run, /** @type {number} */ day) => writePlanNote(run, day, onNote) : null;
+  // 2235: Stop and Start over are one tap each; the toast's Undo puts the plan back as it was.
+  const stopped = (/** @type {any} */ prev) => {
+    planNavToList();
+    showUndoToast(MANAGE_TOAST, 'Stopped ' + runName(prev, null), () => saveRun(prev));
+  };
+  const startOver = (/** @type {any} */ prev) => {
+    const [old, fresh] = startOverRun(prev, new Date());
+    if (old !== prev) saveRun(old);
+    saveRun(fresh);
+    replacePlanView({ v: 'plan', id: fresh.id });
+    showUndoToast(MANAGE_TOAST, 'Started over from day 1', () => {
+      const s = _store();
+      if (s && typeof s.remove === 'function') s.remove(fresh.id);
+      saveRun(prev);
+      replacePlanView({ v: prev.status === 'stopped' ? 'stopped' : 'plan', id: prev.id });
+    });
+  };
 
   let title = 'Reading plans';
   let gear = false;
   let body = null;
   const v = /** @type {any} */ (top || { v: 'list' });
   const run = v.id ? runOf(v.id) : null;
-  if ((v.v === 'plan' || v.v === 'schedule' || v.v === 'finished') && !run) {
+  if ((v.v === 'plan' || v.v === 'schedule' || v.v === 'finished' || v.v === 'stopped') && !run) {
     body = null;   // a run stopped or removed meanwhile: the effect below goes back to the list
   } else if (v.v === 'preview') {
     body = <PlanPreview key={v.plan + (v.opt ? ':' + v.opt.volKey : '')} planId={v.plan} opt={v.opt} now={now} lettersReady={lettersReady} isRead={isRead}
@@ -148,15 +194,21 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
     body = <PlanFinished run={run} onFind={() => { planNavToList(); setFindFocus((n) => n + 1); }}
       onAgain={() => { const r = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: againPace(run), weekdays: run.weekdays }, new Date()); saveRun(r); replacePlanView({ v: 'plan', id: r.id }); }}
       onDone={back} />;
+  } else if ((v.v === 'stopped' || v.v === 'plan') && run && run.status === 'stopped') {
+    title = runName(run, null);
+    body = <PlanStopped run={run} now={now} onDone={back}
+      onContinue={() => { saveRun(continueRun(run, new Date())); replacePlanView({ v: 'plan', id: run.id }); }}
+      onStartOver={() => startOver(run)} />;
   } else if (v.v === 'plan' && run) {
     title = runName(run, null);
     gear = true;
     body = (
-      <PlanPage run={run} now={now} name={title} settingsOpen={settings} onSettings={setSettings}
-        onRead={(day, k) => readDay(run, day, k)} onListen={onListen} tracksOf={planTracks}
+      <PlanPage key={run.id} run={run} now={now} name={title} settingsOpen={settings} onSettings={setSettings} catchUpAtOpen={!!v.catchUp}
+        onStartOver={() => { setSettings(false); startOver(run); }}
+        onRead={(day, k, span) => readDay(run, day, k, span)} onListen={onListen} tracksOf={planTracks}
         onSchedule={(at) => pushPlanView({ v: 'schedule', id: run.id, at })} onDaySheet={setDaySheet}
         onNote={note ? (day) => note(run, day) : undefined} noteOf={(d) => planNoteOf(run, d)}
-        onStopped={() => planNavToList()} />
+        onStopped={(prev) => stopped(prev)} />
     );
   } else if (v.v === 'build') {
     title = 'Build a plan';
@@ -174,12 +226,13 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   } else {
     body = (
       <ReadingPlansScreen runs={runs} finished={finished} now={now} lettersReady={lettersReady} findFocus={findFocus}
-        onOpenPlan={(id) => pushPlanView({ v: 'plan', id })} onOpenFinished={(id) => pushPlanView({ v: 'finished', id })}
+        onOpenPlan={(id, o) => pushPlanView({ v: 'plan', id, ...(o && o.catchUp ? { catchUp: true } : {}) })}
+        onOpenFinished={(id) => { const r = runOf(id); pushPlanView({ v: r && r.status === 'stopped' ? 'stopped' : 'finished', id }); }}
         onPreview={(plan) => pushPlanView({ v: 'preview', plan, opt: planDef(plan) && plan === 'collection' ? { volKey: 'one' } : undefined })}
         onBuild={() => { setBuildStep(1); pushPlanView({ v: 'build' }); }} />
     );
   }
-  const missing = (v.v === 'plan' || v.v === 'schedule' || v.v === 'finished') && !v.preview && !run;
+  const missing = (v.v === 'plan' || v.v === 'schedule' || v.v === 'finished' || v.v === 'stopped') && !v.preview && !run;
   React.useEffect(() => { if (missing) planNavToList(); }, [missing]);
   const sheetRun = v.v === 'plan' && run ? run : null;
   return (
@@ -187,7 +240,7 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
       onBack: v.v === 'build' && buildStep === 2 ? () => setBuildStep(1) : back, backLabel: stack.length > 1 ? 'Reading plans' : backLabel, showHome: false,
       leftExtras: <PlanBarTitle title={title} />,
       onSearch, hide: ['history', 'theme'].concat(gear ? ['settings'] : [], stack.length > 1 || !onSearch ? ['search'] : []),
-      rightExtras: gear ? <button type="button" className="root-gear-btn plan-gear" title="Plan settings" aria-label="Plan settings" onClick={() => setSettings(true)}>{GEAR}</button> : null,
+      rightExtras: gear ? <button type="button" className="plan-manage-btn" title="Manage plan" aria-label="Manage plan" onClick={() => setSettings(true)}>{GEAR}<span aria-hidden="true">Manage</span></button> : null,
     })}>
       {body}
       {sheetRun && daySheet != null ? <DaySheet run={sheetRun} day={daySheet} now={now} onClose={() => setDaySheet(null)} onRead={(day, k) => readDay(sheetRun, day, k)} /> : null}

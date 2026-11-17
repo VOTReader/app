@@ -10,7 +10,7 @@
    this file is bundle-d), so it is read at call time, never imported.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey } from '../data/plan-engine.js';
+import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace } from '../data/plan-engine.js';
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
@@ -60,6 +60,44 @@ export function unitOf(run) {
 /** "1 day", "4 days". @param {number} n */
 export const daysWord = (n) => n.toLocaleString('en-US') + (n === 1 ? ' day' : ' days');
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** 'YYYY-MM-DD' as "Nov 14", with the year when it is not `now`'s ("Nov 10, 2027"). @param {string} key @param {Date} now */
+export function finishDate(key, now) {
+  const full = shortDate(key);
+  return full.endsWith(', ' + now.getFullYear()) ? full.slice(0, -6) : full;
+}
+
+/** "Starts tomorrow" or "Starts Fri Nov 20". @param {string} start @param {Date} now */
+export function startsText(start, now) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start || '');
+  if (!m) return 'Starts soon';
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  const t = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  if (d.getTime() === t.getTime()) return 'Starts tomorrow';
+  return 'Starts ' + WEEKDAYS[d.getUTCDay()] + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
+}
+
+/**
+ * THE one status of a plan, in the same words on Home's card, the Plans list and the plan's own page (task 2235,
+ * Corbin 11-16: "intuitive and easy to understand at a glance"). One phrase, kind and plain: a paused plan or one not
+ * started is never behind, and nothing is red.
+ * - behind: READING days of schedule slip (runStatus.behind), never calendar lateness: a Mon-Fri plan that missed a
+ *   Friday is "1 day behind" though its finish moves three calendar days (the finish date carries that). It shrinks
+ *   as the reader catches up and goes once Catch up keeps the daily amount or finishes on time; the dates that went
+ *   unread stay on the week strip and in the month (streak / monthCells), as history.
+ * @param {PlanRun} run @param {Date} now @param {ReturnType<typeof runStatus>} [st]
+ * @returns {{ key: 'stopped' | 'finished' | 'paused' | 'starts' | 'behind' | 'done' | 'ontrack', text: string, behind: number }}
+ */
+export function planStatus(run, now, st = runStatus(run, now)) {
+  if (run.status === 'stopped') return { key: 'stopped', text: run.stopped ? 'Stopped ' + finishDate(run.stopped, now) : 'Stopped', behind: 0 };
+  if (st.finished) return { key: 'finished', text: 'Finished', behind: 0 };
+  if (st.paused) return { key: 'paused', text: 'Paused', behind: 0 };
+  if (st.notStarted) return { key: 'starts', text: startsText(run.start, now), behind: 0 };
+  if (st.behind > 0) return { key: 'behind', text: daysWord(st.behind) + ' behind · finishes ' + finishDate(st.projected, now), behind: st.behind };
+  if (st.doneToday) return { key: 'done', text: 'Done today', behind: 0 };
+  return { key: 'ontrack', text: 'On track', behind: 0 };
+}
+
 /**
  * A run's row for the Today card and the Plans screen.
  * @param {PlanRun} run @param {Date} now
@@ -95,6 +133,7 @@ export function runRow(run, now) {
     minutesLeft: (() => { const w = itemsWords(today.filter((it) => !(it.k in ticks))); return w ? minutesFor(w) : 0; })(),
     itemsDone: st.itemsDone, itemsTotal: st.itemsTotal, projected: st.projected, target: st.target,
     counts: fmt(st.itemsDone) + ' of ' + fmt(st.itemsTotal) + ' ' + unitOf(run), pace,
+    status: planStatus(run, now, st),
   };
 }
 
@@ -141,8 +180,30 @@ export function usePlanRuns(opt = {}) {
 /** Save a changed run. @param {PlanRun} run */
 export function saveRun(run) { const s = _store(); if (s) s.put(run); }
 
-/** Stop a run: it stays on the device, stopped (finished runs are the archive; stopped ones are not shown). */
+/** Stop a run: it stays on the device, stopped, and is listed under Past plans (2235) with Continue and Start over. */
 export function stopRun(run, now) { saveRun({ ...run, status: 'stopped', updated: now.getTime(), stopped: todayKey(now) }); }
+
+/**
+ * Continue a stopped run where it stopped (2235): the days it was stopped become a pause, so they are neither missed
+ * nor behind, and the planned finish moves on by them (resumeRun). @param {PlanRun} run @param {Date} now @returns {PlanRun}
+ */
+export function continueRun(run, now) {
+  const { stopped, ...rest } = run;
+  const asPaused = /** @type {PlanRun} */ ({ ...rest, status: 'paused', paused: stopped || todayKey(now) });
+  return resumeRun(asPaused, now);
+}
+
+/**
+ * Start a run over from its first day (2235): a new run of the same plan, pace and days from today; the old one is
+ * kept, stopped, under Past plans with its ticks. Returns [old as stopped, new]. @param {PlanRun} run @param {Date} now
+ */
+export function startOverRun(run, now) {
+  const fresh = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: againPace(run), weekdays: run.weekdays }, now);
+  if (run.remind) fresh.remind = run.remind;
+  if (run.autoAudio === false) fresh.autoAudio = false;
+  const old = run.status === 'stopped' ? run : { ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) };
+  return [old, fresh];
+}
 
 /**
  * rp-s1, mounted once at the app: hands the native reminder the runs on every store change and at boot (a stop,

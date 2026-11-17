@@ -3578,6 +3578,36 @@
     .plan-sheet-body .root-list { margin-bottom: 4px; }
     .plan-sheet-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
     .plan-sheet-actions .plan-danger { margin-left: auto; }
+    /* 2235 (Corbin 11-16: reading plans "intuitive and easy to understand at a glance"). One status on every plan
+       surface (planStatus); behind leads to Catch up; missed reading days are dashed and muted, never red; a day the
+       plan does not read on is faint. Manage in the bar is the gear and the word. */
+    .plan-sheet-actions { flex-wrap: wrap; }
+    .plan-sheet-actions .plan-stop-btn { margin-left: auto; }
+    .top-nav .plan-manage-btn { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 12px 0 9px; border: 1px solid var(--gold-border); border-radius: var(--r-pill); background: none; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); letter-spacing: 0.02em; cursor: pointer; flex-shrink: 0; }
+    .top-nav .plan-manage-btn svg { width: 18px; height: 18px; stroke-width: 1.7; }
+    @media (hover: hover) { .top-nav .plan-manage-btn:hover { background: var(--surface-1); } }
+    .plan-run-li.is-behind { display: flex; align-items: center; }
+    .plan-run-li.is-behind > .plan-run-row { flex: 1 1 auto; min-width: 0; }
+    .plan-run-li.is-behind > .plan-catchup-btn { flex: none; margin: 0 var(--sp-3) 0 4px; }
+    .plan-catchup-btn { border: 1px solid var(--gold-border); color: var(--gold); }
+    .plan-state[data-status="behind"] { white-space: normal; }   /* the whole phrase, finish date and all */
+    .plan-list > li.is-behind + li .root-row { border-top: 0; }
+    .plan-list > li + li.is-behind, .plan-list > li.is-behind + li { border-top: 1px solid var(--border); }
+    .plan-list > li + li.is-behind > .root-row { border-top: 0; }
+    .plan-status { margin-top: 2px; }
+    .plan-status b { color: var(--gold); font-weight: 500; }
+    .plan-progress-text .plan-catchup-btn { margin-top: 10px; }
+    .plan-week-mark[data-missed="1"] { border: 1.5px dashed var(--cream-muted); color: var(--cream-muted); }
+    .plan-week-mark[data-off="1"] { border-color: transparent; color: var(--cream-muted); opacity: 0.55; }
+    .plan-cal-day[data-missed="1"] { border: 1.5px dashed var(--cream-muted); box-sizing: border-box; color: var(--cream-muted); }
+    .plan-cal-key { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-13); }
+    .plan-cal-key .plan-cal-day { width: 16px; height: 16px; color: transparent; }
+    .upnext-status-btn { position: relative; justify-self: start; max-width: 100%; margin: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+    .upnext-status-btn::after { content: ''; position: absolute; inset: -10px 0; }
+    .upnext-row.upnext-paused { padding-top: var(--sp-1); padding-bottom: var(--sp-1); }
+    .upnext-paused-open { flex: 1 1 auto; min-width: 0; min-height: 40px; display: flex; align-items: center; margin: 0; padding: 0; border: 0; background: none; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); text-align: left; cursor: pointer; }
+    .upnext-paused-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upnext-paused-tag { color: var(--text-2); }
     .plan-sheet-foot { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
     .plan-sheet-foot .plan-text-btn:last-child { color: var(--gold); font-weight: 600; }
     /* Day done and the finish page. */

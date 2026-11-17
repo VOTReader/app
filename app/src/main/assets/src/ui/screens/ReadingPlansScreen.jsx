@@ -4,11 +4,15 @@
    The hub's design (P2-plans-design.md 3.1, mock plans-sheet-2 right). The
    title sits in the top bar (PlansHub); the page has three parts:
    - Your plans: one row per running or paused plan, in start order: its
-     ring and percent, its name and one state line ("Today · Genesis 34-36 ·
-     1 of 3", "Done today · tomorrow: 3 letters", "Starts Thu Nov 12",
-     "Day 18 of 30 · waiting for you" with a Paused mark). A tap opens the
+     ring and percent, its name and one state line led by the plan's status
+     (planStatus, 2235: the same words as Home and the plan page): "On track
+     · Today: Genesis 34-36 · 1 of 3", "Done today · tomorrow: 3 letters",
+     "Starts Thu Nov 12", "Paused · Day 18 of 30", "3 days behind ·
+     finishes Nov 14" with a Catch up button beside it. A tap opens the
      plan's own page. No plans yet: one sentence and Find a plan (U rule 15).
-   - Finished: kept for good, newest first; a tap opens the finish page.
+   - Past plans (2235): finished and stopped plans, kept for good, newest
+     first; a tap opens the finish page, or a stopped plan's page with
+     Continue and Start over.
    - Find a plan: Start here, The Scriptures, The Letters, Together, then
      Build your own plan. Each row says what it is and its minutes a day
      and days, computed from its items. A tap opens the preview; it never
@@ -16,28 +20,35 @@
    Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runRow, letterSource, shortDate } from '../../utils/plan-runs-view.js';
+import { runRow, letterSource, shortDate, planStatus } from '../../utils/plan-runs-view.js';
 import { runStatus, itemsLabel, itemsCount, dayNum } from '../../data/plan-engine.js';
 import { PLAN_CATALOG, PLAN_GROUPS, catalogFacts, runName, bookTitle } from '../../data/plan-catalog.js';
-import { PlanRing, PlanSec, CHEVRON, dayDate, countOf } from '../components/PlanBits.jsx';
+import { PlanRing, PlanSec, CHEVRON, countOf } from '../components/PlanBits.jsx';
 
 /**
- * A running plan's one state line. @param {any} run @param {Date} now
- * @returns {{ lead: string, rest: string, paused: boolean }}
+ * A running plan's one state line, led by its status (planStatus). @param {any} run @param {Date} now
+ * @returns {{ lead: string, rest: string, paused: boolean, behind: boolean }}
  */
 export function planStateLine(run, now) {
   const st = runStatus(run, now);
-  const row = runRow(run, now);
-  if (st.paused) return { lead: '', rest: 'Day ' + (st.day + 1) + ' of ' + st.total + ' · waiting for you', paused: true };
-  if (st.notStarted) return { lead: '', rest: 'Starts ' + dayDate(run.start), paused: false };
-  if (st.finished) return { lead: 'Finished', rest: '', paused: false };
-  if (st.doneToday) {
+  const status = planStatus(run, now, st);
+  const line = (/** @type {string} */ lead, rest = '') => ({ lead, rest, paused: status.key === 'paused', behind: status.key === 'behind' });
+  if (status.key === 'paused') return line('Paused', 'Day ' + (st.day + 1) + ' of ' + st.total);
+  if (status.key === 'starts' || status.key === 'finished' || status.key === 'behind') return line(status.text);
+  if (status.key === 'done') {
     const next = st.todayItems;
     const label = itemsLabel(next, bookTitle);
-    return { lead: 'Done today', rest: next.length ? 'tomorrow: ' + (label.length <= 24 ? label : itemsCount(next)) : '', paused: false };
+    return line('Done today', next.length ? 'tomorrow: ' + (label.length <= 24 ? label : itemsCount(next)) : '');
   }
+  const row = runRow(run, now);
   const n = row.items.length;
-  return { lead: 'Today', rest: row.label + (n > 1 ? ' · ' + row.todayTicked + ' of ' + n : ''), paused: false };
+  return line('On track', 'Today: ' + row.label + (n > 1 ? ' · ' + row.todayTicked + ' of ' + n : ''));
+}
+
+/** "Stopped Nov 10 · day 11 of 365" for a stopped run. @param {any} r @param {Date} now */
+export function stoppedLine(r, now) {
+  const st = runStatus(r, now);
+  return planStatus(r, now, st).text + ' · day ' + Math.min(st.total, st.day + 1) + ' of ' + st.total.toLocaleString('en-US');
 }
 
 /** "8 days · finished Oct 30" for a finished run. @param {any} r */
@@ -49,8 +60,9 @@ export function finishedLine(r) {
 
 /**
  * @param {{ runs: any[], finished: any[], now: Date, lettersReady: boolean,
- *   onOpenPlan: (id: string) => void, onOpenFinished: (id: string) => void, onPreview: (planId: string) => void,
+ *   onOpenPlan: (id: string, opt?: { catchUp?: boolean }) => void, onOpenFinished: (id: string) => void, onPreview: (planId: string) => void,
  *   onBuild: () => void, findFocus?: number }} props
+ *   finished: the past plans, finished and stopped (2235), newest first
  *   findFocus: bumped by "Find the next plan" (the finish page) to bring Find a plan into view
  */
 export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPlan, onOpenFinished, onPreview, onBuild, findFocus = 0 }) {
@@ -75,17 +87,20 @@ export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPl
             const line = planStateLine(run, now);
             const name = runName(run, null);
             return (
-              <li key={run.id}>
+              <li key={run.id} className={line.behind ? 'plan-run-li is-behind' : 'plan-run-li'}>
                 <button type="button" className="root-row plan-run-row" onClick={() => onOpenPlan(run.id)}
-                  aria-label={name + ': ' + [line.lead, line.rest].filter(Boolean).join(' · ') + (line.paused ? ', paused' : '')}>
+                  aria-label={name + ': ' + [line.lead, line.rest].filter(Boolean).join(' · ')}>
                   <PlanRing percent={runStatus(run, now).percent} />
                   <span className="root-row-text">
                     <span className="root-row-title">{name}</span>
-                    <span className="root-row-sub plan-state">{line.lead ? <b>{line.lead}</b> : null}{line.lead && line.rest ? ' · ' : ''}{line.rest}</span>
+                    <span className="root-row-sub plan-state" data-status={line.paused ? 'paused' : line.behind ? 'behind' : undefined}>{line.lead ? <b>{line.lead}</b> : null}{line.lead && line.rest ? ' · ' : ''}{line.rest}</span>
                   </span>
-                  {line.paused ? <span className="plan-tag" aria-hidden="true">Paused</span> : null}
-                  {CHEVRON}
+                  {line.behind ? null : CHEVRON}
                 </button>
+                {line.behind ? (
+                  <button type="button" className="ui-btn is-small plan-catchup-btn" aria-label={'Catch up: ' + name}
+                    onClick={() => onOpenPlan(run.id, { catchUp: true })}>Catch up</button>
+                ) : null}
               </li>
             );
           })}
@@ -99,15 +114,15 @@ export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPl
 
       {finished.length ? (
         <>
-          <PlanSec title="Finished" link={finished.length > 2 ? (allFinished ? 'Fewer' : 'All ' + finished.length) : undefined}
+          <PlanSec title="Past plans" link={finished.length > 2 ? (allFinished ? 'Fewer' : 'All ' + finished.length) : undefined}
             onLink={() => setAllFinished(!allFinished)} />
-          <ul className="root-list plan-list" aria-label="Finished">
+          <ul className="root-list plan-list" aria-label="Past plans">
             {shownFinished.map((r) => (
               <li key={r.id}>
                 <button type="button" className="root-row" onClick={() => onOpenFinished(r.id)}>
                   <span className="root-row-text">
                     <span className="root-row-title">{runName(r, null)}</span>
-                    <span className="root-row-sub">{finishedLine(r)}</span>
+                    <span className="root-row-sub">{r.status === 'stopped' ? stoppedLine(r, now) : finishedLine(r)}</span>
                   </span>
                   {CHEVRON}
                 </button>
