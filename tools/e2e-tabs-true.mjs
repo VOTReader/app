@@ -352,6 +352,18 @@ async function main() {
     const touchStartMs = Date.now() - t0;
     for (let i = 1; i <= 24; i++) { const d = Math.round(dx * i / 24); await touch('touchMove', x0 + d); log.push({ t: wall(), dx: d }); await sleep(16); }
     await sleep(250);   // hold still: the last frames before release show the finished drag
+    // rel4: under load the screencast can send nothing after the last move, so the newest frame before the lift was
+    // mid-drag and S1 compared part of the old page (Genesis 49 for 50, mad 18). Hold the lift until a frame captured
+    // after the last move is in (2 s); if none comes, move the finger off by a pixel and back once (a lift here would
+    // turn the page, so the swipe cannot be redone) and wait again. Still none: S0, the walk's camera, not the page.
+    const finished = async () => { const tm = log[log.length - 1].t; for (let w = 0; w < 40; w++) { if (frames.some((f) => f.t > tm)) return true; await sleep(50); } return false; };
+    let nudged = false;
+    if (!(await finished())) {
+      nudged = true;
+      await touch('touchMove', x0 + dx + 1); log.push({ t: wall(), dx: dx + 1 }); await sleep(16);
+      await touch('touchMove', x0 + dx); log.push({ t: wall(), dx });
+      await finished();
+    }
     const peekSig = await pageSig(`.screen-layout > .pager-viewport > .pager-peek-${dir} > .screen-scroll`);
     if (atRel) await atRel();   // TABS5: a look at the drawn neighbour with the finger still down
     // With --shots, a swipe that fails S1/S2 keeps every frame and what changed in the page around release (2045).
@@ -403,12 +415,18 @@ async function main() {
       savePair(`tabs2-swipe-${label}-x${throttle}-release.png`, frames[r.release].url);
       savePair(`tabs2-swipe-${label}-x${throttle}-settled.png`, frames[frames.length - 1].url);
     }
-    need(r.release >= 0 && r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
+    r.releaseDx = r.release >= 0 ? frames[r.release].dx : null; if (nudged) r.nudged = true;
+    const relDone = r.releaseDx === dx;
+    need(relDone, `S0 ${label} x${throttle}: no frame of the finished drag before the lift (the walk's camera, not the page: release frame at dx ${r.releaseDx} of ${dx})`);
+    if (relDone) need(r.drag && r.drag.mad <= LIMITS.dragMad, `S1 ${label} x${throttle}: neighbour at release differs from the page it becomes (mad ${r.drag && r.drag.mad})`);
     need(r.settleJump <= LIMITS.settleJump, `S2 ${label} x${throttle}: the picture changed after the settle (mad ${r.settleJump} at +${r.settleJumpAtMs} ms${r.endLagMs ? `; lift handled +${r.endLagMs} ms late` : ''})`);
     need(r.inkRatio == null || r.inkRatio >= LIMITS.inkRatio, `S3 ${label} x${throttle}: a drag frame showed a blank or half-built neighbour (ink ratio ${r.inkRatio})`);
     need(!domDiff, `S4 ${label} x${throttle}: the neighbour at release is not the page it becomes (${domDiff})`);
-    if (SHOTS && (!(r.release >= 0 && r.drag && r.drag.mad <= LIMITS.dragMad) || r.settleJump > LIMITS.settleJump)) {
-      const dir = join(SHOTS, `fail-${label}-x${throttle}`); mkdirSync(dir, { recursive: true });
+    // rel4: an S0/S1/S2 keeps its frames even without --shots (in the temp dir; the path is printed), so a gate's
+    // finding comes with pictures.
+    if (!relDone || !(r.drag && r.drag.mad <= LIMITS.dragMad) || r.settleJump > LIMITS.settleJump) {
+      const dir = join(SHOTS || join(tmpdir(), 'vot-e2e-tabs-fail-' + process.pid), `fail-${label}-x${throttle}`); mkdirSync(dir, { recursive: true });
+      console.log(`[swipe] ${label} x${throttle}: frames kept in ${dir}`);
       frames.forEach((f, i) => writeFileSync(join(dir, `${String(i).padStart(3, '0')}_${Math.round((f.t - tRel) * 1000)}ms${i === r.release ? '_release' : ''}${i === r.settleJumpIdx ? '_jump' : ''}.png`), Buffer.from(f.url.split(',')[1], 'base64')));
       writeFileSync(join(dir, 'mutations.json'), JSON.stringify(muts.map((m) => ({ ms: Math.round((m.t - tRel) * 1000), ...m, t: undefined })), null, 1));
       writeFileSync(join(dir, 'r.json'), JSON.stringify({ ...r, rect, overlaysAt: ov }, null, 1));
