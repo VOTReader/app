@@ -88,9 +88,15 @@ function usePlaceholder(inputRef) {
       try { ctx = document.createElement('canvas').getContext('2d'); } catch (_e) { ctx = null; }
       if (!ctx) return;
       const cs = getComputedStyle(el);
-      ctx.font = 'italic ' + cs.fontSize + ' ' + cs.fontFamily;
+      // measure in the placeholder's own face: the landing draws it upright, and italic measured narrower (0125)
+      let ps = null;
+      try { ps = getComputedStyle(el, '::placeholder'); } catch (_e) { ps = null; }
+      const f = ps && ps.fontFamily ? ps : cs;
+      ctx.font = [f.fontStyle || 'normal', f.fontWeight || '400', f.fontSize || cs.fontSize, f.fontFamily || cs.fontFamily].join(' ');
       const room = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
-      if (room > 0) setPh(ctx.measureText(ANSWERS_ASK_LEAD).width <= room ? ANSWERS_ASK_LEAD : 'Search Answers…');
+      // 0125: at text 2.0 on 360 px even "Search Answers…" was cut ("Search Answer…"): the last step is "Search…"
+      const ls = parseFloat(f.letterSpacing) || 0;   // 1 px at 30 px text: 15 more px than the canvas says
+      if (room > 0) setPh([ANSWERS_ASK_LEAD, 'Search Answers…'].find((t) => ctx.measureText(t).width + ls * t.length <= room) || 'Search…');
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return undefined;

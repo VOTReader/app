@@ -181,6 +181,10 @@ describe('AnswersHome — the landing (0125: ask, then browse)', () => {
       expect(narrow.ph).toBe('Search Answers…');
       expect(narrow.text).toBe('What does The Lord say about…');
       expect(narrow.beforeQs).toBe(true);
+      // 0125: narrower still (360 px at text 2.0), "Search…", never a cut "Search Answer…"
+      const tight = run(100);
+      expect(tight.ph).toBe('Search…');
+      expect(tight.text).toBe('What does The Lord say about…');
       const wide = run(600);
       expect(wide.ph).toBe('What does The Lord say about…');
       expect(wide.lead).toBeNull();
