@@ -154,15 +154,15 @@ describe('K3 -- kept rows, the Remove all strip, Find kept', () => {
     expect(byTitle('Lead Me To That Place').querySelector('.songs-row-kept')).toBeNull();
   });
 
-  it('(W2-05) Remove all asks in the Downloads screen\'s strip: Keep them, Yes, remove all', async () => {
+  it('(W2-05) Remove all asks in the one confirm, as a card: Keep them, Yes, remove all', async () => {
     await install({ kept: ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'] });
     renderScreen([{ k: 'list', v: 'kept' }]);
     fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
     const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
-    expect(strip.className).toContain('offline-confirm');
-    expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('offline-confirm-cancel');
+    expect(strip.className).toBe('ui-confirm is-card');
+    expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('ui-btn is-small is-text ui-confirm-cancel');
     const go = within(strip).getByRole('button', { name: 'Yes, remove all' });
-    expect(go.className).toBe('offline-confirm-go');
+    expect(go.className).toBe('ui-btn is-small ui-confirm-yes is-danger');
     expect(go.className).not.toContain('songs-shuffle');
     await act(async () => { fireEvent.click(go); });
     expect(store.map.size).toBe(0);
