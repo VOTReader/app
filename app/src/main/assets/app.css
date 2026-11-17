@@ -3357,7 +3357,9 @@
     .ui-confirm-line.is-warn { color: var(--tone-danger); }
     .ui-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); margin-left: auto; }
     /* Two buttons that do not fit side by side stack, each the full width, so neither floats alone at the right. */
-    .ui-confirm-actions > .ui-btn { flex: 1 0 auto; }
+    .ui-confirm-actions > .ui-btn { flex: 1 0 auto; max-width: 100%; }
+    /* x2.0 at 360: 'Cancel downloads' alone is wider than its card; it wraps inside the card instead of running past it. */
+    .vot-large-text .ui-confirm-actions > .ui-btn { white-space: normal; text-align: center; padding-block: 6px; }
     @media (hover:hover) {
       .upnext-pill:hover { background:var(--surface-3); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }
