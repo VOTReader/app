@@ -135,9 +135,10 @@ describe('OfflineLibrary repairs itself when the network returns', () => {
     await OfflineLibrary.check(() => w, 1000);
     expect(OfflineLibrary.getState().phase).toBe('incomplete');
     window.dispatchEvent(new Event('online'));
-    await settle();
+    // The repair's answer comes back over a MessageChannel: wait on the state, not on one tick (rel1: under a loaded
+    // machine the port's message landed after a single setTimeout(0) and the test saw 'retrying').
+    await vi.waitFor(() => expect(OfflineLibrary.getState().phase).toBe('fixed'), { timeout: 3000, interval: 5 });
     expect(w.asked).toEqual(['CHECK_OFFLINE', 'REPAIR_OFFLINE']);
-    expect(OfflineLibrary.getState().phase).toBe('fixed');
   });
   it('a reader who closed the banner is not shown it again while the repair runs', async () => {
     let answer;
@@ -145,12 +146,10 @@ describe('OfflineLibrary repairs itself when the network returns', () => {
     await OfflineLibrary.check(() => w, 1000);
     OfflineLibrary.dismiss();
     window.dispatchEvent(new Event('online'));
-    await settle();
-    expect(w.asked).toContain('REPAIR_OFFLINE');
+    await vi.waitFor(() => expect(w.asked).toContain('REPAIR_OFFLINE'), { timeout: 3000, interval: 5 });
     expect(OfflineLibrary.getState().phase).toBe('dismissed');
     answer();
-    await settle();
-    expect(OfflineLibrary.getState().phase).toBe('fixed');
+    await vi.waitFor(() => expect(OfflineLibrary.getState().phase).toBe('fixed'), { timeout: 3000, interval: 5 });
   });
   it('a whole library, or a repair already running, asks nothing more', async () => {
     const w = fakeWorker({ CHECK_OFFLINE: status([]) });

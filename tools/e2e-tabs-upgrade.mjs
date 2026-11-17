@@ -267,6 +267,12 @@ export async function runUpgrade(o = {}) {
     return page.evaluate(() => window.__ff);
   };
   const closeTabs = async () => { await page.keyboard.press('Escape'); await sleep(500); };
+  // PO2 item 26 (main 3526b4a9a): choosing Light or Dark closes the More menu itself. An Escape after it reached the
+  // page and went Back (Genesis 1 -> its chapter list): press it only while the menu is still open.
+  const closeMenu = async () => {
+    for (let i = 0; i < 20 && await page.evaluate(() => !!document.querySelector('.more-menu[role="menu"]')); i++) await sleep(50);
+    if (await page.evaluate(() => !!document.querySelector('.more-menu[role="menu"]'))) await page.keyboard.press('Escape');
+  };
   const pickTab = async (i) => { await page.evaluate((n) => document.querySelectorAll('.tabs-overview .tab-card-open')[n].click(), i); await sleep(1500); };
   const drawable = (k) => !['settings'].includes(k);
   // U4 spot check (hub, 11-12: usage): a letter and a Bible chapter, not every kind
@@ -305,7 +311,7 @@ export async function runUpgrade(o = {}) {
   const setTheme = async (theme) => {
     await pickTab(2);   // John 12, a reader with the More menu
     await clickText(/^More$/, 'button'); await clickText(new RegExp('^' + (theme === 'light' ? 'Light' : 'Dark') + '$'), 'button');
-    await page.keyboard.press('Escape'); await sleep(800);
+    await closeMenu(); await sleep(800);
   };
   /** U4: every card against its live page, visited after the cards are shot (the visit retakes the card). */
   const compare = async (label, shots) => {

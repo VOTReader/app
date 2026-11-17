@@ -254,6 +254,12 @@ async function main() {
     return urls;
   };
   const closeTabs = async () => { await page.keyboard.press('Escape'); await sleep(500); };
+  // PO2 item 26 (main 3526b4a9a): choosing Light or Dark closes the More menu itself. An Escape after it reached the
+  // page and went Back (Genesis 1 -> its chapter list): press it only while the menu is still open.
+  const closeMenu = async () => {
+    for (let i = 0; i < 20 && await page.evaluate(() => !!document.querySelector('.more-menu[role="menu"]')); i++) await sleep(50);
+    if (await page.evaluate(() => !!document.querySelector('.more-menu[role="menu"]'))) await page.keyboard.press('Escape');
+  };
   const pickTab = async (i) => { await page.evaluate((n) => document.querySelectorAll('.tabs-overview .tab-card-open')[n].click(), i); await sleep(1200); };
   const savePair = (name, dataUrl) => { if (SHOTS && dataUrl) writeFileSync(join(SHOTS, name), Buffer.from(dataUrl.split(',')[1], 'base64')); };
   const storage = () => page.evaluate(() => new Promise((res) => {
@@ -419,7 +425,7 @@ async function main() {
 
     // C3: switch to light from Genesis' reader menu, then open Tabs without visiting the other tabs
     await pickTab(1);
-    await clickText(/^More$/, 'button'); await clickText(/^Light$/, 'button'); await page.keyboard.press('Escape'); await sleep(600);
+    await clickText(/^More$/, 'button'); await clickText(/^Light$/, 'button'); await closeMenu(); await sleep(600);
     out.firstFrame.light = await openTabs();
     await sleep(400);
     const lightShots = await cardShots();
