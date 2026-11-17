@@ -35,6 +35,7 @@ const METHODS = [
   'nativeListRecordings',
   'nativeReadRecording',
   'nativeDeleteRecording',
+  'nativeClearRecordings',
   'setZoomEnabled',
   'resetZoom',
   'getZoomScale',

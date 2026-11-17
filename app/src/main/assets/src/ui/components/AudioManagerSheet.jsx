@@ -95,10 +95,11 @@ function chapterOfTrack(track) {
  * middle of a sentence they never heard.
  *
  * @param {any} current - the playing track
- * select() rebuilds the queue from the corpus (a plain queue rebuilds to itself); swap() makes the switch in place
- * on a queue the listener made, keeping its shape, and says false when it cannot.
+ * select() rebuilds the queue from the corpus (a plain queue rebuilds to itself) and says whether an edition started:
+ * false when the phone refuses it offline. swap() makes the switch in place on a queue the listener made, keeping its
+ * shape: false when it cannot (the sheet then asks to rebuild), 'refused' when the phone refuses the edition offline, true when made.
  *
- * @returns {{ kind: 'reader'|'edition', activeLabel: string, chips: Array<{ id: string, label: string, active: boolean, select: () => void, swap: () => boolean }> } | null}
+ * @returns {{ kind: 'reader'|'edition', activeLabel: string, chips: Array<{ id: string, label: string, active: boolean, select: () => boolean | void, swap: () => boolean | 'refused' }> } | null}
  */
 function voiceChoices(current) {
   const split = splitTrackKey(current);
@@ -121,18 +122,25 @@ function voiceChoices(current) {
         label: edition.short || edition.label,
         active: edition.volKey === split.volKey,
         select: () => {
-          AudioPlayer.playBibleBook({ volKey: edition.volKey, bookId: split.id, chapterNum, label: edition.label, noResume: true });
+          // A plain queue whose edition the phone refuses offline starts nothing (playBibleBook says so): not saved.
+          const started = AudioPlayer.playBibleBook({ volKey: edition.volKey, bookId: split.id, chapterNum, label: edition.label, noResume: true });
+          if (!started) return false;
           // Every other Listen pill in the app reads settings.bibleAudio, so a
           // voice chosen here has to become THE voice — otherwise the next
           // chapter tapped in the reader would snap back to the old edition.
           const setting = typeof window !== 'undefined' ? /** @type {any} */ (window).__setBibleAudioEdition : null;
           if (typeof setting === 'function') setting(id);
+          return true;
         },
         swap: () => {
-          if (!AudioPlayer.switchVoiceInPlace({ volKey: edition.volKey, label: edition.label })) return false;
-          const setting = typeof window !== 'undefined' ? /** @type {any} */ (window).__setBibleAudioEdition : null;
-          if (typeof setting === 'function') setting(id);
-          return true;
+          const switched = AudioPlayer.switchVoiceInPlace({ volKey: edition.volKey, label: edition.label });
+          // 'refused' (offline, the phone does not have this edition): the notice has shown and nothing changed, so
+          // the choice is not saved. Only a switch that was made saves it. The result passes through unchanged.
+          if (switched === true) {
+            const setting = typeof window !== 'undefined' ? /** @type {any} */ (window).__setBibleAudioEdition : null;
+            if (typeof setting === 'function') setting(id);
+          }
+          return switched;
         },
       })),
     };

@@ -61,6 +61,15 @@ describe('the catalog', () => {
     expect(dayItems(m, 0).map((it) => it.k)).toEqual(['matthew:1']);
     expect(itemsLabel(dayItems(m, 4), bookTitle)).toBe('Matthew 5');
   });
+  it('a new plan starts at zero, whatever the reader has read before: no ticks, nothing credited (0245)', () => {
+    const everything = () => true;
+    for (const id of ['bible-year', 'blessed']) {
+      const run = /** @type {any} */ (startCatalogPlan(id, src, at('2026-10-22'), /** @type {any} */ ({ credit: everything })));
+      expect(run.ticks, id).toEqual({});
+      expect(run.credited, id).toBeUndefined();
+      expect(runStatus(run, at('2026-10-22')).itemsDone, id).toBe(0);
+    }
+  });
   it('a letters plan waits for the Volumes: null without them', () => {
     expect(startCatalogPlan('seven-volumes', null, at('2026-10-22'))).toBeNull();
   });

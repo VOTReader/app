@@ -1982,6 +1982,46 @@ describe('audio-player — offline', () => {
   });
 });
 
+describe('audio-player — a Bible voice swap, offline', () => {
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = {
+      'bible-brm-kjv:jonah': [['brm1_jonah_001', '', 'Chapter 1'], ['brm1_jonah_002', '', 'Chapter 2'], ['brm1_jonah_003', '', 'Chapter 3']],
+      'bible-wop-nkjv:jonah': [['wop1_jonah_001', '', 'Chapter 1'], ['wop1_jonah_002', '', 'Chapter 2'], ['wop1_jonah_003', '', 'Chapter 3']],
+    };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+  });
+  afterEach(() => {
+    delete globalThis.BIBLE_AUDIO_MANIFEST;
+    delete globalThis.BIBLE_AUDIO_BOOKS;
+    setOnline(true);
+  });
+
+  it('an edition the phone does not have is refused as "refused", and the queue stays as it was', () => {
+    setOnline(true);
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 2, label: 'KJV' });
+    const urls = () => AudioPlayer.getState().queue.map((t) => t.url);
+    const before = urls();
+    setOnline(false);
+    expect(AudioPlayer.switchVoiceInPlace({ volKey: 'bible-wop-nkjv', label: 'NKJV' })).toBe('refused');
+    expect(urls()).toEqual(before);
+  });
+
+  it('playBibleBook says whether the book started: true when it plays, false when offline refuses it', () => {
+    setOnline(true);
+    expect(AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 2, label: 'KJV' })).toBe(true);
+    setOnline(false);
+    expect(AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'jonah', chapterNum: 2, label: 'NKJV' })).toBe(false);
+  });
+
+  it('the same switch online is made in place and reports true', () => {
+    setOnline(true);
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 2, label: 'KJV' });
+    expect(AudioPlayer.switchVoiceInPlace({ volKey: 'bible-wop-nkjv', label: 'NKJV' })).toBe(true);
+    const st = AudioPlayer.getState();
+    expect(st.queue[st.qi].url).toContain('wop1_jonah_002');
+  });
+});
+
 /* Listening item 8 (2026-09-24): recordings downloaded to the phone play with no signal. The Android app's
    OfflineAudioStore answers the <audio> element from disk; the player must stop refusing them. Offline, a queue plays
    what is on the phone from where the listener started, passing over what is not; a seam onto a recording that is not

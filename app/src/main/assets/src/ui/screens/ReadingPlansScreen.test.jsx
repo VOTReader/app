@@ -8,7 +8,7 @@ import { PlansHub } from './PlansHub.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
 import { builderSpec } from '../../data/plan-builder.js';
-import { tickItem, todayKey, dayItems, markDay, pauseRun, runStatus, dayNum, dateOf, monthCells, streak, newRun } from '../../data/plan-engine.js';
+import { tickItem, todayKey, dayItems, markDay, pauseRun, runStatus, dayNum, dateOf, monthCells, streak, newRun, creditRead } from '../../data/plan-engine.js';
 import { usePlanReminders } from '../../utils/plan-runs-view.js';
 import { _resetPlanNavForTests } from '../../utils/plan-nav.js';
 import { _resetForTests } from '../../utils/plan-reminder.js';
@@ -69,8 +69,8 @@ describe('Reading plans: the list (3.1)', () => {
     render(<PlansHub {...base()} />);
     const rows = [...screen.getByRole('list', { name: 'Your plans' }).querySelectorAll('.plan-run-row')];
     expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Bible in a Year: On track · Today: Genesis 1-3 · 0 of 3', 'Psalms: Paused · Day 1 of 30']);
-    // 0130: a running plan's way to change or stop it is the word Manage; a paused one has its chevron (Resume is on its page)
-    expect([...document.querySelectorAll('.plan-manage-link')].map((b) => b.getAttribute('aria-label'))).toEqual(['Manage Bible in a Year']);
+    // 0130/0430: every plan's way to change or stop it is the word Manage, a paused one's too (its sheet has Resume)
+    expect([...document.querySelectorAll('.plan-manage-link')].map((b) => b.getAttribute('aria-label'))).toEqual(['Manage Bible in a Year', 'Manage Psalms']);
     expect(rows[1].querySelector('.plan-state b').textContent).toBe('Paused');
   });
 });
@@ -120,17 +120,44 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(runs()[0].start).toBe(todayKey(new Date()));
   });
 
-  it('Already read: "Count my N" credits the chapters read before; they never make a day done today', () => {
-    const isRead = (b, c) => b === 'genesis' && Number(c) <= 3;
+  // Corbin 11-17 02:28: "reading plans should not be measured by what I've already read, but by a new, independent count
+  // kept by the new plan". A reader who has read all of Genesis starts Bible in a Year at day 1, with nothing counted.
+  it('a new plan starts at zero: Genesis 1-50 read before, Bible in a Year is at day 1 with nothing done, and a read afterwards ticks day 1 today', () => {
+    const isRead = (b, c) => b === 'genesis' && Number(c) <= 50;
     render(<PlansHub {...base({ isRead })} />);
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
-    expect(screen.getByText('Count my 3 chapters')).toBeTruthy();
+    expect(screen.queryByText('Already read')).toBeNull();
+    expect(screen.queryByText(/^Count my /)).toBeNull();
+    const week = within(screen.getByRole('list', { name: 'Your first week' })).getAllByRole('listitem');
+    expect(week.map((li) => li.querySelector('.plan-day-portion').textContent)).toEqual(['Genesis 1-3', 'Genesis 4-7', 'Genesis 8-10']);
     fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
-    const st = runStatus(runs()[0], new Date());
-    expect(st.itemsDone).toBe(3);
+    const run = runs()[0];
+    expect(run.ticks).toEqual({});
+    expect(run.credited).toBeUndefined();
+    const st = runStatus(run, new Date());
+    expect(st.itemsDone).toBe(0);
+    expect(st.percent).toBe(0);
+    expect(st.ahead).toBe(0);
+    expect(st.behind).toBe(0);
     expect(st.doneToday).toBe(false);
-    expect(st.day).toBe(1);                       // today's portion is the first day not read
-    expect(screen.getByText(/^Today · Genesis 4-7/)).toBeTruthy();
+    expect(screen.getByText(/^Today · Genesis 1-3/)).toBeTruthy();
+    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    expect(runs()[0].ticks).toEqual({ 'genesis:1': todayKey(new Date()) });
+    expect(dayItems(runs()[0], 0).map((it) => it.k)).toEqual(['genesis:1', 'genesis:2', 'genesis:3']);   // day 1
+  });
+
+  it('a plan that starts tomorrow counts nothing read today: its card still says Day 1 (0245, C6)', () => {
+    const isRead = (b, c) => b === 'genesis' && Number(c) <= 50;
+    render(<PlansHub {...base({ isRead })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tomorrow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    expect(runs()[0].ticks).toEqual({});
+    const card = document.querySelector('.plan-today');
+    expect(card.querySelector('.root-eyebrow').textContent).toMatch(/^Starts /);
+    expect(card.querySelector('.plan-today-title').textContent).toBe('Genesis 1-3');
+    expect(card.querySelector('.plan-today-sub').textContent).toMatch(/^Day 1 · about /);
   });
 
   it('Days: the seven toggles, at least one always on', () => {
@@ -549,7 +576,7 @@ describe('changing a custom plan after it starts (2310)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.getByRole('list', { name: 'Your picks' }).textContent).toMatch(/Ruth.*Jonah/);
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next' })); });
-    expect(screen.getByText(/4 read already/)).toBeTruthy();
+    expect(screen.getByText(/4 read so far/)).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Plan name' }).value).toBe('Two short books');
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
     expect(runs().length).toBe(1);
@@ -602,5 +629,144 @@ describe('changing a custom plan after it starts (2310)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
     expect(screen.queryByRole('button', { name: 'Change what\u2019s in it' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy();
+  });
+});
+
+describe('Reading plans: Manage on every plan surface a reader meets (0430, second blind test)', () => {
+  const dialog = () => screen.queryByRole('dialog', { name: 'Manage plan' });
+  const toSchedule = () => { openRow(); fireEvent.click(screen.getAllByRole('button', { name: 'Whole schedule' })[0]); };
+
+  it("a paused plan's row has 'Manage ›' as a running one does; it opens the plan on Manage, Resume first", () => {
+    ReadingPlanStore.put(pauseRun(startCatalogPlan('psalms', null, new Date()), new Date()));
+    render(<PlansHub {...base()} />);
+    const li = document.querySelector('.plan-run-li');
+    expect(li.querySelector('.plan-chev')).toBeNull();
+    expect(li.querySelector('.plan-manage-link').textContent).toBe('Manage ›');
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Psalms' }));
+    expect(barTitle()).toBe('Psalms');
+    expect(dialog()).toBeTruthy();
+    expect(dialog().querySelector('.plan-sheet-actions .ui-btn').textContent).toBe('Resume plan');
+  });
+
+  it("the schedule's bar has the plan page's Manage: the same sheet over the schedule; Done and Back keep the way back", () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<PlansHub {...base()} />);
+    toSchedule();
+    expect(barTitle()).toBe('Bible in a Year · Schedule');
+    const btn = screen.getByRole('button', { name: 'Manage plan' });
+    expect(btn.textContent).toBe('Manage');
+    fireEvent.click(btn);
+    expect(dialog()).toBeTruthy();
+    expect(dialog().id).toBe('plan-settings');
+    expect(barTitle()).toBe('Bible in a Year · Schedule');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(dialog()).toBeNull();
+    expect(barTitle()).toBe('Bible in a Year · Schedule');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(barTitle()).toBe('Bible in a Year');
+    expect(dialog()).toBeNull();
+  });
+
+  it("from the schedule's sheet: Pause stays on the schedule; Stop goes to the list with Undo, the plan in Past plans", () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<PlansHub {...base()} />);
+    toSchedule();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Pause plan' })); });
+    expect(runStatus(runs()[0], new Date()).paused).toBe(true);
+    expect(barTitle()).toBe('Bible in a Year · Schedule');
+    expect(screen.getByRole('button', { name: 'Resume plan' })).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Stop plan' })); });
+    expect(runs().length).toBe(0);
+    expect(ReadingPlanStore.all()[0].status).toBe('stopped');
+    expect(barTitle()).toBe('Reading plans');
+    expect(dialog()).toBeNull();
+  });
+
+  it("Start over from the schedule's sheet opens the new run's page, and Back goes to the list, never the old run", () => {
+    const run = markDay(startCatalogPlan('bible-year', null, daysAgo(3)), 0, true, daysAgo(3));
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    toSchedule();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start over' })); });
+    expect(runs().length).toBe(1);
+    expect(runs()[0].id).not.toBe(run.id);
+    expect(barTitle()).toBe('Bible in a Year');
+    expect(dialog()).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(barTitle()).toBe('Reading plans');
+  });
+
+  it("a preview's schedule has nothing to manage: no Manage in its bar", () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis to Revelation/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Whole schedule' }));
+    // (jsdom has no Volumes, so the draft's schedule body is empty; the view is the preview's schedule all the same)
+    expect(screen.queryByRole('button', { name: 'Manage plan' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Manage plan' })).toBeNull();
+  });
+});
+
+describe("Reading plans: Manage's 'Count only this plan's reading' (0450)", () => {
+  /** Bible in a Year from 10 days ago, the first 30 chapters counted from before it began, the first day read since. */
+  const creditedRun = () => {
+    let run = startCatalogPlan('bible-year', null, daysAgo(10));
+    const first30 = new Set(run.tracks[0].items.slice(0, 30).map((it) => it.k));
+    run = creditRead(run, (b, c) => first30.has(b + ':' + c));
+    for (const it of run.tracks[0].items.slice(30, 33)) run = tickItem(run, it.k, todayKey(daysAgo(1)), 1);
+    return run;
+  };
+
+  it('says what the tap does before it; the tap starts again from today with the dated reading; Undo puts the stored run back exactly', () => {
+    const run = creditedRun();
+    ReadingPlanStore.put(run);
+    const stored = JSON.stringify(ReadingPlanStore.get(run.id));
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Bible in a Year' }));
+    const sheet = screen.getByRole('dialog', { name: 'Manage plan' });
+    expect(sheet.querySelector('.plan-own-only-text').textContent).toBe('30 chapters you had read before this plan began count toward it.');
+    expect(sheet.textContent).toMatch(/Starts the plan again from today\. What you read for it stays ticked; you give up the days the earlier reading put you ahead\./);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Count only this plan’s reading' })); });
+    expect(runs().length).toBe(1);
+    const fresh = runs()[0];
+    expect(fresh.id).not.toBe(run.id);
+    expect([fresh.start, fresh.credited, Object.keys(fresh.ticks).length]).toEqual([todayKey(new Date()), undefined, 3]);
+    expect(ReadingPlanStore.get(run.id).status).toBe('stopped');
+    expect(barTitle()).toBe('Bible in a Year');
+    expect(screen.queryByRole('dialog', { name: 'Manage plan' })).toBeNull();
+    const toast = document.getElementById('vot-toast-plan-manage');
+    expect(toast.textContent).toMatch(/^Started again from today/);
+    act(() => { toast.querySelector('.vot-undo-btn').click(); });
+    expect(ReadingPlanStore.get(fresh.id)).toBeFalsy();
+    expect(JSON.stringify(ReadingPlanStore.get(run.id))).toBe(stored);
+    expect(runs().map((r) => r.id)).toEqual([run.id]);
+  });
+
+  it('from the schedule: the new run opens on its page and Back goes to the list', () => {
+    ReadingPlanStore.put(creditedRun());
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Whole schedule' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage plan' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Count only this plan’s reading' })); });
+    expect(barTitle()).toBe('Bible in a Year');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(barTitle()).toBe('Reading plans');
+  });
+
+  it('no row for a plan that counts nothing from before, nor for an rp1 plan', () => {
+    const credited = creditedRun();
+    ReadingPlanStore.put({ ...startCatalogPlan('psalms', null, daysAgo(2)), id: 'p_plain' });
+    ReadingPlanStore.put({ ...credited, id: 'p_rp1', from: 'rp1' });
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Psalms' }));
+    expect(screen.getByRole('dialog', { name: 'Manage plan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Count only this plan’s reading' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Bible in a Year' }));
+    expect(screen.getByRole('dialog', { name: 'Manage plan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Count only this plan’s reading' })).toBeNull();
   });
 });

@@ -101,7 +101,9 @@ describe('TodayCard (the up-next card)', () => {
 
   it('a plan just finished keeps a row until it is opened or dismissed (plans2 3.7)', () => {
     const onOpenPlan = vi.fn();
-    render(<TodayCard rows={[row({ finished: true })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    const { container } = render(<TodayCard rows={[row({ finished: true })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    // 0430: its eyebrow says it is a plan, as every plan card on Home does (CSS draws it PLAN FINISHED)
+    expect(container.querySelector('.upnext-offer .upnext-eyebrow').textContent).toBe('Plan finished');
     fireEvent.click(screen.getByRole('button', { name: /You finished Bible in a Year/ }));
     expect(onOpenPlan).toHaveBeenCalledWith('bible-year');
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy();

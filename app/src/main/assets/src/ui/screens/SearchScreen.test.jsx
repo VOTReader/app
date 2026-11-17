@@ -1290,6 +1290,43 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  it('a typed /home runs once and clears the box before it acts, so reopening Search cannot replay it', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: { kind: 'command', action: 'home', label: 'Go home' }, results: [], parsedTerms: [],
+    }));
+    const base = baseProps();
+    const onCommand = vi.fn();
+    const onQueryChange = vi.fn();
+    /** @type {any} */
+    let host = null;
+    // The parent owns the box, as the app does: a reopened screen mounts on whatever query it last asked for.
+    const Host = () => {
+      const [query, setQuery] = React.useState('');
+      const [open, setOpen] = React.useState(true);
+      const changeQuery = React.useCallback((q) => { onQueryChange(q); setQuery(q); }, []);
+      host = { type: setQuery, close: () => setOpen(false), reopen: () => setOpen(true) };
+      return open ? <SearchScreen {...base} query={query} onCommand={onCommand} onQueryChange={changeQuery} /> : null;
+    };
+    render(<Host />);
+    act(() => host.type('/home'));
+    await act(async () => { vi.advanceTimersByTime(200); await Promise.resolve(); });
+
+    expect(onCommand).toHaveBeenCalledTimes(1);
+    expect(onCommand).toHaveBeenCalledWith('home');
+    // The box is cleared first, so the command is never handed the query again.
+    const clearAt = onQueryChange.mock.calls.findIndex((c) => c[0] === '');
+    expect(clearAt).toBeGreaterThanOrEqual(0);
+    expect(onQueryChange.mock.invocationCallOrder[clearAt]).toBeLessThan(onCommand.mock.invocationCallOrder[0]);
+
+    // Leave Search and come back: the screen remounts on the cleared box, so the search it kept is not resumed.
+    act(() => host.close());
+    act(() => host.reopen());
+    await act(async () => { vi.advanceTimersByTime(200); await Promise.resolve(); });
+    expect(onCommand).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it('unmounting mid-build and mid-search leaves no dangling setState (back out of Search)', async () => {
     vi.useFakeTimers();
     let progressCb = null;

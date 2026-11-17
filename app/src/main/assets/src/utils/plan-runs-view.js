@@ -10,7 +10,7 @@
    this file is bundle-d), so it is read at call time, never imported.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace, replaceContents } from '../data/plan-engine.js';
+import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace, replaceContents, freshFromDated } from '../data/plan-engine.js';
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
@@ -204,6 +204,17 @@ export function startOverRun(run, now) {
   if (run.autoAudio === false) fresh.autoAudio = false;
   const old = run.status === 'stopped' ? run : { ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) };
   return [old, fresh];
+}
+
+/**
+ * "Count only this plan's reading" (0450): [the old run as stopped, the new run from today holding its dated ticks]
+ * (freshFromDated), or null when the run counts nothing from before it began. @param {PlanRun} run @param {Date} now
+ * @returns {null | [PlanRun, PlanRun]}
+ */
+export function countOwnOnlyRun(run, now) {
+  const fresh = freshFromDated(run, now);
+  if (!fresh) return null;
+  return [{ ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) }, fresh];
 }
 
 /**

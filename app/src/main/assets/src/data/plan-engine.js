@@ -708,6 +708,33 @@ export function replaceContents(run, spec, now) {
   return next;
 }
 
+/**
+ * "Count only this plan's reading" (0450, hub's pick on 0245 Part B): a run that counted reads from before it began
+ * (credited > 0, plans2's Count my N) starts again from today as a NEW run of the same plan, tracks, days and pace
+ * (againPace: a Finish by date becomes the plan's own length, or a restart would cram), holding only the old run's
+ * DATED ticks: what was read for the plan stays read, the credited (undated) ones go, and `credited` with them. The
+ * reminder and the download choice carry; a paused plan stays paused; day notes stay on the old run, which the caller
+ * keeps, stopped, under Past plans. Never for an rp1 run (its undated ticks are its own reading) or one with no credit:
+ * null then. @param {PlanRun} run @param {Date} now @returns {PlanRun | null}
+ */
+export function freshFromDated(run, now) {
+  if (!canCountOwnOnly(run)) return null;
+  let next = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: /** @type {PlanPace} */ (againPace(run)), weekdays: run.weekdays }, now);
+  /** @type {Record<string, string>} */ const ticks = {};
+  for (const [k, v] of Object.entries(run.ticks || {})) if (v) ticks[k] = v;
+  next = { ...next, ticks };
+  if (run.remind) next.remind = run.remind;
+  if (run.autoAudio === false) next.autoAudio = false;
+  next = finishIfDone(next, todayKey(now));
+  if (next.status !== 'finished' && (run.status === 'paused' || run.paused)) next = pauseRun(next, now);
+  return next;
+}
+
+/** Whether a run offers "Count only this plan's reading": it counts reads from before it began, and is not an rp1 run. @param {PlanRun} run */
+export function canCountOwnOnly(run) {
+  return !!run && (run.credited || 0) > 0 && run.from !== 'rp1' && (run.status === 'running' || run.status === 'paused');
+}
+
 /** Start today instead of a later start date: the plan's days move up with it. */
 export function startToday(run, now) {
   const st = runStatus(run, now);

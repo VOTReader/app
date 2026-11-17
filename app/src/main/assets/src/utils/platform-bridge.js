@@ -62,6 +62,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => string} nativeListRecordings
  * @property {(name: string) => string | null} nativeReadRecording
  * @property {(name: string) => boolean} nativeDeleteRecording
+ * @property {() => void} nativeClearRecordings
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string | Blob) => void} saveToFile
  * @property {(suggestedName: string, opts?: { onSlow?: (escape: () => void) => void }) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
@@ -144,6 +145,8 @@ const androidImpl = {
   nativeListRecordings: () => /** @type {any} */ (window).AndroidBridge.nativeListRecordings(),
   nativeReadRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeReadRecording(name),
   nativeDeleteRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeDeleteRecording(name),
+  // Clear All My Data: every served memo on disk goes (NativeAudioRecorder.clearRecordings).
+  nativeClearRecordings: () => /** @type {any} */ (window).AndroidBridge.nativeClearRecordings(),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
@@ -995,6 +998,8 @@ const webImpl = {
   nativeListRecordings: () => '[]',
   nativeReadRecording: () => null,
   nativeDeleteRecording: () => false,
+  // Web keeps no voice memos on the device, so there is nothing for Clear All to remove here.
+  nativeClearRecordings: () => {},
 
   // Category 4 — not-yet-implemented warnings (void returns only)
   haptic: notYetImplemented('haptic'),                       // future; haptic JS wiring not yet present

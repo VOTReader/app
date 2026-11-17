@@ -6,8 +6,7 @@
    first three days still to read, with Whole schedule); Make it yours
    (Start: Today / Tomorrow / Pick a day, and Where I am for a letters plan
    partway read, saying what it skips; Length; the seven Days; Remind me on
-   the Android app only; Already read "Count my N" when the reader has read
-   some of it); one START PLAN with the finish under it. Starting is a
+   the Android app only); one START PLAN with the finish under it. Starting is a
    decision: nothing starts until START PLAN.
    The facts, the first week and the finish are read off a draft run built
    from the choices, so what the page says is what the plan will do.
@@ -15,7 +14,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { startCatalogPlan, catalogResume, planDef, PLAN_GROUPS, LETTER_CHAIN, runFacts, bookTitle } from '../../data/plan-catalog.js';
-import { schedule, itemsLabel, itemKinds, readCount, todayKey, dayNum, dateOf } from '../../data/plan-engine.js';
+import { schedule, itemsLabel, itemKinds, todayKey, dayNum, dateOf } from '../../data/plan-engine.js';
 import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, askForReminders, isReminderTime } from '../../utils/plan-reminder.js';
 import { PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, dayDate, minText, countOf, clockTime, paceChoices } from '../components/PlanBits.jsx';
@@ -33,17 +32,17 @@ function itemsUnit(items) {
 }
 
 /**
- * The run the choices would start (null while its items are not loaded).
- * @param {string} planId @param {any} choice @param {(bid: string, cid: any) => boolean} isRead @param {Date} now
+ * The run the choices would start (null while its items are not loaded). It starts at zero: what was read before never
+ * counts (Corbin 11-17, 0245).
+ * @param {string} planId @param {any} choice @param {Date} now
  */
-export function draftRun(planId, choice, isRead, now) {
+export function draftRun(planId, choice, now) {
   const src = letterSource();
   const opt = /** @type {any} */ ({ volKey: choice.volKey, weekdays: choice.weekdays, pace: choice.pace || undefined });
   const today = /** @type {number} */ (dayNum(todayKey(now)));
   if (choice.start === 'tomorrow') opt.startOn = dateOf(today + 1);
   else if (choice.start === 'pick' && choice.on && (dayNum(choice.on) ?? 0) > today) opt.startOn = choice.on;
   if (choice.start === 'where' && choice.from) opt.from = choice.from;
-  if (choice.credit) opt.credit = isRead;
   return startCatalogPlan(planId, src, now, opt);
 }
 
@@ -57,21 +56,17 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
   const defPace = def ? def.pace.mode + ':' + def.pace.n : '';
   const [choice, setChoice] = React.useState(() => ({
     start: 'today', on: '', from: '', volKey: (opt && opt.volKey) || 'one',
-    paceId: defPace, weekdays: (def && def.weekdays) || ALL_WEEK, remind: reminderSupported(), at: REMIND_AT, credit: true,
+    paceId: defPace, weekdays: (def && def.weekdays) || ALL_WEEK, remind: reminderSupported(), at: REMIND_AT,
   }));
   const [status, setStatus] = React.useState('');
   const set = (/** @type {any} */ patch) => setChoice((c) => ({ ...c, ...patch }));
   const pace = paces.find((p) => p.id === choice.paceId) || null;
   const src = lettersReady ? letterSource() : null;
-  const tracks = React.useMemo(() => (def ? def.tracks(src, { volKey: choice.volKey }) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- src is rebuilt each render; lettersReady is what changes it
-    [def, lettersReady, choice.volKey]);
-  const read = React.useMemo(() => readCount(tracks, isRead), [tracks, isRead]);
   const resume = React.useMemo(() => (def && def.letters && src ? catalogResume(planId, src, isRead, { volKey: choice.volKey }) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- src is rebuilt each render; lettersReady is what changes it
     [planId, lettersReady, choice.volKey, isRead]);
-  const spec = { ...choice, pace: pace ? { mode: pace.mode, n: pace.n } : null, from: resume ? resume.k : '', credit: choice.credit && read > 0 && choice.start !== 'where' };
-  const draft = React.useMemo(() => draftRun(planId, spec, isRead, now),
+  const spec = { ...choice, pace: pace ? { mode: pace.mode, n: pace.n } : null, from: resume ? resume.k : '' };
+  const draft = React.useMemo(() => draftRun(planId, spec, now),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the choices, read as one key
     [planId, JSON.stringify(spec), lettersReady, now]);
   if (!def) return null;
@@ -84,7 +79,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
   const startOpts = [{ id: 'today', label: 'Today' }, { id: 'tomorrow', label: 'Tomorrow' }, { id: 'pick', label: 'Pick a day' }];
   if (resume) startOpts.push({ id: 'where', label: 'Where I am' });
   const start = () => {
-    const run = draftRun(planId, spec, isRead, new Date());
+    const run = draftRun(planId, spec, new Date());
     if (!run) { setStatus('Loading the Volumes… try again in a moment.'); return; }
     if (choice.remind && reminderSupported() && isReminderTime(choice.at)) {
       run.remind = choice.at;
@@ -93,7 +88,6 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
     saveRun(run);
     onStarted(run.id);
   };
-  const unitWord = unit.unit === 'chapter' || unit.unit === 'chapters' ? 'chapters' : unit.unit === 'readings' || unit.unit === 'reading' ? 'readings' : 'letters';
   return (
     <div className="root-screen plans-hub plan-preview">
       <p className="root-eyebrow plan-eyebrow">{group}</p>
@@ -156,12 +150,6 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
               onChange={(e) => { if (isReminderTime(e.target.value)) set({ at: e.target.value }); }} />
             <span className="plan-time-text" aria-hidden="true">{clockTime(choice.at)}</span>
             <PlanSwitch on={choice.remind} label="Remind me each day" onChange={(v) => set({ remind: v })} />
-          </PlanOptRow>
-        ) : null}
-        {read > 0 && choice.start !== 'where' ? (
-          <PlanOptRow label="Already read">
-            <span className="plan-opt-text">{'Count my ' + countOf(read, unitWord === 'chapters' ? 'chapter' : unitWord === 'letters' ? 'letter' : 'reading')}</span>
-            <PlanSwitch on={choice.credit} label={'Count my ' + read + ' read already'} onChange={(v) => set({ credit: v })} />
           </PlanOptRow>
         ) : null}
       </div>

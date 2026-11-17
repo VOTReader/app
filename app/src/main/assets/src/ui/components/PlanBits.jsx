@@ -101,7 +101,9 @@ export function PlanSheet({ id, title, onClose, closeLabel = 'Cancel', actions, 
 
 /** The title in the top bar (U rule 10/11: back, title, at most two actions). @param {{ title: string }} props */
 export function PlanBarTitle({ title }) {
-  return <h1 className="root-title plan-bar-title">{title}</h1>;
+  // 0430: a name past what fits beside Manage at 412 px ('Volumes and Scriptures in a year · Schedule') steps down a size
+  // and wraps to two lines, rather than cutting to 'Volumes and Script…'.
+  return <h1 className={'root-title plan-bar-title' + (title.length > 22 ? ' is-long' : '')}>{title}</h1>;
 }
 
 /** A section title with an optional link at its right ("Whole schedule"). @param {{ title: string, link?: string, onLink?: () => void, id?: string }} props */

@@ -100,10 +100,9 @@ export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPl
                   <button type="button" className="ui-btn is-small plan-catchup-btn" aria-label={'Catch up: ' + name}
                     onClick={() => onOpenPlan(run.id, { catchUp: true })}>Catch up</button>
                 ) : null}
-                {/* 0130: the way to change, pause or stop it, in a word (readers could not tell from a bare chevron). */}
-                {line.paused ? CHEVRON : (
-                  <button type="button" className="plan-manage-link" aria-label={'Manage ' + name} onClick={() => onOpenPlan(run.id, { manage: true })}>Manage<span aria-hidden="true">{' ›'}</span></button>
-                )}
+                {/* 0130: the way to change, pause or stop it, in a word (readers could not tell from a bare chevron);
+                    0430: a paused plan too (its sheet holds Resume). */}
+                <button type="button" className="plan-manage-link" aria-label={'Manage ' + name} onClick={() => onOpenPlan(run.id, { manage: true })}>Manage<span aria-hidden="true">{' ›'}</span></button>
               </li>
             );
           })}

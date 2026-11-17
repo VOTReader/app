@@ -11,6 +11,8 @@
      finished     Ruth, read through, finished today and not yet seen
      stopped      stopped six days ago on day 10
      custom       a plan built here (Ruth, Jonah, Esther; 5 min a day), day 5, on track
+     credited     (0450; not in STATES, ask for it by name) Bible in a Year from 10 days ago with Count my N on: Genesis
+                  1-30 counted from before it began, then the portion shown read on each of the 10 days since
 
    Run:  node tools/plan-states.mjs --list
          node tools/plan-states.mjs --json STATE[,STATE...] [--date YYYY-MM-DD]   (the runs as JSON on stdout)
@@ -54,6 +56,9 @@ export async function planStates(now) {
   const spec = B.builderSpec({ picks: [{ t: 'b', bid: 'ruth' }, { t: 'b', bid: 'jonah' }, { t: 'b', bid: 'esther' }], order: 'picked', share: 'serial',
     goal: { mode: 'minutes', n: 5 }, weekdays: [true, true, true, true, true, true, true], name: 'Three short books' }, null);
   out.custom = readDays({ ...E.newRun(spec, at(-4)), id: 'st-custom' }, 4, 4);
+  let cr = E.creditRead(bibleYear(10, 'st-credited'), (b, c) => b === 'genesis' && +c <= 30);
+  for (let w = -10; w < 0; w++) { const st = E.runStatus(cr, at(w)); for (const it of st.todayItems) cr = E.tickItem(cr, it.k, key(w), at(w).getTime()); }
+  out.credited = cr;
   return out;
 }
 

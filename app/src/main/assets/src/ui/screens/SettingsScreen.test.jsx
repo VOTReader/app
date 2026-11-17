@@ -448,6 +448,19 @@ describe('Listening group', () => {
     expect(row('Your data').querySelector('.settings-row-desc').textContent).not.toContain('songs');
   });
 
+  it('the Protection row does not call an unbacked phone Saved: the APK has no persistence lever, so it says On this device', async () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      useStorageInfo: () => ({ status: 'ready', usage: 5e8, quota: 2e9, persisted: false, persistDenied: false, persistable: false }),
+      measureUserData: () => Promise.resolve({ total: 2e6, structured: 2e6, media: 0, mediaCount: 0 }),
+    });
+    renderSettings();
+    await act(async () => { await Promise.resolve(); });
+    const protection = row('Protection');
+    expect(within(protection).queryByText('Saved', { exact: true })).toBeNull();
+    expect(within(protection).getByText('On this device', { exact: true })).toBeTruthy();
+  });
+
   // ra6 (Corbin 2026-10-14, brief design-10, the mock's place): under Songs kept on this phone, off by default.
   it('Download only on Wi-Fi sits under Songs kept on this phone, off by default, and toggles its own key', () => {
     window.AndroidBridge = { offlineAudioState: () => '{}', offlineAudioWifiOnly: vi.fn() };
