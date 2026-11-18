@@ -916,3 +916,14 @@ describe('app.css — the Songs list buttons stack at large text', () => {
     expect(CSS).toMatch(/\.vot-large-text :is\(\.listen-coll-actions, \.songs-list-actions\) \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   });
 });
+
+/* A KEPT SONG'S NAME GETS THE ROW (vot-ui walk, 2026-11-18). On Kept on this phone each row carries Remove, the star
+   and the menu, and at 360 they left the name a ~60 px column ('Honor / Me!', its line four lines tall). The name
+   takes the row; Remove, star and menu sit together on the line under it, at the right. */
+describe('app.css — a kept song row wraps its actions under the name', () => {
+  it('the row wraps, the main part takes the line, Remove leads the actions to the right', () => {
+    expect(ruleBlock(CSS, '.songs-row:has(> .song-keep-remove) {')).toMatch(/flex-wrap:\s*wrap/);
+    expect(ruleBlock(CSS, '.songs-row:has(> .song-keep-remove) > .ui-row-main {')).toMatch(/flex:\s*1 1 100%/);
+    expect(ruleBlock(CSS, '.songs-row > .song-keep-remove {')).toMatch(/margin-left:\s*auto/);
+  });
+});

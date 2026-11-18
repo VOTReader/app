@@ -1936,6 +1936,10 @@
       .song-keep-line .song-keep-bar { flex: 1 0 100%; }
       .song-keep-remove { flex: none; min-height: 44px; padding: 0 .6rem; border: 1px solid var(--gold-border); border-radius: 999px; background: transparent; color: var(--cream); font: inherit; font-size: var(--fs-14); cursor: pointer; }
       .song-keep-remove-all { margin-top: .4rem; }
+      /* 11-18: on Kept on this phone, Remove + star + menu left the name ~60 px at 360 ('Honor / Me!'). The name takes the row; Remove, star and menu sit together under it, at the right. */
+      .songs-row:has(> .song-keep-remove) { flex-wrap: wrap; row-gap: 0; }
+      .songs-row:has(> .song-keep-remove) > .ui-row-main { flex: 1 1 100%; }
+      .songs-row > .song-keep-remove { margin-left: auto; }
       .song-keep-restore { margin-top: .9rem; padding: .75rem .9rem; border: 1px solid var(--gold); border-radius: 10px; }
       .song-keep-restore p { margin: 0; color: var(--cream); font-size: var(--fs-16); }
       .song-keep-restore .song-keep-action { margin-top: .6rem; }
