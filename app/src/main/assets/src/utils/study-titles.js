@@ -67,3 +67,17 @@ export function studyNextStep(order, currentId, read) {
   if (!unread) return { k: 'Read again', ch: order[0] };
   return { k: at >= 0 || order.some(read) ? 'Up next' : 'Start here', ch: unread };
 }
+
+/**
+ * A study paragraph that is one row of a chart: a few plain words ending in a figure set in bold italic
+ * ("10 prophecies = 1 chance in" + "1,024"; the Odds Chart is 46 of them). The page draws a run of these as the rows
+ * of a table (.is-figure-row): the words left, the figure right. The data and its words are not touched.
+ * @param {any} block
+ * @returns {boolean}
+ */
+export function isFigureRow(block) {
+  const s = block && block.segments;
+  if (!Array.isArray(s) || s.length !== 2 || !s[0] || !s[1]) return false;
+  const words = String(s[0].v || '');
+  return s[0].t === 'text' && s[1].t === 'bold-italic' && words.length <= 48 && words.includes(' = ') && /^[\d,. ]+$/.test(String(s[1].v || ''));
+}

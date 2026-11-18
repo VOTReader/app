@@ -146,17 +146,45 @@ describe('LetterView — a study names its parts (A02.10)', () => {
     expect(labels).toEqual(['Previous part', 'Next part']);
   });
 
-  it('a long study title: the hero holds it to one cut line before an always-shown position; the band names it short', () => {
+  it('a long study title: the hero and the band both name the study short, before an always-shown position', () => {
     const LONG = 'YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study)';
     globalThis.studyShortTitle = (t) => t.slice(0, t.indexOf(':'));
     try {
       renderLetter({ studyMode: true, volumeLabel: LONG }, { ...LETTER, num: 1, unitWord: 'Chapter' });
       const eb = document.querySelector('.hero-eyebrow');
       expect(eb.classList.contains('has-col')).toBe(true);
-      expect(eb.querySelector('.hero-eyebrow-col').textContent).toBe(LONG);
+      expect(eb.querySelector('.hero-eyebrow-col').textContent).toBe('YAHUSHUA More Than a Man');
       expect(eb.querySelector('.hero-eyebrow-pos').textContent).toBe(' \xA0\xB7\xA0 Chapter 1');
       expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('YAHUSHUA More Than a Man \xB7 Chapter 1');
     } finally { delete globalThis.studyShortTitle; }
+  });
+
+  it("a chapter's own label goes above and its name is the heading (studies pass 3)", () => {
+    const STUDY = 'YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study)';
+    globalThis.studyShortTitle = (t) => t.slice(0, t.indexOf(':'));
+    try {
+      renderLetter({ studyMode: true, volumeLabel: STUDY }, { ...LETTER, title: 'Section One: YahuShua The Messiah, God With Us', num: 1, unitWord: 'Chapter' });
+      expect(document.querySelector('.hero-eyebrow-pos').textContent).toBe('  ·  Section One');
+      expect(document.querySelector('.hero-title').textContent).toBe('YahuShua The Messiah, God With Us');
+      expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('YAHUSHUA More Than a Man · Section One');
+      expect(band().querySelector('.mini-title-name').textContent).toBe('YahuShua The Messiah, God With Us');
+    } finally { delete globalThis.studyShortTitle; }
+  });
+
+  it('a one-page study: its name above, the rest of its title as the heading, no "Part 1" of one', () => {
+    const ODDS = 'Odds Chart - YahuShua Fulfills Over 200 Messianic Prophecies';
+    globalThis.studyShortTitle = (t) => t.slice(0, t.indexOf(' - '));
+    try {
+      renderLetter({ studyMode: true, volumeLabel: ODDS }, { ...LETTER, title: ODDS, num: 1, unitWord: 'Part' });
+      expect(document.querySelector('.hero-eyebrow').textContent).toBe('Odds Chart');
+      expect(document.querySelector('.hero-title').textContent).toBe('YahuShua Fulfills Over 200 Messianic Prophecies');
+      expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('Odds Chart');
+    } finally { delete globalThis.studyShortTitle; }
+  });
+
+  it('a letter keeps its whole title, colon and all', () => {
+    renderLetter({ volumeLabel: 'Volume One' }, { ...LETTER, title: 'Regarding: The Day' });
+    expect(document.querySelector('.hero-title').textContent).toBe('Regarding: The Day');
   });
 
   it('a letter still says Letter', () => {

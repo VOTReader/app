@@ -118,9 +118,9 @@ describe.each([
 });
 
 describe('InlineEcho — pill label', () => {
-  it('shows "ref — Volume" when there is a volume', () => {
+  it('shows "ref · Volume" when there is a volume', () => {
     const { container } = render(<Echo scriptures={[]} votNotes={[REAL_VOLUME]} />);
-    expect(container.textContent).toContain('10:1 — Volume One');
+    expect(container.textContent).toContain('10:1 · Volume One');
   });
 
   it('leaves no dangling separator when the note names no volume', () => {

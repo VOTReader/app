@@ -20,6 +20,7 @@ import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
+import { studyTitleParts, chapterTitleParts, isFigureRow } from '../../utils/study-titles.js';
 import { prophecyCardsOf } from '../components/ProphecyGroup.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
 import { AddendumHeadLines } from '../components/AddendumHead.jsx';
@@ -107,8 +108,20 @@ export function LetterView(props) {
   const position = letter.num === 0 ? "Preface" : `${unit} ${letter.num}`;
   // The band's one line cut a long study title before its position: a study names itself short there.
   const bandLabel = volumeLabel && studyMode && typeof studyShortTitle === 'function' ? studyShortTitle(volumeLabel) : volumeLabel;
+  /* Studies pass 3 (hub, 2026-11-18): a study's page names itself in the three levels its contents page uses. The study
+     by its short name and the chapter's own label ("Section One", "Part One") sit above; the heading is the chapter's
+     name alone. Before, the eyebrow was the study's 108-character title cut with an ellipsis, and the heading said
+     "Section One: ..." under an eyebrow that already said "Chapter 1". No word of the title is dropped. */
+  const studyParts = studyMode && volumeLabel ? studyTitleParts(volumeLabel) : null;
+  /* A one-page study (the Odds Chart) is its own only chapter, titled as the study is: the name goes above and the
+     rest of the title is the heading, with no "Part 1" of one. */
+  const onePage = !!studyParts && letter.title === volumeLabel && !!studyParts.tail;
+  const named = onePage ? { over: '', name: studyParts.tail }
+    : studyMode ? chapterTitleParts(letter.title, studyParts ? studyParts.head : '') : { over: '', name: letter.title };
+  const heroCol = studyMode ? bandLabel : volumeLabel;
+  const heroPos = onePage ? '' : named.over || position;
   const miniTitle = (
-    <MiniTitleBand heroRef={heroRef} eyebrow={(bandLabel ? bandLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
+    <MiniTitleBand heroRef={heroRef} eyebrow={[bandLabel, heroPos].filter(Boolean).join(' · ')} title={named.name} pageKey={letter.id} />
   );
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
@@ -396,8 +409,8 @@ export function LetterView(props) {
               "Volume Two". The position label alone is honest. */}
           {/* A long collection name (a study's 108-character title) holds one line with an
               ellipsis; the position after it always shows (studies pass, 2026-11-12). */}
-          <div className={'hero-eyebrow' + (volumeLabel ? ' has-col' : '')}>{volumeLabel ? <><span className="hero-eyebrow-col">{volumeLabel}</span><span className="hero-eyebrow-pos">{" \xA0\xB7\xA0 "}{position}</span></> : position}</div>
-          <h1 className="hero-title">{letter.title}</h1>
+          <div className={'hero-eyebrow' + (heroCol ? ' has-col' : '')}>{heroCol ? <><span className="hero-eyebrow-col">{heroCol}</span>{heroPos ? <span className="hero-eyebrow-pos">{" \xA0\xB7\xA0 "}{heroPos}</span> : null}</> : heroPos}</div>
+          <h1 className="hero-title">{named.name}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           {/* Streaming audio letter (2026-08-05). Presence + reader come from
               the AUDIO_MANIFEST lazy-corpus global (same bundle as the letter
@@ -489,7 +502,7 @@ export function LetterView(props) {
                 );
               }
               if (block.type === "para") return (
-                <p key={letter.id + ":" + bi} className="letter-para" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
+                <p key={letter.id + ":" + bi} className={"letter-para" + (studyMode && isFigureRow(block) ? " is-figure-row" : "")} data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
                   <StaticSubtree>
                     <Segments segments={block.segments} {...fnProps} />
                   </StaticSubtree>

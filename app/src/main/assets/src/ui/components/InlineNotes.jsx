@@ -5,22 +5,29 @@
    study prose carries data-hl-key + data-hl-dom + StaticSubtree; tappable
    rows stay navigation chrome. `hlKeyBase` is the verse's own study key
    ('study:matthew-5:12') — suffixes keep these containers distinct from
-   the verse text container that owns the bare key. */
+   the verse text container that owns the bare key.
+
+   Studies pass 3 (hub, 2026-11-18): a verse's notes are one card of rows in
+   the parts the chapter's end already wears (StudyPanels): the verse in the
+   accent, the reference or the letter's name, the kit chevron. Before, they
+   hung off a gold rule in 10 px capitals inside hairline boxes, a look the
+   rest of the app had left. The words and what a tap opens are unchanged. */
 
 import { renderCommentaryCite } from './ModeToggle.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   if (!scriptures.length && !votNotes.length) return null;
   const ann = (suffix) => hlKeyBase ? { 'data-hl-key': hlKeyBase + '-' + suffix, 'data-hl-dom': true } : {};
   return (
-    <div className="inline-notes">
+    <div className="inline-notes ui-group">
       {scriptures.map((s, i) => {
         const hasVerse = !!MATTHEW_NKJV[s.cite];
         return hasVerse ? (
           <button key={`s${i}`} className="inline-note-scripture" onClick={() => onScriptureClick && onScriptureClick(s)}>
             <span className="inline-note-tag">{s.ref}</span>
             <span className="inline-note-cite">{s.cite}</span>
-            <span className="inline-note-chevron">{"›"}</span>
+            <UiIcon name="chev" size="sm" className="inline-note-chevron" />
           </button>
         ) : (
           <div key={hlKeyBase ? hlKeyBase + '-s' + i : `s${i}`} className="inline-note-scripture inline-note-plain" {...ann('s' + i)}>
@@ -39,7 +46,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
         const badge = hm ? (
           <span className="inline-vot-hm" title="Hidden Manna — The Word of The Lord Spoken to Timothy">Hidden Manna</span>
         ) : canTap ? (
-          <span className="inline-vot-chevron">{"›"}</span>
+          <UiIcon name="chev" size="sm" className="inline-vot-chevron" />
         ) : null;
         const inner = (
           <>
@@ -48,7 +55,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
               {volLabel && <span className="inline-vot-vol">{volLabel}</span>}
               {badge}
             </div>
-            <div className="inline-vot-letter">{"\""}{n.letter}{"\""}</div>
+            <div className="inline-vot-letter">{n.letter}</div>
             {n.excerpt && <div className="inline-vot-excerpt">{n.excerpt}</div>}
           </>
         );

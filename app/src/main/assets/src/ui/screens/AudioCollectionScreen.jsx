@@ -18,6 +18,7 @@ import { OfflineCollectionMark, OfflineNote, rowOnPhone, useOfflineAudio, useOnl
 import { CollectionDownload } from '../components/CollectionDownload.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
 import { EmptyState, ListGroup, ListRow, RowPlay, SectionLabel, Segmented, UiButton } from '../components/UiParts.jsx';
+import { studyTitleParts } from '../../utils/study-titles.js';
 import { editionName, editionReading } from './AudioBibleScreen.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { audioLibraryStore } from '../components/AudioShelf.jsx';
@@ -211,7 +212,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
   // A Bible edition's bar says its name ("KJV"); the line under it says the reading (listen.html au-books).
   const edition = bible ? Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey) || null : null;
   // A study's bar says its own name ("Purity"); what it is goes on the line under it (listen.html au-study).
-  const studyName = study && label ? label.replace(/\s*(?:-\s*Bible\/Letter Study|\(Bible\/Letter Study\))\s*$/, '') || label : '';
+  const studyName = study && label ? studyTitleParts(label).head || label : '';
   const utility = { title: (edition ? editionName(edition) : studyName || label) || 'Recordings', onBack, backLabel };
 
   if (!label && !items.length) {

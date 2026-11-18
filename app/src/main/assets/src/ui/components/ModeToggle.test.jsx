@@ -15,7 +15,7 @@ import { ModeToggle, renderCommentaryCite } from './ModeToggle.jsx';
 
 afterEach(cleanup);
 
-/* r-study (W2h): the switch sits under the chapter title, in words: Study notes: In the text | As the page | Off. */
+/* r-study (W2h): the switch sits under the chapter title, in words: Study notes: In the text | At the end | Off. */
 const radios = () => screen.getAllByRole('radio');
 const names = () => radios().map((b) => b.textContent.trim());
 const chosen = () => radios().filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.textContent.trim());
@@ -27,9 +27,9 @@ const mount = (mode, showStudy) => {
 afterEach(cleanup);
 
 describe('the study-notes switch names each view in words and checks the one the reader is in', () => {
-  it.each([['pdf', true, 'As the page'], ['inline', true, 'In the text'], ['pdf', false, 'Off']])('%s, shown %s: %s', (mode, shown, want) => {
+  it.each([['pdf', true, 'At the end'], ['inline', true, 'In the text'], ['pdf', false, 'Off']])('%s, shown %s: %s', (mode, shown, want) => {
     mount(mode, shown);
-    expect(names()).toEqual(['In the text', 'As the page', 'Off']);
+    expect(names()).toEqual(['In the text', 'At the end', 'Off']);
     expect(chosen()).toEqual([want]);
     expect(screen.getByText('Study notes')).toBeTruthy();
   });

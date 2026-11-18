@@ -2217,13 +2217,8 @@
       .vot-note-excerpt { margin-top: var(--sp-1); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.5; }
       .vot-note-tappable .vot-note-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
       .vot-note-excerpt em { color: var(--accent); font-style: normal; }
-      .vot-note-hm, .inline-vot-hm {
-        margin-left: auto; align-self: center; flex-shrink: 0;
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-        color: var(--gold-dim); padding: 0.12rem 0.35rem;
-        border: 1px solid var(--gold-border); border-radius: 2px;
-        text-transform: uppercase;
-      }
+      /* The Hidden Manna mark on a note that opens nothing: a quiet kit pill (studies pass 3). */
+      .vot-note-hm, .inline-vot-hm { margin-left: auto; align-self: center; flex-shrink: 0; padding: 2px 8px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--fs-11); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
       /* ── end W2i readers (r-study2) ── */
 
       /* Further study (Matthew chapters): kit link rows in a ui-group (vot-ui letter-end), set off from the body. */
@@ -2251,72 +2246,38 @@
       .ornament-divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent); }
       .ornament-divider-symbol { font-family: 'Cinzel', serif; font-size: var(--fs-12); color: var(--gold-dim); letter-spacing: 0.15em; }
       /* ── ANIMATIONS ── */
-      /* ── INLINE NOTES ── */
-      .inline-notes {
-        margin: 0.4rem 0 1.1rem 1.1rem;
-        display: flex; flex-direction: column; gap: 0.5rem;
-        border-left: 2px solid var(--gold-border);
-        padding-left: 0.85rem;
-      }
-      .inline-note-scripture {
-        display: flex; gap: 0.6rem; align-items: baseline;
-        font-size: var(--fs-14); cursor: pointer; text-align: left;
-        background: none; border: none; padding: 0.1rem 0;
-        width: 100%; border-radius: 3px;
-        transition: opacity 0.15s ease;
-      }
-      @media (hover: hover) { .inline-note-scripture:hover { opacity: 0.75; } }
-      .inline-note-tag {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
-        color: var(--gold); letter-spacing: 0.08em;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .inline-note-cite { color: var(--cream-muted); font-style: italic; line-height: 1.5; }
-      .inline-vot-note {
-        background: rgba(200,164,86,0.05);
-        border: 1px solid rgba(200,164,86,0.12);
-        border-radius: 4px;
-        padding: 0.55rem 0.7rem;
-      }
-      .inline-vot-header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem; }
-      .inline-vot-ref { font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold); letter-spacing: 0.08em; }
-      .inline-vot-vol { font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold-dim); }
-      .inline-vot-letter { font-size: var(--fs-12); color: var(--cream-muted); font-style: italic; margin-bottom: 0.3rem; }
-      .inline-vot-excerpt { font-size: var(--fs-14); color: var(--cream-dim); line-height: 1.65; }
-      .inline-vot-chevron {
-        margin-left: auto; color: var(--gold-dim); font-size: var(--fs-14); line-height: 1;
-        align-self: center; flex-shrink: 0;
-      }
-      .inline-vot-note-tappable {
-        display: block; width: 100%; text-align: left; cursor: pointer;
-        color: inherit; font: inherit; transition: all var(--transition);
-      }
-      @media (hover: hover) { .inline-vot-note-tappable:hover { background: rgba(200,164,86,0.10); border-color: var(--gold-dim); } }
-      .inline-vot-note-tappable:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
-      .inline-vot-note-tappable:active .inline-vot-chevron { color: var(--gold-bright); }
+      /* ── INLINE NOTES (studies pass 3, hub 2026-11-18) ──
+         "Study notes: In the text": a verse's notes are one card of rows under it, in the parts the chapter's end
+         wears (.study-panels above): the verse in the accent, the reference or the letter's name, the kit chevron.
+         The card is the shared .ui-group (InlineNotes.jsx). Before: 10 px capitals in hairline boxes off a gold rule. */
+      .inline-notes { display: block; margin: var(--sp-2) 0 var(--sp-5); font-size: var(--fs-16); line-height: 1.4; }
+      .inline-notes > * + * { border-top: 1px solid var(--hairline); }
+      .inline-note-scripture { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: var(--tap); margin: 0; padding: 10px 12px 10px var(--card-pad); border: 0; border-radius: 0; background: none; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); text-align: left; cursor: pointer; box-sizing: border-box; }
+      .inline-note-scripture:active { background: var(--surface-2); }
+      .inline-note-scripture:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .inline-note-tag { flex: none; min-width: 3.4em; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); font-variant-numeric: tabular-nums; }
+      .inline-note-cite { flex: 1; min-width: 0; color: var(--text-1); font-size: var(--fs-16); font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
+      .inline-note-plain { align-items: baseline; cursor: default; }
+      .inline-note-plain:active { background: none; }
+      .inline-note-plain .inline-note-cite { color: var(--text-2); font-family: var(--font-serif); font-style: italic; font-weight: 400; line-height: 1.5; }
+      .inline-note-chevron, .inline-vot-chevron { flex: none; color: var(--text-3); }
+      .inline-vot-note { display: block; width: 100%; margin: 0; padding: 14px var(--card-pad); border: 0; border-radius: 0; background: none; color: inherit; font: inherit; text-align: left; box-sizing: border-box; }
+      .inline-vot-header { display: flex; align-items: center; flex-wrap: wrap; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      .inline-vot-ref { color: var(--accent); white-space: nowrap; }
+      .inline-vot-ref + .inline-vot-vol::before { content: '\00a0\00b7\00a0'; }
+      .inline-vot-chevron { margin-left: auto; }
+      .inline-vot-letter { margin-top: 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: 1.3; }
+      .inline-vot-excerpt { margin-top: var(--sp-1); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.55; }
+      .inline-vot-note-tappable { cursor: pointer; }
+      .inline-vot-note-tappable:active { background: var(--surface-2); }
+      .inline-vot-note-tappable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-      /* ── INLINE ECHO PILLS ── */
-      .inline-echo {
-        margin: 0.25rem 0 0.6rem 1.1rem;
-        display: flex; flex-wrap: wrap; gap: 0.35rem;
-        padding-left: 0.85rem;
-      }
-      .inline-echo-pill {
-        display: inline-flex; align-items: center; gap: 0.3rem;
-        padding: 0.25rem 0.6rem; border-radius: 20px;
-        border: 1px solid rgba(200,164,86,0.25);
-        background: rgba(200,164,86,0.06);
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
-        letter-spacing: 0.08em; color: var(--gold-dim);
-        cursor: pointer; transition: all 0.2s ease;
-        text-transform: uppercase; white-space: nowrap;
-      }
-      @media (hover: hover) {
-        .inline-echo-pill:hover { background: rgba(200,164,86,0.12); color: var(--gold); border-color: var(--gold-dim); }
-      }
-      .inline-echo-pill:active { background: rgba(200,164,86,0.18); }
-      .inline-echo-pill svg { width: 10px; height: 10px; opacity: 0.7; }
-      .inline-echo-pill .echo-arrow { font-size: var(--fs-11); line-height: 1; }
+      /* ── INLINE ECHO PILLS: "this note is up at verse N". A kit pill, sentence case; a long name wraps. ── */
+      .inline-echo { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-4); }
+      .inline-echo-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; padding: 4px 12px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: 1.3; text-align: left; cursor: pointer; }
+      .inline-echo-pill:active { background: var(--surface-2); }
+      .inline-echo-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .inline-echo-pill .echo-arrow { flex: none; color: var(--accent); line-height: 1; }
 
       .verses-inline { display: flex; flex-direction: column; }
       .verse-row { margin-bottom: 0.15rem; }
@@ -2385,6 +2346,13 @@
     /* A study's headings: centred, set as the UI pass sets a section label (UI face, 600, caps, --track-label, accent). */
     .study-heading { font-family:var(--font-ui); font-size:var(--fs-15); font-weight:600; letter-spacing:var(--track-label); color:var(--accent); text-transform:uppercase; text-align:center; margin:2.4rem 0 1rem; line-height:var(--lh-label); text-wrap:balance; }
     .study-heading-l3 { font-size:var(--fs-13); margin:2rem 0 0.85rem; }
+    /* Studies pass 3 (hub, 2026-11-18): a chart the study sets as paragraphs reads as a table. The Odds Chart is 46
+       lines "N prophecies = 1 chance in X"; as body paragraphs they ran five screens with a blank line between each.
+       A row keeps its own paragraph (its highlight key, its words); the figure floats right, so a long one drops
+       under its words, right-aligned, and nothing is cut. */
+    .letter-para.is-figure-row { margin:0; padding:9px 0; border-top:1px solid var(--hairline); overflow:hidden; color:var(--text-2); font-size:var(--fs-16); line-height:1.45; }
+    .letter-para.is-figure-row .bold-italic { float:right; margin-left:var(--sp-3); color:var(--text-1); font-style:normal; font-variant-numeric:tabular-nums; }
+    .letter-para.is-figure-row + :not(.is-figure-row) { margin-top:2rem; }
 
     /* ── PROPHECY GROUP (collapsible stacked cards) ── */
     /* ── STUDY COVER IMAGE (inline in preface) ── */
@@ -2404,6 +2372,11 @@
     /* The three part-title plates are dark type on white: in the dark theme they turn
        light on dark, and lighten lets the page show through their black, so no edge. */
     body:not(.light) .study-image-block img[src*="study-title-"] { filter:invert(1); mix-blend-mode:lighten; }
+    /* Studies pass 3: a part's title plate is the same plate wherever the study puts it. As a study's cover block it
+       stood as a white card on the dark page (The Lamb of God's preface) while the same plate inside a part read in
+       the page's own colours; now both do. A real cover picture keeps its card and shadow. */
+    .study-cover-inline img:is([src*="study-title-"], [src*="study-cover-lamb"]) { border-radius:4px; box-shadow:none; }
+    body:not(.light) .study-cover-inline img:is([src*="study-title-"], [src*="study-cover-lamb"]) { filter:invert(1); mix-blend-mode:lighten; }
     .study-image-caption { padding:0.5rem 1.5rem 0; font-size:var(--fs-12); color:var(--cream-dim); font-style:italic; }
 
     .section-intro-quote { padding:1.5rem 1.5rem 0; text-align:center; }
@@ -2682,11 +2655,10 @@
     .mini-title-eyebrow, .mini-title-name {
       max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
     }
-    .mini-title-eyebrow {
-      font-family: var(--font-cinzel); font-size: var(--fsc-10); line-height: 1.3;
-      letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-dim);
-    }
-    .mini-title-name { font-family: var(--font-garamond); font-size: var(--fsc-16); line-height: 1.25; color: var(--cream); }
+    /* Studies pass 3 (hub, 2026-11-18): the band wears the hero's own type (the eyebrow in the UI sans, sentence case;
+       the name in the serif), not the old letter-spaced capitals it kept after the heroes changed. */
+    .mini-title-eyebrow { font-family: var(--font-ui); font-size: var(--fsc-12); line-height: 1.3; color: var(--text-2); }
+    .mini-title-name { font-family: var(--font-serif); font-size: var(--fsc-16); font-weight: 600; line-height: 1.25; color: var(--text-1); }
     @media (prefers-reduced-motion: reduce) { .mini-title, .mini-title.shown { transition: none; transform: none; } }
     /* FINAL1 (r-study): a plain row in the page's own type, sentence case, no pill */
     .back-hint-pill {
@@ -2778,9 +2750,6 @@
     /* screen-routes _fallbackView (mw17 s17.3): loading, failed loads, stale tabs. */
     .route-fallback { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:14px; text-align:center; padding:0 24px; }
     .route-fallback-btn { padding:8px 20px; border-radius:999px; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; opacity:0.85; }
-    .inline-note-chevron { margin-left:auto; color:var(--gold-dim); font-size:var(--fs-14); flex-shrink:0; align-self:center; padding-left:0.3rem; }
-    .inline-note-plain { cursor:default; }
-    @media (hover: hover) { .inline-note-plain:hover { opacity:1 !important; } }
     @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
     /* ── FOOTNOTE LIST ── */
     .footnote-list { margin-top:var(--label-above); }
@@ -3224,7 +3193,9 @@
     .listen-chapters .ui-row-lead.is-play { width: 30px; height: 30px; background: none; color: var(--accent); }
     .listen-chapters .ui-row-title { font-family: var(--font-ui); font-size: var(--ts-control); font-weight: var(--fw-name); }   /* MERGE1: the shared name weight (mock .u 500) */
     .listen-chapters-all { display: block; padding: var(--sp-3) var(--card-pad); }
-    .listen-studies .ui-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    /* Studies pass 3 (hub, 2026-11-18): a study's row is its name with the rest of its title under it (.sty-sub), whole. */
+    .listen-studies .ui-row-title { white-space: normal; overflow-wrap: break-word; }
+    .listen-studies .ui-row-meta { white-space: normal; }
     /* -- end W3c listen */
     /* -- W3d listen: Songs (listen.html au-styles, au-songmenu, au-songs2) */
     .songs-styles-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -9016,6 +8987,11 @@ body.light .install-step-num { color: #fff; }
     .listen-coll-sections .ui-chip .ui-i { color: var(--accent); }
     .listen-rec-num { margin-right: .45em; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-variant-numeric: tabular-nums; }
     .listen-rec.is-unavailable .ui-row-title { color: var(--text-2); }
+    /* Studies pass 3: a recording's name takes two lines before it is cut, as a song's does (task-1720): '1 I Am The Passo...'
+       named nothing. The star and the menu keep their 44 px. The bar's title takes two lines too (56 px bar). */
+    .listen-rec .ui-row-title { white-space: normal; overflow-wrap: break-word; text-wrap: pretty; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .vot-large-text .listen-rec .ui-row-title { display: block; -webkit-line-clamp: unset; }
+    .screen-layout:has(> .screen-scroll .listen-coll) > .top-nav > .bar-title { white-space: normal; overflow-wrap: break-word; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .listen-rec .ui-row-meta .coverage-badge { margin-left: var(--sp-2); }
     .ui-row-star { flex: none; display: flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: -6px -4px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
     .ui-row-star.is-on { color: var(--accent); }
