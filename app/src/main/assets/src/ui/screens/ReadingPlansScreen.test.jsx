@@ -105,6 +105,19 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(screen.getByRole('group', { name: 'This week' })).toBeTruthy();
   });
 
+  // app map 11-18: a preview's schedule view has id '' (no run yet), and the 'no run: going back' branch took it before
+  // the preview branch could, so Whole schedule drew a blank page (since 2082583cc, 11-16).
+  it('Whole schedule from a preview draws the draft plan’s schedule, and starts nothing', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Whole schedule' }));
+    expect(barTitle()).toMatch(/^Bible in a Year · Schedule$/);
+    expect(screen.getAllByText(/Genesis 4-7/).length).toBeGreaterThan(0);
+    expect(runs()).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('button', { name: 'Start plan' })).toBeTruthy();
+  });
+
   it('Length changes the plan ("90 days" means 90), and Tomorrow starts it later', () => {
     render(<PlansHub {...base()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
