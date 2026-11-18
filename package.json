@@ -28,6 +28,7 @@
     "e2e:update-waits": "node tools/e2e-update-waits.mjs",
     "e2e:search": "node tools/e2e-search.mjs",
     "e2e:contrast": "node tools/e2e-contrast.mjs",
+    "e2e:official": "node tools/e2e-never-official.mjs",
     "e2e:tabs": "node tools/e2e-tabs-true.mjs",
     "bench:search": "node tools/search-bench.mjs",
     "bench:tri": "node tools/search-bench.mjs --set tri",

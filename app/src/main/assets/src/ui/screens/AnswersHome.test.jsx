@@ -345,7 +345,12 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     expect(rows.slice(4)).toEqual(SITE.sisterSites.slice(4).map((s) => s.label));
     const yt = [...sister.parentNode.nextElementSibling.querySelectorAll('a')].find((a) => a.textContent.startsWith('YouTube channel'));
     expect(yt.querySelector('.ans-row-sub').textContent).toBe('youtube.com/AnswersOnlyGodCanGive');
-    expect(yt.getAttribute('aria-label')).toBe('Answers Only God Can Give - Official YouTube Channel, youtube.com/AnswersOnlyGodCanGive');
+    expect(yt.getAttribute('aria-label')).toBe('Answers Only God Can Give YouTube channel, youtube.com/AnswersOnlyGodCanGive');
+    // Corbin 11-18: nothing the sheet draws or says calls a page official
+    expect(d.textContent).not.toMatch(/official/i);
+    for (const el of d.querySelectorAll('[aria-label], [title], [alt]')) {
+      for (const at of ['aria-label', 'title', 'alt']) expect(el.getAttribute(at) || '').not.toMatch(/official/i);
+    }
     expect(d.textContent).toContain('Copyright © 2004-2024 ~ All Rights Reserved.');
     expect(d.textContent).toContain('2026-10-19');
     expect(d.textContent).toContain('The words, headings and order are the site’s.');
@@ -625,7 +630,8 @@ describe('AnswersMedia — Charts & videos (f13)', () => {
     expect(links.length).toBe(4 + 13 + 7);
     for (const a of links) { expect(a.getAttribute('target')).toBe('_blank'); expect(a.getAttribute('href')).toMatch(/^https?:\/\//); }
     expect(document.querySelector('iframe')).toBeNull();
-    expect(links[4].querySelector('.ans-row-title').textContent).toBe('OFFICIAL YOUTUBE CHANNEL');
+    // the site's "OFFICIAL YOUTUBE CHANNEL" is a plain "YouTube channel", its address under it (Corbin 11-18)
+    expect(links[4].querySelector('.ans-row-title').textContent).toBe('YouTube channel');
     expect(links[5].querySelector('.ans-row-title').textContent).toBe('The Lord Speaks About The Sabbath (Video-Playlist)');
     fireEvent.click(document.querySelector('.ans-thumb'));
     const viewer = screen.getByRole('dialog');

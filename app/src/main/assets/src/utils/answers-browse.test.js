@@ -266,12 +266,12 @@ describe('the landing bar title', () => {
 describe('About this collection rows', () => {
   it('names the official pages short and puts their address under them', () => {
     expect(answersSisterRow({ label: 'Answers Only God Can Give - Official YouTube Channel', url: 'https://www.youtube.com/AnswersOnlyGodCanGive' }))
-      .toEqual({ title: 'YouTube channel', sub: 'youtube.com/AnswersOnlyGodCanGive' });
+      .toEqual({ title: 'YouTube channel', sub: 'youtube.com/AnswersOnlyGodCanGive', label: 'Answers Only God Can Give YouTube channel, youtube.com/AnswersOnlyGodCanGive' });
     expect(answersSisterRow({ label: 'Answers Only God Can Give - Official Facebook Page', url: 'https://www.facebook.com/AnswersOnlyGodCanGive' }))
-      .toEqual({ title: 'Facebook page', sub: 'facebook.com/AnswersOnlyGodCanGive' });
+      .toMatchObject({ title: 'Facebook page', sub: 'facebook.com/AnswersOnlyGodCanGive' });
     expect(answersSisterRow({ label: 'Answers Only God Can Give - Official Twitter X Page', url: 'https://x.com/DailyTrumpet' }))
-      .toEqual({ title: 'X page', sub: 'x.com/DailyTrumpet' });
+      .toMatchObject({ title: 'X page', sub: 'x.com/DailyTrumpet' });
     expect(answersSisterRow({ label: 'TheVolumesofTruth.com', url: 'https://www.thevolumesoftruth.com/Main_Page' }))
-      .toEqual({ title: 'TheVolumesofTruth.com', sub: 'thevolumesoftruth.com' });
+      .toMatchObject({ title: 'TheVolumesofTruth.com', sub: 'thevolumesoftruth.com' });
   });
 });

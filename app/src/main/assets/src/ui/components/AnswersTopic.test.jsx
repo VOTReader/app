@@ -207,9 +207,9 @@ describe('AnswersTopic — hero words (f07)', () => {
 
 describe('AnswersTopic — 0125 E: the site’s navigation words, said plainly', () => {
   const NB = (s) => s.split(String.fromCharCode(160)).join(' ');
-  it('the Main Page is "Start here" in rows and "Introduction" in its eyebrow; Official website kept', () => {
+  it('the Main Page is "Start here" in rows and "Introduction" in its eyebrow, never "Official website" (Corbin 11-18)', () => {
     const mp = byId.get('answers-main-page');
-    expect(NB(answersEyebrow(A, mp).text)).toBe('Official website · Introduction');
+    expect(NB(answersEyebrow(A, mp).text)).toBe('Introduction');
     expect(answersRunTitle(mp)).toBe('Start here');
     expect(answersPlaceOf(A, 'answers-main-page')).toBe('Start here');
   });

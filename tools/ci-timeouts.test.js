@@ -40,6 +40,12 @@ describe('the restore walk is a CI gate (n7-06)', () => {
   });
 });
 
+describe('the never-official walk is a CI gate (task-0211, Corbin 11-18)', () => {
+  it('ci.yml runs npm run e2e:official', () => {
+    expect(wf('ci.yml')).toMatch(/\n {8}run: npm run e2e:official\n/);
+  });
+});
+
 /* ln1 (2026-10-05): the serial build job became gates / vitest / browser in parallel. `build + syntax-check` is the only
    required status check on main, so the job that publishes it must wait for all three and must RUN when one fails: a
    skipped required check counts as passing. */

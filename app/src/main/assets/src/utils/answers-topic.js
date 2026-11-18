@@ -17,7 +17,7 @@
    text (tools/fetch-answers.py).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { pl, SEP, NBSP, answersMinWords, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead } from './answers-browse.js';
+import { pl, SEP, NBSP, answersMinWords, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead, answersMediaSource, answersChannelName } from './answers-browse.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle, isAttribution, isTrumpetSection } from './answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, ANSWERS_OTHER_LABEL, answersSiteShelfOf } from './answers-site.js';
 import { answersSource } from './answers-contents.js';
@@ -46,8 +46,9 @@ export function answersFoldable(meta) {
  */
 export function answersEyebrow(entries, entry) {
   const id = entry && entry.id;
-  // 0125 E: the site's Main Page is "Start here" in rows; its own eyebrow says what it is
-  if (id === ANSWERS_MAIN_PAGE_ID) return { text: 'Official website' + SEP + 'Introduction', shelf: null };
+  // 0125 E: the site's Main Page is "Start here" in rows; its own eyebrow says what it is. Never "Official website":
+  // the app never presents a page as the official site (Corbin 11-18 02:09, DECISIONS)
+  if (id === ANSWERS_MAIN_PAGE_ID) return { text: 'Introduction', shelf: null };
   const s = answersSiteShelfOf(entries, id);
   if (!s) return { text: ANSWERS_OTHER_LABEL, shelf: null };
   if (s.kind === 'other') return { text: ANSWERS_OTHER_LABEL, shelf: s };
@@ -258,8 +259,9 @@ export function answersFootMedia(meta) {
   return ((meta && meta.media) || []).filter((m) => m.at === 'end');
 }
 
-/** "Playlist · YouTube": what a media card opens. */
+/** "Playlist · YouTube": what a media card opens; a channel, its address ("youtube.com/c/AnswersOnlyGodCanGive"). */
 export function answersMediaKindSub(m) {
+  if (m && m.kind === 'channel') return answersMediaSource(m);
   const where = String((m && m.url) || '').includes('youtube.com') || String((m && m.url) || '').includes('youtu.be') ? 'YouTube' : answersDomain(m && m.url);
   const kind = m.kind === 'channel' ? 'Channel' : m.kind === 'playlist' ? 'Playlist' : m.kind === 'audio' ? 'Audio' : m.kind === 'pdf' ? 'PDF' : 'Video';
   return kind + SEP + where;
@@ -267,6 +269,7 @@ export function answersMediaKindSub(m) {
 
 /** A media label as the card shows it: the site's "▶️" becomes the card's play disc. */
 export function answersMediaLabel(m) {
+  if (m && m.kind === 'channel') return answersChannelName(m);
   const t = String((m && m.title) || '');
   return t.startsWith('▶️') ? t.slice(2).trim() : t;
 }

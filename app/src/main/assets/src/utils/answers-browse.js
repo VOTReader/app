@@ -467,8 +467,18 @@ export function answersDomain(url) {
   return host;
 }
 
-/** The site's own label for a media item, word for word, less the "▶️" its playlist labels open with (the row's disc stands in). */
+/**
+ * A channel row's name: "YouTube channel", its address under it. The site labels these "OFFICIAL YOUTUBE CHANNEL";
+ * the app never calls anything official (Corbin 11-18 02:09, DECISIONS), so a channel is named by where it opens.
+ */
+export function answersChannelName(m) {
+  const host = answersDomain(m && m.url);
+  return host.endsWith('youtube.com') || host === 'youtu.be' ? 'YouTube channel' : 'Channel';
+}
+
+/** The site's own label for a media item, word for word, less the "▶️" its playlist labels open with (the row's disc stands in); a channel by its plain name. */
 export function answersMediaTitle(m) {
+  if (m && m.kind === 'channel') return answersChannelName(m);
   let t = String((m && m.title) || '').split('\n')[0];
   for (const lead of ['▶️ ', '▶ ']) if (t.startsWith(lead)) t = t.slice(lead.length);
   return t.trim();
@@ -501,20 +511,21 @@ export function answersMediaSource(m) {
 /**
  * A sister-site row in About this collection (ANS1, the mock's a-about): the site's own "Answers Only God Can Give -
  * Official YouTube Channel" as "YouTube channel" with its address under it ("youtube.com/AnswersOnlyGodCanGive");
- * any other link keeps its label, its domain under it.
+ * any other link keeps its label, its domain under it. `label` is what a screen reader hears: the site's name and the
+ * short name, never the site's "Official" (Corbin 11-18 02:09).
  * @param {{ label: string, url: string }} s
- * @returns {{ title: string, sub: string }}
+ * @returns {{ title: string, sub: string, label: string }}
  */
 export function answersSisterRow(s) {
   const label = String((s && s.label) || '');
   const url = String((s && s.url) || '');
   const m = /^Answers Only God Can Give\s*-\s*Official\s+(?:Twitter\s+)?(.+)$/i.exec(label);
-  if (!m) return { title: label, sub: answersDomain(url) };
+  if (!m) return { title: label, sub: answersDomain(url), label: label + ', ' + answersDomain(url) };
   const words = m[1].trim().split(/\s+/);
   const title = words.map((w, i) => (i === words.length - 1 && words.length > 1 ? w.toLowerCase() : w)).join(' ');
   const at = url.indexOf('//');
   const rest = (at >= 0 ? url.slice(at + 2) : url).split(/[?#]/)[0].replace(/^www\./i, '').replace(/\/$/, '');
-  return { title, sub: rest };
+  return { title, sub: rest, label: 'Answers Only God Can Give ' + title + ', ' + rest };
 }
 
 /** A media row's sub: its topic, then where it opens. */

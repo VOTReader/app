@@ -588,6 +588,15 @@ jobs:
         # file with their reasons. ~TIMING.
         run: npm run e2e:contrast
 
+      - name: The app never calls itself official (never-official walk)
+        # tools/e2e-never-official.mjs (vot-ui task-0211, 2026-11-18; Corbin: "It should NEVER look like it's
+        # portraying itself as the official website inside our app. Ever"): the built app's head, manifest and
+        # Android strings, then a walk at 412x915 through the roots, Settings, a letter, the Bible, Search and every
+        # Answers page (landing, A-Z, About, Charts & videos, search, the introduction and every topic). Any
+        # /official/i in drawn text or a spoken label fails, except the source's own running text; so does a page
+        # it could not open.
+        run: npm run e2e:official
+
   search-bench:
     name: Search benchmark (500 remembered queries + the fresh 100)
     runs-on: ubuntu-latest
