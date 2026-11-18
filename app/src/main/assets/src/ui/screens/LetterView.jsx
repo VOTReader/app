@@ -394,8 +394,8 @@ export function LetterView(props) {
         onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
         prevDisabled={!letter.prevLetter && !prevBoundary}
         nextDisabled={!letter.nextLetter && !nextBoundary}
-        prevLabel="Previous letter"
-        nextLabel="Next letter"
+        prevLabel={"Previous " + unit.toLowerCase()}
+        nextLabel={"Next " + unit.toLowerCase()}
       />}
       navChildren={LibraryNav({
         // The back button was the app's ONLY `nav-volume` — and app.css's
@@ -415,7 +415,8 @@ export function LetterView(props) {
           onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
           prevDisabled: !letter.prevLetter && !prevBoundary,
           nextDisabled: !letter.nextLetter && !nextBoundary,
-          prevLabel: 'Previous letter', nextLabel: 'Next letter',
+          // 11-18: a study's arrows say its unit (chapter, part), as the footers do; a letter's still say letter
+          prevLabel: 'Previous ' + unit.toLowerCase(), nextLabel: 'Next ' + unit.toLowerCase(),
         },
         reading: true,
         chapterBookmark: letter ? { hlKey: 'letter:' + letter.id, label: letter.title || 'Letter bookmark' } : null,
