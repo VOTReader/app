@@ -3456,7 +3456,6 @@
     .plan-text-btn { min-height: var(--tap); min-width: var(--tap); padding: 0 6px; border: 0; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-15); cursor: pointer; }
     .plan-text-btn:disabled { opacity: 0.5; cursor: default; }
     .plan-link { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gold-border); }
-    .plan-danger { color: var(--tone-danger); }
     .plan-links { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 6px; }
     .plan-links-center { justify-content: center; }
     @media (hover:hover) { .plan-text-btn:hover { color: var(--gold-bright); } }
@@ -3496,8 +3495,10 @@
     .plan-own-only-text { flex-basis: 100%; margin: 0; font-family: var(--pl-ui); font-size: var(--fs-15); line-height: 1.4; }
     .plan-opt-note { width: 100%; margin: 2px 0 0; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.4; }
     .plan-days { display: flex; flex-wrap: nowrap; gap: 10px; }   /* 0450: a 44 px pitch, so each day's 44 px press is its own */
-    .plan-opt:has(.plan-days) { flex-direction: column; align-items: stretch; gap: 6px; }   /* seven days need the row's width: the label goes over them */
-    .plan-opt:has(.plan-days) .plan-opt-label { width: auto; }
+    /* seven days need the row's width, and a row that always stacks (Manage's Length: chips, then Finish by, then its note; Read before's sentence, button and note)
+       has no one line to sit beside: the label goes over them (11-18). Not any row with a note: Remind me's and Start's notes come and go, and the label must not jump. */
+    .plan-opt:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text) { flex-direction: column; align-items: stretch; gap: 6px; }
+    .plan-opt:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text) .plan-opt-label { width: auto; }
     .plan-opt .plan-days { justify-content: space-between; width: 100%; max-width: 22rem; }
     .plan-day-toggle { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; cursor: pointer; }
     .plan-day-toggle::after { content: ''; position: absolute; inset: -5px; }   /* a 44 px press */
@@ -3573,13 +3574,14 @@
     .plan-sheet-body .plan-opts { margin: 0 -14px; }
     .plan-sheet-body .ui-btn.is-wide { margin-top: 14px; }
     .plan-sheet-body .root-list { margin-bottom: 4px; }
-    .plan-sheet-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
-    .plan-sheet-actions .plan-danger { margin-left: auto; }
+    /* 11-18: the sheet's foot is a two-column grid of equal buttons (Pause | Start over, then Stop), not a wrapping row that left Stop alone at the right; one column at large text */
+    .plan-sheet-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 14px; }
+    .plan-sheet-actions > .ui-btn { min-width: 0; }
+    .vot-large-text .plan-sheet-actions { grid-template-columns: minmax(0, 1fr); }
+    .vot-large-text .plan-sheet-actions > .ui-btn { white-space: normal; }
     /* 2235 (Corbin 11-16: reading plans "intuitive and easy to understand at a glance"). One status on every plan
        surface (planStatus); behind leads to Catch up; missed reading days are dashed and muted, never red; a day the
        plan does not read on is faint. Manage in the bar is the gear and the word. */
-    .plan-sheet-actions { flex-wrap: wrap; }
-    .plan-sheet-actions .plan-stop-btn { margin-left: auto; }
     .top-nav .plan-manage-btn { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 12px 0 9px; border: 1px solid var(--gold-border); border-radius: var(--r-pill); background: none; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); letter-spacing: 0.02em; cursor: pointer; flex-shrink: 0; }
     .top-nav .plan-manage-btn svg { width: 18px; height: 18px; stroke-width: 1.7; }
     @media (hover: hover) { .top-nav .plan-manage-btn:hover { background: var(--surface-1); } }

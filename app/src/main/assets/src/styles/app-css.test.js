@@ -881,3 +881,18 @@ describe('app.css — Catch up lines wrap and keep each fact whole', () => {
     expect(b).toMatch(/max-width:\s*100%/);
   });
 });
+
+/* MANAGE PLAN READS DOWN THE SHEET (app map, 2026-11-18). Length's label sat centred against a four-line stack and
+   lined up with none of it, while Days had its label above; the foot's row wrapped Stop plan alone to the right. */
+describe('app.css — Manage plan: labels over stacks, one grid at the foot', () => {
+  it('a row of days or a row that always stacks puts its label above; a row whose note comes and goes does not', () => {
+    expect(CSS).toMatch(/\.plan-opt:has\(\.plan-days, \.plan-chips \+ \.plan-opt-line, \.plan-own-only-text\) \{ flex-direction: column;/);
+    expect(CSS).not.toMatch(/\.plan-opt:has\([^)]*\.plan-opt-note/);
+  });
+  it('the actions are a two-column grid, one column at large text, and Stop is not pushed right', () => {
+    expect(ruleBlock(CSS, '\n    .plan-sheet-actions {')).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(ruleBlock(CSS, '.vot-large-text .plan-sheet-actions {')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(CSS).not.toMatch(/\.plan-stop-btn \{ margin-left: auto/);
+    expect(CSS).not.toMatch(/\.plan-danger/);
+  });
+});
