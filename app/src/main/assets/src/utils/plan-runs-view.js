@@ -115,7 +115,7 @@ export function runRow(run, now) {
   // C10: counts; the finish is the honest one. plans2: one phrase when it moved, "N days later than planned"
   // (never behind, missed or catch up), and a paused plan or one not started is never late.
   const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
-  const pace = st.finished ? '' : 'Finishes ' + shortDate(st.projected) + (st.late > 0 ? ' · ' + daysWord(st.late) + ' later than planned' : '');
+  const pace = st.finished ? '' : 'Finishes ' + finishDate(st.projected, now) + (st.late > 0 ? ' · ' + daysWord(st.late) + ' later than planned' : '');
   return {
     id: run.id, plan: run.plan, name: runName(run, null), loading: false,
     label: st.finished ? '' : itemsLabel(shown, bookTitle),

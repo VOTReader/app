@@ -21,7 +21,7 @@
 
 import { usePlanNav, planNavMounted, keepPlanNav, pushPlanView, replacePlanView, popPlanView, planNavToList } from '../../utils/plan-nav.js';
 import { endPlanSession } from '../../utils/plan-session.js';
-import { usePlanRuns, saveRun, shortDate, runRow, continueRun, startOverRun, countOwnOnlyRun } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, saveRun, runRow, continueRun, startOverRun, countOwnOnlyRun, finishDate } from '../../utils/plan-runs-view.js';
 import { showUndoToast } from '../../utils/toast.js';
 import { runStatus, newRun, dayNum, itemKinds, againPace } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
@@ -80,7 +80,7 @@ function PlanFinished({ run, onFind, onAgain, onDone }) {
     <div className="root-screen plans-hub plan-finished">
       <span className="plan-daydone-tick" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M6 12.5l4 4L18 8" /></svg></span>
       <h2 className="plan-daydone-title">{'You finished ' + runName(run, null)}</h2>
-      <p className="plan-daydone-sub">{'Started ' + shortDate(run.start) + ' · finished ' + shortDate(run.finished)}</p>
+      <p className="plan-daydone-sub">{'Started ' + finishDate(run.start, new Date()) + ' · finished ' + finishDate(run.finished, new Date())}</p>
       <div className="plan-facts">
         <div className="plan-fact"><b>{days.toLocaleString('en-US')}</b><span>{days === 1 ? 'day' : 'days'}</span></div>
         {parts.map((p) => { const [n, ...w] = p.split(' '); return <div key={p} className="plan-fact"><b>{n}</b><span>{w.join(' ')}</span></div>; })}
@@ -103,7 +103,7 @@ function PlanStopped({ run, now, onContinue, onStartOver, onDone }) {
   return (
     <div className="root-screen plans-hub plan-finished plan-stopped">
       <h2 className="plan-daydone-title">{'You stopped ' + runName(run, null)}</h2>
-      <p className="plan-daydone-sub">{(run.stopped ? 'Stopped ' + shortDate(run.stopped) + ' · ' : '') + 'day ' + Math.min(st.total, st.day + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
+      <p className="plan-daydone-sub">{(run.stopped ? 'Stopped ' + finishDate(run.stopped, new Date()) + ' · ' : '') + 'day ' + Math.min(st.total, st.day + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
       <p className="plan-daydone-sub">{row.counts + ' read'}</p>
       <button type="button" className="ui-btn is-primary is-wide" onClick={onContinue}>Continue where I stopped</button>
       <button type="button" className="ui-btn is-wide" onClick={onStartOver}>Start over from day 1</button>

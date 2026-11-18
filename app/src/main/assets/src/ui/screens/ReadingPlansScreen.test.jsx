@@ -205,6 +205,23 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
     expect(screen.getByRole('group', { name: 'This week' }).querySelectorAll('[data-missed="1"]').length).toBeGreaterThan(0);
   });
 
+  // One rule for a plan's dates: the year shows when it is not this year's, the same in the head and in Catch up.
+  // On a real clock the plan above finishes next year until Jan 1, so both carry the year and a mismatch hid (push19 sweep).
+  it.each([['2026-11-17', true], ['2027-01-02', false]])('on %s, Catch up says the finish as the head does (year shown: %s)', (day, year) => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(day + 'T12:00:00') });
+    try {
+      ReadingPlanStore.put(lateRun());
+      render(<PlansHub {...base()} />);
+      openRow();
+      const said = document.querySelector('.plan-status').textContent;
+      const when = said.replace(/^.* finishes /, '');
+      expect(/, [0-9]{4}$/.test(when)).toBe(year);
+      fireEvent.click(screen.getByRole('button', { name: 'Catch up' }));
+      const sheet = screen.getByRole('dialog', { name: 'Catch up' });
+      expect(within(sheet).getByRole('button', { name: /^Keep my daily amount/ }).textContent).toBe('Keep my daily amountSame reading each day · still finishes ' + when);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('Read two days today starts one sitting over today and the next day', () => {
     const run = lateRun();
     ReadingPlanStore.put(run);
