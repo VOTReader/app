@@ -16,6 +16,7 @@
    call time — one player, one shelf (see _entry-d.js). */
 
 import { EmptyState, ListGroup, ListRow, RowPlay } from '../components/UiParts.jsx';
+import { studyTitleParts } from '../../utils/study-titles.js';
 
 /** @returns {Array<any>} the loaded studies registry, [] until bible-studies.js lands */
 function studiesList() {
@@ -67,6 +68,12 @@ function studyCountLine(study) {
  *   onReadStudy?: (studyId: string) => void,
  * }} props
  */
+/** A study's row title: its name, and the rest of its title on the line under it (the Studies list's own split). */
+function studyRowTitle(study) {
+  const t = studyTitleParts(study.title, study.subtitle);
+  return <>{t.head}{t.tail ? <span className="sty-sub">{t.tail}</span> : null}</>;
+}
+
 export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpenStudy, onReadStudy }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
@@ -121,7 +128,7 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpe
                 <ListRow key={study.id} current={here}
                   lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + study.title} playing={playing}
                     onClick={() => (here ? AudioPlayer.toggle() : AudioPlayer.playCollection({ volKey: 'study', items: chapters, collectionLabel: study.title }))} />}
-                  title={study.title} meta={studyCountLine(study)} onClick={() => onOpenStudy(study.id)}
+                  title={studyRowTitle(study)} meta={studyCountLine(study)} onClick={() => onOpenStudy(study.id)}
                   ariaLabel={'Open ' + study.title} chevron />
               );
             })}
@@ -130,7 +137,7 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpe
         {toRead.length ? (
           <ListGroup label="To read" aside={studiesWord(toRead.length)}>
             {toRead.map((study) => (
-              <ListRow key={study.id} icon="book" title={study.title} meta={studyCountLine(study)}
+              <ListRow key={study.id} icon="book" title={studyRowTitle(study)} meta={studyCountLine(study)}
                 onClick={() => (typeof onReadStudy === 'function' ? onReadStudy(study.id) : onOpenStudy(study.id))} />
             ))}
           </ListGroup>

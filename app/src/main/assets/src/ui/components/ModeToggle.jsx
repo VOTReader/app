@@ -38,7 +38,7 @@ export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
     <div className="rd-study-switch">
       <div className="rd-study-label" aria-hidden="true">Study notes</div>
       <Segmented label="Study notes" value={current} onChange={pick}
-        options={[{ id: 'inline', label: 'In the text' }, { id: 'pdf', label: 'As the page' }, { id: 'off', label: 'Off' }]} />
+        options={[{ id: 'inline', label: 'In the text' }, { id: 'pdf', label: 'At the end' }, { id: 'off', label: 'Off' }]} />
     </div>
   );
 }

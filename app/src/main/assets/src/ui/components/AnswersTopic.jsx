@@ -301,7 +301,6 @@ function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h
   const line = meta ? answersHeroMeta(entry, meta) : '';
   return (
     <>
-      {entry.id === ANSWERS_MAIN_PAGE_ID ? <img className="ans-banner" src="answers-banner.jpg" alt="Answers Only God Can Give" width="1200" height="304" /> : null}
       <header className="ans-hero" ref={heroRef}>
         {eb ? (eb.shelf
           ? <a className="ans-eyebrow ans-label" href="#" onClick={(e) => { e.preventDefault(); onEyebrow(eb.shelf); }}>{eb.text}<Chev /></a>

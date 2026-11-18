@@ -2,7 +2,7 @@
    real titles from data/bible-studies.js, so a new shape of title shows up
    here before it shows up on a phone. */
 import { describe, it, expect } from 'vitest';
-import { studyTitleParts, chapterTitleParts, studyNextStep } from './study-titles.js';
+import { studyTitleParts, chapterTitleParts, studyNextStep, isFigureRow, headingRepeatsName } from './study-titles.js';
 
 describe('studyTitleParts', () => {
   /** @type {Array<[string, string, { head: string, tail: string, extensive: boolean }]>} */
@@ -80,5 +80,33 @@ describe('studyNextStep', () => {
     expect(studyNextStep(order, 'c', readSet('a', 'b', 'c'))).toEqual({ k: 'Read again', ch: order[0] });
     expect(studyNextStep(order, 'gone', readSet())).toEqual({ k: 'Start here', ch: order[0] });
     expect(studyNextStep([], null, readSet())).toBeNull();
+  });
+});
+
+describe('isFigureRow: a paragraph that is one row of a chart', () => {
+  const row = (words, fig, t = 'bold-italic') => ({ type: 'para', segments: [{ t: 'text', v: words }, { t, v: fig }] });
+  it('the Odds Chart rows', () => {
+    expect(isFigureRow(row('10 prophecies = 1 chance in', '1,024'))).toBe(true);
+    expect(isFigureRow(row('55 prophecies = 1 chance in', '36,028,797,018,963,968'))).toBe(true);
+  });
+  it('ordinary paragraphs are not rows', () => {
+    expect(isFigureRow({ type: 'para', segments: [{ t: 'text', v: 'The chart below calculates the odds.' }] })).toBe(false);
+    expect(isFigureRow(row('And He said to them', 'Follow Me'))).toBe(false);
+    expect(isFigureRow(row('10 prophecies = 1 chance in', '1,024', 'text'))).toBe(false);
+    expect(isFigureRow(row('A long sentence that happens to hold = and then goes on well past a label', '12'))).toBe(false);
+    expect(isFigureRow(null)).toBe(false);
+  });
+});
+
+describe('headingRepeatsName: a first heading that says the chapter\'s name again', () => {
+  it('matches the name whatever its case and punctuation', () => {
+    expect(headingRepeatsName('INTRODUCTION', 'Introduction')).toBe(true);
+    expect(headingRepeatsName('Tuesday Night Passover', 'Tuesday Night, Passover')).toBe(true);
+    expect(headingRepeatsName('YAHUSHUA THE MESSIAH HEALS THE SICK', 'YahuShua The Messiah Heals the Sick')).toBe(true);
+  });
+  it('leaves a heading that says anything else, and an empty one', () => {
+    expect(headingRepeatsName('Yahushua Institutes the New Covenant', 'Tuesday Night, Passover')).toBe(false);
+    expect(headingRepeatsName('Introduction to the Law', 'Introduction')).toBe(false);
+    expect(headingRepeatsName('', '')).toBe(false);
   });
 });

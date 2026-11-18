@@ -131,7 +131,8 @@ describe('the Studies screen (listen.html au-studies)', () => {
     const onOpenStudy = vi.fn();
     render(<AudioStudiesScreen onBack={noop} onOpenStudy={onOpenStudy} onReadStudy={noop} />);
     expect(screen.getByRole('heading', { name: 'Studies' })).toBeTruthy();
-    expect(titles('With audio')).toEqual([STUDIES[1].title, STUDIES[2].title]);
+    // a study is named as the Studies list names it: its name, less the "- Bible/Letter Study" its title ends in
+    expect(titles('With audio')).toEqual([STUDIES[1].title, 'Purity']);
     expect(screen.getByText('3 chapters · 2 recorded')).toBeTruthy();
     expect(screen.getByText('2 chapters · all recorded')).toBeTruthy();
     expect(screen.getByText('2 studies')).toBeTruthy();
