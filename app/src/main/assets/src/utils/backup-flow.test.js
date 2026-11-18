@@ -340,11 +340,20 @@ describe('Import (web)', () => {
     bridge.pickImportFile.mockResolvedValue(await votbakFile());
     await createBackupFlow(ctx).importPersonalData();
     await settle();
-    expect(lastToast()).toBe("Import completed — 2 errors; 1 section skipped (invalid: vot-links); some records didn't restore (vot-notes). Reloading…");
+    expect(lastToast()).toBe("Restored, with gaps: 2 errors; 1 section skipped (invalid: vot-links); some records didn't restore (vot-notes). Reloading…");
     vi.advanceTimersByTime(4999);
     expect(reload).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('a restore with gaps says so first, in counts a reader knows (task-1720)', async () => {
+    globalThis.applyV3.mockResolvedValue({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: ['media 1/2', 'vot-notes 3/5'] });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(lastToast()).toBe('Restored, with gaps: 1 of 2 media files could not be restored; 2 of 5 notes could not be restored. Reloading…');
+    expect(lastToast()).not.toMatch(/complete/i);
   });
 
   it('a write that failed keeps the page up, the marker set and the writers live', async () => {

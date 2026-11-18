@@ -653,7 +653,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, onB
           </ListGroup>
 
           {tiles.length ? (
-            <ListGroup label="From the letters">
+            <ListGroup label="From the letters" className="songs-cols">
               {shownTiles.map(({ col, n }) => (
                 <ListRow key={col} noLead one title={colLabel(col)} value={songCountLabel(n)} onClick={() => open({ k: 'list', v: 'col:' + col })} />
               ))}
@@ -666,7 +666,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, onB
           ) : null}
 
           {shelves.length || readings.length ? (
-            <ListGroup label="More to hear">
+            <ListGroup label="More to hear" className="songs-cols">
               {shelves.map(({ shelf, n }) => (
                 <ListRow key={shelf.v} noLead one title={shelf.title} value={songCountLabel(n)} onClick={() => open({ k: 'list', v: shelf.v })} />
               ))}

@@ -344,7 +344,7 @@ try {
   if (shotsDir) await B.page.screenshot({ path: join(shotsDir, 'b2-B-confirm.png') });
   const reloaded = B.page.waitForNavigation({ waitUntil: 'load', timeout: 30000 });
   await click(B.page, 'Restore and overwrite');
-  const doneToast = await waitToast(B.page, /Import complete|Import completed|Import incomplete|failed/i, 30000);
+  const doneToast = await waitToast(B.page, /Import complete|with gaps|Import incomplete|failed/i, 30000);
   note(`B import toast: ${JSON.stringify(doneToast)}`);
   if (!/^Import complete\. Reloading/.test(doneToast || '')) fail(`B: the import did not report a clean restore: ${JSON.stringify(doneToast)}`);
   await reloaded;
@@ -382,7 +382,7 @@ try {
   let cToast;
   if (confirmShown) {
     await click(C.page, 'Restore and overwrite');
-    cToast = await waitToast(C.page, /Import complete|Import completed|incomplete|failed|could not|corrupt|cut short|not a/i, 20000);
+    cToast = await waitToast(C.page, /Import complete|with gaps|incomplete|failed|could not|corrupt|cut short|not a/i, 20000);
   } else {
     cToast = await toastText(C.page);
   }

@@ -118,6 +118,9 @@ const CACHE_DELETE_WAIT_MS = 1000;
 /** Reading time for "Clear did not finish. Reloading…" before the reload. */
 const CLEAR_UNFINISHED_RELOAD_MS = 2500;
 
+/** task-1720: a store's name as the restore toast says it ('vot-notes 3/5' -> '2 of 5 notes could not be restored'). */
+const _STORE_WORDS = { 'vot-notes': 'notes', 'vot-annotations': 'highlights', 'vot-journal': 'journal entries', 'vot-links': 'links', 'vot-bookmarks': 'bookmarks' };
+
 export function createBackupFlow(ctx) {
   const {
     busyRef: backupBusyRef, reloadPendingRef: backupReloadPendingRef, reloadTimerRef: backupReloadTimerRef,
@@ -700,7 +703,18 @@ export function createBackupFlow(ctx) {
       // always reconciles; a mismatch means a truncated/edited backup or a partial
       // media import — the user should know their only backup didn't fully restore.
       if (countMismatches && countMismatches.length > 0) {
-        problems.push(`some records didn't restore (${countMismatches.join(', ')})`);
+        // task-1720: 'media 1/2' (landed/declared) reads '1 of 2 media files could not be restored'; a row in any
+        // other shape keeps the old words.
+        const odd = [];
+        for (const m of countMismatches) {
+          const hit = /^(.+) (\d+)\/(\d+)$/.exec(String(m));
+          const got = hit ? +hit[2] : 0, want = hit ? +hit[3] : 0;
+          if (hit && got < want) {
+            const what = hit[1] === 'media' ? 'media files' : (_STORE_WORDS[hit[1]] || hit[1].replace(/^vot-/, '').replace(/-/g, ' ') + ' records');
+            problems.push(`${want - got} of ${want} ${what} could not be restored`);
+          } else odd.push(m);
+        }
+        if (odd.length) problems.push(`some records didn't restore (${odd.join(', ')})`);
       }
       // BAK-INTEGRITY: every verify outcome other than ok/absent ('mismatch',
       // 'malformed', 'trailing', 'truncated') is a corruption warning — never a
@@ -720,7 +734,8 @@ export function createBackupFlow(ctx) {
       }
       if (problems.length) {
         // Wave-0: dropped "(check console)." dev-speak — details are in console.warn.
-        _showToast(`Import completed — ${problems.join('; ')}. Reloading…`, 0);
+        // task-1720: what happened comes first; 'completed' read as a clean restore.
+        _showToast(`Restored, with gaps: ${problems.join('; ')}. Reloading…`, 0);
       } else {
         _showToast('Import complete. Reloading…', 0);
       }
