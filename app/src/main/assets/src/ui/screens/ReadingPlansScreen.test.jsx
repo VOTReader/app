@@ -222,6 +222,24 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  // 11-18 (app map): 'finishes Nov 12, / 2027' broke the date off its words, and Catch up cut 'still finishes Nov 12, …'.
+  // Each fact between ' · ' is its own part, kept whole on its line; the words read the same.
+  it('the status and the Catch up lines keep each fact whole: the finish and its date are one part', () => {
+    ReadingPlanStore.put(lateRun());
+    render(<PlansHub {...base()} />);
+    openRow();
+    const parts = (el) => [...el.querySelectorAll('.plan-part')].map((x) => x.textContent);
+    const head = parts(document.querySelector('.plan-status'));
+    expect(head).toHaveLength(2);
+    expect(head[0]).toMatch(/^[0-9]+ days? behind$/);
+    expect(head[1]).toMatch(/^finishes [A-Z][a-z]{2} [0-9]+(, [0-9]{4})?$/);
+    fireEvent.click(screen.getByRole('button', { name: 'Catch up' }));
+    const sheet = screen.getByRole('dialog', { name: 'Catch up' });
+    const keep = parts(within(sheet).getByRole('button', { name: /^Keep my daily amount/ }));
+    expect(keep).toEqual(['Same reading each day', 'still ' + head[1]]);
+    expect(parts(within(sheet).getByRole('button', { name: /^Finish on time/ })).at(-1)).toMatch(/^finishes [A-Z][a-z]{2} [0-9]+/);
+  });
+
   it('Read two days today starts one sitting over today and the next day', () => {
     const run = lateRun();
     ReadingPlanStore.put(run);

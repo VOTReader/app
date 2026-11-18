@@ -3437,7 +3437,8 @@
     .plan-run-row { min-height: 72px; }
     .plan-state b { color: var(--gold); font-weight: 400; }
     .plan-list .root-row-sub, .plan-choices .root-row-sub { font-style: normal; font-family: var(--pl-ui); font-size: var(--fs-14); }   /* U rule 5: facts upright */
-    .plan-list :is(.root-row-title, .root-row-sub) { white-space: normal; }   /* 2320/0430: every plan row's name and status whole, wrapped, never cut ('Volumes and Scriptures in a y…', '· 6 …') */
+    :is(.plan-list, .plan-choices) :is(.root-row-title, .root-row-sub) { white-space: normal; }   /* 2320/0430: every plan row's name and status whole, wrapped, never cut ('Volumes and Scriptures in a y…', '· 6 …'); 11-18: Catch up's 'still finishes Nov 12, …' */
+    .plan-part { display: inline-block; max-width: 100%; }   /* 11-18: a fact between ' · ' moves to the next line whole ('finishes Nov 12, 2027'), and wraps inside only when wider than the line */
     .plan-find-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.35; text-align: right; }
     .plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
     .plan-empty-text { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }

@@ -867,3 +867,17 @@ describe('app.css — the plan card gives its words the row at large text', () =
     expect(ruleBlock(CSS, '.vot-large-text .plan-today-head {')).toMatch(/flex-wrap:\s*wrap/);
   });
 });
+
+/* CATCH UP KEEPS ITS DATES (app map, 2026-11-18). The sheet's choice lines took the row kit's one-line ellipsis and
+   lost the year ('still finishes Nov 12, …'); they wrap like the plan list's rows, and a fact between ' · ' moves
+   to the next line whole (.plan-part), so 'finishes Nov 12, 2027' never breaks off its date. */
+describe('app.css — Catch up lines wrap and keep each fact whole', () => {
+  it('the choice lines wrap', () => {
+    expect(CSS).toMatch(/:is\(\.plan-list, \.plan-choices\) :is\(\.root-row-title, \.root-row-sub\) \{ white-space: normal; \}/);
+  });
+  it('a fact is an inline-block no wider than the line', () => {
+    const b = ruleBlock(CSS, '.plan-part {');
+    expect(b).toMatch(/display:\s*inline-block/);
+    expect(b).toMatch(/max-width:\s*100%/);
+  });
+});
