@@ -30,7 +30,7 @@ import { GearMenuBtn } from '../components/GearMenu.jsx';
 import { SectionLabel, ListRow, EmptyState } from '../components/UiParts.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { readKind, readWords, countedReads } from '../../utils/read-kind.js';
-import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, runRow, finishDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
 
@@ -372,7 +372,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   /** @param {any} r */
   const finishedLine = (r) => {
     const n = /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1;
-    return 'Started ' + shortDate(r.start) + ' · finished ' + shortDate(r.finished) + ' · ' + n + (n === 1 ? ' day' : ' days');
+    return 'Started ' + finishDate(r.start, new Date()) + ' · finished ' + finishDate(r.finished, new Date()) + ' · ' + n + (n === 1 ? ' day' : ' days');
   };
   /* A NEW PROFILE IS ONE LINE AND ONE ACTION (n117, A08.3): it was the sentence and then a page of
      zero rows (0 read, 0 days, 0 entries, 0 notes...) that said the same thing ten times. Nothing kept

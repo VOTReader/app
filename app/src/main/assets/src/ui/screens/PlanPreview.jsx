@@ -15,7 +15,7 @@
 
 import { startCatalogPlan, catalogResume, planDef, PLAN_GROUPS, LETTER_CHAIN, runFacts, bookTitle } from '../../data/plan-catalog.js';
 import { schedule, itemsLabel, itemKinds, todayKey, dayNum, dateOf } from '../../data/plan-engine.js';
-import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
+import { letterSource, saveRun, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, askForReminders, isReminderTime } from '../../utils/plan-reminder.js';
 import { PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, dayDate, minText, countOf, clockTime, paceChoices } from '../components/PlanBits.jsx';
 
@@ -156,7 +156,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
 
       <div className="plan-start">
         <button type="button" className="ui-btn is-primary is-wide" disabled={!draft} onClick={start}>Start plan</button>
-        {draft ? <p className="plan-start-note">{'Finishes ' + shortDate(draft.target) + ' · you can change any of this later'}</p> : null}
+        {draft ? <p className="plan-start-note">{'Finishes ' + finishDate(draft.target, new Date()) + ' · you can change any of this later'}</p> : null}
         <p className="plan-start-note" role="status">{status}</p>
       </div>
     </div>

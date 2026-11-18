@@ -20,7 +20,7 @@
    Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runRow, letterSource, shortDate, planStatus } from '../../utils/plan-runs-view.js';
+import { runRow, letterSource, planStatus, finishDate } from '../../utils/plan-runs-view.js';
 import { runStatus, itemsLabel, itemsCount, dayNum } from '../../data/plan-engine.js';
 import { PLAN_CATALOG, PLAN_GROUPS, catalogFacts, runName, bookTitle } from '../../data/plan-catalog.js';
 import { PlanRing, PlanSec, CHEVRON, countOf } from '../components/PlanBits.jsx';
@@ -55,7 +55,7 @@ export function stoppedLine(r, now) {
 export function finishedLine(r) {
   const a = dayNum(r.start), b = dayNum(r.finished);
   const n = a != null && b != null ? b - a + 1 : 0;
-  return (n ? countOf(n, 'day') + ' · ' : '') + 'finished ' + shortDate(r.finished).replace(/, \d{4}$/, '');
+  return (n ? countOf(n, 'day') + ' · ' : '') + 'finished ' + finishDate(r.finished, new Date());
 }
 
 /**

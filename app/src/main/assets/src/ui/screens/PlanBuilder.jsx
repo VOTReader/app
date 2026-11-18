@@ -19,7 +19,7 @@ import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, 
 import { LETTER_CHAIN, bookTitle } from '../../data/plan-catalog.js';
 import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel, replaceContents, runStatus, minutesFor } from '../../data/plan-engine.js';
 import { PlanSec, PlanDays, dayDate, minText } from '../components/PlanBits.jsx';
-import { letterSource, saveRun, shortDate, editRun } from '../../utils/plan-runs-view.js';
+import { letterSource, saveRun, editRun, finishDate } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
 
@@ -362,7 +362,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
         {resume ? (
           <button type="button" className="today-link build-resume" disabled={mode === 'by' && !by} onClick={() => start(resume.k)}>{'Start where I am: ' + resume.t}</button>
         ) : null}
-        {facts ? <p className="plan-start-note">{'Finishes ' + shortDate(facts.finish) + ' · about ' + facts.dayWords.toLocaleString('en-US') + ' words a day' + (edit ? ' · what you have read stays read' : '')}</p> : null}
+        {facts ? <p className="plan-start-note">{'Finishes ' + finishDate(facts.finish, new Date()) + ' · about ' + facts.dayWords.toLocaleString('en-US') + ' words a day' + (edit ? ' · what you have read stays read' : '')}</p> : null}
       </div>
     </div>
   );

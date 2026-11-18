@@ -28,7 +28,7 @@
 import { runStatus, schedule, sections, streak, itemsLabel, itemsWords, minutesFor, itemKinds, dayItems, totalDays,
   catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate, canCountOwnOnly } from '../../data/plan-engine.js';
 import { planDef, bookTitle } from '../../data/plan-catalog.js';
-import { saveRun, stopRun, shortDate, itemRef, planStatus, finishDate } from '../../utils/plan-runs-view.js';
+import { saveRun, stopRun, itemRef, planStatus, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, isReminderTime, lastActive } from '../../utils/plan-reminder.js';
 import { canTell } from '../../utils/download-gate.js';
 import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
@@ -144,7 +144,7 @@ export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOv
               <input type="date" className="plan-date" aria-label="Finish by" value={by} min={firstRecutDate(run, now)} onChange={(e) => setBy(e.target.value)} />
               <button type="button" className="plan-text-btn" disabled={!by} onClick={() => saveRun(changePace(run, { mode: 'by', date: by }, new Date()))}>Set</button>
             </div>
-            <p className="plan-opt-note">{'Finishes ' + shortDate(st.projected) + ' · what you have read stays read'}</p>
+            <p className="plan-opt-note">{'Finishes ' + finishDate(st.projected, new Date()) + ' · what you have read stays read'}</p>
           </PlanOptRow>
           <PlanOptRow label="Days">
             <PlanDays value={Array.isArray(run.weekdays) && run.weekdays.length === 7 ? run.weekdays : [true, true, true, true, true, true, true]}
@@ -216,7 +216,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
           <button type="button" className="root-row" onClick={() => { saveRun(catchUp(run, new Date())); onClose(); }}>
             <span className="root-row-text">
               <span className="root-row-title">Keep my daily amount</span>
-              <span className="root-row-sub">{'Same reading each day · still finishes ' + shortDate(st.projected)}</span>
+              <span className="root-row-sub">{'Same reading each day · still finishes ' + finishDate(st.projected, new Date())}</span>
             </span>
           </button>
         </li>
@@ -225,7 +225,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
             <button type="button" className="root-row" onClick={() => { saveRun(spreadOut(run, new Date())); onClose(); }}>
               <span className="root-row-text">
                 <span className="root-row-title">Finish on time</span>
-                <span className="root-row-sub">{'About ' + minText(spread.minutes) + ' a day from now · finishes ' + shortDate(run.target)}</span>
+                <span className="root-row-sub">{'About ' + minText(spread.minutes) + ' a day from now · finishes ' + finishDate(run.target, new Date())}</span>
               </span>
             </button>
           </li>
