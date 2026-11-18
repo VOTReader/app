@@ -88,7 +88,21 @@ export function LetterView(props) {
   const [surpriseBlockOff, setSurpriseBlockOff] = React.useState(/** @type {number | null} */ (null)); // where in that block the landing text starts
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
-  const [allExpanded, setAllExpanded] = React.useState(true);
+  /* 11-18 (app map): the word follows what the cards are. They open from their saved state (ProphecyCard), so the word
+     starts from this chapter's saved cards (Collapse while any is open, Expand when all are shut) and follows a card
+     toggled by hand; before, it said Collapse all on every chapter and a return visit's first tap did nothing. */
+  const cardsOpen = () => {
+    const keys = prophecyCardKeysOf(letter);
+    return !prophecyCardStatesRef || !keys.length || keys.some((k) => prophecyCardStatesRef.current[k] !== false);
+  };
+  const [allExpanded, setAllExpanded] = React.useState(cardsOpen);
+  const cardsOpenRef = React.useRef(cardsOpen);
+  cardsOpenRef.current = cardsOpen;
+  // a card saves from inside its own state update: read the cards a tick later, outside that render
+  const saveCardStates = React.useCallback(() => {
+    if (saveProphecyCardStates) saveProphecyCardStates();
+    Promise.resolve().then(() => setAllExpanded(cardsOpenRef.current()));
+  }, [saveProphecyCardStates]);
   // Related Topics past RELATED_CAP wait behind 'Show all N topics' (3 letters of the corpus: 11, 12 and 23 rows); the
   // opened state belongs to one letter, so the next letter starts capped again.
   const [topicsAllFor, setTopicsAllFor] = React.useState(null);
@@ -96,7 +110,7 @@ export function LetterView(props) {
   const firstProphecyGroup = letter.blocks.findIndex((b) => b.type === "prophecy-group");
   // W44: an expand/collapse-all belongs to the letter it was pressed on. This view
   // stays mounted from one letter (or study chapter) to the next.
-  React.useEffect(() => { setExpandSignal(0); setAllExpanded(true); }, [letter.id]);
+  React.useEffect(() => { setExpandSignal(0); setAllExpanded(cardsOpenRef.current()); }, [letter.id]);
 
   const mainRef = React.useRef(null);
   /* search200 UX B10 (1): a landing mid-letter names the letter in a band pinned under
@@ -583,7 +597,7 @@ export function LetterView(props) {
                   expandSignal={expandSignal}
                   groupKey={letter.id + ":" + bi}
                   statesRef={prophecyCardStatesRef}
-                  onSaveStates={saveProphecyCardStates}
+                  onSaveStates={saveCardStates}
                 />
                 </React.Fragment>
               );
