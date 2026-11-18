@@ -763,7 +763,7 @@ export function pauseRun(run, now) {
   return { ...run, status: 'paused', paused: todayKey(now), updated: now.getTime() };
 }
 
-/** Resume: the pause becomes a closed range and the target moves back by the reading days it covered. */
+/** Resume: the pause becomes a closed range and the target moves later by the reading days it covered. */
 export function resumeRun(run, now) {
   if (!run.paused) return run;
   const a = /** @type {number} */ (dayNum(run.paused)), b = /** @type {number} */ (dayNum(todayKey(now))) - 1;
