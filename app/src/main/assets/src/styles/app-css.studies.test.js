@@ -17,15 +17,20 @@ const blocks = (sel) => {
 
 describe('app.css — the study screens', () => {
   it('the white part-title plates turn light on dark in the dark theme only, with no edge', () => {
-    const b = blocks('body:not(.light) .study-image-block img[src*="study-title-"]');
+    const b = blocks('body:not(.light) .study-figure.is-plate img');
     expect(b).toHaveLength(1);
     expect(b[0]).toMatch(/filter:\s*invert\(1\)/);
     expect(b[0]).toMatch(/mix-blend-mode:\s*lighten/);
-    expect(CSS).not.toMatch(/body\.light [^{]*study-title-[^{]*\{[^}]*filter/);
+    expect(CSS).not.toMatch(/body\.light [^{]*is-plate[^{]*\{[^}]*filter/);
+    // on the light page the plate's white is multiplied away, so it has no edge there either
+    expect(blocks('.study-figure.is-plate img').join(';')).toMatch(/mix-blend-mode:\s*multiply/);
   });
 
   it('the study pictures take the card radius', () => {
-    expect(blocks('.study-image-block img').join(';')).toMatch(/border-radius:\s*var\(--r-card\)/);
+    expect(blocks('.study-figure.is-picture img').join(';')).toMatch(/border-radius:\s*var\(--r-card\)/);
+    expect(blocks('.study-figure.is-chart img').join(';')).toMatch(/border-radius:\s*var\(--r-card\)/);
+    // a chart fits the column (no natural-width strip that scrolls sideways)
+    expect(CSS).not.toMatch(/img\[src\*="chart"\]\s*\{[^}]*max-width:\s*none/);
     expect(blocks('.study-cover-inline img').join(';')).toMatch(/border-radius:\s*var\(--r-card\)/);
   });
 

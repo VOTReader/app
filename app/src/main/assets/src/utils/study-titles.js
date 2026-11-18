@@ -81,3 +81,17 @@ export function isFigureRow(block) {
   const words = String(s[0].v || '');
   return s[0].t === 'text' && s[1].t === 'bold-italic' && words.length <= 48 && words.includes(' = ') && /^[\d,. ]+$/.test(String(s[1].v || ''));
 }
+
+/**
+ * A chapter's first heading that only says the chapter's name again (15 of the 72 study chapters open on one, as
+ * the site's pages do under their own page title): the hero has just said it, so the page does not say it twice.
+ * Case and punctuation aside ("Tuesday Night Passover" is "Tuesday Night, Passover").
+ * @param {string} text  the heading's words
+ * @param {string} name  the name the hero shows
+ * @returns {boolean}
+ */
+export function headingRepeatsName(text, name) {
+  const norm = (/** @type {string} */ s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const a = norm(text);
+  return !!a && a === norm(name);
+}

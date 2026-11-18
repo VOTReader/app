@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-cca606a193';
+const CACHE_VERSION = 'v1.0.2-fde1617f5e';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -317,11 +317,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
-  './dist/app.min.css': '24a6d8d356ee2861751999998cc4f227c5038e3b055c17ffabc7a50f5bc75a1e',
+  './dist/app.min.css': '25a53174236e777dd50a35d843b42bcf95448fa69b3be9359281299dd177b910',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'e2372fead72136a9b9bd7a32c140546e64e2d68829cb97f5188cfb69986de47d',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': 'bb56410812b8600a20d7f5f81bfb336a69671c39c6cc0e60957a974d588942f6',
+  './dist/bundle-d.js': '90b6f8de9c3e5c1fba8fcd29697bb4f84d207bbdb912ac78245e033f900a199f',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './index.html': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './manifest.json': 'e1c7daf263bec90aeffc1236ebffe6374859459cb2674259053a4fbc12525d31',
@@ -438,8 +438,8 @@ const ASSET_REVISIONS = {
   './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
   './src/data/scripture-web-data.js': '033ec47bbbbae873d457463f0ec9f5f7696b66f8e3ff24e35d15c22c02e81022',
   './src/data/verse-cites.js': '0f40e34c1038cb12fa3a3464f3d30c79c481dc96f6f484839ad7e6040460f584',
-  './study-chart-chronology.jpg': 'd8991646f54d4b9861ce85bb7ff59517623307b9c7c851a592bd48b7b5b854a8',
-  './study-cover-lamb.jpg': 'dcb877b4ac506318d971b1d3f772862ad84cb5efb701dbf6387b42d3c1f31b58',
+  './study-chart-chronology.jpg': '61013f42aee0e01fb088f0704d00b40f4db90a32742ccad5e617035175801f50',
+  './study-cover-lamb.jpg': 'f5d01352c5d83ed33851bdf674a2ddd2b839b4b5dc75b0e09140769ad90ac7ca',
   './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',
   './study-lamb-burial.jpg': '528f25d503522430628846b74987b3b559371e09e6c43e9b9233d009332a9114',
   './study-lamb-crucifixion.jpg': '37996acaa07035a4dfd494ac81b409008992d4bf038d3d7f1356af667f51f97b',
@@ -448,9 +448,9 @@ const ASSET_REVISIONS = {
   './study-lamb-resurrection.jpg': '47637098274acf305c4bd990c953df72489f323e27b3140a673e539e27c25618',
   './study-lamb-supper.jpg': 'af6822f8b843e573f822626a998addd734eee2851b6407cd2ab9bb252468e87c',
   './study-lamb-thorns.jpg': 'a8f2336fb30ba2a3b01df50ee2c82ebc518e6572b827ba3b2d2507e57a7447bf',
-  './study-title-part-one-title.jpg': 'd4be10f90adb126192164b006c69a14046f8a7b79183ffa8c118fc892f5915e5',
-  './study-title-part-three-title.jpg': '98fb470fff471b7aa53a1a1a7f84286f2ee7e3b558e7951fc829c88a1e98fd26',
-  './study-title-part-two-title.jpg': '1e17c45b43b46fce7828f5474da16ee8af84ffc820bb443393b819efdb2640d7',
+  './study-title-part-one-title.jpg': '0ea0fe4493c3d5ec70fae55f60488df641500e46489fb3cb70b2c399d58df84b',
+  './study-title-part-three-title.jpg': 'f5d01352c5d83ed33851bdf674a2ddd2b839b4b5dc75b0e09140769ad90ac7ca',
+  './study-title-part-two-title.jpg': '3b6ab315155bfa08569949f20f71afb8ff6d4a32a83ff1488c4c79b850f2a8ee',
 };
 // ── END GENERATED: ASSET_REVISIONS ──
 

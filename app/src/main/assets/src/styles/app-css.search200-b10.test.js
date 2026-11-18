@@ -65,27 +65,30 @@ describe('B10 item 1 — the mini title band', () => {
     expect(band['pointer-events']).toBe('none');
   });
 
-  it('is a solid --bg band within 48px, closed by a gold hairline, not a solid rule', () => {
+  it('is a solid --bg band with room for a two-line name (70px), closed by a gold hairline, not a solid rule', () => {
     const band = decls('.mini-title');
     expect(band.background).toBe('var(--bg)');
-    expect(band['max-height']).toBe('48px');
+    expect(band['max-height']).toBe('70px');
     expect(band['border-bottom']).toBe('1px solid var(--gold-border)');
     expect(band.padding).toBe('6px 16px');
   });
 
-  it('says the eyebrow in small Cinzel gold-dim over the title in Garamond cream, one line each, at frozen sizes', () => {
+  /* Studies pass 3 (2026-11-18): the band wears the hero's own type, not the letter-spaced Cinzel capitals it kept
+     after the heroes changed; and a long name takes a second line where it used to end in an ellipsis. */
+  it('says the eyebrow in the UI sans over the name in the serif, at frozen sizes: the eyebrow one line, the name up to two', () => {
     const eb = decls('.mini-title-eyebrow');
-    expect(eb['font-family']).toBe('var(--font-cinzel)');
-    expect(eb['font-size']).toBe('var(--fsc-10)');
-    expect(eb['letter-spacing']).toBe('0.18em');
-    expect(eb.color).toBe('var(--gold-dim)');
+    expect(eb['font-family']).toBe('var(--font-ui)');
+    expect(eb['font-size']).toBe('var(--fsc-12)');
+    expect(eb['letter-spacing']).toBeUndefined();
+    expect(eb.color).toBe('var(--text-2)');
+    expect(eb['white-space']).toBe('nowrap');
+    expect(eb['text-overflow']).toBe('ellipsis');
     const name = decls('.mini-title-name');
-    expect(name['font-family']).toBe('var(--font-garamond)');
+    expect(name['font-family']).toBe('var(--font-serif)');
     expect(name['font-size']).toBe('var(--fsc-16)');
-    expect(name.color).toBe('var(--cream)');
-    const line = decls('.mini-title-name');
-    expect(line['white-space']).toBe('nowrap');
-    expect(line['text-overflow']).toBe('ellipsis');
+    expect(name.color).toBe('var(--text-1)');
+    expect(name['white-space']).toBe('normal');
+    expect(name['-webkit-line-clamp']).toBe('2');
   });
 
   it('shown, it takes the finger itself, so a tap or long-press on it never reaches a link hidden under it', () => {
