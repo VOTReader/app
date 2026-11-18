@@ -193,3 +193,20 @@ describe('LetterView — a study names its parts (A02.10)', () => {
     expect(labels).toEqual(['Previous letter', 'Next letter']);
   });
 });
+
+/* 11-18 (app map, Studies): the arrows said 'Previous letter' / 'Next letter' to a screen reader in a study too; they
+   say the study's own unit, as the footers do. */
+describe('LetterView — a study chapter\'s arrows name its unit', () => {
+  const arrowLabels = () => [...document.querySelectorAll('button[aria-label]')].map((b) => b.getAttribute('aria-label')).filter((l) => /^(Previous|Next) /.test(l));
+  it('a study in chapters: Previous chapter / Next chapter, never letter', () => {
+    renderLetter({ studyMode: true, volumeLabel: 'The Lamb of God' }, { ...LETTER, num: 2, unitWord: 'Chapter', ...NEIGHBOURS });
+    const l = arrowLabels();
+    expect(l).toContain('Previous chapter');
+    expect(l).toContain('Next chapter');
+    expect(l.filter((x) => /letter$/.test(x))).toEqual([]);
+  });
+  it('a letter keeps Previous letter / Next letter on its arrows', () => {
+    renderLetter({}, { ...LETTER, ...NEIGHBOURS });
+    expect(arrowLabels()).toEqual(expect.arrayContaining(['Previous letter', 'Next letter']));
+  });
+});

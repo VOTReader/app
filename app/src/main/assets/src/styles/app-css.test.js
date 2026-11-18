@@ -843,3 +843,76 @@ describe('app.css — tour and Answers boxes are sized by the visible viewport (
     }
   });
 });
+
+/* THE MINI PLAYER'S NAME WRAPS (hub, 2026-11-18). At 360 px the bar's title box is ~110 px, so a one-line
+   title with an ellipsis read "Come, Love A..." with room in the bar for a second line. The name wraps at
+   a word to two lines at every text size; only a name longer than two lines takes an ellipsis. */
+describe('app.css — the mini player title wraps before it cuts', () => {
+  it('wraps to two lines, never one line with an ellipsis', () => {
+    const t = ruleBlock(CSS, '\n      .audio-bar-title {');
+    expect(t).not.toMatch(/white-space:\s*nowrap/);
+    expect(t).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(t).toMatch(/overflow-wrap:\s*break-word/);
+  });
+});
+
+/* THE PLAN CARD'S TEXT HAS THE ROW AT LARGE TEXT (hub, 2026-11-18). At text 2.0 on 360 px the 92 px ring
+   beside it left "Day 1 of 30 / 0 of 150 chapters read" a few words wide, one or two words a line. At large
+   text the ring takes a row of its own above the words, and Today's head lets "5 min left" go under its eyebrow. */
+describe('app.css — the plan card gives its words the row at large text', () => {
+  it('the ring stacks above the text', () => {
+    expect(ruleBlock(CSS, '.vot-large-text .plan-progress {')).toMatch(/flex-direction:\s*column/);
+  });
+  it("Today's head wraps", () => {
+    expect(ruleBlock(CSS, '.vot-large-text .plan-today-head {')).toMatch(/flex-wrap:\s*wrap/);
+  });
+});
+
+/* CATCH UP KEEPS ITS DATES (app map, 2026-11-18). The sheet's choice lines took the row kit's one-line ellipsis and
+   lost the year ('still finishes Nov 12, …'); they wrap like the plan list's rows, and a fact between ' · ' moves
+   to the next line whole (.plan-part), so 'finishes Nov 12, 2027' never breaks off its date. */
+describe('app.css — Catch up lines wrap and keep each fact whole', () => {
+  it('the choice lines wrap', () => {
+    expect(CSS).toMatch(/:is\(\.plan-list, \.plan-choices\) :is\(\.root-row-title, \.root-row-sub\) \{ white-space: normal; \}/);
+  });
+  it('a fact is an inline-block no wider than the line', () => {
+    const b = ruleBlock(CSS, '.plan-part {');
+    expect(b).toMatch(/display:\s*inline-block/);
+    expect(b).toMatch(/max-width:\s*100%/);
+  });
+});
+
+/* MANAGE PLAN READS DOWN THE SHEET (app map, 2026-11-18). Length's label sat centred against a four-line stack and
+   lined up with none of it, while Days had its label above; the foot's row wrapped Stop plan alone to the right. */
+describe('app.css — Manage plan: labels over stacks, one grid at the foot', () => {
+  it('a row of days or a row that always stacks puts its label above; a row whose note comes and goes does not', () => {
+    expect(CSS).toMatch(/\.plan-opt:has\(\.plan-days, \.plan-chips \+ \.plan-opt-line, \.plan-own-only-text\) \{ flex-direction: column;/);
+    expect(CSS).not.toMatch(/\.plan-opt:has\([^)]*\.plan-opt-note/);
+  });
+  it('the actions are a two-column grid, one column at large text, and Stop is not pushed right', () => {
+    expect(ruleBlock(CSS, '\n    .plan-sheet-actions {')).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+    expect(ruleBlock(CSS, '.vot-large-text .plan-sheet-actions {')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(CSS).not.toMatch(/\.plan-stop-btn \{ margin-left: auto/);
+    expect(CSS).not.toMatch(/\.plan-danger/);
+  });
+});
+
+/* THE HANDLE ROW LETS TAPS THROUGH (vot-ui walk, 2026-11-18). The grabber's row is position: relative, so it paints
+   over the head under it; POL4 raised Up next's Clear level with the title, and the row's empty, handler-less area
+   covered Clear's top 23 px and its centre (a tap on the word grabbed nothing and cleared nothing). The row passes
+   taps on; its grab and x keep theirs. */
+describe('app.css — a sheet handle row never swallows a tap meant for the head', () => {
+  it('the row is pointer-events: none and its buttons take taps', () => {
+    expect(ruleBlock(CSS, '\n    .sheet-handle-row { position: relative;')).toMatch(/pointer-events:\s*none/);
+    expect(ruleBlock(CSS, '.sheet-handle-row > * {')).toMatch(/pointer-events:\s*auto/);
+  });
+});
+
+/* SONGS' PLAY ALL AND SHUFFLE STACK AT LARGE TEXT (vot-ui walk, 2026-11-18). A collection's or shelf's list
+   (AudioSongsScreen) keeps .ui-btn-row's two 1fr columns, and at text 2.0 'Play all' + 'Shuffle' ran past the
+   screen's right edge; Listen's own collection row already stacked (.listen-coll-actions). Both stack now. */
+describe('app.css — the Songs list buttons stack at large text', () => {
+  it('one column for both Listen rows', () => {
+    expect(CSS).toMatch(/\.vot-large-text :is\(\.listen-coll-actions, \.songs-list-actions\) \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  });
+});

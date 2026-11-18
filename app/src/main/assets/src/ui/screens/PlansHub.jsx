@@ -210,8 +210,8 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   /** @type {any} */ let sheet = null;
   const v = /** @type {any} */ (top || { v: 'list' });
   const run = v.id ? runOf(v.id) : null;
-  if ((v.v === 'plan' || v.v === 'schedule' || v.v === 'finished' || v.v === 'stopped') && !run) {
-    body = null;   // a run stopped or removed meanwhile: the effect below goes back to the list
+  if ((v.v === 'plan' || v.v === 'schedule' || v.v === 'finished' || v.v === 'stopped') && !v.preview && !run) {
+    body = null;   // a run stopped or removed meanwhile: the effect below goes back to the list (a preview's schedule has no run yet: 11-18)
   } else if (v.v === 'preview') {
     body = <PlanPreview key={v.plan + (v.opt ? ':' + v.opt.volKey : '')} planId={v.plan} opt={v.opt} now={now} lettersReady={lettersReady} isRead={isRead}
       onStarted={(id) => replacePlanView({ v: 'plan', id })} onSchedule={(preview) => pushPlanView({ v: 'schedule', id: '', preview })} />;

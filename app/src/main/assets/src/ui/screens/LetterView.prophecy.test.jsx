@@ -22,11 +22,15 @@ const GLOBALS = ['ReactDOM', 'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'Nav
 let realAudio;
 let toggle;
 let signals;
+let shown;
+let saveCard;
 
 beforeEach(() => {
   realAudio = { hasAudio: AudioPlayer.hasAudio, playLetter: AudioPlayer.playLetter, prewarm: AudioPlayer.prewarm };
   toggle = null;
   signals = [];
+  shown = null;
+  saveCard = null;
   globalThis.ReactDOM = ReactDOM;
   globalThis.ScreenLayout = ({ children, navChildren }) => <div>{navChildren}{children}</div>;
   globalThis.StickyChapterNav = () => null;
@@ -37,8 +41,8 @@ beforeEach(() => {
   globalThis.useMarkAsRead = () => {};
   globalThis.useModalRegistry = () => {};
   globalThis.Segments = () => null;
-  globalThis.ProphecyGroup = ({ expandSignal }) => { signals.push(expandSignal); return null; };
-  globalThis.ProphecyExpandToggle = ({ onToggle }) => { toggle = onToggle; return null; };
+  globalThis.ProphecyGroup = ({ expandSignal, onSaveStates }) => { signals.push(expandSignal); saveCard = onSaveStates; return null; };
+  globalThis.ProphecyExpandToggle = ({ onToggle, allExpanded }) => { toggle = onToggle; shown = allExpanded; return null; };
   globalThis.StaticSubtree = ({ children }) => <>{children}</>;
   window.navHandoff = { peek: () => null, clear: () => {} };
   AudioPlayer.hasAudio = () => false;
@@ -88,5 +92,43 @@ describe('LetterView — W44: expand/collapse-all', () => {
     expect(signals[signals.length - 1]).toBe(-1);
     rerender(view(letterWith('L2'), statesRef, vi.fn()));
     expect(signals[signals.length - 1]).toBe(0);
+  });
+});
+
+/* 11-18 (app map, Studies): the word followed nothing real. allExpanded was set true on every chapter while the cards
+   open from their saved state, so after Collapse all and a return visit the cards were shut, the button still said
+   Collapse all cards, and its first tap changed nothing. It now starts from this chapter's saved cards (Collapse while
+   any is open, Expand when all are shut) and follows a card toggled by hand. */
+describe('LetterView — the expand/collapse word says what the cards are', () => {
+  const KEYS = ['L1:1:intro', 'L1:1:ot', 'L1:1:nt', 'L1:2:ot', 'L1:2:nt'];
+  const saved = (v) => Object.fromEntries(KEYS.map((k) => [k, v]));
+  it('a chapter whose cards are all saved shut offers Expand all', () => {
+    render(view(letterWith('L1'), { current: saved(false) }, vi.fn()));
+    expect(shown).toBe(false);
+  });
+  it('one card open, or nothing saved, offers Collapse all', () => {
+    const { unmount } = render(view(letterWith('L1'), { current: { ...saved(false), 'L1:2:nt': true } }, vi.fn()));
+    expect(shown).toBe(true);
+    unmount();
+    render(view(letterWith('L1'), { current: {} }, vi.fn()));
+    expect(shown).toBe(true);
+  });
+  it('Collapse all, away and back: the word is Expand all', () => {
+    const statesRef = { current: {} };
+    const { rerender } = render(view(letterWith('L1'), statesRef, vi.fn()));
+    act(() => { toggle(false); });
+    expect(shown).toBe(false);
+    rerender(view(letterWith('L2'), statesRef, vi.fn()));
+    expect(shown).toBe(true);
+    rerender(view(letterWith('L1'), statesRef, vi.fn()));
+    expect(shown).toBe(false);
+  });
+  it('the last open card shut by hand turns the word to Expand all', async () => {
+    const statesRef = { current: { ...saved(false), 'L1:1:ot': true } };
+    render(view(letterWith('L1'), statesRef, vi.fn()));
+    expect(shown).toBe(true);
+    statesRef.current['L1:1:ot'] = false;
+    await act(async () => { saveCard(); await Promise.resolve(); });
+    expect(shown).toBe(false);
   });
 });

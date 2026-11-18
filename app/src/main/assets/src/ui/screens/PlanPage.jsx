@@ -110,6 +110,15 @@ function WeekAudio({ plan, from, tracksOf }) {
 }
 
 /**
+ * A line of facts joined by ' · ', each fact kept whole on its line when it fits (11-18: 'finishes Nov 12, / 2027'
+ * broke the date off its words). Each part is an inline-block, so one wider than the line still wraps inside itself.
+ * @param {{ text: string }} props
+ */
+function Parts({ text }) {
+  return String(text).split(' · ').map((t, i) => <React.Fragment key={i}>{i ? ' · ' : null}<span className="plan-part">{t}</span></React.Fragment>);
+}
+
+/**
  * Manage plan (the bar's Manage). Stop and Start over are one tap each: the toast that follows has Undo (PlansHub).
  * @param {{ run: any, now: Date, tracksOf?: (refs: any[]) => any[], onClose: () => void, onStopped: (prev: any) => void, onStartOver?: () => void,
  *   onEdit?: () => void, onOwnOnly?: () => void }} props
@@ -207,7 +216,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
             <button type="button" className="root-row" onClick={() => { onClose(); onReadTwo(st.day, st.doneToday ? 1 : 2); }}>
               <span className="root-row-text">
                 <span className="root-row-title">{st.doneToday ? 'Read one more day today' : 'Read two days today'}</span>
-                <span className="root-row-sub">{itemsLabel(two, bookTitle) + ' · about ' + minText(minutesFor(itemsWords(two))) + ' · one day closer'}</span>
+                <span className="root-row-sub"><Parts text={itemsLabel(two, bookTitle) + ' · about ' + minText(minutesFor(itemsWords(two))) + ' · one day closer'} /></span>
               </span>
             </button>
           </li>
@@ -216,7 +225,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
           <button type="button" className="root-row" onClick={() => { saveRun(catchUp(run, new Date())); onClose(); }}>
             <span className="root-row-text">
               <span className="root-row-title">Keep my daily amount</span>
-              <span className="root-row-sub">{'Same reading each day · still finishes ' + finishDate(st.projected, new Date())}</span>
+              <span className="root-row-sub"><Parts text={'Same reading each day · still finishes ' + finishDate(st.projected, new Date())} /></span>
             </span>
           </button>
         </li>
@@ -225,7 +234,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
             <button type="button" className="root-row" onClick={() => { saveRun(spreadOut(run, new Date())); onClose(); }}>
               <span className="root-row-text">
                 <span className="root-row-title">Finish on time</span>
-                <span className="root-row-sub">{'About ' + minText(spread.minutes) + ' a day from now · finishes ' + finishDate(run.target, new Date())}</span>
+                <span className="root-row-sub"><Parts text={'About ' + minText(spread.minutes) + ' a day from now · finishes ' + finishDate(run.target, new Date())} /></span>
               </span>
             </button>
           </li>
@@ -333,8 +342,8 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
           <p className="plan-progress-line">{st.itemsDone.toLocaleString('en-US') + ' of ' + st.itemsTotal.toLocaleString('en-US') + ' ' + unit + ' read'}</p>
           {/* 2235: the plan's one status, the same words as Home and the Plans list; behind leads to Catch up. */}
           <p className="plan-progress-line plan-status" data-status={status.key}>
-            <b>{status.text}</b>
-            {status.key === 'behind' ? null : <span>{' · ' + (st.paused ? 'planned to finish ' : 'finishes ') + finishDate(st.projected, now)}</span>}
+            <b><Parts text={status.text} /></b>
+            {status.key === 'behind' ? null : <>{' · '}<span className="plan-part">{(st.paused ? 'planned to finish ' : 'finishes ') + finishDate(st.projected, now)}</span></>}
           </p>
           {status.key === 'behind' ? (
             <button type="button" className="ui-btn is-small plan-catchup-btn" onClick={() => setAdjust(true)}>Catch up</button>

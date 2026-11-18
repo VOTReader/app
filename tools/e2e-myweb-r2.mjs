@@ -57,8 +57,11 @@
  *      This asserts the app's coverage SCHEDULE, not the picture: the picture
  *      is a pure function of the fraction (layerCap eases brightness in it),
  *      and pixels cannot be read tonight without demoting the canvas (below).
- *      Gate: after the last live frame at least three fading frames spanning
- *      >= 100 ms, never falling, then 1. Fewer is a POP when the jump into
+ *      Gate: after the last live frame at least three fading frames, on screen
+ *      >= 100 ms (first fading picture to the first full one: the last fading
+ *      picture stays up until full lands), no step between pictures over a
+ *      third (the scheduler's FADE_STEP_MS; a bigger step is the pop), never
+ *      falling, then 1. Fewer is a POP when the jump into
  *      full sits between two ticks <= 50 ms apart (the Verifier's bite, fade
  *      removed: 0 fading frames, both frames, 4-5 ms cadence), UNRESOLVED when
  *      the tick gap there is longer (neither passes).
@@ -503,7 +506,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const firstLiveIdx = all.findIndex((x) => x.cf === 0);
   const shots = firstLiveIdx >= 0 ? all.slice(firstLiveIdx) : all;
   // after the last live frame the fraction must pass through at least three
-  // fading frames spanning >= 100 ms, never fall, and reach 1
+  // fading frames on screen >= 100 ms, step at most a third a picture, never fall, and reach 1
   const live = shots.filter((x) => x.cf === 0);
   const lastLiveIdx = live.length ? shots.indexOf(live[live.length - 1]) : 0;
   const after = shots.slice(lastLiveIdx);
@@ -511,7 +514,12 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const first = shots[0], lastLive = live.length ? live[live.length - 1] : null, firstFull = full.length ? full[0] : null;
   let falls = 0;
   for (let i = 1; i < after.length; i++) if (after[i].cf < after[i - 1].cf) falls++;
-  const fadeSpan = fading.length ? fading[fading.length - 1].t - fading[0].t : 0;
+  // rel20 (vot-ui 11-18): first-to-LAST fading tick left out how long the last fading picture stayed up; with 4 fading
+  // frames and a 99 ms frame into full it read 89 ms of a fade that was on screen >= 114 ms. On screen = to first full.
+  const fadeSpan = fading.length && firstFull ? firstFull.t - fading[0].t : 0;
+  // the pop, measured as the reader sees it: the largest rise between two drawn pictures, last live through full
+  const pics = after.slice(0, firstFull ? after.indexOf(firstFull) + 1 : after.length).filter((x, i, a) => !i || x.cf !== a[i - 1].cf);
+  const maxStep = pics.length > 1 ? Math.max(...pics.slice(1).map((x, i) => x.cf - pics[i].cf)) : 0;
   const gaps = after.slice(1).map((x, i) => x.t - after[i].t);
   const maxGap = gaps.length ? Math.max(...gaps) : 0;
   const cadence = after.length > 1 ? Math.round((after[after.length - 1].t - after[0].t) / (after.length - 1)) : 0;
@@ -522,7 +530,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
   const medGap = relGaps.length ? relGaps[Math.floor(relGaps.length / 2)] : Infinity;
   const soft = medGap > RESOLVE_MS ? [{ t: 0, ms: medGap }] : [];
   note(`${tag} R (launch ${attempt}): release ticks median ${medGap} ms apart (resolves a ${FADE_MS} ms fade into >= 3 frames when <= ${RESOLVE_MS}); long tasks >= ${SOFT_MS} ms: ${longs.filter((l) => l.ms >= SOFT_MS).length} (information)`);
-  note(`${tag} R (launch ${attempt}): cap-fraction trace after the notch: ${shots.length} frames over ${shots[shots.length - 1].t - shots[0].t} ms (cadence ${cadence} ms, largest gap ${maxGap} ms): live ${live.length} frames (${lastLive ? 'to t+' + lastLive.t : 'none'}), fading ${fading.length} frames over ${fadeSpan} ms, falls ${falls}, full from t+${firstFull ? firstFull.t : '-'}; main-thread long tasks in the window: ${longs.length ? longs.map((l) => `${l.ms} ms at t+${l.t}`).join(', ') : 'none'}`);
+  note(`${tag} R (launch ${attempt}): cap-fraction trace after the notch: ${shots.length} frames over ${shots[shots.length - 1].t - shots[0].t} ms (cadence ${cadence} ms, largest gap ${maxGap} ms): live ${live.length} frames (${lastLive ? 'to t+' + lastLive.t : 'none'}), fading ${fading.length} frames on screen ${fadeSpan} ms (largest step ${maxStep.toFixed(2)}), falls ${falls}, full from t+${firstFull ? firstFull.t : '-'}; main-thread long tasks in the window: ${longs.length ? longs.map((l) => `${l.ms} ms at t+${l.t}`).join(', ') : 'none'}`);
   if (OUT) writeFileSync(resolve(OUT, `${fname}-R-launch${attempt}.json`), JSON.stringify({ shots: all, longs }, null, 1));
   // headless Chrome lands the 2D canvas in software raster on some launches
   // (measured: 4 of 11 desktop launches drew every release frame as a
@@ -549,7 +557,8 @@ async function armR(page, tag, fname, c, r0, attempt) {
   if (fading.length < 3) fadeFails.push(jumpGap <= 50
     ? `${tag} R: POP: the cap fraction jumped to full ${jumpGap} ms after the previous tick through ${fading.length} fading frames (frame cadence ${cadence} ms): there was no fade`
     : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
-  else if (!(fadeSpan >= 100)) fadeFails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
+  else if (!(fadeSpan >= 100)) fadeFails.push(`${tag} R: the fade was on screen ${fadeSpan} ms, under 100: not a visible span`);
+  if (fading.length >= 3 && maxStep > 1 / 3 + 0.01) fadeFails.push(`${tag} R: POP: one frame stepped the cap fraction ${maxStep.toFixed(2)}, over a third (FADE_STEP_MS): the fade jumped`);
   // r2-fade -> myweb-pop (vot-ui 11-15): one 94-124 ms frame at the cap's release used to swallow the fade's first
   // half (3 of 23 desktop launches failed; f0d12949e relaunched them). The scheduler now advances the fade at most a
   // third of FADE_MS a drawn frame, so a stall delays the fade instead of skipping it: such a launch is judged as it

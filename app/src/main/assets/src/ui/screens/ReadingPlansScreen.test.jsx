@@ -105,6 +105,19 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(screen.getByRole('group', { name: 'This week' })).toBeTruthy();
   });
 
+  // app map 11-18: a preview's schedule view has id '' (no run yet), and the 'no run: going back' branch took it before
+  // the preview branch could, so Whole schedule drew a blank page (since 2082583cc, 11-16).
+  it('Whole schedule from a preview draws the draft plan’s schedule, and starts nothing', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Whole schedule' }));
+    expect(barTitle()).toMatch(/^Bible in a Year · Schedule$/);
+    expect(screen.getAllByText(/Genesis 4-7/).length).toBeGreaterThan(0);
+    expect(runs()).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('button', { name: 'Start plan' })).toBeTruthy();
+  });
+
   it('Length changes the plan ("90 days" means 90), and Tomorrow starts it later', () => {
     render(<PlansHub {...base()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
@@ -220,6 +233,24 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
       const sheet = screen.getByRole('dialog', { name: 'Catch up' });
       expect(within(sheet).getByRole('button', { name: /^Keep my daily amount/ }).textContent).toBe('Keep my daily amountSame reading each day · still finishes ' + when);
     } finally { vi.useRealTimers(); }
+  });
+
+  // 11-18 (app map): 'finishes Nov 12, / 2027' broke the date off its words, and Catch up cut 'still finishes Nov 12, …'.
+  // Each fact between ' · ' is its own part, kept whole on its line; the words read the same.
+  it('the status and the Catch up lines keep each fact whole: the finish and its date are one part', () => {
+    ReadingPlanStore.put(lateRun());
+    render(<PlansHub {...base()} />);
+    openRow();
+    const parts = (el) => [...el.querySelectorAll('.plan-part')].map((x) => x.textContent);
+    const head = parts(document.querySelector('.plan-status'));
+    expect(head).toHaveLength(2);
+    expect(head[0]).toMatch(/^[0-9]+ days? behind$/);
+    expect(head[1]).toMatch(/^finishes [A-Z][a-z]{2} [0-9]+(, [0-9]{4})?$/);
+    fireEvent.click(screen.getByRole('button', { name: 'Catch up' }));
+    const sheet = screen.getByRole('dialog', { name: 'Catch up' });
+    const keep = parts(within(sheet).getByRole('button', { name: /^Keep my daily amount/ }));
+    expect(keep).toEqual(['Same reading each day', 'still ' + head[1]]);
+    expect(parts(within(sheet).getByRole('button', { name: /^Finish on time/ })).at(-1)).toMatch(/^finishes [A-Z][a-z]{2} [0-9]+/);
   });
 
   it('Read two days today starts one sitting over today and the next day', () => {
