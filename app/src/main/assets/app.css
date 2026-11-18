@@ -8829,8 +8829,6 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .select-sheet.ans-sheet .sheet-handle-grab{order:-1;flex:0 0 100%;height:14px;padding:0;display:flex;align-items:flex-start;justify-content:center}
 .select-sheet.ans-sheet .sheet-handle-bar{width:36px;height:4px;margin:0;border-radius:2px;background:var(--surface-3)}
 .select-sheet.ans-sheet .sheet-handle-back{flex:none;width:var(--tap);height:48px;color:var(--text-1)}
-/* 11-18: the title had 4 px beside the x's box (a keyboard ring sat on its first letter): the x keeps 10 px more on its right */
-.ans-sheet .ans-sheet-head .sheet-handle-back{margin-right:10px}
 .ans-sheet-head>h2.ans-row-title{flex:1;min-width:0}
 .ans-sh-t{flex:1;min-width:0;margin:0;padding-left:2px;font-family:var(--font-serif);font-size:var(--ts-sheet);line-height:1.2;font-weight:700;color:var(--text-1)}
 .ans-sheet-head .ans-sh-k{flex:1;min-width:0;padding-left:2px}

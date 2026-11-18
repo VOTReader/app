@@ -916,12 +916,3 @@ describe('app.css — the Songs list buttons stack at large text', () => {
     expect(CSS).toMatch(/\.vot-large-text :is\(\.listen-coll-actions, \.songs-list-actions\) \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   });
 });
-
-/* 11-18 (app map, Studies chart viewer): the viewer's title ran 4 px from the x's box (the head's 4 px gap), so a
-   keyboard focus ring sat on the title's first letter. The head's x keeps 10 px more on its right; only that space
-   changes, in the chart viewer and the Answers sheets alike (they share the frame). */
-describe('app.css — a sheet head gives its title room beside the x', () => {
-  it('the head x carries a right margin', () => {
-    expect(ruleBlock(CSS, '.ans-sheet .ans-sheet-head .sheet-handle-back{')).toMatch(/margin-right:\s*10px/);
-  });
-});
