@@ -3503,6 +3503,11 @@
        has no one line to sit beside: the label goes over them (11-18). Not any row with a note: Remind me's and Start's notes come and go, and the label must not jump. */
     .plan-opt:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text) { flex-direction: column; align-items: stretch; gap: 6px; }
     .plan-opt:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text) .plan-opt-label { width: auto; }
+    /* chips that run to two lines (the preview's Start at 360: Today, Tomorrow / Pick a day) left the label centred between them (11-18).
+       The label sits on the first chips line: the row tops its items and the label's line is a chip tall; 13 px over it (was 10)
+       keeps a one-line row's chips and label exactly where centring put them in its 64 px. */
+    html:not(.vot-large-text) .plan-opt:has(> .plan-opt-body > .plan-chips:first-child):not(:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text)) { align-items: flex-start; padding-top: 13px; }
+    html:not(.vot-large-text) .plan-opt:has(> .plan-opt-body > .plan-chips:first-child):not(:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text)) > .plan-opt-label { line-height: var(--chip-h); }
     .plan-opt .plan-days { justify-content: space-between; width: 100%; max-width: 22rem; }
     .plan-day-toggle { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; cursor: pointer; }
     .plan-day-toggle::after { content: ''; position: absolute; inset: -5px; }   /* a 44 px press */

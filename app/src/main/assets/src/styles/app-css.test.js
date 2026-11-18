@@ -927,3 +927,15 @@ describe('app.css — a kept song row wraps its actions under the name', () => {
     expect(ruleBlock(CSS, '.songs-row > .song-keep-remove {')).toMatch(/margin-left:\s*auto/);
   });
 });
+
+/* A PLAN ROW'S LABEL SITS ON ITS FIRST CHIPS LINE (vot-ui walk, 2026-11-18). The preview's Start chips run to two lines at 360
+   (Today, Tomorrow / Pick a day) and the label sat centred between them. The row tops its items, the label's line is a chip
+   tall, and 13 px over keeps a one-line row where centring put it. Not at large text (label over choices) nor the stacking rows. */
+describe('app.css — a plan row label sits on its first chips line', () => {
+  const SEL = 'html:not(.vot-large-text) .plan-opt:has(> .plan-opt-body > .plan-chips:first-child):not(:has(.plan-days, .plan-chips + .plan-opt-line, .plan-own-only-text))';
+  it('the chips row tops its items with 13 px over, the label a chip tall', () => {
+    expect(ruleBlock(CSS, SEL + ' {')).toMatch(/align-items:\s*flex-start/);
+    expect(ruleBlock(CSS, SEL + ' {')).toMatch(/padding-top:\s*13px/);
+    expect(ruleBlock(CSS, SEL + ' > .plan-opt-label {')).toMatch(/line-height:\s*var\(--chip-h\)/);
+  });
+});
