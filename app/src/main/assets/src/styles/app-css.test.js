@@ -843,3 +843,27 @@ describe('app.css — tour and Answers boxes are sized by the visible viewport (
     }
   });
 });
+
+/* THE MINI PLAYER'S NAME WRAPS (hub, 2026-11-18). At 360 px the bar's title box is ~110 px, so a one-line
+   title with an ellipsis read "Come, Love A..." with room in the bar for a second line. The name wraps at
+   a word to two lines at every text size; only a name longer than two lines takes an ellipsis. */
+describe('app.css — the mini player title wraps before it cuts', () => {
+  it('wraps to two lines, never one line with an ellipsis', () => {
+    const t = ruleBlock(CSS, '\n      .audio-bar-title {');
+    expect(t).not.toMatch(/white-space:\s*nowrap/);
+    expect(t).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(t).toMatch(/overflow-wrap:\s*break-word/);
+  });
+});
+
+/* THE PLAN CARD'S TEXT HAS THE ROW AT LARGE TEXT (hub, 2026-11-18). At text 2.0 on 360 px the 92 px ring
+   beside it left "Day 1 of 30 / 0 of 150 chapters read" a few words wide, one or two words a line. At large
+   text the ring takes a row of its own above the words, and Today's head lets "5 min left" go under its eyebrow. */
+describe('app.css — the plan card gives its words the row at large text', () => {
+  it('the ring stacks above the text', () => {
+    expect(ruleBlock(CSS, '.vot-large-text .plan-progress {')).toMatch(/flex-direction:\s*column/);
+  });
+  it("Today's head wraps", () => {
+    expect(ruleBlock(CSS, '.vot-large-text .plan-today-head {')).toMatch(/flex-wrap:\s*wrap/);
+  });
+});

@@ -1236,11 +1236,13 @@
       .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
       .vot-large-text .audio-bar-mark { display: none; }
       .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      /* The name wraps at a word to two lines before it takes an ellipsis (hub 11-18: "Come, Love A..." had room
+         for a second line); the bar grows and the dock follows its measured height. */
       .audio-bar-title {
-        display: block; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; line-height: 1.25;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+        color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; line-height: 1.25;
+        overflow-wrap: break-word; text-wrap: balance;
       }
-      .vot-large-text .audio-bar-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
       .audio-bar-part { color: var(--cream-muted); }
       /* Line 2 is one line (r-listen: "1 of 29 · 1 min left · Volu…"): the place first, so the edge loses the source;
          at large text it wraps between its parts. The chips stay whole. */
@@ -3515,12 +3517,16 @@
     .plan-progress-text { flex: 1; min-width: 0; }
     .plan-progress-day { margin: 0 0 4px; color: var(--cream); font-size: var(--fs-24); line-height: 1.2; }
     .plan-progress-line { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
+    .vot-large-text .plan-progress { flex-direction: column; align-items: flex-start; gap: 12px; }   /* 11-18: at 2.0 the ring beside it left the words a few wide */
+    .vot-large-text .plan-progress-text { align-self: stretch; }
     .plan-late { color: var(--cream-muted); }
     .plan-late.is-gold { color: var(--gold); }
     .plan-late .plan-link { min-height: 32px; padding: 0 2px; font-size: var(--fs-15); }
     .plan-today { margin-top: 14px; }
     .plan-today-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
     .plan-today-head .root-eyebrow { flex: 1; min-width: 0; color: var(--gold); }
+    .vot-large-text .plan-today-head { flex-wrap: wrap; row-gap: 2px; }
+    .vot-large-text .plan-today-head .root-eyebrow { flex: 1 1 auto; }   /* its own width first, so "5 min left" goes under only when both do not fit */
     .plan-today-left { flex: none; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
     .plan-today-title { margin: 0; color: var(--cream); font-size: var(--fs-20); line-height: 1.3; }
     .plan-today-sub { margin: 4px 0 12px; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); line-height: 1.45; }
