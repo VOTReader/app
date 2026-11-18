@@ -18,7 +18,7 @@
    The deliberate differences are named: four top-bar settings the three tabs retired, and two screen states
    (vot-audio-recent-open, vot-plan-ribbon-hidden) whose screens the overhaul replaced; both stay in storage. */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
@@ -158,7 +158,15 @@ const STORES = [StateStore, BookmarkStore, AnnotationStore, NoteStore, NotebookS
   RecentNavStore, ProphecyCardsStore, JournalStore, JournalNotebookStore, JournalIndexStore, JournalStatsStore,
   HomeOrderStore, LibraryOrderStore, GardenPosStore];
 
+/* The day main wrote the fixture (its streaks' lastReadDate). The streak stores break a streak 2 days after it, and the
+   boot then writes currentStreak 0: on a real clock this test failed from 2026-11-18 on (push19). The clock is the
+   fixture's day, at noon; only Date is faked (fake-indexeddb runs on the real timers). */
+const FIXTURE_DAY = /"lastReadDate":"(\d{4}-\d{2}-\d{2})"/.exec(JSON.stringify(MAIN))[1];
+
+afterAll(() => { vi.useRealTimers(); });
+
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(FIXTURE_DAY + 'T12:00:00') });
   // Same schemas: nothing in this build upgrades a database main left.
   expect(IDBAdapter.DB_VERSION).toBe(MAIN.dbVersion);
   expect(MAIN.databases['votreader'].version).toBe(MAIN.dbVersion);
