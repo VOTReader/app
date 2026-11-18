@@ -786,9 +786,10 @@ function SongsList({ frame, library, playingId, active, onPush }) {
           askingRemoveAll ? (
             // W2-05: the Downloads screen's own strip (AudioOfflineScreen), words and buttons alike.
             <ConfirmStrip card label="Remove all kept songs" back={false} focus={false}
-              question={'Remove all ' + songCountLabel(ids.length) + ' (' + formatSongBytes(keptBytes) + ') from this phone?'}
-              lines={['They can be kept again.']}
-              cancelLabel="Keep them" yesLabel="Yes, remove all"
+              // One song left reads as that song, not 'all 1 song' (vot-ui walk, 11-18).
+              question={(ids.length === 1 ? 'Remove this song' : 'Remove all ' + songCountLabel(ids.length)) + ' (' + formatSongBytes(keptBytes) + ') from this phone?'}
+              lines={[ids.length === 1 ? 'It can be kept again.' : 'They can be kept again.']}
+              cancelLabel={ids.length === 1 ? 'Keep it' : 'Keep them'} yesLabel={ids.length === 1 ? 'Yes, remove it' : 'Yes, remove all'}
               onCancel={() => setAskingRemoveAll(false)} onConfirm={() => { void keep.removeAll(); setAskingRemoveAll(false); }} />
           ) : (
             <button type="button" className="songs-see-all song-keep-remove-all" onClick={() => setAskingRemoveAll(true)}>Remove all from this phone</button>

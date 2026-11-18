@@ -126,8 +126,11 @@ describe('Keep on this phone -- lists, the hub row and the Kept list', () => {
     expect(document.querySelectorAll('.songs-row')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
     const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
-    expect(strip.textContent).toContain('Remove all 1 song (3 MB) from this phone?');
-    await act(async () => { fireEvent.click(within(strip).getByRole('button', { name: 'Yes, remove all' })); });
+    // One song left: the strip names that song, not 'all 1 song' (vot-ui walk, 11-18).
+    expect(strip.textContent).toContain('Remove this song (3 MB) from this phone?');
+    expect(strip.textContent).toContain('It can be kept again.');
+    expect(within(strip).getByRole('button', { name: 'Keep it' })).toBeTruthy();
+    await act(async () => { fireEvent.click(within(strip).getByRole('button', { name: 'Yes, remove it' })); });
     expect(store.map.size).toBe(0);
     expect(screen.getByText(/Songs you keep play here with no signal/)).toBeTruthy();
   });
@@ -159,6 +162,7 @@ describe('K3 -- kept rows, the Remove all strip, Find kept', () => {
     renderScreen([{ k: 'list', v: 'kept' }]);
     fireEvent.click(screen.getByRole('button', { name: 'Remove all from this phone' }));
     const strip = screen.getByRole('group', { name: 'Remove all kept songs' });
+    expect(strip.textContent).toContain('Remove all 2 songs (');
     expect(strip.className).toBe('ui-confirm is-card');
     expect(within(strip).getByRole('button', { name: 'Keep them' }).className).toBe('ui-btn is-small is-outline ui-confirm-cancel');
     const go = within(strip).getByRole('button', { name: 'Yes, remove all' });
