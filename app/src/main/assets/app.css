@@ -9019,7 +9019,7 @@ body.light .install-step-num { color: #fff; }
     .vot-large-text .listen-coll .listen-rec { flex-wrap: wrap; }
     .vot-large-text .listen-coll .listen-rec > .ui-row-main { flex: 1 1 100%; }
     .vot-large-text .listen-coll .listen-rec > .ui-row-main + :is(.ui-row-star, .ui-row-menu) { margin-left: auto; }
-    .vot-large-text .listen-coll-actions { grid-template-columns: minmax(0, 1fr); }
+    .vot-large-text :is(.listen-coll-actions, .songs-list-actions) { grid-template-columns: minmax(0, 1fr); }   /* 11-18: the Songs list's Play all + Shuffle ran off the right edge at 2.0 */
     .screen-layout:has(> .screen-scroll .listen-coll) > .top-nav > .bar-title { white-space: normal; overflow-wrap: break-word; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .listen-rec .ui-row-meta .coverage-badge { margin-left: var(--sp-2); }
     .ui-row-star { flex: none; display: flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: -6px -4px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }

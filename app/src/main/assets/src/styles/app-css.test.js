@@ -907,3 +907,12 @@ describe('app.css — a sheet handle row never swallows a tap meant for the head
     expect(ruleBlock(CSS, '.sheet-handle-row > * {')).toMatch(/pointer-events:\s*auto/);
   });
 });
+
+/* SONGS' PLAY ALL AND SHUFFLE STACK AT LARGE TEXT (vot-ui walk, 2026-11-18). A collection's or shelf's list
+   (AudioSongsScreen) keeps .ui-btn-row's two 1fr columns, and at text 2.0 'Play all' + 'Shuffle' ran past the
+   screen's right edge; Listen's own collection row already stacked (.listen-coll-actions). Both stack now. */
+describe('app.css — the Songs list buttons stack at large text', () => {
+  it('one column for both Listen rows', () => {
+    expect(CSS).toMatch(/\.vot-large-text :is\(\.listen-coll-actions, \.songs-list-actions\) \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  });
+});
