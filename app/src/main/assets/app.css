@@ -5601,7 +5601,10 @@
     /* POL3 (mock base.css .sheet .grab + .sh): the grabber 8 px from the sheet's top, the title row (48 high) right
        under it, the close x on the title row at the right, level with the title. The grab button keeps its 44 px
        hit box; its lower part lies over the title row's middle, where nothing is tapped. */
-    .sheet-handle-row { position: relative; margin: -8px 0 -16px; }
+    /* 11-18: the row paints over the head under it (relative); its empty area has no handler, and it covered the top half of
+       Up next's Clear (POL4 put Clear level with the title). Taps pass through the row; its grab and x keep theirs. */
+    .sheet-handle-row { position: relative; margin: -8px 0 -16px; pointer-events: none; }
+    .sheet-handle-row > * { pointer-events: auto; }
     .sheet-handle-grab { align-items: flex-start; padding-top: 8px; }
     .sheet-handle-back { position: absolute; top: calc(100% - 26px); right: -10px; margin: 0; color: var(--text-2); }
     .link-action-sheet .sheet-handle-back { right: calc(var(--gutter) - 10px); }

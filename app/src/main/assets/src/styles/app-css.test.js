@@ -896,3 +896,14 @@ describe('app.css — Manage plan: labels over stacks, one grid at the foot', ()
     expect(CSS).not.toMatch(/\.plan-danger/);
   });
 });
+
+/* THE HANDLE ROW LETS TAPS THROUGH (vot-ui walk, 2026-11-18). The grabber's row is position: relative, so it paints
+   over the head under it; POL4 raised Up next's Clear level with the title, and the row's empty, handler-less area
+   covered Clear's top 23 px and its centre (a tap on the word grabbed nothing and cleared nothing). The row passes
+   taps on; its grab and x keep theirs. */
+describe('app.css — a sheet handle row never swallows a tap meant for the head', () => {
+  it('the row is pointer-events: none and its buttons take taps', () => {
+    expect(ruleBlock(CSS, '\n    .sheet-handle-row { position: relative;')).toMatch(/pointer-events:\s*none/);
+    expect(ruleBlock(CSS, '.sheet-handle-row > * {')).toMatch(/pointer-events:\s*auto/);
+  });
+});
