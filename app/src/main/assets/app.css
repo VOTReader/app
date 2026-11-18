@@ -1882,6 +1882,16 @@
       .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
       @media (max-width:360px) { .songs-row-len { display:none; } }
+      /* task-1720 (vot-eye later pass, 360): names that were cut wrap. A collection's name on Songs of the Letters wraps
+         beside its count ('Words To Live By: Part ...' twice read alike); a song's title takes two lines at most, its
+         byline wraps ('Spoken · Dance · ...'); the star and the menu keep their 44 px. A songs screen's bar title takes
+         two lines in the 56 px bar (two at 22 px are 51 px). The mini player's title stays one line: a second needs
+         about 60 px and the bar holds about 55. */
+      .songs-cols .ui-row-title { white-space:normal; overflow-wrap:break-word; text-wrap:pretty; }
+      .songs-row .ui-row-title { white-space:normal; overflow-wrap:break-word; text-wrap:pretty; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+      .songs-row .ui-row-meta { white-space:normal; overflow-wrap:break-word; }
+      .vot-large-text .songs-row .ui-row-title { display:block; -webkit-line-clamp:unset; }   /* large text already wrapped every line; two would cut it */
+      .screen-layout:has(> .screen-scroll .songs-screen) > .top-nav > .bar-title { white-space:normal; overflow-wrap:break-word; text-wrap:balance; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
       /* W3d listen: the song page (au-song): cover, title, one line, Play | Save, the vote, From the letter and Lyrics rows. */
       .song-page { display:flex; flex-direction:column; align-items:center; padding-top:4px; text-align:center; }
       .song-page-cover { width:180px; height:180px; border:0; border-radius:16px; }
