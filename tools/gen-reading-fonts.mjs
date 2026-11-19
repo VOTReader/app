@@ -18,24 +18,27 @@
  * NEVER hand-edit the emitted woff2s — regenerate.
  */
 import { writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'app', 'src', 'main', 'assets', 'fonts', 'reading');
 
-const CDN = 'https://cdn.jsdelivr.net/fontsource/fonts/';
-const vf = (id) => [
+export const CDN = 'https://cdn.jsdelivr.net/fontsource/fonts/';
+export const vf = (id) => [
   { remote: `${id}:vf@latest/latin-wght-normal.woff2`, file: `${id}-latin-wght-normal.woff2`, weight: '100 900', style: 'normal' },
   { remote: `${id}:vf@latest/latin-wght-italic.woff2`, file: `${id}-latin-wght-italic.woff2`, weight: '100 900', style: 'italic' },
 ];
-const vfNoItalic = (id) => [vf(id)[0]];
-const st = (id, specs) => specs.map(([w, s]) => ({
+export const vfNoItalic = (id) => [vf(id)[0]];
+export const st = (id, specs) => specs.map(([w, s]) => ({
   remote: `${id}@latest/latin-${w}-${s}.woff2`, file: `${id}-latin-${w}-${s}.woff2`, weight: String(w), style: s,
 }));
 
+/** One row of the _reading-fonts-report.json written by main(). */
+export const reportRow = (font, bytes) => ({ id: font.id, kb: Math.round(bytes / 1024), files: font.faces.length });
+
 /* Keep ids + families in sync with READING_FONTS (src/utils/reading-fonts.js). */
-const FONTS = [
+export const FONTS = [
   { id: 'cormorant-garamond', family: 'Cormorant Garamond', faces: st('cormorant-garamond', [[400, 'normal'], [700, 'normal'], [400, 'italic']]) },
   { id: 'cardo', family: 'Cardo', faces: st('cardo', [[400, 'normal'], [700, 'normal'], [400, 'italic']]) },
   { id: 'gentium-book-plus', family: 'Gentium Book Plus', faces: st('gentium-book-plus', [[400, 'normal'], [700, 'normal'], [400, 'italic'], [700, 'italic']]) },
@@ -76,7 +79,7 @@ async function main() {
       bytes += buf.length;
     }
     total += bytes;
-    report.push({ id: font.id, kb: Math.round(bytes / 1024), files: font.faces.length });
+    report.push(reportRow(font, bytes));
     console.log(`${font.id}: ${Math.round(bytes / 1024)} KB (${font.faces.length} files)`);
   }
   console.log(`\nTOTAL: ${(total / 1024 / 1024).toFixed(2)} MB, ${FONTS.reduce((s, f) => s + f.faces.length, 0)} files\n`);
@@ -98,4 +101,5 @@ async function main() {
   writeFileSync(join(ROOT, 'tools', '_reading-fonts-report.json'), JSON.stringify(report, null, 2));
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+if (isMain) main().catch((e) => { console.error(e); process.exit(1); });
