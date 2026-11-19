@@ -242,9 +242,11 @@ jobs:
         # AUDIO_LENGTHS come from an MP3's first bytes (Xing frames, else size over bit rate). Synthetic frames only.
         # test_gen_vot_glyphs.py rides the same call (2026-11-18, votreader-tests-2 item 8): the symbol
         # glyphs land in every declared face (faces/css_block on fixtures; build_font needs real TTFs, untested).
+        # test_css_dead_base.py rides the same call (2026-11-19, votreader-tests-2 item 11): base
+        # declarations a later rule always overrides (pure core on fixtures; main() on tmp CSS).
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_gen_audio_lengths test_gen_vot_glyphs test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers test_build_semantic -v
+          python -m unittest test_check_balance test_gen_audio_lengths test_gen_vot_glyphs test_css_dead_base test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers test_build_semantic -v
           python check_balance.py --strict
 
       - name: Check App() size budget (P11 canary)
