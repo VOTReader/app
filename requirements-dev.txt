@@ -26,3 +26,10 @@ gdown==6.1.0
 # requests — HTTP for the release mirror and its verifier. Consumers:
 # tools/mirror-audio-release.py, tools/verify-audio-release.py, tools/gen-audio-lengths.py.
 requests==2.33.1
+
+# fonttools — the woff2 subset + merge in tools/gen-vot-glyphs.py (the app's
+# symbol glyphs). Consumers: tools/gen-vot-glyphs.py. The CI unittest run
+# imports it through test_gen_vot_glyphs.py, so an unpinned upgrade breaks the
+# gate the same way an undeclared import would. Version measured 2026-11-18
+# on this PC (Python 3.13.17, fontTools 4.64.0).
+fonttools==4.64.0
