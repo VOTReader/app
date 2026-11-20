@@ -40,11 +40,11 @@ MANIFEST = os.path.join(ROOT, "app", "src", "main", "assets", "src", "data", "au
 STAGING = os.path.join(HERE, "_audio-mirror-staging")
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
 COOKIES = os.path.join(HERE, "_drive-cookies.json")  # from tools/drive-login.mjs
-# rclone with the owner's OAuth grant (2026-08-06, drive.readonly scope, remote
-# "gdrive") — `backend copyid` fetches by file id on the ACCOUNT's quota, which
-# is what finally beat Drive's anonymous per-IP download wall. NOTE: uses
-# rclone's shared client_id (retires during 2026) — fine for this mirror; make
-# a personal client_id if this pipeline is still pulling from Drive by then.
+# rclone with an OAuth grant (2026-08-06) — `backend copyid` fetches by file id
+# on the ACCOUNT's quota, which is what finally beat Drive's anonymous per-IP
+# download wall. Remote "gdrive3" (lythgoecorbin) since 2026-11-19, the same one
+# D:\FlockSync reads through (DRIVE_REMOTE); it was "gdrive" (corbinlythgoe)
+# until Corbin moved the pipeline off his main Drive.
 def find_rclone():
     """rclone on PATH, else the winget install this pipeline was first set up with.
     The versioned folder alone meant an rclone upgrade silently fell back to the
@@ -110,7 +110,7 @@ def _rclone_batch(fids):
     Returns the subset that landed whole. A batch rclone reports as failed
     promotes nothing: which of its transfers finished is not knowable from
     here, and the per-file fallback in main() fetches each one again."""
-    args = [RCLONE, "backend", "copyid", "gdrive:"]
+    args = [RCLONE, "backend", "copyid", "gdrive3:"]   # lythgoecorbin; off corbinlythgoe 2026-11-19 (D:\FlockSync DRIVE_REMOTE)
     for fid in fids:
         args += [fid, os.path.join(STAGING, fid + ".mp3.part")]
     r = subprocess.run(args, capture_output=True, text=True)
