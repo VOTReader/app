@@ -97,14 +97,16 @@ class SplitDecls(unittest.TestCase):
 
 class NewerFeatures(unittest.TestCase):
     def test_viewport_units(self):
-        # NOTE: NEWER's leading \b means a digit-prefixed unit - the real
-        # shape, 100dvh - does NOT match; only a bare unit token does.
-        # Pinned as-is; flagged for the hub in the queue LOG, not fixed here
-        # (this item is test-only, like item 8's ResourceWarning note).
+        # The real shape is digit-prefixed (100dvh): it must match, or the
+        # fallback-pair guard never fires for viewport units (flag 3).
         assert d.newer_features("height: dvh") == {"dvh"}
-        assert d.newer_features("height: 100dvh") == set()
-        assert d.newer_features("width: 100svw") == set()
-        assert d.newer_features("height: 100DVH") == set()
+        assert d.newer_features("height: 100dvh") == {"dvh"}
+        assert d.newer_features("width: 100svw") == {"svw"}
+        assert d.newer_features("height: 100DVH") == {"dvh"}
+        assert d.newer_features("height: calc(100dvh - 4px)") == {"dvh"}
+        # A unit name inside a longer word or custom property is not a unit.
+        assert d.newer_features("height: var(--x-dvh)") == set()
+        assert d.newer_features("grid-area: advh") == set()
 
     def test_functions(self):
         assert d.newer_features("color: color-mix(in srgb, red 50%, blue)") == {"color-mix("}
@@ -213,6 +215,11 @@ class MainEndToEnd(unittest.TestCase):
     def test_fallback_pair_keeps_the_earlier_decl(self):
         _code, out, _after = self._run(
             ".a { width: 100px; } .a { width: clamp(1px, 2vw, 3px); }")
+        assert "0 overridden declarations" in out
+
+    def test_fallback_pair_keeps_a_vh_decl_before_a_dvh_one(self):
+        _code, out, _after = self._run(
+            ".a { height: 100vh; } .a { height: 100dvh; }")
         assert "0 overridden declarations" in out
 
     def test_plain_later_value_kills_a_clamp_earlier_decl(self):

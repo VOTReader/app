@@ -97,7 +97,7 @@ def split_decls(text, start, end):
     return out
 
 
-NEWER = re.compile(r'\b(?:dvh|svh|lvh|dvw|svw|lvw|dvb|svb|lvb|dvi|svi|lvi|cqw|cqh|cqi|cqb|cqmin|cqmax)\b|'
+NEWER = re.compile(r'(?<![a-z_-])(?:dvh|svh|lvh|dvw|svw|lvw|dvb|svb|lvb|dvi|svi|lvi|cqw|cqh|cqi|cqb|cqmin|cqmax)\b|'
                    r'(?<![\w-])(?:env|color-mix|oklch|oklab|lch|lab|clamp|min|max|light-dark|round|mod|rem|hwb)\(|:has\(', re.I)
 
 
