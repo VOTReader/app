@@ -79,11 +79,13 @@ const stripName = (s) => { const d = sessionDaysLabel(s); return s.name + ' · '
 export function PlanSessionStrip({ bid, cid, inert }) {
   const s = usePlanSession();
   const [sheet, setSheet] = React.useState(false);
-  const k = !inert && s ? sessionKeyOf(bid, cid) : null;
+  // A swipe peek (inert) draws the strip as its page will have it, so the strip does not vanish and pop back in
+  // with every swipe inside a sitting; only the live page owns the phone's Back and the day sheet.
+  const k = s ? sessionKeyOf(bid, cid) : null;
   const host = planSessionHost();
   // The phone's Back takes the chevron's steps: the previous reading; from the first, the ordinary Back (out).
   React.useEffect(() => {
-    if (!k) return undefined;
+    if (!k || inert) return undefined;
     const fn = () => {
       const prev = sessionNeighbours(k).prev;
       const h = planSessionHost();
@@ -93,8 +95,7 @@ export function PlanSessionStrip({ bid, cid, inert }) {
     };
     /** @type {any} */ (window).__screenBack = fn;
     return () => { if (/** @type {any} */ (window).__screenBack === fn) /** @type {any} */ (window).__screenBack = null; };
-  }, [k]);
-  if (inert) return null;
+  }, [k, inert]);
   if (!k) {
     const p = s ? null : pausedPlanSession();
     const prun = p ? sessionRun(true) : null;
@@ -144,7 +145,7 @@ export function PlanSessionStrip({ bid, cid, inert }) {
             aria-label={itemName(run, x) + (x in ticks ? ', read' : '') + (x === k ? ', open now' : '')}><span /></button>
         ))}
       </div>
-      {sheet ? (
+      {sheet && !inert ? (
         <DaySheet run={run} day={s.day} now={new Date()} onClose={() => setSheet(false)}
           onRead={(/** @type {number} */ _d, /** @type {string | undefined} */ x) => go(x && s.keys.includes(x) ? x : (sessionOpenKey() || k))} />
       ) : null}
