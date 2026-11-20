@@ -207,6 +207,36 @@ describe('the plan as a container', () => {
     expect(planSession()).not.toBeNull();
   });
 
+  it("inside a sitting the day sheet's button says what it does from here, never 'Read this day' (hub 21:32)", () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    const openSheet = () => act(() => { fireEvent.click(screen.getByRole('button', { name: /: the day's readings$/ })); });
+    // on the first reading not read: the button only takes the reader back to it
+    const a = render(<PlanSessionStrip bid="genesis" cid={2} />);
+    openSheet();
+    expect(screen.queryByRole('button', { name: 'Read this day' })).toBeNull();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Keep reading' })); });
+    expect(host.move).not.toHaveBeenCalled();
+    expect(document.getElementById('plan-day-sheet')).toBeNull();
+    a.unmount();
+    // past it: the button goes to the first reading not read, and says which
+    render(<PlanSessionStrip bid="genesis" cid={3} />);
+    openSheet();
+    const next = screen.getByRole('button', { name: 'Next unread reading: Genesis 2' });
+    expect(next.textContent).toBe('Next unread reading');
+    act(() => { fireEvent.click(next); });
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 2 });
+  });
+
+  it("with the whole day read, the sheet's button stays on the page (it used to jump to the day's first reading)", () => {
+    const run = start();
+    for (const k of ['genesis:1', 'genesis:2', 'genesis:3']) tick(run, k);
+    render(<PlanSessionStrip bid="genesis" cid={3} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /: the day's readings$/ })); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Keep reading' })); });
+    expect(host.move).not.toHaveBeenCalled();
+  });
+
   it('paused: a page outside the day shows the way back in, and Resume opens the first reading not read', () => {
     const run = start();
     tick(run, 'genesis:1');
