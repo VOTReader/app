@@ -939,3 +939,16 @@ describe('app.css — a plan row label sits on its first chips line', () => {
     expect(ruleBlock(CSS, SEL + ' > .plan-opt-label {')).toMatch(/line-height:\s*var\(--chip-h\)/);
   });
 });
+
+/* A SETTINGS GROUP'S PILL GOES UNDER ITS LINE AT LARGE TEXT (vot-ui walk, 2026-11-18). At Text 2.0 the home row "Your data"
+   kept its Back up pill beside the title, and the title and "Last backup: never" broke a word per line. At large text the
+   row is a grid: icon, words, chevron; the pill takes its own line under the words. */
+describe('app.css — a settings group pill sits under its words at large text', () => {
+  const SEL = '.vot-large-text .settings-group-head.ui-row:has(> .ws1-tag)';
+  it('the row is a grid and the pill takes the second line of the words column', () => {
+    expect(ruleBlock(CSS, SEL + ' {')).toMatch(/display:\s*grid/);
+    expect(ruleBlock(CSS, SEL + ' > .ws1-tag {')).toMatch(/grid-row:\s*2/);
+    expect(ruleBlock(CSS, SEL + ' > .ws1-tag {')).toMatch(/grid-column:\s*2/);
+    expect(ruleBlock(CSS, SEL + ' > .ui-row-chev {')).toMatch(/grid-row:\s*1 \/ span 2/);
+  });
+});

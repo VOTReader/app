@@ -5951,6 +5951,13 @@
     .settings-group-head.ui-row .settings-section-label { margin:0; font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:var(--fw-name); line-height:var(--lh-headline); letter-spacing:0; text-transform:none; color:var(--text-1); }
     .settings-group-head.ui-row .settings-group-sub { font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
     .ws1-tag.ui-row-mark { padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-size:var(--ts-label); }
+    /* Large text: a group row with a pill (Your data's Back up) is a grid, so the pill takes its own line under the words
+       instead of squeezing the title and its line to a word per line (vot-ui walk 2026-11-18). */
+    .vot-large-text .settings-group-head.ui-row:has(> .ws1-tag) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 14px; row-gap: 6px; align-items: center; }
+    .vot-large-text .settings-group-head.ui-row:has(> .ws1-tag) > .ui-row-lead { grid-column: 1; grid-row: 1 / span 2; }
+    .vot-large-text .settings-group-head.ui-row:has(> .ws1-tag) > .ui-row-text { grid-column: 2; grid-row: 1; }
+    .vot-large-text .settings-group-head.ui-row:has(> .ws1-tag) > .ws1-tag { grid-column: 2; grid-row: 2; justify-self: start; }
+    .vot-large-text .settings-group-head.ui-row:has(> .ws1-tag) > .ui-row-chev { grid-column: 3; grid-row: 1 / span 2; }
     .ws1-foot { margin:var(--sp-5) 0 0; text-align:center; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
     .ws1-settings .settings-section.is-screen { margin:0; }
     .ws1-settings .settings-section.is-screen > .settings-group-body { margin:0; }
