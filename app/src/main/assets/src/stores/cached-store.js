@@ -1463,6 +1463,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-sw-spot',                  // ScriptureWebScreen: where the web was left (the Scripture Web lane's key)
   'vot-auto-downloads',           // utils/auto-download.js (the offline downloads lane's keys)
   'vot-auto-gone',
+  'vot-plan-session',             // utils/plan-session.js PLAN_SESSION_KEY: today's paused plan sitting (same-day, not backed up)
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
