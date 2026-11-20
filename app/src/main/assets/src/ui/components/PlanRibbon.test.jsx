@@ -160,6 +160,22 @@ describe('the plan as a container', () => {
     expect(planSession()).toBeNull();
   });
 
+  it("a swipe peek draws the strip its page will have, and leaves the phone's Back to the live page", () => {
+    start();
+    const live = render(<PlanSessionStrip bid="genesis" cid={2} />);
+    const fn = window.__screenBack;
+    const peek = render(<PlanSessionStrip bid="genesis" cid={3} inert />);
+    expect(peek.container.querySelector('.plan-strip').textContent).toContain('3 of 3');   // no strip-less page drags in
+    expect(window.__screenBack).toBe(fn);                                                  // the peek takes no Back
+    peek.unmount();
+    expect(window.__screenBack).toBe(fn);
+    let used;
+    act(() => { used = window.__screenBack(); });
+    expect(used).toBe(true);
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    live.unmount();
+  });
+
   it('each segment is a button to that reading, and says whether it is read', () => {
     const run = start();
     tick(run, 'genesis:1');
