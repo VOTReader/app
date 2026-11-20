@@ -31,6 +31,10 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 import { throughFirstRun, declineTourOffer } from './first-run.mjs';
+import { waitForFades, stopUnreached, fixLine, walkSite, installFailureReport } from './e2e-walk-lib.mjs';
+import { contrastFixes } from './e2e-contrast-lib.mjs';
+
+installFailureReport('e2e-contrast');
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : d);
@@ -255,13 +259,17 @@ async function runTheme(theme) {
     if (ONLY && !ONLY.has(name)) return;
     await sleep(500);
     const isLight = theme === 'light';
+    // CI 44681552243 (web-focus @0.49): the style below pauses animations, so a fade still running was frozen half way
+    // and read as a contrast failure. Wait until no finite fade runs (capped; an infinite one never blocks).
+    const fades = await waitForFades(page);
+    if (!fades.settled) console.log(`${theme.padEnd(5)} ${name.padEnd(18)} still fading after ${fades.waitedMs} ms: ${fades.still.slice(0, 3).join('; ')}`);
     await ev(() => { const s = document.createElement('style'); s.id = 'ctx-pe'; s.textContent = '*{pointer-events:auto!important;transition:none!important;animation-play-state:paused!important}'; document.head.appendChild(s); });
     const m = await page.evaluate(measureInPage, isLight);
     await sampleComplex(page, m.items);
     await ev(() => { const s = document.getElementById('ctx-pe'); if (s) s.remove(); });
     if (SHOTS) await page.screenshot({ path: resolve(SHOTS, `${theme}-${name}.png`) });
     const fails = m.items.filter((i) => i.ratio < i.need);
-    const res = { stop: name, theme, measured: m.items.length, fails: [], excepted: [], literal: [], meta: m.meta, themeOk: m.light === isLight };
+    const res = { stop: name, theme, measured: m.items.length, fails: [], excepted: [], literal: [], meta: m.meta, themeOk: m.light === isLight, fades };
     for (const f of fails) (excepted(name, f.sel, f.kind) ? res.excepted : res.fails).push(f);
     for (const l of m.literal) (excepted(name, l.sel, l.kind) ? res.excepted : res.literal).push(l);
     results.push(res);
@@ -271,9 +279,17 @@ async function runTheme(theme) {
     for (const f of worst) { const k = f.kind + f.sel + f.fg + f.bg; if (seen.has(k)) continue; seen.add(k); if (seen.size > 8) break; console.log(`    ${f.kind.padEnd(11)} ${f.ratio.toFixed(2)}<${f.need} ${f.sel.slice(0, 70)} fg ${f.fg}${f.fga < 1 ? '@' + f.fga : ''} on ${f.bg} "${f.text}"`); }
     const ls = new Set();
     for (const l of res.literal) { const k = l.kind + l.sel + l.value; if (ls.has(k)) continue; ls.add(k); if (ls.size > 5) break; console.log(`    literal    ${l.kind} ${l.value} ${l.sel.slice(0, 70)} "${l.text}"`); }
+    for (const f of contrastFixes(res)) console.log('    ' + f);
+    if (!m.meta.ok || !res.themeOk) console.log('    ' + fixLine(`at ${name} (${theme}) the theme-color meta or body.light does not match the theme the reader chose: the theme switch must update both`));
   };
   const step = async (name, fn) => {
-    try { await fn(); } catch (e) { results.push({ stop: name, theme, unreached: String(e.message || e).slice(0, 400) }); console.log(`${theme.padEnd(5)} ${name.padEnd(18)} UNREACHED ${String(e.message || e).slice(0, 400)}`); await esc(3); }
+    try { await fn(); } catch (e) {
+      results.push({ stop: name, theme, unreached: String(e.message || e).slice(0, 400) });
+      console.log(`${theme.padEnd(5)} ${name.padEnd(18)} UNREACHED ${String(e.message || e).slice(0, 400)}`);
+      const u = stopUnreached({ stop: name, how: String(e.message || e).split('\n')[0].slice(0, 120), at: e.at || walkSite(e.stack) || undefined });
+      console.log('    ' + fixLine(u.fix));
+      await esc(3);
+    }
   };
   const want = (...names) => !ONLY || names.some((n) => ONLY.has(n));
 

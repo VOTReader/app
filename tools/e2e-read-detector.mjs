@@ -96,6 +96,9 @@
    ─────────────────────────────────────────────────────────────────── */
 import puppeteer from 'puppeteer';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-read');
 
 // ONE origin, and this file does not build it. serveOwnTree() binds the port,
 // proves the bytes it is serving are this tree's, and hands back the URL --

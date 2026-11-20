@@ -105,6 +105,21 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
+import { noControl, failureReport, fixFor, fixLine, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-myweb-r2');
+/* What to change for each arm's findings (hub 11-20). The arms judge the Scripture Web scene; what in the renderer
+   to change is the walk's best pointer, not a certainty: the shots it names hold what tells. */
+const R2_FIXES = [
+  [/\bS: horiz/, 'the zoomed context reads as a horizontal streak field: the context threads run level; check the thread path in ui/scripture-web/rail-renderer.js against the -S shot'],
+  [/\bT\d*: .*(did not zoom|moved the (Bible|Volumes) camera|did not return)/, 'a rail zoom is no longer independent of the other rail (or does not zoom): the two cameras (ppv-vot, ppv-css) must change only for the rail under the wheel'],
+  [/\bT\d*: (top|bottom) rail to/, 'the walk could not zoom a rail to its book: if the rail labels or data-rails changed, update the walk; if not, the rail zoom stopped reaching the book'],
+  [/\bT\d*: (no thread|level )/, 'with both rails zoomed the threads no longer meet their rails as the walk expects: check the thread endpoints in rail-renderer.js against the -T shot'],
+  [/\bC\b/, 'a thread vanished, left the screen or ran flat across the notches: compare the -C notch shots; the thread path must stay drawn and curved as the camera moves'],
+  [/\bR: three browser launches|software/, 'the release could not be measured (software raster, coarse frames): the machine, not the app; rerun the walk alone'],
+  [/\bR\b/, 'the release fade broke (no hold, cap not back to full, or not monotone): check the cap fraction animation after the last notch'],
+  [/data-rails/, 'the screen publishes no data-rails: the Scripture Web stage must set data-rails for the walk to find the rails'],
+];
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -232,7 +247,7 @@ async function control(page, label, need) {
     await closeMenu(page);
     if (ok) return true;
   }
-  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  if (need) throw noControl({ wording: String(label) + ' (on screen or in the More controls menu)' });
   return false;
 }
 async function closeMenu(page) {
@@ -640,7 +655,7 @@ try {
     }
   }
 } catch (e) {
-  console.error('[e2e-myweb-r2] harness: ' + (e && e.stack || e));
+  console.error('[e2e-myweb-r2] harness: ' + failureReport(e, 'e2e-myweb-r2') + '\n' + (e && e.stack || e));
   if (fails.length) console.error('[e2e-myweb-r2] fails so far:\n  ' + fails.join('\n  '));
   process.exitCode = 3;
 } finally {
@@ -652,6 +667,10 @@ if (ARMS.includes('R')) console.log('[e2e-myweb-r2] R relaunches: ' + FRAME_LIST
 if (OUT) writeFileSync(resolve(OUT, 'e2e-myweb-r2.json'), JSON.stringify({ tree: TREE, sha: sha(TREE), notes, fails }, null, 2));
 if (process.exitCode === 3) process.exit(3);
 if (nothingToCheck) { console.log('[e2e-myweb-r2] NOTHING TO CHECK: ' + nothingToCheck); process.exit(2); }
-if (fails.length) { console.log('[e2e-myweb-r2] FAIL\n  ' + fails.join('\n  ')); process.exit(1); }
+if (fails.length) {
+  const shown = new Set();
+  console.log('[e2e-myweb-r2] FAIL\n  ' + fails.map((f) => { const fx = fixFor(f, R2_FIXES); if (!fx || shown.has(fx)) return f; shown.add(fx); return f + '\n  ' + fixLine(fx); }).join('\n  '));
+  process.exit(1);
+}
 console.log('[e2e-myweb-r2] PASS');
 process.exit(0);

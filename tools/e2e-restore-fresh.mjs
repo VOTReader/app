@@ -30,6 +30,9 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import puppeteer from 'puppeteer';
+import { failureReport, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-restore-fresh');
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -392,7 +395,7 @@ try {
   await C.ctx.close();
 } catch (e) {
   if (e instanceof Precondition) { console.log('NOT DRIVABLE: ' + e.message); exitCode = 2; }
-  else { console.log('ERROR ' + (e && e.stack ? e.stack : e)); exitCode = 2; }
+  else { console.log('ERROR ' + failureReport(e, 'e2e-restore-fresh') + '\n' + (e && e.stack ? e.stack : e)); exitCode = 2; }
 } finally {
   await browser.close();
   server.close();

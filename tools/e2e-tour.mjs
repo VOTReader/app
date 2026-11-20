@@ -29,6 +29,20 @@ import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { TOUR_STEPS } from '../app/src/main/assets/src/utils/tour-steps.js';
 import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
+import { fixFor, fixLine, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-tour');
+/* What to change for the walk's findings (hub 11-20: a failure names its fix); a finding with no row prints none. */
+const TOUR_FIXES = [
+  [/^(\S+): the card covers the (control|row)/, (m) => `at stop ${m[1]} the tour card sits over the ringed ${m[2]}: place the card above or below the target; if the target is at the end of its list, give the scroller bottom room so scrollIntoView can lift it (rel13)`],
+  [/^(\S+): the ring (does not wrap|is off screen)/, (m) => `at stop ${m[1]} the ring ${m[2]}: the ring is drawn from the target's box after it scrolls into view; check the target selector in the tour steps and its scroll-into-view`],
+  [/^(\S+): no ring on the control/, (m) => `stop ${m[1]} found no target to ring: the step's selector in the tour steps no longer matches the control (renamed class or label); point it at the control's new selector`],
+  [/^(\S+): the card is off screen/, (m) => `at stop ${m[1]} the card is clamped off the frame: at this size the card must fit between the bars (cap its height and let its words scroll, or dock it)`],
+  [/a button (label wraps|spills out)/, 'a strip button wraps or spills at this text size: let the row wrap its buttons to a second line under the large-text class, or shorten the label'],
+  [/^expected stop (\S+), the tour is at (\S+)/, (m) => `the tour went to ${m[2]} where the walk expected ${m[1]}: if the tour's steps changed on purpose, update the walk's step list; if not, a step's skip rule skipped ${m[1]}`],
+  [/focus is not inside the card/, 'focus left the tour card: the card must take focus when it opens and trap Tab inside it'],
+  [/dim panes/, 'the tour drew the wrong number of dim panes: the dimmer cuts four panes around the ring; check the target box it was given'],
+];
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -59,7 +73,7 @@ const SCALE = parseFloat((process.argv[process.argv.indexOf('--scale') + 1]) || 
 if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 
 const failures = [];
-const fail = (m) => { failures.push(m); console.log('FAIL ' + m); };
+const fail = (m) => { failures.push(m); console.log('FAIL ' + m); const fx = fixFor(m, TOUR_FIXES); if (fx) console.log('  ' + fixLine(fx)); };
 const ok = (m) => console.log('  ok  ' + m);
 /* THE CUT RULE (the Verifier's gate-cut on 121, 2026-09-13: 58 of 300 pictures had a line of the card's
    words straddling the sticky button row's top edge — the title and the tip as often as the text).

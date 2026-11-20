@@ -23,6 +23,9 @@ import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
+import { failureReport, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-update-waits');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
@@ -140,7 +143,7 @@ try {
     if (!failures.some((f) => f.startsWith('3'))) note(`3 away 11 min, nothing playing: reloaded onto ${v3}`);
   }
 } catch (e) {
-  fail('walk: ' + ((e && e.message) || e));
+  fail('walk: ' + failureReport(e, 'e2e-update-waits'));
 } finally {
   await browser.close();
   server.close();

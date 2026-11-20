@@ -25,6 +25,7 @@
 import { statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixLine } from './e2e-walk-lib.mjs';
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets');
 const DIST = join(ASSETS, 'dist');
@@ -217,6 +218,7 @@ for (const b of BUDGETS) {
 if (missing.length) {
   console.error('[bundle-budget] these bundles are missing from dist/ — run `npm run build`:');
   for (const f of missing) console.error('  ' + f);
+  console.error(fixLine(`run npm run build; if ${missing[0]} was renamed or dropped on purpose, change or remove its row in tools/check-bundle-budget.js`));
   process.exit(1);
 }
 
@@ -239,6 +241,8 @@ if (over.length) {
   console.error('  To re-baseline DELIBERATELY: edit `measured` + `max` for that file in');
   console.error('  tools/check-bundle-budget.js, in the same commit, with the reason in the');
   console.error('  commit message. There is no flag to skip this.');
+  const o = over[0];
+  console.error(fixLine(`${o.file} is ${o.size - o.max} bytes over its ${o.max}-byte ceiling: find what the change pulled into it (npx esbuild --analyze on its entry) and cut it; if the growth is meant, raise measured + max for it in tools/check-bundle-budget.js with the reason in the commit`));
   process.exit(1);
 }
 

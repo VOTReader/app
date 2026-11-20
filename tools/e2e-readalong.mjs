@@ -44,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import puppeteer from 'puppeteer';
 import { probeTapTargets, TAP_TARGET_MIN_PX } from './smoke-ci.js';
+import { failureReport } from './e2e-walk-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -1085,4 +1086,4 @@ async function run() {
   process.exit(1);
 }
 
-run().catch((e) => { console.error(e); process.exit(1); });
+run().catch((e) => { console.error(failureReport(e, 'e2e-readalong')); console.error(e); process.exit(1); });

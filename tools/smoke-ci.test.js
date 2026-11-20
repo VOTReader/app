@@ -247,3 +247,43 @@ describe('smoke-ci: the walked screens log no console errors', () => {
     expect(isAppConsoleError({ type: 'error', text: 'Failed to load resource: net::ERR_FAILED', url: '' }, APP)).toBe(true);
   });
 });
+
+/* Hub 11-20: "screens 0 crashed, 1 unreached" named no screen and no change (ans1, rel18). Each failing part of the
+   report gets one fix line naming what failed. */
+import { smokeFixes } from './smoke-ci.js';
+import { FIX_TOKEN } from './e2e-walk-lib.mjs';
+
+describe('smokeFixes: a failing smoke report names each part and its fix', () => {
+  const base = () => ({ ok: false, globals: { ok: true, missing: [] }, dataWiring: { ok: true }, screens: [], console: { errorsSeen: 0 }, resourceErrors: { total: 0, samples: [] }, lazyArrival: 'skipped' });
+  it('an unreached screen is named with what the walk saw, and both cases', () => {
+    const r = base();
+    r.screens = [{ name: 'answers', reached: true, crashed: false }, { name: 'journal', reached: false, crashed: false, detail: 'content assertion failed @ Home' }];
+    const f = smokeFixes(r);
+    expect(f).toHaveLength(1);
+    expect(f[0].startsWith(FIX_TOKEN)).toBe(true);
+    expect(f[0]).toContain('"journal"');
+    expect(f[0]).toContain('content assertion failed @ Home');
+    expect(f[0]).toContain('tools/smoke.js');
+    expect(f[0]).toMatch(/passes alone/);
+  });
+  it('a crashed screen names the screen and where its error is', () => {
+    const r = base();
+    r.screens = [{ name: 'settings', reached: false, crashed: true, detail: 'TypeError: x' }];
+    expect(smokeFixes(r)[0]).toMatch(/"settings" crashed/);
+  });
+  it('missing globals, empty data, 404s and console errors each get a line', () => {
+    const r = base();
+    r.globals = { ok: false, missing: ['LetterView'] };
+    r.dataWiring = { ok: false, emptyCollections: ['letters'] };
+    r.resourceErrors = { total: 1, samples: ['404:/x.js'] };
+    r.console = { errorsSeen: 2 };
+    const f = smokeFixes(r).join('\n');
+    expect(f).toContain('LetterView');
+    expect(f).toContain('letters');
+    expect(f).toContain('404:/x.js');
+    expect(f).toMatch(/console/);
+  });
+  it('a passing report has none', () => {
+    expect(smokeFixes({ ...base(), ok: true })).toEqual([]);
+  });
+});

@@ -27,6 +27,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
+import { failureReport, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-sw-legend');
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('out', null);
@@ -147,7 +150,7 @@ try {
     } finally { await ctx.close().catch(() => {}); }
   }
 } catch (e) {
-  harnessFault = e && e.stack ? e.stack : String(e);
+  harnessFault = failureReport(e, 'e2e-sw-legend') + '\n' + (e && e.stack ? e.stack : String(e));
 } finally {
   if (browser) await browser.close().catch(() => {});
   if (server) server.close();

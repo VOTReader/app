@@ -62,6 +62,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
+import { noControl, failureReport, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-myweb');
+let harnessErr = null;
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const has = (k) => process.argv.includes('--' + k);
@@ -149,7 +153,7 @@ async function clickLabel(page, label, ms = NAV_MS) {
     if (clicked) return;
     const seen = await page.evaluate(() => [...document.querySelectorAll('button,[role=button],a')]
       .filter((b) => b.getBoundingClientRect().width > 0).map((b) => (b.getAttribute('aria-label') || b.textContent.trim()).slice(0, 40)));
-    throw new Error('no control "' + label + '"; visible: ' + JSON.stringify(seen));
+    throw noControl({ wording: String(label), seen });
   }
   await page.evaluate((l, r, s) => (new Function('return ' + s)())(l, r).click(), String(label), re, src);
 }
@@ -179,7 +183,7 @@ async function control(page, label, need) {
     await closeMenu(page);
     if (ok) return true;
   }
-  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  if (need) throw noControl({ wording: String(label) + ' (on screen or in the More controls menu)' });
   return false;
 }
 async function closeMenu(page) {
@@ -536,13 +540,14 @@ try {
   }
 } catch (e) {
   harnessFault = e && e.stack ? e.stack : String(e);
+  harnessErr = e;
 } finally {
   if (browser) await browser.close().catch(() => {});
   if (server) server.close();
 }
 if (OUT) writeFileSync(resolve(OUT, 'e2e-myweb.json'), JSON.stringify({ HEAD, notes, fails, nothingToCheck, harnessFault }, null, 2));
 if (harnessFault) {
-  console.error('[e2e-myweb] HARNESS FAULT: ' + harnessFault);
+  console.error('[e2e-myweb] HARNESS FAULT: ' + (harnessErr ? failureReport(harnessErr, 'e2e-myweb') + '\n' + harnessFault : harnessFault));
   console.error('[e2e-myweb] RESULT HARNESS-FAULT — nothing was measured');
   process.exit(3);
 }

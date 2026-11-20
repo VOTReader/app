@@ -29,7 +29,10 @@ import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serveOwnTree } from './e2e-read-serve.mjs';
 import { runUpgrade } from './e2e-tabs-upgrade.mjs';
-import { inTimeOrder, settleStart } from './e2e-tabs-frames.mjs';
+import { inTimeOrder, settleStart, settleWindow, tabsFix } from './e2e-tabs-frames.mjs';
+import { noControl, failureReport, fixLine, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-tabs');
 
 const argv = process.argv.slice(2);
 const MEASURE = argv.includes('--measure');
@@ -178,14 +181,18 @@ async function main() {
       const ce = Document.prototype.createElement;
       Document.prototype.createElement = function (t, o) { const el = ce.call(this, t, o); if (/^(audio|video)$/i.test(String(t))) window.__medias.push(el); return el; };
     });
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
+    // ans4 (beside the other walks): the load took over 30 s. Loading is not what this walk measures: give it 90 s.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: 90000 });
     await page.evaluate(async () => {
       for (const n of ['__loadBibleCorpus', '__loadVotCorpus']) if (typeof window[n] === 'function') await window[n]();
     });
   };
-  const clickText = async (re, sel = 'button, [role="button"], a') => {
-    for (let i = 0; i < 60; i++) {
+  // rel18 (beside the other walks): onboarding's Continue came after the 60 tries (~15 s on a quiet machine) ran out.
+  // Tries are counted in time now (45 s), and a miss says what was on screen.
+  const clickText = async (re, sel = 'button, [role="button"], a', step = null) => {
+    const until = Date.now() + 45000;
+    while (Date.now() < until) {
       const ok = await page.evaluate((src, s) => {
         const rx = new RegExp(src, 'i');
         const el = [...document.querySelectorAll(s)].find((b) => b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'
@@ -196,7 +203,9 @@ async function main() {
       if (ok) { await sleep(600); return; }
       await sleep(250);
     }
-    throw new Error(`walk: no control matching ${re}`);
+    const seen = await page.evaluate((s) => [...document.querySelectorAll(s)].filter((b) => b.getClientRects().length)
+      .map((b) => (b.textContent || '').trim() || b.getAttribute('aria-label') || '').filter(Boolean), sel).catch(() => []);
+    throw noControl({ wording: String(re), step, seen });
   };
   const goHome = async () => {
     for (let i = 0; i < 6; i++) {
@@ -432,6 +441,13 @@ async function main() {
         window.__tSlide = Date.now() / 1000; document.removeEventListener('transitionstart', onSlide, true);
       };
       document.addEventListener('transitionstart', onSlide, true);
+      // the slide's own end (ans9, rel26: a stalled compositor ran it long): S2 judges from here when it is later
+      window.__tSlideEnd = null;
+      const onEnd = (e) => {
+        if (!e.target || !e.target.classList || !e.target.classList.contains('pager-track') || e.propertyName !== 'transform') return;
+        window.__tSlideEnd = Date.now() / 1000; document.removeEventListener('transitionend', onEnd, true);
+      };
+      document.addEventListener('transitionend', onEnd, true);
     });
     // TABS_TRACE=<label> with --shots: a Chrome performance trace of that swipe's lift and settle, in the shots dir.
     const TRACE = SHOTS && process.env.TABS_TRACE && label === process.env.TABS_TRACE;
@@ -440,8 +456,9 @@ async function main() {
     await touch('touchEnd', x0 + dx);
     await sleep(1600);
     if (TRACE) await page.tracing.stop();
-    const [tEnd, tSlide] = await page.evaluate(() => [window.__tEnd, window.__tSlide]);
+    const [tEnd, tSlide, tSlideEnd] = await page.evaluate(() => [window.__tEnd, window.__tSlide, window.__tSlideEnd]);
     const settle = settleStart(tRel, Math.max(tEnd || 0, tSlide || 0) || null);
+    const win = settleWindow({ from: settle.from, settleMs: 360, slideEnd: tSlideEnd });
     if (settle.lagMs > 300) await sleep(settle.lagMs);   // the settle started late: let it finish on camera
     // rel6 (search-landing-next): under load the screencast can send nothing after the lift, so the newest frame was
     // mid-slide and S1 compared the neighbour with a half-slid "settled" page (mad 20, the whole page 38 px off). A
@@ -466,7 +483,9 @@ async function main() {
     if (domDiff && SHOTS) for (const [k, v] of [['peek', peekSig], ['page', liveSig]]) writeFileSync(join(SHOTS, `tabs2-dom-${label}-x${throttle}-${k}.txt`), v ? v.top + '\n' + v.lines.join('\n') : '-');
     // each frame's finger offset: the last move dispatched before it
     for (const f of frames) { let d = null; for (const l of log) if (l.t <= f.t) d = l.dx; f.dx = d; }
-    const r = await ana.evaluate((fr, rc, d, t, s, m, ts) => window.__ana.swipe(fr, rc, d, t, s, m, ts), frames, rect, dx, tRel, 0.36, ov, settle.from);
+    const r = await ana.evaluate((fr, rc, d, t, s, m, ts) => window.__ana.swipe(fr, rc, d, t, s, m, ts), frames, rect, dx, tRel, win.fromSec - settle.from, ov, settle.from);
+    r.slideEndMs = tSlideEnd ? Math.round((tSlideEnd - tRel) * 1000) : null;
+    if (win.by === 'transitionend') r.slideLateMs = win.lateMs;
     r.label = label; r.throttle = throttle; r.dom = domDiff || 'same'; r.top = liveSig && liveSig.top;
     r.peeksAtTouch = peeksAtTouch; r.touchStartMs = touchStartMs; r.endLagMs = settle.lagMs;
     if (ov.length) r.overlays = [...new Set(ov.map((o) => o.c))];
@@ -876,7 +895,7 @@ async function main() {
     }
 
   } catch (e) {
-    fails.push(`walk: ${(e && e.stack) || e}`);
+    fails.push('walk: ' + failureReport(e, 'e2e-tabs'));
   } finally {
     const anaB = out._anaBrowser; delete out._anaBrowser;
     await browser.close().catch(() => {});
@@ -893,8 +912,15 @@ async function main() {
   const summary = JSON.stringify(out, (k, v) => (k === 'keys' || k === 'sizes' ? undefined : v), 1);
   console.log(summary);
   if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({ ...out, fails }, (k, v) => (k === 'keys' ? undefined : v), 1));
-  if (fails.length) { console.log(`\n${fails.length} finding(s):`); for (const f of fails) console.log('  ' + f); }
-  console.log(fails.length ? (MEASURE ? 'MEASURED (limits not enforced)' : 'FAIL') : 'PASS');
+  if (fails.length) {
+    console.log(`\n${fails.length} finding(s):`);
+    for (const f of fails) {
+      console.log('  ' + f);
+      const fix = f.startsWith('walk: ') ? null : tabsFix(f);   // a walk error carries its own fix line already
+      if (fix) console.log('  ' + fixLine(fix));
+    }
+  }
+  console.log(fails.length ? (MEASURE ? 'MEASURED (limits not enforced)' : `FAIL: ${fails.length} finding(s), first: ${fails[0].split('\n')[0].slice(0, 200)}`) : 'PASS');
   process.exit(fails.length && !MEASURE ? 1 : 0);
 }
 

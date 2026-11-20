@@ -125,8 +125,8 @@ export async function runUpgrade(o = {}) {
     await page.setViewport({ width: vw, height: vh, deviceScaleFactor: 3, isMobile: vw < 900 || vh < 500, hasTouch: true });
   };
   const boot = async () => {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });   // the load is not what this measures (ans4)
+    await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: 90000 });
     await page.evaluate(async () => { for (const n of ['__loadBibleCorpus', '__loadVotCorpus', '__loadAnswersCorpus']) if (typeof window[n] === 'function') { try { await window[n](); } catch (_e) { /* the app retries */ } } });
     await sleep(1500);
   };

@@ -30,6 +30,7 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { installFailureReport } from './e2e-walk-lib.mjs';
 
 const shotsAt = process.argv.indexOf('--shots');
 const SHOTS = shotsAt > 0 ? resolve(process.argv[shotsAt + 1]) : null;
@@ -357,4 +358,4 @@ async function main() {
 
 const invokedDirectly = !!process.argv[1]
   && resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
-if (invokedDirectly) main();
+if (invokedDirectly) { installFailureReport('e2e-phone'); main(); }

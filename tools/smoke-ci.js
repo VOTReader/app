@@ -37,6 +37,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, dirname, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { fixLine, failureReport } from './e2e-walk-lib.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assetsDir = resolve(root, 'app/src/main/assets');
@@ -322,6 +323,34 @@ async function auditSharedLink(browser, url) {
 
 // Fold the page's uncaught errors into the walk's verdict. Exported for
 // tools/smoke-ci.test.js; pure, so the verdict rule is pinned without a browser.
+/**
+ * One fix line per failing part of a smoke report (hub 11-20: "screens 0 crashed, 1 unreached" named no screen).
+ * @param {any} report  votSmoke()'s report
+ * @returns {string[]}
+ */
+export function smokeFixes(report) {
+  if (!report || report.ok) return [];
+  const out = [];
+  const screens = Array.isArray(report.screens) ? report.screens : [];
+  for (const s of screens.filter((x) => x.crashed)) {
+    out.push(fixLine(`screen "${s.name}" crashed on open (${String(s.detail || '').slice(0, 80)}): the component it draws threw; its error is in the report and pageerrors above`));
+  }
+  const un = screens.filter((x) => !x.reached && !x.crashed);
+  if (un.length) {
+    const s = un[0];
+    out.push(fixLine(`screen "${s.name}" not reached (${String(s.detail || '').slice(0, 70)})${un.length > 1 ? ` (+${un.length - 1} more: ${un.slice(1, 4).map((x) => x.name).join(', ')})` : ''}:`
+      + ` if it fails alone too, the door tools/smoke.js walks for it changed: update its step there; if it passes alone, the page was still loading`));
+  }
+  if (report.globals && !report.globals.ok) out.push(fixLine(`globals missing: ${(report.globals.missing || []).slice(0, 6).join(', ')}: a bundle no longer exports them to window; restore the export or drop the name from smoke.js's list`));
+  if (report.dataWiring && !report.dataWiring.ok) out.push(fixLine(`data empty: ${(report.dataWiring.emptyCollections || []).join(', ')}: the corpus loader for it did not fill the store; check the data file and its loader`));
+  if (report.resourceErrors && report.resourceErrors.total) out.push(fixLine(`${report.resourceErrors.total} resource(s) failed to load (${(report.resourceErrors.samples || []).slice(0, 2).join(', ')}): the build is missing the file or a path in the code is wrong`));
+  if (report.console && report.console.errorsSeen) out.push(fixLine(`${report.console.errorsSeen} console.error(s) during the walk (samples in the report above): fix the code that logs them, or the walk counts them as a failure`));
+  if (report.lazyArrival && report.lazyArrival !== 'skipped' && !report.lazyArrival.ok) {
+    out.push(fixLine(`lazy screens did not arrive: ${(report.lazyArrival.legs || []).filter((l) => !l.arrived).map((l) => l.screen).join(', ')}: their lazy chunk did not load or did not register`));
+  }
+  return out;
+}
+
 export function foldPageErrors(report, pageErrors) {
   if (!pageErrors || pageErrors.length === 0) return report;
   const n = pageErrors.length;
@@ -486,7 +515,7 @@ async function main() {
       } catch (e) {
         // HARNESS error (CDP timeout / launch failure / wedged runner), NOT a
         // render failure — retry with a fresh browser.
-        console.error(`[smoke-ci] harness error on attempt ${attempt}/${MAX_ATTEMPTS}:`, (e && e.message) || e);
+        console.error(`[smoke-ci] harness error on attempt ${attempt}/${MAX_ATTEMPTS}: ` + failureReport(e, 'smoke-ci'));
         if (attempt < MAX_ATTEMPTS) { console.error('[smoke-ci] retrying with a fresh browser…'); continue; }
         console.error('[smoke-ci] giving up after', MAX_ATTEMPTS, 'attempts (runner likely wedged).');
         break;
@@ -506,6 +535,7 @@ async function main() {
         console.error(JSON.stringify(report, null, 2));
         if (pageErrors.length) console.error('[smoke-ci] pageerrors:', pageErrors);
         if (consoleErrors.length) console.error('[smoke-ci] browser console errors:', consoleErrors);
+        for (const f of smokeFixes(report)) console.error('[smoke-ci] ' + f);
       }
       break;
     }

@@ -36,6 +36,16 @@ import puppeteer from 'puppeteer';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixLine, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-dock');
+/* One fix per kind of finding (hub 11-20). */
+const DOCK_FIXES = {
+  G1: (f) => `two docked parts overlap (${f}): the dock stack in app.css must lift the upper part by the lower one's height (--audio-bar-h and the pill heights)`,
+  G2: (f) => `a docked part sits off screen (${f}): its bottom must sit above the system inset (--inset-bottom) and below the top bar`,
+  G3: (f) => `a docked part is shown or hidden against the rule (${f}): check its display rule for that combination in app.css; if a part was renamed, update PARTS in tools/e2e-dock-geometry.mjs`,
+  G4: (f) => `a docked part covers the reading's last line (${f}): the scroller's bottom padding must add that part's height`,
+};
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
@@ -158,5 +168,6 @@ try {
 }
 if (!checked) { console.error('e2e-dock-geometry: NOTHING CHECKED'); process.exit(1); }
 for (const f of fails) console.error(f);
+for (const k of Object.keys(DOCK_FIXES)) { const f = fails.find((x) => x.startsWith(k + ' ')); if (f) console.error(fixLine(DOCK_FIXES[k](f.slice(0, 120)))); }
 console.log(`e2e-dock-geometry: ${checked} layouts (${CASES.length} combinations x ${VIEWPORTS.length} viewports x with/without insets), ${fails.length} failures`);
 process.exit(fails.length ? 1 : 0);

@@ -19,6 +19,8 @@ const hasButton = (page, label) => page.evaluate((l) => [...document.querySelect
     && b.getBoundingClientRect().width > 0), label);
 
 /** The default press: a DOM click on the first visible match. Throws when there is none. */
+import { noControl, waitTimedOut } from './e2e-walk-lib.mjs';
+
 async function domPress(page, label) {
   const hit = await page.evaluate((l) => {
     const b = [...document.querySelectorAll('button,[role=button]')]
@@ -27,7 +29,11 @@ async function domPress(page, label) {
     if (b) /** @type {HTMLElement} */ (b).click();
     return !!b;
   }, label);
-  if (!hit) throw new Error(`first-run: no "${label}" button to press`);
+  if (!hit) {
+    const seen = await page.evaluate(() => [...document.querySelectorAll('button,[role=button]')].filter((b) => b.getBoundingClientRect().width > 0)
+      .map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim().slice(0, 40)).filter(Boolean)).catch(() => undefined);
+    throw noControl({ wording: `"${label}"`, step: 'first run', seen });
+  }
 }
 
 /**
@@ -42,7 +48,7 @@ export async function throughFirstRun(page, opts = {}) {
     for (;;) {
       const v = await test();
       if (v) return v;
-      if (Date.now() > deadline) throw new Error(`first-run: timed out waiting for ${what}`);
+      if (Date.now() > deadline) throw waitTimedOut({ what, ms: opts.timeoutMs || 30000, step: 'first run' });
       await sleep(250);
     }
   };

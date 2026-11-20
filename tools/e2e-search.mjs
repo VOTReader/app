@@ -30,6 +30,9 @@
 import puppeteer from 'puppeteer';
 import { readFileSync } from 'node:fs';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { fixLine, installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-search');
 
 const CASES = JSON.parse(readFileSync(new URL('./e2e-search.cases.json', import.meta.url), 'utf8')).cases;
 const VERBOSE = process.argv.includes('--verbose');
@@ -55,7 +58,7 @@ try {
   // through the page's own CSP, service-worker-free fetches and onnxruntime-web's wasm.
   const meaning = await page.evaluate(async () => { await window.VotSearchMini.startMeaning(); return window.VotSearchMini.meaningStatus(); });
   console.log(`[e2e-search] meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
-  if (meaning.status !== 'ready') failed++;
+  if (meaning.status !== 'ready') { failed++; console.log('[e2e-search] ' + fixLine(`the meaning model did not start (${meaning.status}${meaning.failure ? ': ' + meaning.failure : ''}): check the model files in the build and the CSP for its wasm and fetches`)); }
 
   const outcomes = await page.evaluate(async (cases) => {
     const E = window.VotSearchMini;
@@ -118,6 +121,7 @@ try {
     if (o.problems.length) {
       failed++;
       console.log('[e2e-search] FAIL ' + JSON.stringify(o.q) + ' (' + o.corpus + '): ' + o.problems.join('; ') + (o.top3 ? '  | top: ' + o.top3.join(' / ') : ''));
+      console.log('[e2e-search] ' + fixLine(`search for ${JSON.stringify(o.q)} no longer gives what tools/e2e-search.cases.json expects (${o.problems[0]}): if the change meant to alter that, update the case there; if not, the change broke search's ${/^parse/.test(o.problems[0]) ? 'query parsing' : /corrected/.test(o.problems[0]) ? 'spelling correction' : /places/.test(o.problems[0]) ? 'match places' : 'ranking'}`));
     } else if (VERBOSE) {
       console.log('[e2e-search] ok   ' + JSON.stringify(o.q) + ' (' + o.corpus + ')' + (o.rank ? ' rank ' + o.rank : '') + (o.places != null ? ' places ' + o.places : ''));
     }

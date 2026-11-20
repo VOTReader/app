@@ -30,6 +30,9 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
+import { installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-textzoom');
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;

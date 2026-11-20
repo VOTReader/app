@@ -108,3 +108,144 @@ describe('settleLine — the report sentence carries the moves, not only the ver
     expect(line.startsWith('NOT still: 41 at +1008 ms')).toBe(true);
   });
 });
+
+/* Hub 11-20 (Corbin: "make the gate failures name the fix"): a failing walk prints where it stopped and one line
+   holding the fix token, which the gate's summary, CI and a local run all show. The shapes every walk shares. */
+import { FIX_TOKEN, fixLine, walkSite, noControl, waitTimedOut, stopUnreached, describeError, failureReport } from './e2e-walk-lib.mjs';
+
+const fixesIn = (text) => text.split('\n').filter((l) => l.includes(FIX_TOKEN));
+const STACK = [
+  'TimeoutError: Navigation timeout of 30000 ms exceeded',
+  '    at new Deferred (file:///D:/w/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:57:34)',
+  '    at CdpPage.goto (file:///D:/w/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:582:43)',
+  '    at fail (file:///D:/w/tools/e2e-walk-lib.mjs:10:5)',
+  '    at open (file:///D:/w/tools/e2e-tabs-true.mjs:181:16)',
+  '    at async main (file:///D:/w/tools/e2e-tabs-true.mjs:514:5)',
+].join('\n');
+
+describe('fix lines: one line, the token once, under 300 characters', () => {
+  it('fixLine folds whitespace and caps the length', () => {
+    const l = fixLine('change   the\nwording ' + 'x'.repeat(400));
+    expect(l.startsWith(FIX_TOKEN)).toBe(true);
+    expect(l).not.toContain('\n');
+    expect(l.length).toBeLessThanOrEqual(300);
+    expect(FIX_TOKEN).toBe('FIX' + ': ');
+  });
+  it('walkSite names the walk\'s own frame, not puppeteer\'s or the lib\'s', () => {
+    expect(walkSite(STACK)).toBe('tools/e2e-tabs-true.mjs:181');
+    expect(walkSite('Error: x\n    at node:internal/foo:1:1')).toBe(null);
+  });
+});
+
+describe('the shapes every walk shares', () => {
+  it('no control: the wording, the step, what was on screen, and both cases in the fix', () => {
+    const e = noControl({ wording: '/^Continue$/', step: 'onboarding', seen: ['Skip', 'Next'], at: 'tools/e2e-tabs-true.mjs:516' });
+    const r = failureReport(e, 'e2e-tabs');
+    expect(r).toMatch(/^\[e2e-tabs\] FAILED at tools\/e2e-tabs-true\.mjs:516 \(step "onboarding"\): no control matching \/\^Continue\$\//);
+    expect(r).toContain('on screen: "Skip", "Next"');
+    const f = fixesIn(r);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toContain('renamed');
+    expect(f[0]).toContain('step before');
+  });
+  it('a wait that timed out names what it waited for and how long', () => {
+    const r = failureReport(waitTimedOut({ what: 'the Tabs screen', ms: 30000, step: 'open tabs', at: 'tools/x.mjs:9' }), 'x');
+    expect(r).toContain('waited 30000 ms for the Tabs screen');
+    expect(fixesIn(r)[0]).toContain('passes alone');
+  });
+  it('a stop not reached names the stop', () => {
+    const r = failureReport(stopUnreached({ stop: 'web-focus', how: 'no button "Focus"', at: 'tools/e2e-contrast.mjs:300' }), 'e2e-contrast');
+    expect(r).toContain('stop "web-focus" not reached: no button "Focus"');
+    expect(fixesIn(r)[0]).toContain('web-focus');
+  });
+});
+
+describe('puppeteer errors a walk did not catch get a step and a fix', () => {
+  it('navigation timeout', () => {
+    const e = Object.assign(new Error('Navigation timeout of 30000 ms exceeded'), { name: 'TimeoutError', stack: STACK });
+    const r = failureReport(e, 'e2e-tabs');
+    expect(r.split('\n')[0]).toBe('[e2e-tabs] FAILED at tools/e2e-tabs-true.mjs:181: TimeoutError: Navigation timeout of 30000 ms exceeded');
+    expect(fixesIn(r)[0]).toMatch(/did not load in 30000 ms/);
+  });
+  it('waiting for a selector', () => {
+    const e = Object.assign(new Error('Waiting for selector `.ans-row` failed: Waiting failed: 30000ms exceeded'), { name: 'TimeoutError', stack: STACK });
+    expect(fixesIn(failureReport(e, 'w'))[0]).toContain('`.ans-row` never appeared');
+  });
+  it('waitForFunction', () => {
+    const e = Object.assign(new Error('Waiting failed: 15000ms exceeded'), { name: 'TimeoutError', stack: STACK });
+    expect(fixesIn(failureReport(e, 'w'))[0]).toContain('did not hold within 15000 ms');
+  });
+  it('an older walk\'s own no-control message', () => {
+    expect(describeError(new Error('no control "/^1The Creation/"; visible: ["a"]')).fix).toContain('renamed');
+  });
+  it('an error of no known shape gets a place and no invented fix', () => {
+    const r = failureReport(Object.assign(new Error('boom'), { stack: 'Error: boom\n    at main (file:///D:/w/tools/e2e-dock-geometry.mjs:40:3)' }), 'e2e-dock');
+    expect(r).toBe('[e2e-dock] FAILED at tools/e2e-dock-geometry.mjs:40: Error: boom');
+  });
+});
+
+/* Hub 11-20 (CI 44681552243, web-focus @0.49): the contrast stop pauses animations to read, so a fade still running
+   was frozen half way and read as a contrast failure. A stop waits until no finite fade is running, capped. */
+import { isFadeBlocking, waitForFades } from './e2e-walk-lib.mjs';
+
+describe('isFadeBlocking: what a reading must wait for', () => {
+  const a = (o) => ({ playState: 'running', iterations: 1, props: ['opacity'], ...o });
+  it('a running finite fade of opacity, colour, background or filter blocks', () => {
+    for (const p of ['opacity', 'color', 'background-color', 'fill', 'stroke', 'filter', 'visibility']) expect(isFadeBlocking(a({ props: [p] })), p).toBe(true);
+  });
+  it('an infinite one (a spinner, a pulse) never blocks, or the stop would never read', () => {
+    expect(isFadeBlocking(a({ iterations: Infinity }))).toBe(false);
+  });
+  it('a finished, paused or idle one does not block; nor a move that changes no colour', () => {
+    for (const s of ['finished', 'paused', 'idle']) expect(isFadeBlocking(a({ playState: s }))).toBe(false);
+    expect(isFadeBlocking(a({ props: ['transform', 'width'] }))).toBe(false);
+  });
+});
+
+describe('waitForFades: wait for the fades, cap the wait, name what still moved', () => {
+  const fake = (seq) => { let i = 0; return { evaluate: async () => seq[Math.min(i++, seq.length - 1)] }; };
+  const c = () => { let t = 0; return { now: () => t, sleep: async (ms) => { t += ms; } }; };
+  it('returns once nothing blocks', async () => {
+    const k = c();
+    const r = await waitForFades(fake([['button.sw-btn opacity'], ['button.sw-btn opacity'], []]), { ...k, everyMs: 50 });
+    expect(r).toEqual({ settled: true, waitedMs: 100, still: [] });
+  });
+  it('gives up at the cap and says which element was still moving', async () => {
+    const k = c();
+    const r = await waitForFades(fake([['div.toast opacity']]), { ...k, everyMs: 50, maxMs: 3000 });
+    expect(r.settled).toBe(false);
+    expect(r.waitedMs).toBe(3000);
+    expect(r.still).toEqual(['div.toast opacity']);
+  });
+});
+
+import { fixFor } from './e2e-walk-lib.mjs';
+
+describe('fixFor: a walk\'s own table of finding -> fix', () => {
+  const T = [[/covers the control/, (m) => `move the card off ${m[0]}`], [/ring/, 'wrap the ring']];
+  it('the first row that matches; a function row sees the match', () => {
+    expect(fixFor('settings: the card covers the control', T)).toBe('move the card off covers the control');
+    expect(fixFor('x: the ring does not wrap', T)).toBe('wrap the ring');
+  });
+  it('null when no row matches: the walk does not invent a fix', () => {
+    expect(fixFor('something new', T)).toBe(null);
+  });
+});
+
+describe('the site of a shape built inside a walk\'s helper is the step that called it', () => {
+  it('walkSite(stack, 1) skips the helper frame; first-run.mjs is never the site', () => {
+    expect(walkSite(STACK, 1)).toBe('tools/e2e-tabs-true.mjs:514');
+    const fr = 'Error: x\n    at domPress (file:///D:/w/tools/first-run.mjs:30:9)\n    at main (file:///D:/w/tools/e2e-tour.mjs:77:3)';
+    expect(walkSite(fr)).toBe('tools/e2e-tour.mjs:77');
+  });
+  it('a real nested call: noControl in clickText names clickText\'s caller, and the fix names the same line', () => {
+    const clickText = () => noControl({ wording: '/^Go$/', seen: [] });
+    const step = () => clickText();   // this line is the site
+    const e = step();
+    const line = new Error().stack.split('\n')[1];   // a line of this test file, to read its name
+    const file = /tools[\\/][^:()]+\.test\.js/.exec(line)[0].replace(/\\/g, '/');
+    const here = Number(/:(\d+):\d+\)?$/.exec(line)[1]);
+    expect(e.at).toBe(file + ':' + (here - 2));   // the `step` line that called clickText, not clickText's (here - 3)
+    expect(e.fix).toContain(e.at);
+  });
+});

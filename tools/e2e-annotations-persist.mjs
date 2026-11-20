@@ -20,6 +20,9 @@ import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { installFailureReport } from './e2e-walk-lib.mjs';
+
+installFailureReport('e2e-annotations-persist');
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('out', '');

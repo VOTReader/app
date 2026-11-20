@@ -107,6 +107,8 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(1);
     expect(out).toContain('app/src/main/assets/src/utils/backup.js');
     expect(out).not.toMatch(/would run/);
+    // hub 11-20: the refusal names its fix on one line the gate summary reads
+    expect(out.split('\n').filter((l) => l.startsWith('FIX' + ': '))[0]).toMatch(/commit the files listed above/);
   }, HOOK_RUN_MS);
 
   it('skips a gate that already passed on the same tree (the pass cache)', () => {

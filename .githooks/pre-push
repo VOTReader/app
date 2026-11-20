@@ -115,6 +115,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       echo "[pre-push] FATAL: the working tree is not the commit being pushed (${local_sha%"${local_sha#???????}"} -> $remote_ref):"
       echo "$differs" | head -20 | sed 's/^/    /'
       echo "  The gates test the files on disk. Check out the commit you push, or commit these edits (a WIP commit on your branch; not git stash, whose one stack every worktree shares), then push again."
+      echo "FIX: commit the files listed above (or check out ${local_sha%"${local_sha#???????}"} so the tree is the commit), then push again"
       exit 1
     fi
   fi
@@ -150,6 +151,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         elif command -v gradle >/dev/null 2>&1; then GRADLE_CMD="gradle"
         else
           echo "[pre-push] FATAL: neither ./gradlew nor gradle on PATH; cannot run the Kotlin tests (git push --no-verify skips them; CI runs them)."
+          echo "FIX: push from a checkout that has ./gradlew, or put gradle on PATH"
           exit 1
         fi
         # 'Cannot access ...: it is internal' from compileDebugKotlin is the shared Kotlin daemon still holding another
@@ -176,6 +178,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       echo "---------------------------------------------------------------"
       echo "[pre-push] $g FAILED - see the output above. Nothing was pushed."
       [ "$g" = gradle ] && echo "Reports: app/build/reports/tests/testDebugUnitTest/index.html, app/build/reports/jacoco/"
+      case $g in
+        vitest) echo "FIX: make the failing test above pass (a guard test prints its own fix line above), commit, push again; rerun it alone with npx vitest run <its file>" ;;
+        vitest-tools) echo "FIX: make the failing tools/ test above pass, commit, push again; rerun with npx vitest run tools/" ;;
+        gradle) echo "FIX: make the failing Kotlin test or coverage rule above pass (the reports above name it), commit, push again" ;;
+      esac
       echo "Fix it, commit, push again. Emergency bypass (not recommended): git push --no-verify"
       echo "---------------------------------------------------------------"
       exit 1
