@@ -16,7 +16,7 @@ import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { EndNav } from '../components/EndNav.jsx';
-import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip, usePlanSessionNav } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
@@ -144,8 +144,13 @@ export function LetterView(props) {
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
 
-  const goPrev = () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
-  const goNext = () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
+  // Inside a plan sitting the ways back and forward go between the day's readings only (Corbin 11-19).
+  const _planCol = !studyMode && typeof COL_BY_KEY !== 'undefined' ? COL_BY_KEY.get(volKey) : null;
+  const planNav = usePlanSessionNav(_planCol ? _planCol.readKey : '', letter.id, inert);
+  const goPrev = planNav ? planNav.goPrev : () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
+  const goNext = planNav ? planNav.goNext : () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
+  const prevOff = planNav ? !planNav.prev : !letter.prevLetter && !prevBoundary;
+  const nextOff = planNav ? false : !letter.nextLetter && !nextBoundary;
 
   // Visible finger-follow page swipe (ScreenLayout `pager`). The neighbor page
   // that drags in is the REAL LetterView rendered inert (ScreenLayout `inert` +
@@ -214,7 +219,7 @@ export function LetterView(props) {
   const pager = {
     onPrev: goPrev,
     onNext: goNext,
-    peek: (side) => side === 'next'
+    peek: planNav ? (side) => planNav.peek(side) : (side) => side === 'next'
       ? (letter.nextLetter ? _letterPeek(letter.nextLetter) : nextBoundary ? _chainPeek(nextBoundary, 'next') : null)
       : (letter.prevLetter ? _letterPeek(letter.prevLetter) : prevBoundary ? _chainPeek(prevBoundary, 'prev') : null),
   };
@@ -392,8 +397,8 @@ export function LetterView(props) {
       stickyNav={<StickyChapterNav
         onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
         onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
-        prevDisabled={!letter.prevLetter && !prevBoundary}
-        nextDisabled={!letter.nextLetter && !nextBoundary}
+        prevDisabled={prevOff}
+        nextDisabled={nextOff}
         prevLabel={"Previous " + unit.toLowerCase()}
         nextLabel={"Next " + unit.toLowerCase()}
       />}
@@ -411,10 +416,10 @@ export function LetterView(props) {
         // (screen-routes' searchBackActive), named so; the collection still heads the page.
         onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (volumeLabel || "Library"),
         arrows: {
-          onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
-          onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
-          prevDisabled: !letter.prevLetter && !prevBoundary,
-          nextDisabled: !letter.nextLetter && !nextBoundary,
+          onPrev: goPrev,
+          onNext: goNext,
+          prevDisabled: prevOff,
+          nextDisabled: nextOff,
           // 11-18: a study's arrows say its unit (chapter, part), as the footers do; a letter's still say letter
           prevLabel: 'Previous ' + unit.toLowerCase(), nextLabel: 'Next ' + unit.toLowerCase(),
         },
@@ -714,14 +719,14 @@ export function LetterView(props) {
 
             {/* U01.3: the letter ends on Next letter. Related, songs, audio and videos sit above it, and the install
                 offer is one line under it. */}
-            <EndNav
+            {planNav ? null : <EndNav
               prev={letter.prevLetter ? { label: 'Previous ' + String(unit).toLowerCase(), title: letter.prevLetter.title, onClick: () => onNavigate(letter.prevLetter.id) }
                 : prevBoundary ? { label: edgeLabel('prev', prevBoundary, 'Previous book'), title: prevBoundary.title, onClick: onPrevBoundary }
                 : null}
               next={letter.nextLetter ? { label: 'Next ' + String(unit).toLowerCase(), title: letter.nextLetter.title, onClick: () => onNavigate(letter.nextLetter.id) }
                 : nextBoundary ? { label: edgeLabel('next', nextBoundary, 'Next book'), title: nextBoundary.title, onClick: onNextBoundary }
                 : letter.nextLetterExternal ? { label: 'Next ' + String(unit).toLowerCase(), title: letter.nextLetterExternal.title, href: letter.nextLetterExternal.url }
-                : null} />
+                : null} />}
           </div>
         </div>
       </div>

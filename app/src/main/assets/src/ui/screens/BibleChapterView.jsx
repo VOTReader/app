@@ -10,7 +10,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { EndNav } from '../components/EndNav.jsx';
-import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip, usePlanSessionNav } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
@@ -171,8 +171,12 @@ export function BibleChapterView(props) {
   React.useEffect(() => () => { setHighlightedVerses([]); setVisit(null); }, [book.id, chapter.num]);
   const prevCh = book.chapters.find((c) => c.num === chapter.num - 1);
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
-  const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();
-  const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook();
+  // Inside a plan sitting the ways back and forward go between the day's readings only (Corbin 11-19).
+  const planNav = usePlanSessionNav(book.id, chapter.num, inert);
+  const goPrevCh = planNav ? planNav.goPrev : () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();
+  const goNextCh = planNav ? planNav.goNext : () => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook();
+  const prevOff = planNav ? !planNav.prev : !prevCh && !prevBook;
+  const nextOff = planNav ? false : !nextCh && !nextBook;
 
   // Visible finger-follow page swipe (ScreenLayout `pager`). Same neighbors the
   // nav arrows + bottom-nav use: a same-book chapter peeks full verse content,
@@ -216,10 +220,16 @@ export function BibleChapterView(props) {
   // no remount, no flash. The lone pseudo-book (Revelation's "Volume One"
   // bridge — a cross-corpus, cross-component edge) has no `id` and keeps
   // the boundary card.
+  // A plan neighbour that is a Bible chapter drags in as the real page; a letter is named on a card.
+  const _planReal = (ref) => {
+    const bk = typeof BOOKS !== 'undefined' ? BOOKS[ref.bid] : null;
+    const ch = bk && Array.isArray(bk.chapters) ? bk.chapters.find((c) => c.num === ref.cid) : null;
+    return ch ? _versesPeek(bk, ch) : null;
+  };
   const pager = {
     onPrev: goPrevCh,
     onNext: goNextCh,
-    peek: (side) => side === 'next'
+    peek: planNav ? (side) => planNav.peek(side, _planReal) : (side) => side === 'next'
       ? (nextCh ? _versesPeek(book, nextCh)
         : (nextBook && nextBook.id) ? _versesPeek(nextBook, nextBook.chapters[0])
           : nextBook ? { kind: 'boundary', eyebrow: 'Next book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
@@ -258,8 +268,8 @@ export function BibleChapterView(props) {
       stickyNav={<StickyChapterNav
         onPrev={goPrevCh}
         onNext={goNextCh}
-        prevDisabled={!prevCh && !prevBook}
-        nextDisabled={!nextCh && !nextBook}
+        prevDisabled={prevOff}
+        nextDisabled={nextOff}
         prevLabel="Previous chapter"
         nextLabel="Next chapter"
       />}
@@ -270,8 +280,8 @@ export function BibleChapterView(props) {
         onBack: navBack ? navBack.onBack : onIndex, backLabel: navBack ? navBack.label : book.title,
         arrows: {
           onPrev: goPrevCh, onNext: goNextCh,
-          prevDisabled: !prevCh && !prevBook,
-          nextDisabled: !nextCh && !nextBook,
+          prevDisabled: prevOff,
+          nextDisabled: nextOff,
           prevLabel: 'Previous chapter', nextLabel: 'Next chapter',
         },
         reading: true,
@@ -441,11 +451,11 @@ export function BibleChapterView(props) {
             <div className="ornament-divider-line" />
           </div>
           <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
-          <EndNav
+          {planNav ? null : <EndNav
             prev={prevCh ? { label: 'Previous chapter', title: `${book.title} ${prevCh.num}`, onClick: () => onNavigate(prevCh.num) }
               : prevBook ? { label: 'Previous book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}`, onClick: onPrevBook } : null}
             next={nextCh ? { label: 'Next chapter', title: `${book.title} ${nextCh.num}`, onClick: () => onNavigate(nextCh.num) }
-              : nextBook ? { label: 'Next book', title: nextBoundaryTitle || `${nextBook.title} 1`, onClick: onNextBook } : null} />
+              : nextBook ? { label: 'Next book', title: nextBoundaryTitle || `${nextBook.title} 1`, onClick: onNextBook } : null} />}
         </div>
       </div>
       {/* Find in this chapter (idea 160): the ⋯ menu's field and the find pill, over the chapter's verses only.

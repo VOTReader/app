@@ -3654,14 +3654,28 @@
     .plan-finished .plan-daydone-tick { display: flex; }
     .plan-finished .plan-facts { margin-bottom: 18px; }
     /* Inside the reader: the session strip under the top bar, the end panel, the one-line ribbon outside a session. */
-    .plan-strip { position: sticky; top: 0; z-index: 5; margin: 0 0 6px; padding: 10px 16px 8px; border-bottom: 1px solid var(--gold-border); background: var(--bg); font-family: var(--pl-ui); }
-    .plan-strip-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 36rem; margin: 0 auto 7px; }
-    .plan-strip-name { color: var(--gold); font-size: var(--fsc-14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .plan-strip-left { flex: none; color: var(--cream-dim); font-size: var(--fsc-14); }
-    .plan-strip-segs { display: flex; gap: 6px; max-width: 36rem; margin: 0 auto; }
-    .plan-strip-segs > span { flex: 1; height: 3px; border-radius: 2px; background: var(--border); }
-    .plan-strip-segs > span[data-done="1"] { background: var(--gold); }
-    .plan-strip-segs > span[data-now="1"]:not([data-done]) { background: linear-gradient(90deg, var(--gold) 50%, var(--border) 50%); }
+    /* The plan's container header (Corbin 11-19): a quiet gold tint and rule; back, the plan and day (opens the day's
+       readings), the close, and one segment per reading, each a 44 px press. Kit icons; pressed = gold-faint for --press. */
+    .plan-strip { position: sticky; top: 0; z-index: 5; margin: 0 0 6px; padding: 2px 4px 0; border-bottom: 2px solid var(--gold-border); background: linear-gradient(var(--gold-faint), var(--gold-faint)) var(--bg); font-family: var(--pl-ui); }
+    .plan-strip-line { display: flex; align-items: center; gap: 2px; max-width: 36rem; margin: 0 auto; }
+    .plan-strip-btn { flex: none; width: var(--tap); height: var(--tap); display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--gold); cursor: pointer; transition: background-color var(--press) ease; -webkit-tap-highlight-color: transparent; }
+    .plan-strip-title { flex: 1; min-width: 0; min-height: var(--tap); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding: 4px 6px; border: 0; border-radius: var(--r-chip); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--press) ease; -webkit-tap-highlight-color: transparent; }
+    .plan-strip-btn:active, .plan-strip-title:active, .plan-strip-segs > button:active > span { background-color: var(--gold-faint); }
+    @media (hover:hover) { .plan-strip-btn:hover, .plan-strip-title:hover { background-color: var(--gold-faint); } }
+    .plan-strip-btn:focus-visible, .plan-strip-title:focus-visible, .plan-strip-segs > button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .plan-strip-name { max-width: 100%; color: var(--gold); font-size: var(--fsc-14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plan-strip-left { color: var(--cream-dim); font-size: var(--fsc-13); }
+    .vot-large-text .plan-strip-name { white-space: normal; overflow-wrap: anywhere; text-wrap: pretty; }
+    .plan-strip-segs { display: flex; gap: 6px; max-width: 36rem; margin: 4px auto 0; padding: 0 14px; }
+    .plan-strip-segs > button { position: relative; flex: 1; min-width: 0; height: 26px; display: flex; align-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .plan-strip-segs > button::after { content: ''; position: absolute; inset: -9px -3px; }
+    .plan-strip-segs > button > span { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--border); transition: background-color var(--press) ease; }
+    .plan-strip-segs > button[data-done="1"] > span { background: var(--gold); }
+    .plan-strip-segs > button[data-now="1"] > span { height: 6px; box-shadow: 0 0 0 1px var(--gold); }
+    .plan-strip-segs > button[data-now="1"]:not([data-done]) > span { background: linear-gradient(90deg, var(--gold) 50%, var(--border) 50%); }
+    .plan-strip.is-paused { padding-bottom: 2px; border-bottom-width: 1px; }
+    .plan-strip-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 4px 0 4px 12px; }
+    .plan-strip-resume { flex: none; font-size: var(--fsc-14); }
     .plan-end { max-width: 34rem; margin: 18px auto 8px; text-align: center; font-family: var(--font-body); }
     .plan-end-read { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 14px; color: var(--cream); font-size: var(--fs-18); }
     .plan-end-note { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }

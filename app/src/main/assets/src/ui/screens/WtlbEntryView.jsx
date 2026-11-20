@@ -26,7 +26,7 @@ import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
-import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip, usePlanSessionNav } from '../components/PlanRibbon.jsx';
 import { BgDrawContext } from '../components/bg-draw.js';
 
 
@@ -291,8 +291,13 @@ export function WtlbEntryView(props) {
 
   const prevEntry = entry.prevEntry;
   const nextEntry = entry.nextEntry;
-  const goPrev = () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary();
-  const goNext = () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary();
+  // Inside a plan sitting the ways back and forward go between the day's readings only (Corbin 11-19).
+  const _planCol = !isAns && typeof COL_BY_KEY !== 'undefined' ? COL_BY_KEY.get(volKey) : null;
+  const planNav = usePlanSessionNav(_planCol ? _planCol.readKey : '', entry.id, inert);
+  const goPrev = planNav ? planNav.goPrev : () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary();
+  const goNext = planNav ? planNav.goNext : () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary();
+  const prevOff = planNav ? !planNav.prev : !prevEntry && !prevBoundary;
+  const nextOff = planNav ? false : !nextEntry && !nextBoundary;
 
   // Visible finger-follow page swipe (ScreenLayout `pager`). The neighbor page
   // that drags in is the REAL WtlbEntryView rendered inert (ScreenLayout `inert`
@@ -338,7 +343,7 @@ export function WtlbEntryView(props) {
   const pager = {
     onPrev: goPrev,
     onNext: goNext,
-    peek: (side) => side === 'next'
+    peek: planNav ? (side) => planNav.peek(side) : (side) => side === 'next'
       ? (nextEntry ? _entryPeek(nextEntry) : nextBoundary ? _chainPeek(nextBoundary, 'next') : null)
       : (prevEntry ? _entryPeek(prevEntry) : prevBoundary ? _chainPeek(prevBoundary, 'prev') : null),
   };
@@ -517,8 +522,8 @@ export function WtlbEntryView(props) {
       stickyNav={<StickyChapterNav
         onPrev={goPrev}
         onNext={goNext}
-        prevDisabled={!prevEntry && !prevBoundary}
-        nextDisabled={!nextEntry && !nextBoundary}
+        prevDisabled={prevOff}
+        nextDisabled={nextOff}
         prevLabel="Previous entry"
         nextLabel="Next entry"
       />}
@@ -536,8 +541,8 @@ export function WtlbEntryView(props) {
         showHome: !isAns,
         arrows: {
           onPrev: goPrev, onNext: goNext,
-          prevDisabled: !prevEntry && !prevBoundary,
-          nextDisabled: !nextEntry && !nextBoundary,
+          prevDisabled: prevOff,
+          nextDisabled: nextOff,
           prevLabel: 'Previous entry', nextLabel: 'Next entry',
         },
         reading: true,
@@ -622,11 +627,11 @@ export function WtlbEntryView(props) {
               <LetterSongsCard volKey={volKey} letterId={entry.id} letterTitle={entry.title} showSongs={showSongs} unit="entry" />
             </div>
 
-            <EndNav
+            {planNav ? null : <EndNav
               prev={prevEntry ? { label: 'Previous entry', title: prevEntry.title, onClick: () => onNavigate(prevEntry.id) }
                 : prevBoundary ? { label: prevBoundary.short ? `Previous · ${prevBoundary.short}` : 'Previous book', title: prevBoundary.title, onClick: onPrevBoundary } : null}
               next={nextEntry ? { label: 'Next entry', title: nextEntry.title, onClick: () => onNavigate(nextEntry.id) }
-                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />
+                : nextBoundary ? { label: nextBoundary.short ? `Next · ${nextBoundary.short}` : 'Next book', title: nextBoundary.title, onClick: onNextBoundary } : null} />}
           </div>
         </div>
       </div>

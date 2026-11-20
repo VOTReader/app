@@ -46,7 +46,7 @@ import { BarAction } from './components/RootNav.jsx';
 import { VOLUME_YEARS } from '../utils/volume-facts.js';
 import { bookTitle, runName } from '../data/plan-catalog.js';
 import { runStatus } from '../data/plan-engine.js';
-import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace } from '../utils/plan-session.js';
+import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace, sessionOpenKey } from '../utils/plan-session.js';
 import { openPlanNav, keepPlanNav, planNavOnScreen } from '../utils/plan-nav.js';
 import { suppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { removeHistoryRow } from '../utils/history-undo.js';
@@ -377,9 +377,9 @@ export function buildScreenRoutes({
     const run = store ? store.get(runId) : null;
     const s = run ? beginPlanSession({ runId, day, name: runName(run, null), days: span }) : null;
     if (!s) return;
-    const first = k && s.keys.includes(k) ? k : (s.keys.find((x) => !(run.ticks && x in run.ticks)) || s.keys[0]);
+    const first = sessionOpenKey(k);
     if (screen === 'reading-plans') keepPlanNav();
-    openPlanItem(refOf(first));
+    if (first) openPlanItem(refOf(first));
   };
   // Next inside a session moves the reader in place and carries the way back along (retargetTop, as the audio follow
   // does), so Back still returns to where the session began. Matthew's study chapters open the ordinary way.
@@ -408,6 +408,8 @@ export function buildScreenRoutes({
   // screen the reader is on (a drawn Home tab ended a running session), and its actions are no-ops.
   if (!bgDraw) setPlanSessionHost({
     move: _movePlanItem,
+    // Resume from a page outside the sitting opens the reading as a new page, so Back returns to that page.
+    open: openPlanItem,
     back: () => { if (typeof window.handleAndroidBack === 'function') window.handleAndroidBack(); else goNavOrigin(); },
     markRead: (bid, cid) => markRead(bid, cid),
     unmarkRead: (bid, cid) => unmarkRead(bid, cid),
