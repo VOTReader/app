@@ -78,7 +78,9 @@ def faces(css):
     descriptors exactly: a 100 900 glyph face beside a 400 800 EB Garamond face won the match and left every
     letter to the device serif."""
     out = []
-    for text in (open(HTML, encoding='utf-8').read(), re.sub(r'/\* GLYPHS-BEGIN.*?GLYPHS-END \*/', '', css, flags=re.S)):
+    with open(HTML, encoding='utf-8') as f:
+        html = f.read()
+    for text in (html, re.sub(r'/\* GLYPHS-BEGIN.*?GLYPHS-END \*/', '', css, flags=re.S)):
         for key in FACE_RE.findall(text):
             if key not in out:
                 out.append(key)
@@ -99,7 +101,8 @@ def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     cps = build_font(sys.argv[1], os.path.dirname(OUT))
-    css = open(CSS, encoding='utf-8', newline='').read()
+    with open(CSS, encoding='utf-8', newline='') as f:
+        css = f.read()
     block = css_block(cps, css)
     m = re.search(r'      /\* GLYPHS-BEGIN.*?/\* GLYPHS-END \*/\n', css, re.S)
     if m:
@@ -107,7 +110,8 @@ def main():
     else:
         anchor = css.index('\n', css.index("fonts/reading/lexend-latin-wght-normal.woff2")) + 1
         css = css[:anchor] + block + css[anchor:]
-    open(CSS, 'w', encoding='utf-8', newline='').write(css)
+    with open(CSS, 'w', encoding='utf-8', newline='') as f:
+        f.write(css)
     print('%d code points, %d bytes, %d faces' % (len(cps), os.path.getsize(OUT), len(faces(css))))
 
 

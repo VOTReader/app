@@ -136,7 +136,8 @@ def main():
     ap.add_argument('--write', action='store_true')
     ap.add_argument('--list', action='store_true')
     a = ap.parse_args()
-    text = io.open(a.css, encoding='utf-8').read()
+    with io.open(a.css, encoding='utf-8') as f:
+        text = f.read()
     line_of = lambda pos: text.count('\n', 0, pos) + 1
 
     rules = []   # (index, selectors, decls, prelude_start, body_end)
@@ -205,7 +206,8 @@ def main():
         out = out[:s] + out[e2:]
     # a line left holding nothing but spaces goes
     out = re.sub(r'\n[ \t]+\n', '\n', out)
-    io.open(a.css, 'w', encoding='utf-8', newline='').write(out)
+    with io.open(a.css, 'w', encoding='utf-8', newline='') as f:
+        f.write(out)
     print(f'[css-dead-base] wrote {a.css}: {len(text)} -> {len(out)} bytes ({len(whole)} rules removed whole)')
     return 0
 
