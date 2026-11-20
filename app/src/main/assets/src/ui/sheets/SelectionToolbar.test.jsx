@@ -896,6 +896,46 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     expect(toastText()).not.toMatch(/Copied/);
   });
 
+  // A reader's report, 2026-11-20: "I hit copy and nothing happens. Then the highlighted area is deselected."
+  it('Copy on a clipboard that never answers still ends on the retry sheet, with the words kept', async () => {
+    setClipboard(() => new Promise(() => {}));
+    raiseToolbar();
+    tapAction('Copy');
+    await settle();
+    expect(recovery()).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    const dlg = recovery();
+    expect(dlg).not.toBeNull();
+    expect(/** @type {any} */ (dlg).querySelector('textarea').value).toContain(QUOTE);
+  });
+
+  it('Copy is taken inside the tap, on the copy event it raises, before the selection is cleared', async () => {
+    /** @type {Record<string, string>} */ const data = {};
+    /** @type {string[]} */ const order = [];
+    const origExec = /** @type {any} */ (document).execCommand;
+    /** @type {any} */ (document).execCommand = () => {
+      order.push('copy');
+      const ev = new Event('copy', { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'clipboardData', { value: { setData: (/** @type {string} */ t, /** @type {string} */ v) => { data[t] = v; } } });
+      document.body.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    const writeText = vi.fn(() => new Promise(() => {}));
+    setClipboard(/** @type {any} */ (writeText));
+    try {
+      raiseToolbar();
+      const stubbed = window.getSelection;   // stubSelection hands out a new object per call
+      window.getSelection = () => Object.assign(/** @type {any} */ (stubbed()), { removeAllRanges: () => { order.push('clear'); } });
+      tapAction('Copy');
+      await settle();
+      expect(order.slice(0, 2)).toEqual(['copy', 'clear']);
+      expect(data['text/plain']).toContain(QUOTE);
+      expect(writeText).not.toHaveBeenCalled();
+      expect(toastText()).toMatch(/Copied/);
+      expect(recovery()).toBeNull();
+    } finally { /** @type {any} */ (document).execCommand = origExec; }
+  });
+
   it('Copy with no clipboard API at all (an insecure page) is reported, not thrown', async () => {
     setClipboard(null);
     raiseToolbar();

@@ -1,7 +1,7 @@
 /* copy-share — the outcome words are the contract SelectionToolbar and
    NoteSheet act on (A15). Every path resolves; nothing rejects. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { copyText, shareText, copyFromSelection, shareCanvasImage } from './copy-share.js';
+import { copyText, copyNow, COPY_WAIT_MS, shareText, copyFromSelection, shareCanvasImage } from './copy-share.js';
 
 /** @type {PropertyDescriptor | undefined} */ let origClipboard;
 /** @type {PropertyDescriptor | undefined} */ let origShare;
@@ -176,6 +176,80 @@ describe('copyFromSelection (the Try again path)', () => {
     /** @type {any} */ (document).execCommand = vi.fn(() => { throw new Error('nope'); });
     setClipboard({ writeText: rejectWith('NotAllowedError') });
     await expect(copyFromSelection(null, 'Hope')).resolves.toBe('failed');
+  });
+});
+
+/* A reader's report, 2026-11-20: "I hit copy and nothing happens. Then the highlighted area is deselected."
+   The Copy button waited on the async Clipboard API alone; a browser that never answers it showed nothing. */
+describe('copyNow (the Copy button, inside the tap)', () => {
+  /** execCommand('copy') as a browser runs it: a `copy` event with a clipboardData, true when a listener took it.
+      @param {Record<string, string>} data */
+  function realExec(data) {
+    return vi.fn(() => {
+      const ev = new Event('copy', { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'clipboardData', { value: { setData: (/** @type {string} */ t, /** @type {string} */ v) => { data[t] = v; } } });
+      document.body.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+  }
+
+  it("puts the text on the copy event the tap raises: 'copied', and the async API is never asked", async () => {
+    /** @type {Record<string, string>} */ const data = {};
+    /** @type {any} */ (document).execCommand = realExec(data);
+    const writeText = vi.fn(() => new Promise(() => {}));   // would never answer
+    setClipboard({ writeText });
+    await expect(copyNow('Grace')).resolves.toBe('copied');
+    expect(data['text/plain']).toBe('Grace');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("its words win over the page's own copy listener, which is not reached", async () => {
+    /** @type {Record<string, string>} */ const data = {};
+    /** @type {any} */ (document).execCommand = realExec(data);
+    const pages = vi.fn((/** @type {any} */ e) => { e.clipboardData.setData('text/plain', 'the page\'s words'); e.preventDefault(); });
+    document.addEventListener('copy', pages);
+    try {
+      await expect(copyNow('Grace')).resolves.toBe('copied');
+      expect(data['text/plain']).toBe('Grace');
+      expect(pages).not.toHaveBeenCalled();
+    } finally { document.removeEventListener('copy', pages); }
+  });
+
+  it('leaves no listener behind: a later copy of the page is the page\'s own', async () => {
+    /** @type {Record<string, string>} */ const data = {};
+    /** @type {any} */ (document).execCommand = realExec(data);
+    await copyNow('Grace');
+    /** @type {Record<string, string>} */ const later = {};
+    realExec(later)();
+    expect(later['text/plain']).toBeUndefined();
+  });
+
+  it('a browser that says yes but raised no copy event is not believed: the async API decides', async () => {
+    /** @type {any} */ (document).execCommand = vi.fn(() => true);
+    setClipboard({ writeText: rejectWith('NotAllowedError') });
+    await expect(copyNow('Grace')).resolves.toBe('failed');
+  });
+
+  it('execCommand refused or throwing falls back to the async API', async () => {
+    /** @type {any} */ (document).execCommand = vi.fn(() => false);
+    setClipboard({ writeText: () => Promise.resolve() });
+    await expect(copyNow('Grace')).resolves.toBe('copied');
+    /** @type {any} */ (document).execCommand = vi.fn(() => { throw new Error('nope'); });
+    await expect(copyNow('Grace')).resolves.toBe('copied');
+  });
+
+  it("an async clipboard that never answers is 'failed' after the wait, not silence", async () => {
+    vi.useFakeTimers();
+    try {
+      /** @type {any} */ (document).execCommand = vi.fn(() => false);
+      setClipboard({ writeText: () => new Promise(() => {}) });
+      const seen = vi.fn();
+      copyNow('Grace').then(seen);
+      await vi.advanceTimersByTimeAsync(COPY_WAIT_MS - 1);
+      expect(seen).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(seen).toHaveBeenCalledWith('failed');
+    } finally { vi.useRealTimers(); }
   });
 });
 

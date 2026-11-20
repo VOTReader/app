@@ -4,7 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
-import { copyText as copyToClipboard, shareText, shareLinkSetting, LINK_NAME, offerOtherLink } from '../../utils/copy-share.js';
+import { copyNow, shareText, shareLinkSetting, LINK_NAME, offerOtherLink } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
 import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils/answers-extras.js';
@@ -956,9 +956,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const copyText = React.useCallback(() => {
     if (!selInfo) return;
     const text = selInfo.copyText || selInfo.text;
+    // The copy starts inside the tap, while the passage is still selected (utils/copy-share.js copyNow): a browser
+    // whose async clipboard never answers used to leave this tap with no "Copied" and no retry sheet.
+    const copying = copyNow(text);
     window.getSelection().removeAllRanges();
     setVisible(false);
-    copyToClipboard(text).then((outcome) => {
+    copying.then((outcome) => {
       if (outcome === 'copied') confirmCopied('Copied');
       else setCopyFallback({ text, verb: 'copy' });
     });

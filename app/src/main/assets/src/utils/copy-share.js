@@ -63,6 +63,54 @@ export function copyText(text) {
   }
 }
 
+/** How long the async Clipboard API gets to answer before the copy counts as failed. */
+export const COPY_WAIT_MS = 2000;
+
+/**
+ * Put `text` on the clipboard from inside the reader's tap, with the passage
+ * still selected (a reader's report, 2026-11-20: "I hit copy and nothing
+ * happens. Then the highlighted area is deselected", on two Answers topics).
+ * The Copy button had one way to the clipboard, the async API, and showed its
+ * answer only once that promise settled: a browser that never settles it (an
+ * in-app browser, a web view with the API half there) said nothing at all, no
+ * "Copied" and no retry sheet, while the selection had already been cleared.
+ *
+ * So the copy goes the way the phone's own Copy does first: execCommand('copy')
+ * inside the tap raises a `copy` event, and a listener for that one event puts
+ * `text` on it. That needs no permission and no promise. Only when the browser
+ * refuses it (or raises no event) is the async API tried, and it is given
+ * COPY_WAIT_MS: no answer by then is 'failed', and the retry sheet keeps the
+ * words on screen. Call it BEFORE clearing the selection: Safari raises the
+ * event only with something selected. Never rejects.
+ * @param {string} text
+ * @param {number} [waitMs]
+ * @returns {Promise<CopyOutcome>}
+ */
+export function copyNow(text, waitMs = COPY_WAIT_MS) {
+  let put = false;
+  const onCopy = (/** @type {any} */ e) => {
+    if (!e || !e.clipboardData || typeof e.clipboardData.setData !== 'function') return;
+    e.clipboardData.setData('text/plain', text);
+    e.preventDefault();
+    e.stopImmediatePropagation();   // this copy's words are `text`; the reading page's own listener would re-derive them
+    put = true;
+  };
+  try {
+    if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+      document.addEventListener('copy', onCopy, true);
+      let ok = false;
+      try { ok = document.execCommand('copy') === true; } finally { document.removeEventListener('copy', onCopy, true); }
+      if (ok && put) return Promise.resolve(/** @type {CopyOutcome} */ ('copied'));
+    }
+  } catch (_e) {
+    // execCommand throws in some hosts; the async API below still gets its try.
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(/** @type {CopyOutcome} */ ('failed')), waitMs);
+    copyText(text).then((r) => { clearTimeout(timer); resolve(r); });
+  });
+}
+
 /**
  * The Android app's share sheet (sh1): true when the phone took the text.
  * False on the web (no bridge), and when the bridge refuses or throws.
