@@ -10,7 +10,7 @@ import { PlanRibbon, PlanSessionStrip } from './PlanRibbon.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
 import { tickItem, todayKey, pauseRun } from '../../data/plan-engine.js';
-import { beginPlanSession, setPlanSessionHost, planSession, _resetPlanSessionForTests } from '../../utils/plan-session.js';
+import { beginPlanSession, setPlanSessionHost, planSession, pausedPlanSession, notePlanSessionPlace, _resetPlanSessionForTests } from '../../utils/plan-session.js';
 
 let read;
 let host;
@@ -26,7 +26,7 @@ beforeEach(() => {
     markRead: vi.fn((bid, cid) => { read.add(bid + ':' + cid); ReadingPlanStore.noteRead(bid, cid); }),
     unmarkRead: vi.fn((bid, cid) => { read.delete(bid + ':' + cid); }),
     isRead: (bid, cid) => read.has(bid + ':' + cid),
-    move: vi.fn(), back: vi.fn(), openPlans: vi.fn(), openNote: vi.fn(),
+    move: vi.fn(), open: vi.fn(), back: vi.fn(), openPlans: vi.fn(), openNote: vi.fn(),
   };
   setPlanSessionHost(host);
 });
@@ -115,5 +115,122 @@ describe('the reading session', () => {
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Stop for now' })); });
     expect(planSession()).toBeNull();
     expect(host.back).toHaveBeenCalled();
+  });
+});
+
+/* Corbin 11-19: "you should be able to tap a simple button and go back, although it should still be marked read for
+   that day if you already read it all the way through"; reading plans as a "container" kept "clearly deliniated". */
+describe('the plan as a container', () => {
+  const tick = (run, k) => ReadingPlanStore.put(tickItem(ReadingPlanStore.get(run.id), k, todayKey(new Date()), 1));
+
+  it("back keeps the tick: the strip's back goes to the previous reading and unticks nothing", () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    render(<PlanSessionStrip bid="genesis" cid={2} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Back to Genesis 1' })); });
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    expect('genesis:1' in ticks(run.id)).toBe(true);
+    expect(planSession()).not.toBeNull();
+  });
+
+  it('on the first reading, back leaves the plan the way the reader came in', () => {
+    start();
+    render(<PlanSessionStrip bid="genesis" cid={1} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Leave the plan' })); });
+    expect(host.back).toHaveBeenCalled();
+    expect(host.move).not.toHaveBeenCalled();
+    expect(planSession()).toBeNull();
+    expect(pausedPlanSession()).toBeNull();
+  });
+
+  it("the phone's Back takes the same steps: the previous reading, then out of the plan", () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    const r = render(<PlanSessionStrip bid="genesis" cid={2} />);
+    let used;
+    act(() => { used = window.__screenBack(); });
+    expect(used).toBe(true);
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    expect('genesis:1' in ticks(run.id)).toBe(true);
+    r.unmount();
+    expect(window.__screenBack == null).toBe(true);            // the strip's Back goes with it
+    render(<PlanSessionStrip bid="genesis" cid={1} />);
+    act(() => { used = window.__screenBack(); });
+    expect(used).toBe(false);                                  // the ordinary Back runs: out to where the reader came from
+    expect(planSession()).toBeNull();
+  });
+
+  it('each segment is a button to that reading, and says whether it is read', () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    render(<PlanSessionStrip bid="genesis" cid={2} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Genesis 1, read' })); });
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Genesis 3' })); });
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 3 });
+    expect(screen.getByRole('button', { name: 'Genesis 2, open now' })).toBeTruthy();
+  });
+
+  it('the close ends the sitting and goes back, as Stop for now does', () => {
+    start();
+    render(<PlanSessionStrip bid="genesis" cid={2} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Stop for now' })); });
+    expect(planSession()).toBeNull();
+    expect(pausedPlanSession()).toBeNull();
+    expect(host.back).toHaveBeenCalled();
+  });
+
+  it("the title opens the day's readings with their ticks; a tap goes to that reading", () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    render(<PlanSessionStrip bid="genesis" cid={2} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year · Day 1: the day's readings$/ })); });
+    expect(screen.getByRole('button', { name: 'Read Genesis 1, read' })).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 3' })); });
+    expect(host.move).toHaveBeenCalledWith({ bid: 'genesis', cid: 3 });
+    expect(planSession()).not.toBeNull();
+  });
+
+  it('paused: a page outside the day shows the way back in, and Resume opens the first reading not read', () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    vi.useFakeTimers();
+    try {
+      notePlanSessionPlace('genesis', 2);
+      notePlanSessionPlace('nt', 5);
+      vi.runAllTimers();
+    } finally { vi.useRealTimers(); }
+    expect(planSession()).toBeNull();
+    render(<PlanSessionStrip bid="nt" cid={5} />);
+    expect(screen.getByText('Bible in a Year · Day 1')).toBeTruthy();
+    expect(screen.getByText('1 of 3 read')).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Resume' })); });
+    expect(planSession()).not.toBeNull();
+    expect(host.open).toHaveBeenCalledWith({ bid: 'genesis', cid: 2 });   // opened as a new page: Back returns to this one
+  });
+
+  it("the paused line's close forgets the sitting and ticks nothing off", () => {
+    const run = start();
+    tick(run, 'genesis:1');
+    vi.useFakeTimers();
+    try { notePlanSessionPlace('genesis', 2); notePlanSessionPlace(null); vi.runAllTimers(); } finally { vi.useRealTimers(); }
+    render(<PlanSessionStrip bid="nt" cid={5} />);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Stop for now' })); });
+    expect(pausedPlanSession()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull();
+    expect(Object.keys(ticks(run.id))).toEqual(['genesis:1']);
+  });
+
+  it('a finished day opened again keeps every tick and ends on Done, not a second Day done', () => {
+    const run = start();
+    for (const k of ['genesis:1', 'genesis:2', 'genesis:3']) tick(run, k);
+    act(() => { beginPlanSession({ runId: run.id, day: 0, name: 'Bible in a Year' }); });
+    render(<PlanRibbon bid="genesis" cid={3} />);
+    expect(screen.queryByRole('button', { name: 'Finish day 1' })).toBeNull();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Done' })); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(planSession()).toBeNull();
+    expect(host.back).toHaveBeenCalled();
+    expect(Object.keys(ticks(run.id)).sort()).toEqual(['genesis:1', 'genesis:2', 'genesis:3']);
   });
 });
