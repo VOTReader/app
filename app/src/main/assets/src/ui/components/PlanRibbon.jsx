@@ -125,6 +125,10 @@ export function PlanSessionStrip({ bid, cid, inert }) {
   const name = stripName(s);
   const go = (/** @type {string} */ x) => { if (x !== k && host) host.move(refOf(x)); };
   const back = () => { if (prev) go(prev); else { endPlanSession(); if (host) host.back(); } };
+  // The day sheet's big button from inside the sitting (hub 21:32: not "Read this day", the reader is already in it):
+  // to the first reading not read when that is elsewhere, else back to this page.
+  const firstLeft = left.length ? left[0].k : null;
+  const jump = firstLeft && firstLeft !== k ? firstLeft : null;
   return (
     <div className="plan-strip" role="group" aria-label="Reading plan">
       <div className="plan-strip-line">
@@ -147,7 +151,8 @@ export function PlanSessionStrip({ bid, cid, inert }) {
       </div>
       {sheet && !inert ? (
         <DaySheet run={run} day={s.day} now={new Date()} onClose={() => setSheet(false)}
-          onRead={(/** @type {number} */ _d, /** @type {string | undefined} */ x) => go(x && s.keys.includes(x) ? x : (sessionOpenKey() || k))} />
+          readLabel={jump ? 'Next unread reading' : 'Keep reading'} readName={jump ? 'Next unread reading: ' + itemName(run, jump) : undefined}
+          onRead={(/** @type {number} */ _d, /** @type {string | undefined} */ x) => go(x && s.keys.includes(x) ? x : (jump || k))} />
       ) : null}
     </div>
   );

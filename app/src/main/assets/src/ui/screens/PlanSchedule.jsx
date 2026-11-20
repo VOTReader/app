@@ -27,11 +27,13 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const dayEyebrow = (d) => (d.today ? 'Today' : 'Day ' + (d.day + 1));
 
 /**
- * A day's sheet: its items, Read this day, Mark day as read / Not read yet.
+ * A day's sheet: its items, Read this day, Mark day as read / Not read yet. Inside a sitting the strip names the big
+ * button for where it goes from there (`readLabel`, `readName`: "Keep reading", "Next unread reading").
  * @param {{ run: any, day: number, now: Date, preview?: boolean, onClose: () => void,
- *   onRead: (day: number, k?: string) => void, noteOf?: (day: number) => string | null }} props
+ *   onRead: (day: number, k?: string) => void, noteOf?: (day: number) => string | null,
+ *   readLabel?: string, readName?: string }} props
  */
-export function DaySheet({ run, day, now, preview = false, onClose, onRead }) {
+export function DaySheet({ run, day, now, preview = false, onClose, onRead, readLabel = 'Read this day', readName }) {
   const all = schedule(run, now, bookTitle);
   const d = all[day];
   if (!d) return null;
@@ -66,7 +68,8 @@ export function DaySheet({ run, day, now, preview = false, onClose, onRead }) {
           </li>
         ))}
       </ul>
-      {canAct ? <button type="button" className="ui-btn is-primary is-wide" onClick={() => { onClose(); onRead(d.day); }}>Read this day</button> : null}
+      {canAct ? <button type="button" className="ui-btn is-primary is-wide" aria-label={readName}
+        onClick={() => { onClose(); onRead(d.day); }}>{readLabel}</button> : null}
     </PlanSheet>
   );
 }
