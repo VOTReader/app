@@ -398,9 +398,10 @@ try {
   await click('Back');
 
   // ── a letter, scrolled ──
-  await click('Prophetic Letters'); await click('Volume One');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.ui-group .sty-row')][1]; if (b) b.click(); });
-  await page.waitForSelector('.hero-title', { timeout: 15000 }); await sleep(900);
+  // By its link: the Home shelves this walk clicked through ("Prophetic Letters", "Volume One") went with the UI
+  // overhaul of 2026-11-17, and the walk is about what a reload does to a reader in a letter, not how they got there.
+  await page.goto(BASE + '?p=' + encodeURIComponent('letter:christmas:1'), { waitUntil: 'load' });
+  await page.waitForSelector('.hero-title', { timeout: 15000 }); await sleep(2500);
   const title0 = await page.evaluate(() => (document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll').querySelector('.hero-title') || { textContent: '' }).textContent.trim());
   // The LIVE reading scroller: the one under .screen-layout's pager viewport. The
   // swipe pager also mounts inert clones of the neighbouring letters, each with its own
