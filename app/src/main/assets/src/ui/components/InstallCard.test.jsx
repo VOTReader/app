@@ -590,6 +590,50 @@ describe('InstallPopup: it comes up by itself', () => {
     });
   });
 
+  /* Corbin 2026-11-20: "if I try to install via chrome, the app icon doesn't appear". Chrome's own menu installs
+     without a tap of ours: the page hears appinstalled and nothing else. */
+  describe('an install made from Chrome\'s own menu', () => {
+    const after = () => [...document.querySelectorAll('.install-steps-title')].filter((t) => t.textContent === 'Almost done');
+    it('on a phone: "Almost done" comes up, once, on whatever screen; the popup does not ask after it', () => {
+      attachInstallCapture(window);
+      const v = render(<InstallPopup screen="letter" />);
+      act(() => { window.dispatchEvent(new Event('appinstalled')); });
+      expect(after().length).toBe(1);
+      expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+      act(() => { fireEvent.click(document.querySelector('.install-steps .install-steps-done')); });
+      expect(after().length).toBe(0);
+      v.rerender(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(ask()).toBeNull();
+      expect(after().length).toBe(0);
+    });
+    it('while the popup is up: the note takes its place', () => {
+      handOver();
+      render(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(ask()).not.toBeNull();
+      act(() => { window.dispatchEvent(new Event('appinstalled')); });
+      expect(ask()).toBeNull();
+      expect(after().length).toBe(1);
+    });
+    it('on a computer the install is done when Chrome says so: nothing more is said', () => {
+      ua = UA.chromeDesktop;
+      attachInstallCapture(window);
+      render(<InstallPopup screen="home" />);
+      act(() => { window.dispatchEvent(new Event('appinstalled')); });
+      expect(after().length).toBe(0);
+    });
+    it('started from the Settings row with the popup mounted too: one sheet, counted once', async () => {
+      const e = handOver('accepted');
+      const v = render(<><InstallPopup screen="settings" /><InstallRow /></>);
+      act(() => { window.dispatchEvent(new Event('appinstalled')); });   // Chrome may say this first
+      await act(async () => { fireEvent.click(v.getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
+      expect(after().length).toBe(1);
+      expect(JSON.parse(localStorage.getItem(KEY)).dismissals).toBe(1);
+      expect(e.prompt).toHaveBeenCalledTimes(0);       // the event went with the install; the row shows its steps
+    });
+  });
+
   it('goes when the screen changes under it, and that is not a "Not now"', () => {
     handOver();
     const v = render(<InstallPopup screen="home" />);

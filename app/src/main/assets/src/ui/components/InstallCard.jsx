@@ -31,8 +31,10 @@ const STATE_KEY = 'vot-install-offer';
 
 /** The unit (chapter/letter) that showed the card this session; null until one has. */
 let _sessionUnit = /** @type {string | null} */ (null);
+/** Whether this session has shown "Almost done" (one sheet, whoever saw the install first). */
+let _afterTold = false;
 /** Tests only. */
-export function _resetInstallCardSession() { _sessionUnit = null; }
+export function _resetInstallCardSession() { _sessionUnit = null; _afterTold = false; }
 
 /* On screen (search200 UX B1): the long-press tip (AnnotationHint) waits while a card is in view, or the
    pill sits on the card's heading (both live at the bottom of a chapter's end). One id per card in view. */
@@ -346,8 +348,8 @@ export function InstallRow({ Row = null }) {
     if (flow !== 'prompt') { setStepsFor(flow); return; }
     const outcome = await promptInstall();
     if (outcome === 'accepted') {
-      _writeState(dismiss(_readState(), _isAndroid() ? 'later' : 'installed', Date.now()));
-      if (_isAndroid()) setStepsFor('android-after');
+      if (_isAndroid()) _tellAfter(setStepsFor);
+      else _writeState(dismiss(_readState(), 'installed', Date.now()));
     } else if (outcome !== 'dismissed') setStepsFor(PROMPT_FALLBACK());
   };
   if (!flow || (installed && !_isAndroid())) return null;
@@ -421,7 +423,21 @@ const _standalone = () => {
 const _eventMayCome = (/** @type {string | null} */ f) => f === 'android-chrome' || f === 'samsung' || f === 'desktop';
 let _popupSeen = false;
 /** Tests only. */
-export function _resetInstallPopupSession() { _popupSeen = false; _related = null; }
+export function _resetInstallPopupSession() { _popupSeen = false; _related = null; _afterTold = false; }
+
+/**
+ * After Install on a phone, however it was started (our popup, the Settings row, or Chrome's own menu): say once
+ * what the phone asks next and where the icon lands, and do not ask again for 21 days. A phone's yes is not yet
+ * an icon (see InstallRow), so the offer waits instead of ending.
+ * @param {(flow: string) => void} show the caller's own setStepsFor
+ */
+function _tellAfter(show) {
+  if (_afterTold) return;
+  _afterTold = true;
+  _popupSeen = true;
+  _writeState(dismiss(_readState(), 'later', Date.now()));
+  show('android-after');
+}
 
 /** The tour or another dialog has the screen. */
 function _screenTaken() {
@@ -475,6 +491,16 @@ export function InstallPopup({ screen }) {
   // The popup belongs to Home: if the screen changes under it (a link, the back key), it goes, and that is no
   // answer from the reader.
   React.useEffect(() => { if (screen !== 'home') setKind(null); }, [screen]);
+  /* Corbin 2026-11-20: "if I try to install via chrome, the app icon doesn't appear". An install made from
+     Chrome's own menu fires appinstalled and nothing else, and where the phone then leaves no icon the page said
+     nothing at all. On a phone it gets the same "Almost done" as an install started here. A computer's install is
+     done when Chrome says so. */
+  const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
+  React.useEffect(() => {
+    if (!installed || !_isAndroid() || _standalone()) return;
+    setKind(null);
+    _tellAfter(setStepsFor);
+  }, [installed]);
   // The event arrived while the popup was describing the menu: it gets its button.
   const shown = kind && _eventMayCome(kind) && flow === 'prompt' ? 'prompt' : kind;
 
@@ -485,8 +511,8 @@ export function InstallPopup({ screen }) {
     if (outcome === 'accepted') {
       // A computer's yes is the install. A phone's is not yet an icon (see InstallRow): say what comes next, and
       // ask again in 21 days if this browser can still install then.
-      _writeState(dismiss(_readState(), _isAndroid() ? 'later' : 'installed', Date.now()));
-      if (_isAndroid()) setStepsFor('android-after');
+      if (_isAndroid()) _tellAfter(setStepsFor);
+      else _writeState(dismiss(_readState(), 'installed', Date.now()));
     } else if (outcome === 'dismissed') _writeState(dismiss(_readState(), 'later', Date.now()));
     else setStepsFor(PROMPT_FALLBACK());
   }, []);
