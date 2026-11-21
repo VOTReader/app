@@ -249,7 +249,9 @@ describe('audio-player on the native player (m3)', () => {
     AudioPlayer.toggle();
     const last = loads().at(-1);
     expect(last.url).toBe(URL_OF('idC'));
-    expect(last.startMs).toBe(300000);
+    // Letter C was playing when the step was made, so its clock ran on the real clock for the few milliseconds between
+    // native's word and the step: 300002 on a slow runner (CI run 44868866386, 0f972da60). The place, as two lines up.
+    expect(last.startMs / 1000).toBeCloseTo(300, 1);
   });
 
   it('online, a recording gone from the release (HTTP 404, native 2004) is a load failure, not No signal, and is not stepped back from', async () => {
