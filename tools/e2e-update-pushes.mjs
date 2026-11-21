@@ -12,8 +12,9 @@
  * Serves its own committed tree on an ephemeral port with the real service worker, boots until the page is
  * CONTROLLED, then publishes a new build the way a deploy does (service-worker.js served with a bumped
  * CACHE_VERSION; the assets and their integrity map as committed, so the install verifies) and asks the
- * registration to update. Four arms on one page; in each the page must reload onto the build just published (a
- * marker set on window is gone, the new worker controls the page, nothing is left waiting):
+ * registration to update. In arms 1 to 4 the page must reload onto the build just published (a marker set on
+ * window is gone, the new worker controls the page, nothing is left waiting); arms 5 and 6 are the one thing that
+ * still holds a RELOAD, a note being typed (update-hold.js), which never holds the takeover:
  *
  *   1  MID-READ. The reader is partway down a letter, has touched the page, and its clock says three hours have
  *      passed. After the reload they are on the same letter at the same place (Corbin 2026-09-10: "land reader back
@@ -22,6 +23,11 @@
  *   3  OUT OF SIGHT. The page is hidden.
  *   4  THE SECOND DOOR. The published worker does not skip waiting by itself (what a build of the up1 weeks did,
  *      and what a failed skipWaiting leaves): the page sees it installed and asks, and it takes over.
+ *   5  TWO TABS, ONE HOLDING A NOTE. The free tab reloads at once. The tab with the note open keeps its document,
+ *      is already under the new worker and knows it (the takeover flag); when the note is saved it reloads.
+ *   6  A HELD PAGE ASKS FOR A LAZY CORPUS. Bundle names carry no hash, so after the takeover every lazy byte would
+ *      be the NEW build's inside a page still running the OLD one. The loader refuses and reloads the page instead
+ *      (index.html, service-worker-1); the words of the note are kept by note-draft.js, not by this hold.
  *
  * Visibility is driven in-page (document.visibilityState is overridden and visibilitychange dispatched) and the
  * page's clock by shifting Date.now. /semantic/ answers 404: the meaning search's 55 MB first download would keep
@@ -173,11 +179,89 @@ try {
   await arm('2 listening', 'play', () => page.evaluate(() => { navigator.mediaSession.playbackState = 'playing'; }));
   await arm('3 out of sight', 'away', () => setVisibility(page, 'hidden'));
   await arm('4 the second door (the worker leaves it to the page)', 'door', async () => {}, true);
+
+  // ── 5 TWO TABS, ONE HOLDING A NOTE ──
+  const appUp = (pg) => pg.waitForFunction(() => !!document.body && document.body.innerText.length > 200 && typeof (/** @type {any} */ (window)).holdUpdateReload === 'function', { timeout: 30000 });
+  const hold = (pg) => pg.evaluate(() => { const w = /** @type {any} */ (window); w.__e2eMark = 'same document'; w.__e2eRelease = w.holdUpdateReload('note'); });
+  const heldState = (pg) => pg.evaluate(() => { const w = /** @type {any} */ (window); return { mark: w.__e2eMark, took: !!w.__votSwTookOver }; }).catch(() => null);
+  const held = await browser.newPage();
+  await held.goto(BASE, { waitUntil: 'load' });
+  await appUp(held);
+  await sleep(2000);
+  await hold(held);
+  await page.bringToFront();
+  await arm('5 two tabs, the free one', 'tabs', async () => {});
+  await sleep(2500);
+  const h5 = await heldState(held);
+  const hv5 = await controllerVersion(held).catch(() => null);
+  if (!h5 || h5.mark !== 'same document') fail('5 the tab holding a note was reloaded under it');
+  else if (hv5 !== served.new) fail(`5 the takeover waited for the tab holding a note (it is controlled by ${hv5}, the build published is ${served.new})`);
+  else if (!h5.took) fail('5 the held tab was taken over without its takeover flag: a lazy load there would mix two builds');
+  else {
+    note('5 the tab holding a note: same document, already under the new worker, takeover flag set');
+    const navH = held.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).then(() => true, () => false);
+    const tH = Date.now();
+    await held.evaluate(() => (/** @type {any} */ (window)).__e2eRelease());
+    if (!(await navH)) fail('5 the held tab did not reload within 20 s of the note being saved');
+    else {
+      await held.evaluate(() => navigator.serviceWorker.ready);
+      const v = await controllerVersion(held);
+      if (v !== served.new) fail(`5 after its reload the held tab is controlled by ${v}, want ${served.new}`);
+      else note(`5 the note saved: the held tab reloaded onto ${v} ${Date.now() - tH} ms later`);
+    }
+  }
+  await held.close();
+
+  // ── 6 A HELD PAGE ASKS FOR A LAZY CORPUS ──
+  // A page loads its three lazy corpora by itself 2 to 8 s after it opens (probed 2026-11-20), so a reader with a
+  // note open has normally nothing left to lazy-load. To put the question at all, this tab's Matthew corpus is kept
+  // from loading until the arm asks for it: the page's own early ask gets a promise that never settles.
+  const lazy = await browser.newPage();
+  await lazy.evaluateOnNewDocument(() => {
+    const w = /** @type {any} */ (window);
+    let real = null;
+    Object.defineProperty(w, '__loadMatthewCorpus', { configurable: true, set: (f) => { real = f; }, get: () => (w.__e2eAskNow && real ? real : () => new Promise(() => {})) });
+  });
+  await lazy.goto(BASE, { waitUntil: 'load' });
+  await appUp(lazy);
+  await sleep(9000);   // past the page's own loading of the other corpora
+  const had = await lazy.evaluate(() => [...document.querySelectorAll('script[src]')].some((x) => /bundle-a-matthew/.test(x.getAttribute('src') || '')));
+  if (had) fail('6 the bench did not keep the Matthew corpus from loading: nothing lazy is left to ask for');
+  await hold(lazy);
+  swWaits = false;
+  swBump = 'lazy' + Date.now().toString(36);
+  await lazy.evaluate(() => { navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {}); });
+  const t6 = Date.now();
+  let v6 = await controllerVersion(lazy).catch(() => null);
+  while (v6 !== served.new && Date.now() - t6 < TAKEOVER_MS) { await sleep(400); v6 = await controllerVersion(lazy).catch(() => null); }
+  const h6 = await heldState(lazy);
+  if (v6 !== served.new) fail(`6 the build published (${served.new}) did not take over the held page within ${TAKEOVER_MS / 1000} s`);
+  else if (!h6 || h6.mark !== 'same document' || !h6.took) fail(`6 the held page after the takeover: ${JSON.stringify(h6)} (want the same document with the takeover flag)`);
+  else if (!had) {
+    const nav6 = lazy.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).then(() => true, () => false);
+    const asked = await lazy.evaluate(() => {
+      const w = /** @type {any} */ (window);
+      w.__e2eAskNow = true;
+      if (typeof w.__loadMatthewCorpus !== 'function') return 'no loader';
+      w.__loadMatthewCorpus().catch(() => {});
+      return [...document.querySelectorAll('script[src]')].some((x) => /bundle-a-matthew/.test(x.getAttribute('src') || '')) ? 'APPENDED' : 'refused';
+    }).catch(() => 'reloading');   // the reload may take the document before the answer comes back
+    if (asked === 'no loader') fail('6 index.html no longer has window.__loadMatthewCorpus: this arm needs a new lazy corpus to ask for');
+    else if (asked === 'APPENDED') fail('6 the held page appended a lazy bundle after the takeover: the new build\'s code inside the old page');
+    else if (!(await nav6)) fail('6 the held page asked for a lazy corpus after the takeover and did not reload within 20 s');
+    else {
+      await lazy.evaluate(() => navigator.serviceWorker.ready);
+      const v = await controllerVersion(lazy);
+      if (v !== served.new) fail(`6 after the reload the page is controlled by ${v}, want ${served.new}`);
+      else note(`6 a held page asked for a lazy corpus after the takeover: nothing appended, reloaded onto ${v}`);
+    }
+  }
+  await lazy.close();
 } catch (e) {
   fail('walk: ' + failureReport(e, 'e2e-update-pushes'));
 } finally {
   await browser.close();
   server.close();
 }
-console.log(failures.length ? `FAIL e2e-update-pushes: ${failures.length} problem(s)` : 'PASS e2e-update-pushes: a new build takes over the moment it has installed: mid-read, while listening, out of sight, and when the page has to ask');
+console.log(failures.length ? `FAIL e2e-update-pushes: ${failures.length} problem(s)` : 'PASS e2e-update-pushes: a new build takes over the moment it has installed: mid-read, while listening, out of sight, and when the page has to ask; a note being typed holds only its own tab\'s reload');
 process.exit(failures.length ? 1 : 0);
