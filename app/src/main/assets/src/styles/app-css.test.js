@@ -952,3 +952,23 @@ describe('app.css — a settings group pill sits under its words at large text',
     expect(ruleBlock(CSS, SEL + ' > .ui-row-chev {')).toMatch(/grid-row:\s*1 \/ span 2/);
   });
 });
+
+/* THE PLAN'S NEXT BUTTON KEEPS ITS LABEL INSIDE (Corbin's phone, 2026-11-21: "Fix the text overflow in this screenshot").
+   At a reading's end the plan card's gold button names the next reading: "Next · Volume One: Honor Not the Day of the
+   Dead... →". A shared button is one line (white-space: nowrap) and centred, so a long letter title ran out of the
+   button on both sides. The card's wide button wraps its label and grows instead. */
+describe('app.css — the plan end card\'s button wraps a long reading name', () => {
+  const SEL = '.plan-end > .ui-btn.is-wide {';
+  it('the label wraps, centred, and the button grows with it', () => {
+    const block = ruleBlock(CSS, SEL);
+    expect(block).not.toBeNull();
+    expect(block).toMatch(/white-space:\s*normal/);
+    expect(block).toMatch(/text-align:\s*center/);
+    expect(block).toMatch(/height:\s*auto/);
+    expect(block).not.toMatch(/overflow:\s*hidden/);   // nothing of the name is cut
+    expect(block).toMatch(/border-radius:\s*28px/);     // a tall button is a rounded box: a full pill's curve crowds the words
+  });
+  it('the shared button stays one line everywhere else', () => {
+    expect(ruleBlock(CSS, '\n    .ui-btn {')).toMatch(/white-space:\s*nowrap/);
+  });
+});

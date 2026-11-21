@@ -3677,6 +3677,10 @@
     .plan-strip-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 4px 0 4px 12px; }
     .plan-strip-resume { flex: none; font-size: var(--fsc-14); }
     .plan-end { max-width: 34rem; margin: 18px auto 8px; text-align: center; font-family: var(--font-body); }
+    /* The Next button names the next reading ("Next · Volume One: Honor Not the Day of the Dead... →"): a long letter
+       title wraps inside the button, which grows, instead of running out of it on both sides. The corners stop at 28px: one
+       and two lines are still a pill, and a taller button (large text) is a rounded box whose corners clear the words. */
+    .plan-end > .ui-btn.is-wide { height: auto; padding-block: 10px; border-radius: 28px; white-space: normal; text-align: center; text-wrap: balance; overflow-wrap: anywhere; }
     .plan-end-read { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 14px; color: var(--cream); font-size: var(--fs-18); }
     .plan-end-note { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
     /* The Read tab's plan row: its text opens the plan's page. */
