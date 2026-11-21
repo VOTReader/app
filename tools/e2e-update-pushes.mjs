@@ -230,12 +230,16 @@ try {
   await hold(lazy);
   swWaits = false;
   swBump = 'lazy' + Date.now().toString(36);
+  // served.new is only renamed when the server next serves the worker: until then it still names arm 5's build,
+  // which is what controls this page now. This arm's takeover is a controller that carries this arm's tag.
+  served.new = null;
+  const mine6 = (/** @type {any} */ v) => !!v && v === served.new && String(v).includes('-lazy');
   await lazy.evaluate(() => { navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {}); });
   const t6 = Date.now();
   let v6 = await controllerVersion(lazy).catch(() => null);
-  while (v6 !== served.new && Date.now() - t6 < TAKEOVER_MS) { await sleep(400); v6 = await controllerVersion(lazy).catch(() => null); }
+  while (!mine6(v6) && Date.now() - t6 < TAKEOVER_MS) { await sleep(400); v6 = await controllerVersion(lazy).catch(() => null); }
   const h6 = await heldState(lazy);
-  if (v6 !== served.new) fail(`6 the build published (${served.new}) did not take over the held page within ${TAKEOVER_MS / 1000} s`);
+  if (!mine6(v6)) fail(`6 the build published (${served.new}) did not take over the held page within ${TAKEOVER_MS / 1000} s (it is controlled by ${v6})`);
   else if (!h6 || h6.mark !== 'same document' || !h6.took) fail(`6 the held page after the takeover: ${JSON.stringify(h6)} (want the same document with the takeover flag)`);
   else if (!had) {
     const nav6 = lazy.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).then(() => true, () => false);
