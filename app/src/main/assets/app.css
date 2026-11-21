@@ -9042,6 +9042,8 @@ body.light .install-step-num { color: #fff; }
 .install-ask { text-align: center; padding-bottom: 0; }
 /* The popup's buttons hold the foot of the sheet while its words scroll under them (largest text, small screen). */
 .install-ask-actions { position: sticky; bottom: 0; padding: 0.4rem 0 calc(1rem + var(--inset-bottom, 0px)); background: var(--bg); }
+/* At large text the words run under the buttons: a line across the sheet says so, where a cut box edge looked broken. */
+.vot-large-text .install-ask-actions { margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; border-top: 1px solid var(--gold-border); }
 .install-ask-icon { display: block; width: 3.5rem; height: 3.5rem; margin: 0 auto 0.6rem; border-radius: 22%; }
 .install-ask-go {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 52px; margin-top: 0.5rem;
