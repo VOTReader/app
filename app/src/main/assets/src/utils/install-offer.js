@@ -18,6 +18,8 @@
                  most once a session, "Maybe later" snoozes 21 days, three
                  dismissals or "Don't ask again" end it for good.
    dismiss       the next persisted state after a dismissal.
+   seemsInstalled / markStandalone
+                 a browser tab does not ask a reader who has the app already.
    capture       holds the deferred beforeinstallprompt event, from boot.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -58,7 +60,7 @@ export function installFlow(ua, env) {
 }
 
 /**
- * @typedef {{ never?: boolean, dismissals?: number, snoozeUntil?: number }} InstallOfferState
+ * @typedef {{ never?: boolean, dismissals?: number, snoozeUntil?: number, standaloneAt?: number, real?: boolean }} InstallOfferState
  */
 
 /**
@@ -85,6 +87,44 @@ export function dismiss(state, how, now) {
   s.dismissals = (s.dismissals || 0) + 1;
   s.snoozeUntil = now + SNOOZE_DAYS * 86400000;
   return s;
+}
+
+/* ── installed already? ──────────────────────────────────────────────────
+   A page in a browser tab cannot ask whether its icon is on the home screen. It can know two things:
+     related        what navigator.getInstalledRelatedApps() answered: true, the browser sees the installed app
+                    (Chrome on Android, for a real app it had Google Play install, once the manifest names itself
+                    under related_applications); false, it sees none; null, it cannot say.
+     standaloneAt   the last time the app ran from its own icon. That window shares this browser's storage on
+                    Android and on a computer (not on an iPhone, where the home-screen app keeps its own).
+                    `real` is what the browser answered about itself in that window.
+   So a reader who uses the icon is not asked in a tab, and one who removed the app is asked again as soon as
+   the browser can tell (a real app that is gone; a computer's Chrome offering to install), else 21 days after
+   the icon was last used. A phone without Google Play pins a home-screen icon that is no app the browser can
+   see, and its Chrome offers to install whether or not the icon is there: only the 21 days speak for it. */
+
+/**
+ * The state after a run from the app's own icon.
+ * @param {InstallOfferState | null | undefined} state @param {number} now @param {boolean | undefined} real
+ * @returns {InstallOfferState}
+ */
+export function markStandalone(state, now, real) {
+  const s = Object.assign({}, state || {}, { standaloneAt: now });
+  if (typeof real === 'boolean') s.real = real;
+  return s;
+}
+
+/**
+ * @param {InstallOfferState | null | undefined} state
+ * @param {{ now: number, related: boolean | null, hasPrompt: boolean, android: boolean }} ctx
+ * @returns {boolean}
+ */
+export function seemsInstalled(state, ctx) {
+  if (ctx.related === true) return true;
+  const s = state || {};
+  if (!s.standaloneAt || ctx.now - s.standaloneAt >= SNOOZE_DAYS * 86400000) return false;
+  if (s.real === true && ctx.related === false) return false;   // it was a real app, and the browser says it is gone
+  if (ctx.hasPrompt && !ctx.android) return false;               // a computer's Chrome offers install only when it is not installed
+  return true;
 }
 
 /* ── capture: Chromium fires beforeinstallprompt once, early; keep it ────── */

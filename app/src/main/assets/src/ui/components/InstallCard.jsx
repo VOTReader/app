@@ -24,7 +24,7 @@
    (the PWA does not keep recordings the way the APK does).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { installFlow, shouldOffer, dismiss, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
+import { installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
 import { watchReaderScroll } from '../../utils/reader-hand.js';
 
 const STATE_KEY = 'vot-install-offer';
@@ -110,19 +110,24 @@ const STEPS = {
       ['install/android-1.jpg', 'Tap the menu', 'The three dots at the top right.'],
       ['install/android-2.jpg', 'Tap Add to Home screen', 'Some phones say Install app.'],
       ['install/android-3.jpg', 'Tap Install', 'Not Create shortcut. If a box asks again, tap Install again.'],
-      ['install/android-4.jpg', 'Tap Add to home screen', 'Your phone may ask this last. Cancel leaves no icon.'],
+      ['install/android-4.jpg', 'Tap Add to home screen', 'Your phone may ask this last. Cancel leaves no icon. You can also press and hold the icon in the box and drag it to your home screen.'],
     ],
   },
   /* After the reader said Install in Chrome's dialog. Chrome calls that installed already, but on a phone that
      asks in a second box nothing is on the home screen until that box is answered; and a phone that installs a
-     real app may put it in the list of apps only (Samsung's "Add new apps to Home screen" is off by default). */
+     real app may put it in the list of apps only (Samsung's "Add new apps to Home screen" is off by default).
+     Walked again on Android 17 with the Pixel launcher (2026-11-20, Chrome 145): the box's button puts the icon
+     on the SECOND home-screen page, with the first page half empty. And launchers built on Android 16 QPR1 and
+     later, GrapheneOS's among them, are reported to hold the button's icon back until the launcher restarts
+     (GrapheneOS forum, threads 28708 and 28641); dragging the icon out of the box places it at once. */
   'android-after': {
     title: 'Almost done',
     intro: 'Your phone finishes the install:',
     steps: [
       ['install/android-4.jpg', 'Tap Add to home screen', 'If your phone shows this box. Cancel leaves no icon.'],
-      [null, 'Look on your home screen', 'It can take a minute. Not there? Swipe up to your list of apps: some phones put it there. Press and hold it to drag it to the home screen.'],
-      [null, 'Still not there?', 'Go to Settings and tap Install VOTReader. It shows each step with a picture.'],
+      [null, 'Look on your home screen', 'Swipe sideways too: many phones put a new icon on the second page. It can take a minute.'],
+      [null, 'Not there?', 'Swipe up to your list of apps and look for VOTReader. Press and hold it to drag it to the home screen.'],
+      [null, 'Still not there?', 'Install again: Settings, then Install VOTReader. When the box in the picture comes up, press and hold the icon in it and drag it onto your home screen.'],
     ],
   },
   /* An in-app browser cannot install anything and the browser never offers it there. The reader is told where to
@@ -391,10 +396,32 @@ const POPUP_DELAY_MS = 1500;
 /* A Chromium hands its install event over some seconds after the page is up (the worker and the manifest are
    checked first). Until it has, the popup could only describe the menu; it waits this long for the button. */
 const POPUP_EVENT_WAIT_MS = 8000;
+/* A driven browser (the walks' headless Chrome says navigator.webdriver, as use-web-renderer's walkOn reads it)
+   is nobody to ask: the popup would lie over the screens a walk photographs (rel33: e2e-tabs' cards came out
+   dimmed by its backdrop). A walk that wants the popup sets window.__votInstallPopup = true first. */
+const _driven = () => typeof navigator !== 'undefined' && navigator.webdriver === true
+  && /** @type {any} */ (globalThis).__votInstallPopup !== true;
+/* What the browser says of an installed app here (see install-offer's seemsInstalled): null until it answers. */
+let _related = /** @type {boolean | null} */ (null);
+function _askRelated() {
+  const nav = /** @type {any} */ (typeof navigator !== 'undefined' ? navigator : null);
+  if (!nav || typeof nav.getInstalledRelatedApps !== 'function') return Promise.resolve(null);
+  try {
+    return Promise.resolve(nav.getInstalledRelatedApps()).then(
+      (/** @type {any} */ apps) => { _related = Array.isArray(apps) ? apps.length > 0 : null; return _related; },
+      () => null,
+    );
+  } catch (_e) { return Promise.resolve(null); }
+}
+const _standalone = () => {
+  const g = /** @type {any} */ (globalThis);
+  return !(g.PlatformBridge && g.PlatformBridge.isAndroid)
+    && !!(g.StorageHealth && typeof g.StorageHealth._isStandalone === 'function' && g.StorageHealth._isStandalone());
+};
 const _eventMayCome = (/** @type {string | null} */ f) => f === 'android-chrome' || f === 'samsung' || f === 'desktop';
 let _popupSeen = false;
 /** Tests only. */
-export function _resetInstallPopupSession() { _popupSeen = false; }
+export function _resetInstallPopupSession() { _popupSeen = false; _related = null; }
 
 /** The tour or another dialog has the screen. */
 function _screenTaken() {
@@ -424,17 +451,30 @@ export function InstallPopup({ screen }) {
   const [stepsFor, setStepsFor] = React.useState(/** @type {string | null} */ (null));
   const flow = _flow();
   const offer = flow;   // every browser with a way to install: a button where the browser gives one, a line where not
-  const due = !kind && !_popupSeen && screen === 'home' && !!offer
+  const due = !kind && !_popupSeen && screen === 'home' && !!offer && !_driven()
     && shouldOffer(_readState(), { flow: offer, engaged: true, shownThisSession: false, now: Date.now() });
+  // Ask the browser once whether the app is installed here; a run from the app's own icon is written down, so a
+  // tab of the same browser knows not to ask a reader who has it.
+  React.useEffect(() => {
+    let live = true;
+    _askRelated().then((related) => {
+      if (live && _standalone()) _writeState(markStandalone(_readState(), Date.now(), related == null ? undefined : related));
+    });
+    return () => { live = false; };
+  }, []);
   React.useEffect(() => {
     if (!due) return undefined;
     const t = setTimeout(() => {
       if (_popupSeen || _screenTaken()) return;   // the next arrival on Home asks instead
+      if (seemsInstalled(_readState(), { now: Date.now(), related: _related, hasPrompt: hasInstallPrompt(), android: _isAndroid() })) return;
       _popupSeen = true;
       setKind(offer);
     }, _eventMayCome(offer) ? POPUP_EVENT_WAIT_MS : POPUP_DELAY_MS);
     return () => clearTimeout(t);
   }, [due, offer]);
+  // The popup belongs to Home: if the screen changes under it (a link, the back key), it goes, and that is no
+  // answer from the reader.
+  React.useEffect(() => { if (screen !== 'home') setKind(null); }, [screen]);
   // The event arrived while the popup was describing the menu: it gets its button.
   const shown = kind && _eventMayCome(kind) && flow === 'prompt' ? 'prompt' : kind;
 
@@ -481,11 +521,15 @@ function InstallAsk({ kind, onInstall, onLater }) {
         <h2 className="install-steps-title" id={'install-ask-title-' + id}>Install VOTReader</h2>
         <p className="install-steps-intro">{line}</p>
         {how ? <p className="install-ask-how">{how}</p> : null}
-        {how ? null : inApp
-          ? <a className="install-ask-go" href={ownBrowserUrl(kind, typeof location !== 'undefined' ? location.href : '')}>Open in {browser}</a>
-          : <button type="button" className="install-ask-go" onClick={onInstall}>Install</button>}
-        {inApp ? <p className="install-ask-note">If nothing happens, tap the three dots at the top of this screen, then Open in {browser}.</p> : null}
-        <button type="button" className="install-steps-done" onClick={onLater}>{how ? 'Got it' : 'Not now'}</button>
+        {inApp ? <p className="install-ask-note">If the button does nothing, tap the three dots at the top of this screen, then Open in {browser}.</p> : null}
+        {/* The buttons stay at the foot of the sheet while its words scroll: at the largest text the words alone
+            are taller than a small screen. */}
+        <div className="install-ask-actions">
+          {how ? null : inApp
+            ? <a className="install-ask-go" href={ownBrowserUrl(kind, typeof location !== 'undefined' ? location.href : '')}>Open in {browser}</a>
+            : <button type="button" className="install-ask-go" onClick={onInstall}>Install</button>}
+          <button type="button" className="install-steps-done" onClick={onLater}>{how ? 'Got it' : 'Not now'}</button>
+        </div>
       </div>
     </div>,
     document.body,

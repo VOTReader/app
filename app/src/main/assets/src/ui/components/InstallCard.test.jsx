@@ -539,7 +539,7 @@ describe('InstallPopup: it comes up by itself', () => {
     const go = ask().querySelector('a.install-ask-go');
     expect(go.textContent).toBe('Open in Chrome');
     expect(go.getAttribute('href')).toBe(ownBrowserUrl('in-app-android', location.href));
-    expect(ask().querySelector('.install-ask-note').textContent).toBe('If nothing happens, tap the three dots at the top of this screen, then Open in Chrome.');
+    expect(ask().querySelector('.install-ask-note').textContent).toBe('If the button does nothing, tap the three dots at the top of this screen, then Open in Chrome.');
   });
 
   it('the way out is this page in the phone\'s own browser: an intent link for Chrome, x-safari for Safari', () => {
@@ -554,6 +554,130 @@ describe('InstallPopup: it comes up by itself', () => {
     act(() => { vi.advanceTimersByTime(1600); });
     expect(ask().querySelector('a.install-ask-go').textContent).toBe('Open in Safari');
     expect(ask().querySelector('a.install-ask-go').getAttribute('href')).toMatch(/^x-safari-http/);
+  });
+
+  /* The hub's read of the popup at 200% text in Messenger: Not now sat below the fold. The buttons are one block
+     at the foot of the sheet (it sticks there in CSS) and the words, the note included, come before it. */
+  it('its buttons are one block at the foot of the sheet, after every word', () => {
+    ua = UA.messengerAndroid;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    const foot = ask().querySelector('.install-ask-actions');
+    expect(foot).toBe(ask().lastElementChild);
+    expect([...foot.children].map((b) => b.textContent)).toEqual(['Open in Chrome', 'Not now']);
+    expect(ask().querySelector('.install-ask-note').compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  /* rel33: the gate's tab walk (headless Chrome, "Chrome/" in its UA) met the popup's backdrop over the screens
+     it photographs. A driven browser is nobody to ask; a walk that wants the popup says so. */
+  describe('a driven browser', () => {
+    const drive = (on) => Object.defineProperty(window.navigator, 'webdriver', { configurable: true, get: () => on });
+    afterEach(() => { drive(false); delete globalThis.__votInstallPopup; });
+    it('is not asked', () => {
+      drive(true);
+      handOver();
+      render(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(ask()).toBeNull();
+    });
+    it('is asked when the walk sets window.__votInstallPopup', () => {
+      drive(true);
+      globalThis.__votInstallPopup = true;
+      handOver();
+      render(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(ask()).not.toBeNull();
+    });
+  });
+
+  it('goes when the screen changes under it, and that is not a "Not now"', () => {
+    handOver();
+    const v = render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask()).not.toBeNull();
+    v.rerender(<InstallPopup screen="letter" />);
+    expect(ask()).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+    v.rerender(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(ask()).toBeNull();                          // once a session
+  });
+
+  /* Corbin 2026-11-20: "make sure you address the wrinkle you mentioned" (a reader who has the app was asked
+     again in a browser tab after 21 days). A tab does not ask where the app is installed. */
+  describe('where the app is installed already', () => {
+    const settle = () => act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    const DAY = 86400000;
+    afterEach(() => { delete window.navigator.getInstalledRelatedApps; });
+    const browserSays = (apps) => { window.navigator.getInstalledRelatedApps = vi.fn(() => Promise.resolve(apps)); };
+
+    it('the browser says the app is installed (a real app from Google Play): not asked', async () => {
+      browserSays([{ platform: 'webapp', url: 'https://votreader.github.io/app/manifest.json' }]);
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(ask()).toBeNull();
+    });
+
+    it('a run from the app\'s own icon is written down, with what the browser said of it', async () => {
+      browserSays([]);
+      globalThis.StorageHealth._isStandalone = () => true;
+      render(<InstallPopup screen="home" />);
+      await settle();
+      const s = JSON.parse(localStorage.getItem(KEY));
+      expect(s.standaloneAt).toBeGreaterThan(Date.now() - 5000);
+      expect(s.real).toBe(false);                      // a home-screen icon the browser cannot see (no Google Play)
+      expect(ask()).toBeNull();
+    });
+
+    it('a tab on a phone whose icon was used in the last 21 days: not asked, even with the install event (that Chrome always offers)', async () => {
+      browserSays([]);
+      localStorage.setItem(KEY, JSON.stringify({ standaloneAt: Date.now() - 3 * DAY, real: false }));
+      handOver();
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(ask()).toBeNull();
+    });
+
+    it('the icon unused for 21 days: asked again', async () => {
+      browserSays([]);
+      localStorage.setItem(KEY, JSON.stringify({ standaloneAt: Date.now() - 22 * DAY, real: false }));
+      handOver();
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(ask()).not.toBeNull();
+    });
+
+    it('a reader who removed a real app and came back the same day (the reader of 2026-11-20): asked at once', async () => {
+      browserSays([]);
+      localStorage.setItem(KEY, JSON.stringify({ standaloneAt: Date.now() - 3600000, real: true }));
+      handOver();
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(ask().querySelector('.install-ask-go').textContent).toBe('Install');
+    });
+
+    it('a computer whose Chrome offers to install has no app: asked', async () => {
+      ua = UA.chromeDesktop;
+      localStorage.setItem(KEY, JSON.stringify({ standaloneAt: Date.now() - 3600000 }));
+      handOver();
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(ask()).not.toBeNull();
+    });
+
+    it('a computer whose Chrome does not offer, the app\'s window used lately: not told about the address bar', async () => {
+      ua = UA.chromeDesktop;
+      localStorage.setItem(KEY, JSON.stringify({ standaloneAt: Date.now() - 3600000 }));
+      render(<InstallPopup screen="home" />);
+      await settle();
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(ask()).toBeNull();
+    });
   });
 });
 
@@ -624,10 +748,13 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     expect(sheet.getAttribute('role')).toBe('dialog');
     expect(sheet.querySelector('.install-steps-title').textContent).toBe('Almost done');
     expect([...sheet.querySelectorAll('.install-step-title')].map((t) => t.textContent))
-      .toEqual(['Tap Add to home screen', 'Look on your home screen', 'Still not there?']);
+      .toEqual(['Tap Add to home screen', 'Look on your home screen', 'Not there?', 'Still not there?']);
     expect(sheet.querySelector('.install-step-note').textContent).toMatch(/Cancel leaves no icon/);
-    expect(sheet.querySelectorAll('.install-step-note')[2].textContent).toBe('Go to Settings and tap Install VOTReader. It shows each step with a picture.');
-    expect(sheet.querySelectorAll('.install-step-note')[1].textContent).toMatch(/list of apps/);
+    // Android 17's launcher puts the new icon on the second home page (walked 2026-11-20): the note says to look there.
+    expect(sheet.querySelectorAll('.install-step-note')[1].textContent).toBe('Swipe sideways too: many phones put a new icon on the second page. It can take a minute.');
+    expect(sheet.querySelectorAll('.install-step-note')[2].textContent).toMatch(/list of apps/);
+    // Where the launcher holds the button's icon back (Android 16 QPR1 and later, GrapheneOS), dragging places it.
+    expect(sheet.querySelectorAll('.install-step-note')[3].textContent).toBe('Install again: Settings, then Install VOTReader. When the box in the picture comes up, press and hold the icon in it and drag it onto your home screen.');
     // The phone's own box is pictured; the second step is words only and takes the picture's room.
     expect([...sheet.querySelectorAll('.install-step img')].map((i) => i.getAttribute('src'))).toEqual(['install/android-4.jpg']);
     expect(sheet.querySelectorAll('.install-step')[1].classList.contains('install-step-plain')).toBe(true);

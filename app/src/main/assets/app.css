@@ -9039,7 +9039,9 @@ body.light .install-step-num { color: #fff; }
 .install-step-pic { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--gold-border); }
 .install-step-plain .install-step-text { grid-column: 2 / -1; }   /* a step with no picture: its words take that room */
 /* The install popup: the same sheet, the app's icon, one line, Install and Not now. */
-.install-ask { text-align: center; }
+.install-ask { text-align: center; padding-bottom: 0; }
+/* The popup's buttons hold the foot of the sheet while its words scroll under them (largest text, small screen). */
+.install-ask-actions { position: sticky; bottom: 0; padding: 0.4rem 0 calc(1rem + var(--inset-bottom, 0px)); background: var(--bg); }
 .install-ask-icon { display: block; width: 3.5rem; height: 3.5rem; margin: 0 auto 0.6rem; border-radius: 22%; }
 .install-ask-go {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 52px; margin-top: 0.5rem;

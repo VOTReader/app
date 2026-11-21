@@ -1,7 +1,7 @@
 /* ip1 — when and how to offer "install as an app" (utils/install-offer.js). */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  installFlow, shouldOffer, dismiss, SNOOZE_DAYS, attachInstallCapture, hasInstallPrompt, wasInstalled,
+  installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, SNOOZE_DAYS, attachInstallCapture, hasInstallPrompt, wasInstalled,
   subscribeInstall, promptInstall, _resetInstallCapture,
 } from './install-offer.js';
 
@@ -86,6 +86,40 @@ describe('shouldOffer + dismiss', () => {
   it('"Don\'t ask again" and an install end it for good', () => {
     expect(shouldOffer(dismiss(null, 'never', now), { ...ctx, now: now + 1e12 })).toBe(false);
     expect(shouldOffer(dismiss(null, 'installed', now), ctx)).toBe(false);
+  });
+});
+
+/* A tab does not ask a reader who has the app (Corbin 2026-11-20). */
+describe('seemsInstalled + markStandalone', () => {
+  const now = 1_800_000_000_000;
+  const DAY = 86400000;
+  const tab = { now, related: /** @type {boolean | null} */ (null), hasPrompt: false, android: true };
+  it('the browser seeing the installed app settles it', () => {
+    expect(seemsInstalled(null, { ...tab, related: true })).toBe(true);
+    expect(seemsInstalled({ standaloneAt: now - 400 * DAY }, { ...tab, related: true })).toBe(true);
+  });
+  it('nothing known: not installed', () => {
+    expect(seemsInstalled(null, tab)).toBe(false);
+    expect(seemsInstalled({ dismissals: 1 }, { ...tab, related: false })).toBe(false);
+  });
+  it('a run from the icon is written down and keeps what was there', () => {
+    expect(markStandalone({ dismissals: 2 }, now, false)).toEqual({ dismissals: 2, standaloneAt: now, real: false });
+    expect(markStandalone({ real: true }, now, undefined)).toEqual({ real: true, standaloneAt: now });
+  });
+  it('the icon used within ' + SNOOZE_DAYS + ' days counts as installed on a phone, whatever its Chrome offers', () => {
+    const s = markStandalone(null, now - 5 * DAY, false);
+    expect(seemsInstalled(s, { ...tab, related: false, hasPrompt: true })).toBe(true);
+    expect(seemsInstalled(s, { ...tab, now: now + SNOOZE_DAYS * DAY, related: false })).toBe(false);
+  });
+  it('a real app the browser no longer sees is gone', () => {
+    const s = markStandalone(null, now - DAY, true);
+    expect(seemsInstalled(s, { ...tab, related: false })).toBe(false);
+    expect(seemsInstalled(s, { ...tab, related: null })).toBe(true);     // the browser cannot say: the icon was used yesterday
+  });
+  it('a computer\'s Chrome offers to install only what is not installed', () => {
+    const s = markStandalone(null, now - DAY, undefined);
+    expect(seemsInstalled(s, { ...tab, android: false, hasPrompt: true })).toBe(false);
+    expect(seemsInstalled(s, { ...tab, android: false, hasPrompt: false })).toBe(true);
   });
 });
 

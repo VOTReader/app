@@ -9,6 +9,9 @@
   "background_color": "#000000",
   "theme_color": "#000000",
   "categories": ["books", "education"],
+  "related_applications": [
+    { "platform": "webapp", "url": "https://votreader.github.io/app/manifest.json" }
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",
