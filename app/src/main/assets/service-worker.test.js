@@ -157,7 +157,7 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
     addEventListener: (t, fn) => { handlers[t] = fn; },
     // scriptPath: where the worker is served (the PWA's is /app/service-worker.js); unset, the location has no path.
     location: scriptPath ? { origin: 'https://app.test', pathname: scriptPath } : { origin: 'https://app.test' },
-    skipWaiting: () => { skipped.count += 1; return Promise.resolve(); },
+    skipWaiting: () => { if (skipped.fail) return Promise.reject(new Error('no')); skipped.count += 1; return Promise.resolve(); },
     clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
     registration,
   };
@@ -167,7 +167,7 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   // eslint-disable-next-line no-new-func
   const run = new Function('self', 'caches', 'fetch', 'console', 'Request', 'crypto', SW_SRC);
   run(self, caches, fetchFn, { log() {}, warn: (...args) => warnLog.push(args), error() {} }, FakeRequest, webcrypto);
-  return { handlers, caches, claimed, cacheModes, attempts, warnLog, postedMessages, skipped };
+  return { handlers, caches, claimed, cacheModes, attempts, warnLog, postedMessages, skipped, failSkip: () => { skipped.fail = true; } };
 }
 
 // Drive the fetch handler: returns the promise passed to respondWith, or
@@ -196,48 +196,53 @@ async function coreCache(sw) {
   return sw.caches.open(name);
 }
 
-describe('a new build waits for a quiet moment (up1, Corbin 2026-10-23)', () => {
-  const win = (id, visibilityState) => ({ id, type: 'window', visibilityState, postMessage: () => {} });
-  async function ask(sw, sourceId) {
+describe('nothing makes an update wait (Corbin 2026-11-20)', () => {
+  /** A window of the app; it records what the worker asks it. */
+  const win = (id, visibilityState, asked = []) => ({ id, type: 'window', visibilityState, postMessage: (m, ports) => { asked.push(m && m.type); if (ports && ports[0]) ports[0].postMessage({ busy: true }); } });
+  async function ask(sw, source) {
     let work = Promise.resolve();
-    sw.handlers.message({ data: { type: 'SKIP_WAITING' }, source: { id: sourceId }, waitUntil: (p) => { work = p; } });
+    sw.handlers.message({ data: { type: 'SKIP_WAITING' }, source, waitUntil: (p) => { work = p; } });
     await work;
   }
 
-  it('install does not skip waiting: the open page keeps its build until it asks', async () => {
+  it('a build that has installed skips waiting, an older worker running and a reader on screen', async () => {
+    const asked = [];
+    const sw = bootSW({ windows: [win('reader', 'visible', asked)], registration: { active: {} } });
+    await install(sw);
+    expect(sw.skipped.count).toBe(1);
+    expect(asked, 'it asks the windows nothing first').toEqual([]);
+  });
+
+  it('a first install skips waiting too', async () => {
     const sw = bootSW();
     await install(sw);
-    expect(sw.skipped.count).toBe(0);
-  });
-
-  it('the page that asks takes over when no other window of the app is on screen', async () => {
-    const sw = bootSW({ windows: [win('me', 'visible'), win('other', 'hidden')] });
-    await ask(sw, 'me');
     expect(sw.skipped.count).toBe(1);
   });
 
-  it('another window still on screen refuses it: that reader would be reloaded mid-session', async () => {
-    const sw = bootSW({ windows: [win('me', 'hidden'), win('other', 'visible')] });
-    await ask(sw, 'me');
+  it('a refused install never takes over: the previous build keeps serving', async () => {
+    const sw = bootSW({ registration: { active: {} }, corrupt: ['./dist/bundle-a.js'] });
+    await expect(install(sw)).rejects.toThrow();
     expect(sw.skipped.count).toBe(0);
   });
 
-  it('a hidden window that says it is busy (playing, or a note open) refuses it; one that is not, does not', async () => {
-    const busyWin = (busy) => ({ id: 'other', type: 'window', visibilityState: 'hidden', postMessage: (_m, ports) => ports[0].postMessage({ busy }) });
-    const a = bootSW({ windows: [win('me', 'visible'), busyWin(true)] });
-    await ask(a, 'me');
-    expect(a.skipped.count).toBe(0);
-    const b = bootSW({ windows: [win('me', 'visible'), busyWin(false)] });
-    await ask(b, 'me');
-    expect(b.skipped.count).toBe(1);
+  it('a page that asks a waiting build: it takes over with another window on screen that calls itself busy', async () => {
+    const asked = [];
+    const sw = bootSW({ windows: [win('me', 'hidden'), win('other', 'visible', asked)] });
+    await ask(sw, { id: 'me' });
+    expect(sw.skipped.count).toBe(1);
+    expect(asked).toEqual([]);
   });
 
-  it('an ask with no source (an older page) is still honoured when nothing else is on screen', async () => {
-    const sw = bootSW({ windows: [win('a', 'hidden')] });
-    let work = Promise.resolve();
-    sw.handlers.message({ data: { type: 'SKIP_WAITING' }, waitUntil: (p) => { work = p; } });
-    await work;
+  it('an ask with no source (an older page) is honoured', async () => {
+    const sw = bootSW({ windows: [win('a', 'visible')] });
+    await ask(sw, undefined);
     expect(sw.skipped.count).toBe(1);
+  });
+
+  it('a skipWaiting that fails does not fail the install: the build waits and the page asks', async () => {
+    const sw = bootSW({ registration: { active: {} } });
+    sw.failSkip();
+    await expect(install(sw)).resolves.toBeUndefined();
   });
 });
 

@@ -12,26 +12,29 @@
  *      explicit (the 'imports' default already bypasses the HTTP cache for the
  *      top-level script; 'none' also covers any future importScripts and any
  *      browser that reads the default loosely).
- *   2. A new build downloads in the background and WAITS (the SW no longer
- *      skips waiting on install; up1, Corbin 2026-10-23: "VOTReader has been
- *      flashing 'VOTReader was just updated' at me all day long"). It takes
- *      over only when nobody is in the middle of anything:
- *        - the next time the app opens from closed: the browser activates a
- *          waiting worker once its last page is gone, or this page finds it
- *          waiting at registration and asks it to (step 4);
- *        - when the app comes back after AWAY_TAKEOVER_MS (10 min) in the
- *          background, or is still hidden when that time is up.
- *      Never while a recording plays (screen off included) and never while a
- *      note, voice memo or backup holds it (update-hold.js). The worker also
- *      refuses while another window of the app is on screen.
+ *   2. A new build downloads in the background and TAKES OVER THE MOMENT IT
+ *      HAS INSTALLED: the worker skips waiting by itself (service-worker.js)
+ *      and claims every open page. Nothing makes it wait: not a reader in the
+ *      middle of a read, not a recording playing. Corbin 2026-11-20: "Make
+ *      sure updates are actually pushing ... there's no reason users should be
+ *      outdated", and of those two reasons to wait: "neither of those should
+ *      make the update wait. Clearly we're having issues pushing updates."
+ *      History: from 2026-10-23 (up1) a new build waited for the next open or
+ *      for 10+ minutes away, so every open ran the build the PREVIOUS open had
+ *      downloaded, and a reader back after weeks read weeks-old code for that
+ *      whole visit. What bounds the reloads now is the publish schedule (two
+ *      windows a day), not the client.
  *   3. 'controllerchange' fires here → we reload the page onto the new build,
- *      except at the first claim of a page its own build loaded (SW-CLAIM
- *      below). Since step 2 asks only at those moments, the reload lands on
- *      an opening app or one the reader is just coming back to; the app's own
- *      state restore (screen, scroll, playback position) carries them across,
- *      and update-toast.js says what changed.
- *   4. If a SW is already waiting when we register (the app just opened), we
- *      post SKIP_WAITING at once: the reader has not started anything yet.
+ *      wherever the reader is, except at the first claim of a page its own
+ *      build loaded (SW-CLAIM below). The app's own state restore (screen,
+ *      scroll, playback position) carries them across, and update-toast.js
+ *      says what changed. One thing holds the RELOAD, never the takeover: a
+ *      note being typed, a voice memo or a backup import (update-hold.js). It
+ *      would be lost, so the page reloads the moment it is saved or closed.
+ *   4. A worker found WAITING (one installed by a build from the up1 weeks, or
+ *      one whose own skipWaiting failed) is asked to take over wherever this
+ *      page sees it: at registration, when a build finishes installing, when
+ *      the app comes back on screen, and on ANOTHER_BUILD.
  */
 
 import { PlatformBridge } from './platform-bridge.js';
@@ -41,27 +44,6 @@ import { markUpdateReload } from './update-toast.js';
 import { onIdle } from './on-idle.js';
 import { updateHolds, whenUpdateUnheld } from './update-hold.js';
 import { registeredStores } from '../stores/cached-store.js';
-
-/** Away this long (the app in the background), and a waiting build may take over (up1). */
-export const AWAY_TAKEOVER_MS = 10 * 60 * 1000;
-
-/** A build that finishes installing this soon after the app opens, before the reader has touched anything, takes over
- *  at once (up1): the reload lands on a page nobody has started using. */
-export const BOOT_TAKEOVER_MS = 15 * 1000;
-export const UPDATE_READY_TOAST_ID = 'vot-toast-update-ready';
-export const UPDATE_READY_TEXT = 'A newer version is ready. Tap to update.';
-
-/** Whether something is playing: the player's media session (set for the native and the web player), or any media element. */
-function listening() {
-  try {
-    const ms = /** @type {any} */ (navigator).mediaSession;
-    if (ms && ms.playbackState === 'playing') return true;
-  } catch (_e) { /* no media session */ }
-  try {
-    for (const m of document.querySelectorAll('audio, video')) if (!(/** @type {HTMLMediaElement} */ (m)).paused) return true;
-  } catch (_e) { /* no DOM */ }
-  return false;
-}
 
 /** After the last hold lets go: long enough for the closing save's effects to issue their writes. */
 const HOLD_SETTLE_MS = 400;
@@ -98,13 +80,6 @@ export function registerServiceWorker() {
   // uncontrolled while a worker is already active (activeAtLoad), so the first
   // claim it sees is the next build's, and that one reloads like any other.
   const controllerAtRegistration = navigator.serviceWorker.controller;
-  // up1: the boot window. Any touch, key or wheel ends it: from then on a new build waits.
-  const bootAt = Date.now();
-  let touched = false;
-  if (typeof window !== 'undefined') {
-    const mark = () => { touched = true; };
-    for (const t of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(t, mark, { capture: true, passive: true, once: true });
-  }
   let controllerNow = controllerAtRegistration;
   /** @type {ServiceWorker | null} */ let activeAtLoad = null;
 
@@ -188,7 +163,8 @@ export function registerServiceWorker() {
   // the page at all — the s12 lesson again ("new work committed, nothing
   // changing on screen"). Record it AND show a toast naming the asset, since
   // the SW console is unreachable on a phone.
-  // up1: the worker asks every other window before a takeover (it reloads them all): busy = playing or holding.
+  // BUSY: a worker installed by a build from the up1 weeks (10-23 to 11-20) asks this of the other windows before
+  // it takes over, and waits on a yes. Nothing makes an update wait now, so the answer is always no.
   // ANOTHER_BUILD: this page asked for something its build cannot give it (W27: another build's code or timings
   // on the network); the waiting build is what it needs (onAnotherBuild, set once the registration is known).
   /** @type {() => void} */ let onAnotherBuild = () => { anotherBuildSeen = true; };
@@ -197,7 +173,7 @@ export function registerServiceWorker() {
     const d = event && event.data;
     if (d && d.type === 'BUSY') {
       const port = event.ports && event.ports[0];
-      if (port) { try { port.postMessage({ busy: listening() || updateHolds().length > 0 }); } catch (_e) { /* the worker gave up */ } }
+      if (port) { try { port.postMessage({ busy: false }); } catch (_e) { /* the worker gave up */ } }
       return;
     }
     if (d && d.type === 'ANOTHER_BUILD') { onAnotherBuild(); return; }
@@ -225,72 +201,21 @@ export function registerServiceWorker() {
   navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).then((reg) => {
     // The worker already active while this page is uncontrolled (a hard reload): see SW-CLAIM above.
     if (!controllerNow) activeAtLoad = reg.active || null;
-    // The app just opened: a build that waited since the last session takes over now, before anything is begun.
-    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-
-    // A build that finishes installing while the reader is here waits (up1): no reload mid-session. It takes over
-    // when the reader comes back after AWAY_TAKEOVER_MS away, or at the next open; or now, if the app opened moments
-    // ago and nothing has been touched (BOOT_TAKEOVER_MS), or this page's build already failed the reader (below).
-    const quiet = () => !listening() && !updateHolds().length;
+    // NOTHING MAKES AN UPDATE WAIT (Corbin 2026-11-20; the header, step 2). A new worker skips waiting by itself
+    // the moment it has installed. One can still be found waiting (step 4): wherever this page sees it, it asks.
+    const takeWaiting = () => { const w = reg.waiting; if (w) w.postMessage({ type: 'SKIP_WAITING' }); };
+    takeWaiting();
     reg.addEventListener('updatefound', () => {
       const incoming = reg.installing;
       if (!incoming) return;
       incoming.addEventListener('statechange', () => {
-        if (incoming.state !== 'installed') return;
-        if (!touched && Date.now() - bootAt < BOOT_TAKEOVER_MS && quiet()) { incoming.postMessage({ type: 'SKIP_WAITING' }); return; }
-        if (anotherBuildSeen) { offerBuild(); return; }   // installed later than the failure: offered, never taken unasked
-        console.info('[sw] new build downloaded; it waits for the next open or a return after 10 min away');
+        if (incoming.state === 'installed') incoming.postMessage({ type: 'SKIP_WAITING' });
       });
     });
-
-    // W27 + up1: something the reader asked for did not load (another build's code or timings: the worker's 503).
-    // A build already waiting, nothing playing, nothing held: take it now, the load that failed is what the reader is
-    // waiting for. Otherwise offer it, one tap; a build that only finishes installing later is offered too.
-    let offered = false;
-    const takeNeededBuild = () => {
-      const w = reg.waiting;
-      if (!w) return;   // still installing: 'installed' above offers it
-      if (quiet()) { w.postMessage({ type: 'SKIP_WAITING' }); return; }
-      offerBuild();
-    };
-    const offerBuild = () => {
-      if (offered || !reg.waiting) return;
-      offered = true;
-      showToast({ id: UPDATE_READY_TOAST_ID, className: 'vot-toast', text: UPDATE_READY_TEXT, durationMs: 20000 });
-      const el = document.getElementById(UPDATE_READY_TOAST_ID);
-      if (!el) return;
-      el.classList.add('vot-toast-action');
-      el.setAttribute('role', 'button');
-      el.setAttribute('tabindex', '0');
-      const go = () => { const ww = reg.waiting; if (ww) ww.postMessage({ type: 'SKIP_WAITING' }); };
-      el.addEventListener('click', go, { once: true });
-      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }, { once: true });
-    };
-    onAnotherBuild = () => { anotherBuildSeen = true; takeNeededBuild(); };
-    if (anotherBuildSeen) takeNeededBuild();
-
-    /** @type {number | null} */ let hiddenAt = null;
-    /** @type {ReturnType<typeof setTimeout> | null} */ let awayTimer = null;
-    const takeOverIfAway = () => {
-      const w = reg.waiting;
-      if (!w || hiddenAt == null || Date.now() - hiddenAt < AWAY_TAKEOVER_MS) return;
-      if (listening() || updateHolds().length) return;   // the next time away will do
-      w.postMessage({ type: 'SKIP_WAITING' });
-    };
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          hiddenAt = Date.now();
-          if (awayTimer) clearTimeout(awayTimer);
-          // Still away when the time is up: take over unseen (a frozen page runs this late, or the return below does).
-          awayTimer = setTimeout(() => { awayTimer = null; if (document.visibilityState === 'hidden') takeOverIfAway(); }, AWAY_TAKEOVER_MS);
-        } else if (document.visibilityState === 'visible') {
-          if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
-          takeOverIfAway();
-          hiddenAt = null;
-        }
-      });
-    }
+    // W27: something the reader asked for did not load (another build's code or timings: the worker's 503). A
+    // build already waiting is what it needs; one still installing takes over by itself when it is done.
+    onAnotherBuild = takeWaiting;
+    if (anotherBuildSeen) takeWaiting();
 
     // Poll hourly + on tab-focus so long-lived tabs still catch updates.
     // reg.update() REJECTS offline; unhandled, that rejection lands in
@@ -305,7 +230,7 @@ export function registerServiceWorker() {
     setInterval(pokeUpdate, 60 * 60 * 1000);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') pokeUpdate();
+        if (document.visibilityState === 'visible') { takeWaiting(); pokeUpdate(); }
       });
     }
     warmMeaningSearch();

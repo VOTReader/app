@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-14c85b015b';
+const CACHE_VERSION = 'v1.0.2-cc6a32788f';
 const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -319,7 +319,7 @@ const ASSET_INTEGRITY = {
   './': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './dist/app.min.css': 'fc57926917d30e3545547a26f075898b8352e71118f22868144b5b0eec082fc4',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': 'c895fc6a349fa2e798e612be529449d430330736a1ed35f591d33cb2e2c7135a',
+  './dist/bundle-b.js': '066ece9c128c42b1ac8fc0ed6a62592467d5909aabd5de21fa22f22712feecb4',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
   './dist/bundle-d.js': '4ea3b9bb7fecabfdd7905e673ef4953a05c0789437067e8b29edbe0b5c0cecbc',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
@@ -560,8 +560,8 @@ async function addVerified(cache, url, expected) {
 }
 
 self.addEventListener('install', (event) => {
-  // No skipWaiting here (up1, 2026-10-23): the new build waits until the page asks at a quiet moment (the
-  // SKIP_WAITING message below) or the app's last page closes. Taking over at once reloaded readers mid-session.
+  // THE NEW BUILD TAKES OVER THE MOMENT IT HAS INSTALLED (Corbin 2026-11-20; takeOver below). From 2026-10-23 to
+  // then (up1) it waited for the page to ask, at the next open or after 10+ minutes away.
   event.waitUntil((async () => {
     try {
       await installCore();
@@ -592,8 +592,28 @@ self.addEventListener('install', (event) => {
       for (const client of clientsList) client.postMessage(payload);
       throw err; // still fail the install — the previous worker keeps serving
     }
+    await takeOver();
   })());
 });
+
+// ── Nothing makes an update wait (Corbin 2026-11-20) ──
+// up1 (2026-10-23) had a new build wait until the page asked, and the page asked at an open only for a build
+// that was already waiting. So every open ran the build the PREVIOUS open had downloaded: a reader back after
+// three weeks spent that whole visit on three-week-old code, and the page that would have had to ask for the
+// new build was the old build's own. Corbin, with his phone's Chrome and a reader's iPhone both on old builds:
+// "Make sure updates are actually pushing ... there's no reason users should be outdated." Offered a build
+// that waits only for a reader well into a session or for a recording playing: "No, neither of those should
+// make the update wait. Clearly we're having issues pushing updates."
+// So the build that has just installed skips waiting, activate claims every open page, and each page reloads
+// onto it wherever the reader is (sw-register.js, controllerchange; its state restore lands them where they
+// were). The only thing left that waits is that page's reload while a note, voice memo or backup is open
+// (update-hold.js): the takeover itself never does. What bounds how often a reader is reloaded is the publish
+// schedule (two windows a day), not this file.
+
+/** Run once this build has installed. Never throws: if it fails the build waits and the page asks (SKIP_WAITING). */
+async function takeOver() {
+  try { await self.skipWaiting(); } catch (_e) { /* the page asks when it next sees this build waiting */ }
+}
 
 /** Every CRITICAL asset is in this build's core bucket right now. */
 async function shellCached() {
@@ -927,41 +947,13 @@ async function otherBuildCopy(response, key) {
   return new Response(out, { status: response.status, statusText: response.statusText, headers });
 }
 
-// ── Message: page-triggered activation (up1) ────
-// The one way a waiting build takes over while the app is open: sw-register.js
-// asks at app open, after 10+ min away, or when its build could not serve what the
-// reader asked for. The takeover reloads EVERY page it claims, so it is refused
-// while another window of the app is on screen, or busy out of sight: playing a
-// recording, or holding a note, memo or backup (each page answers BUSY; one that
-// does not answer within BUSY_WAIT_MS, an older build's, counts as not busy).
-const BUSY_WAIT_MS = 1500;
-/** Whether a hidden window says it is busy. @param {any} client */
-function askBusy(client) {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (/** @type {boolean} */ v) => { if (!done) { done = true; resolve(v); } };
-    try {
-      const ch = new MessageChannel();
-      ch.port1.onmessage = (e) => finish(!!(e && e.data && e.data.busy));
-      client.postMessage({ type: 'BUSY' }, [ch.port2]);
-    } catch (_e) { finish(false); return; }
-    setTimeout(() => finish(false), BUSY_WAIT_MS);
-  });
-}
+// ── Message: the page asks a waiting build to take over ────
+// A build skips waiting by itself once it has installed (takeOver above), so this is the second door: a page
+// that finds a build waiting all the same (sw-register.js, step 4) asks, and it takes over. No conditions:
+// from 2026-10-23 to 2026-11-20 (up1) it refused while another window was on screen or busy.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    const asker = event.source && event.source.id;
-    const work = (async () => {
-      /** @type {any[]} */ let others = [];
-      try {
-        const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        others = all.filter((c) => c && c.id !== asker);
-      } catch (_e) { /* cannot tell: take over, as the page asked */ }
-      if (others.some((c) => c.visibilityState === 'visible')) return;
-      const busy = await Promise.all(others.map(askBusy));
-      if (busy.some(Boolean)) return;
-      await self.skipWaiting();
-    })();
+    const work = takeOver();
     if (typeof event.waitUntil === 'function') event.waitUntil(work);
   }
   // GET_VERSION — let the PAGE ask which build is actually serving it.

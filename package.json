@@ -25,7 +25,7 @@
     "e2e:phone": "node tools/e2e-phone-fit.mjs",
     "e2e:readalong": "node tools/e2e-readalong.mjs",
     "e2e:restore-fresh": "node tools/e2e-restore-fresh.mjs",
-    "e2e:update-waits": "node tools/e2e-update-waits.mjs",
+    "e2e:update-pushes": "node tools/e2e-update-pushes.mjs",
     "e2e:search": "node tools/e2e-search.mjs",
     "e2e:contrast": "node tools/e2e-contrast.mjs",
     "e2e:official": "node tools/e2e-never-official.mjs",

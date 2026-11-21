@@ -20,10 +20,12 @@
  *      audio clock within one frame (CLOCK_TOL_FRAME) of the read taken in that tick,
  *      text size equal. A synthetic controllerchange drives it (no new build, so no
  *      toast is expected here — that is arm B's).
- *   B  A REAL UPDATE WHILE READING AND LISTENING (up1, 2026-10-23). The harness serves
- *      service-worker.js with a bumped CACHE_VERSION and asks the registration to update:
- *      the new worker installs and WAITS; the page does not reload and the recording plays
- *      on. (The takeover after 10+ min away is tools/e2e-update-waits.mjs.)
+ *   B  A REAL UPDATE WHILE READING AND LISTENING. The harness serves service-worker.js with a
+ *      bumped CACHE_VERSION and asks the registration to update: the new worker takes over at once
+ *      (Corbin 2026-11-20: nothing makes an update wait; tools/e2e-update-pushes.mjs walks the
+ *      takeover itself) and the page reloads under the reader. Asserted: the same letter, the
+ *      scroll, the text size, the same recording at the clock the reload event wrote, and sound
+ *      back at that clock, by itself or by one tap on "Updated · Tap to continue listening".
  *   C  A CLOSE WITH NO RELOAD EVENT (audio-clock-close-gap-1). The tab is closed mid-listen at
  *      a moment the periodic snapshot is provably >= 2.5 s stale, and a new tab in the same
  *      profile boots: the bar comes back on the same recording within 1 s of the clock read
@@ -621,33 +623,83 @@ try {
   }
 
   // ════════ ARM B — a real update while the reader reads and listens ════════
-  // up1 (Corbin 2026-10-23: "VOTReader has been flashing 'VOTReader was just updated' at me all day
-  // long"): a new build no longer takes over a page in use. It installs, WAITS, and takes over at the
-  // next open or after 10+ min away with nothing playing (tools/e2e-update-waits.mjs walks that).
-  // Until 10-23 this arm asserted the opposite: the instant reload, and the recording resuming across it.
+  // Same reader, a little later: playing again (a gesture if the browser refused arm A's
+  // resume), scrolled by the wheel to a new place and left idle, and then the server
+  // publishes a new worker and the app is asked to look for it. Nothing makes an update wait
+  // (Corbin 2026-11-20: "neither of those should make the update wait"): the new worker takes
+  // over at once and the page reloads under a reader who is reading and listening. From 10-23 to
+  // 11-20 (up1) this arm asserted the opposite: the build waits and the recording plays on.
   if (withAudio) { if (!(await ensurePlaying())) fail('B precondition: could not get the recording playing again before the real update'); }
   await wheelTo(400); await sleep(1200);
   const B0 = await readPage();
   swBump = 'walk' + Date.now().toString(36);
-  const navB = page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }).then(() => true, () => false);
-  await page.evaluate(() => { navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {}); });
+  const navB = page.waitForNavigation({ waitUntil: 'load', timeout: 90000 }).then(() => true, () => false);
   const tB = Date.now();
-  let waitingB = false;
-  while (!waitingB && Date.now() - tB < 90000) {
-    waitingB = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!(r && r.waiting); }).catch(() => false);
-    if (!waitingB) await sleep(500);
-  }
+  // Fire and return: update() resolves only once the new worker is installed, by which
+  // time it has claimed and the app has reloaded — an evaluate still awaiting it dies
+  // with the document ("Execution context was destroyed"). Nothing is awaited in-page.
+  await page.evaluate(() => { navigator.serviceWorker.getRegistration().then((r) => r && r.update()); });
   const reloadedB = await navB;
-  note(`B before: letter ${JSON.stringify(B0.title)} scrollTop=${B0.y} ${B0.status}; worker ${served.old} -> ${served.new}`);
-  if (!waitingB) fail(`B the new build (${served.new}) never reached waiting in 90 s`);
-  if (reloadedB) fail('B the page reloaded while the reader was reading and listening (up1: a new build waits)');
-  const B1 = await readPage();
-  // (The title may move on: a recording that ends plays the next one in the queue, and the page follows it.)
-  if (withAudio && B0.status === 'playing' && B1.status !== 'playing') fail(`B the recording stopped (${B1.status}) when the new build arrived`);
-  if (!reloadedB && waitingB) note(`B the new build waits: no reload ${Date.now() - tB} ms after update() was asked, still ${B1.status} on ${JSON.stringify(B1.title)}`);
+  note(`B before: letter ${JSON.stringify(B0.title)} scrollTop=${B0.y} ${B0.status} key ${B0.key} at ${B0.t === null ? 'n/a' : B0.t.toFixed(1)} s; worker ${served.old} -> ${served.new}`);
+  if (!reloadedB) fail(`B the page did not reload within 90 s of the new worker (served ${served.old} -> ${served.new})`);
+  else note(`B the new worker took over and the page reloaded ${Date.now() - tB} ms after update() was asked`);
+  if (B0.reloadBtn) fail('B a "Reload" prompt was rendered before the takeover — the reload is meant to be instant and unprompted');
+  const B1 = await afterReload('B');
   await shot('B-after');
-  // The waiting build must not leak into the arms below: they reopen this profile, and a waiting worker takes
-  // over at the next open. That is the intended behaviour, and arm C/D read the restore, not the build.
+  note(`B after:  letter ${JSON.stringify(B1.title)} scrollTop=${B1.y} --font-scale=${B1.fs} ${B1.status} key ${B1.key} store=${B1.storeT} clock=${B1.t === null ? 'n/a' : B1.t.toFixed(1)} toast=${JSON.stringify(B1.toast)} shown=${B1.toastShown}`);
+  const bootB = bootReport('B', B1, B0.y);
+  if (B1.title !== B0.title) fail(`B the reader came back on ${JSON.stringify(B1.title) || 'a different screen'}, not ${JSON.stringify(B0.title)}`);
+  assertScroll('B', B0.y, B1);
+  if (B1.fs !== fs0) fail(`B text size came back as --font-scale=${B1.fs}, was ${fs0}`);
+  // No toast is owed here: "Updated · What's new" shows once per release that changed something a reader
+  // would notice (update-toast.js), and this build changed nothing. The one toast this arm holds is the
+  // listening offer, below, when the browser refuses to resume the recording by itself.
+  note(`B toast after the real new build: ${JSON.stringify(B1.toastSeen ? B1.toastSeen.text : (B1.toastShown ? B1.toast : ''))}`);
+  if (withAudio && B0.key) {
+    if (B1.key !== B0.key) fail(`B the player holds ${JSON.stringify(B1.key)}, the reader was listening to ${JSON.stringify(B0.key)}`);
+    // The pre-reload read here is seconds before the event (the worker decides when),
+    // so the exact clock is the one the EVENT wrote: the record must sit between the
+    // read and the reload, and sound must come back at the record, within one frame.
+    const recT = bootB.audioRec ? bootB.audioRec.time : null;
+    const elapsedMax = (Date.now() - tB) / 1000 + 2;   // read → event, generously
+    if (recT === null) fail('B the clock record was not written on the reload event');
+    else if (recT < B0.t - CLOCK_TOL_FRAME || recT > B0.t + elapsedMax) fail(`B the clock record carries ${recT} s, outside [${B0.t.toFixed(3)}, ${(B0.t + elapsedMax).toFixed(1)}] s — not the clock at the event`);
+    let fp = firstPlaying(B1);
+    const refusals = (B1.audioEvents || []).filter((e) => e.type === 'play-refused');
+    if (refused && (fp || B1.status === 'playing')) phonePolicyVerdict('B', B1);
+    if (!fp && B1.status !== 'playing') {
+      // THE REFUSED SHAPE (the phone's): paused AT the flushed clock; the ONE toast reads
+      // the listening offer, exactly; one tap resumes at that clock; the toast then goes.
+      const LISTEN = 'Updated · Tap to continue listening';
+      note(`B autoplay after the real update: refused (status ${B1.status}; ${refusals.length} refused play() on record); toast ${JSON.stringify(B1.toast)}`);
+      if (B1.storeT !== recT) fail(`B the player came back paused at ${B1.storeT} s, not at the ${recT} s the event wrote`);
+      else note(`B the player came back paused at exactly the ${recT} s the event wrote`);
+      if (B1.toast !== LISTEN) fail(`B the toast reads ${JSON.stringify(B1.toast)}, want exactly ${JSON.stringify(LISTEN)}`);
+      if (!/tap to continue listening/i.test(B1.toast)) fail(`B the reader came back silent with no way to continue from the toast (toast ${JSON.stringify(B1.toast)})`);
+      else {
+        await page.click('#vot-toast-updated');
+        await page.waitForFunction(() => (window.__e2eAudioEvents || []).some((e) => e.type === 'playing'), { timeout: 15000 }).catch(() => {});
+        const after = await readPage();
+        fp = firstPlaying(after);
+        if (after.status !== 'playing') fail('B tapping the toast did not resume playback');
+        else note('B one tap on the toast resumed playback');
+        if (after.toastShown) fail(`B the toast is still showing after the tap (${JSON.stringify(after.toast)})`);
+        else note('B the toast went with the tap');
+      }
+    } else {
+      note('B autoplay after the real update: ALLOWED by this browser');
+      if (/continue listening/i.test(B1.toast || '') && B1.toastShown) fail(`B the recording resumed by itself and the toast still offers to continue it (${JSON.stringify(B1.toast)})`);
+    }
+    note(`B audio events since the boot: ${fmtEvents((await readPage()).audioEvents)}`);
+    if (!fp) fail('B sound never came back (no \'playing\' event after the boot)');
+    else if (recT !== null && Math.abs(fp.t - recT) > CLOCK_TOL_FRAME) fail(`B sound came back at ${fp.t.toFixed(3)} s against the ${recT} s the event wrote (tolerance ${CLOCK_TOL_FRAME} s, one frame; the reader was at ${B0.t.toFixed(3)} s when last read)`);
+    else if (recT !== null) note(`B clock: sound came back at ${fp.t.toFixed(3)} s against the ${recT} s the event wrote — ${((fp.t - recT) * 1000).toFixed(1)} ms, within one frame (the reader was at ${B0.t.toFixed(3)} s when last read)`);
+    if (fp) {
+      const p1 = await readPage(); await sleep(1500); const p2 = await readPage();
+      if (p2.t <= p1.t) fail('B the clock is not advancing after the resume');
+      else note(`B advancing: ${p1.t.toFixed(1)} s → ${p2.t.toFixed(1)} s`);
+    }
+  }
   // ════════ ARM C — a CLOSE with no reload event ════════
   // The tab closed mid-listen (or the WebView destroyed): nothing fires vot:before-update-reload,
   // so the next boot finds whatever the durable snapshot held. The close is taken at a moment the

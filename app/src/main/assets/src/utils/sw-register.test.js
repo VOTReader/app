@@ -457,197 +457,105 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
     expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
   });
 
-  it('a new build that finishes installing while the reader is here WAITS: no SKIP_WAITING, so no reload mid-session (up1)', async () => {
-    const incoming = fakeWorker();
-    const reg = mockSW({ installing: incoming });
-    registerServiceWorker();
-    await flush();
-    window.dispatchEvent(new Event('pointerdown'));   // the reader has started
-    reg._fire('updatefound');
-    incoming.fireState('installed');
-    expect(incoming.postMessage).not.toHaveBeenCalled();
-  });
-
-  describe('the waiting build takes over after 10+ minutes away (up1, Corbin 10-23)', () => {
-    let now = 0;
+  describe('nothing makes an update wait (Corbin 2026-11-20)', () => {
+    /** @type {(e: any) => void} */ let deliver = () => {};
     const setVisibility = (v) => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: v });
       Object.defineProperty(document, 'hidden', { configurable: true, value: v === 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
     };
-    beforeEach(() => {
-      now = 1_000_000;
-      vi.spyOn(Date, 'now').mockImplementation(() => now);
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
-    });
     afterEach(() => {
-      vi.useRealTimers();
       delete (/** @type {any} */ (document)).visibilityState;
       delete (/** @type {any} */ (document)).hidden;
       try { navigator.mediaSession.playbackState = 'none'; } catch (_e) { /* jsdom without mediaSession */ }
     });
-    async function waitingBuild() {
-      const incoming = fakeWorker();
-      const reg = mockSW({ installing: incoming });
-      registerServiceWorker();
-      await flush();
-      window.dispatchEvent(new Event('keydown'));
-      reg._fire('updatefound');
-      incoming.fireState('installed');
-      reg.waiting = incoming;
-      return incoming;
-    }
-
-    it('back after 10 minutes in the background: SKIP_WAITING on return', async () => {
-      const w = await waitingBuild();
-      setVisibility('hidden');
-      now += 10 * 60 * 1000;
-      setVisibility('visible');
-      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    });
-
-    it('back after 9 minutes: nothing, the reader is mid-session', async () => {
-      const w = await waitingBuild();
-      setVisibility('hidden');
-      now += 9 * 60 * 1000;
-      setVisibility('visible');
-      expect(w.postMessage).not.toHaveBeenCalled();
-    });
-
-    it('still away when 10 minutes pass: it takes over in the background, unseen', async () => {
-      const w = await waitingBuild();
-      setVisibility('hidden');
-      now += 10 * 60 * 1000;
-      vi.advanceTimersByTime(10 * 60 * 1000);
-      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    });
-
-    it('never while a recording plays, screen off or on', async () => {
-      const ms = /** @type {any} */ (navigator).mediaSession;
-      if (!ms) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
-      const w = await waitingBuild();
-      navigator.mediaSession.playbackState = 'playing';
-      setVisibility('hidden');
-      now += 30 * 60 * 1000;
-      vi.advanceTimersByTime(30 * 60 * 1000);
-      setVisibility('visible');
-      expect(w.postMessage).not.toHaveBeenCalled();
-      // Paused, then away again: now it may.
-      navigator.mediaSession.playbackState = 'paused';
-      setVisibility('hidden');
-      now += 11 * 60 * 1000;
-      setVisibility('visible');
-      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    });
-
-    it('never while a note, voice memo or backup holds it', async () => {
-      const w = await waitingBuild();
-      const release = holdUpdateReload('note');
-      setVisibility('hidden');
-      now += 15 * 60 * 1000;
-      setVisibility('visible');
-      expect(w.postMessage).not.toHaveBeenCalled();
-      release();
-    });
-  });
-
-  it('a build installed in the first seconds after open, before any touch, takes over then (the boot window)', async () => {
-    const incoming = fakeWorker();
-    const reg = mockSW({ installing: incoming });
-    registerServiceWorker();
-    await flush();
-    reg._fire('updatefound');
-    incoming.fireState('installed');
-    expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-  });
-
-  it('the boot window closes after 15 s even untouched', async () => {
-    let now = 5_000_000;
-    vi.spyOn(Date, 'now').mockImplementation(() => now);
-    const incoming = fakeWorker();
-    const reg = mockSW({ installing: incoming });
-    registerServiceWorker();
-    await flush();
-    now += 16_000;
-    reg._fire('updatefound');
-    incoming.fireState('installed');
-    expect(incoming.postMessage).not.toHaveBeenCalled();
-  });
-
-  describe('ANOTHER_BUILD: this build could not serve what the reader asked for (W27 + up1)', () => {
-    /** @type {(e: any) => void} */ let deliver = () => {};
-    function mockWithMessages(waiting) {
-      const reg = { waiting, installing: null, addEventListener: () => {}, update: () => {} };
+    /** The app is open; `installing` is a build being downloaded, `waiting` one found waiting. */
+    async function open({ installing = null, waiting = null } = {}) {
+      const regListeners = {};
+      const reg = { waiting, installing, update: () => {}, addEventListener: (t, cb) => { regListeners[t] = cb; }, _fire: (t) => regListeners[t] && regListeners[t]() };
       Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
         controller: {}, register: () => Promise.resolve(reg),
         addEventListener: (type, cb) => { if (type === 'message') deliver = cb; },
       }});
+      registerServiceWorker();
+      await flush();
       return reg;
     }
-    afterEach(() => { try { navigator.mediaSession.playbackState = 'none'; } catch (_e) { /* none */ } document.getElementById('vot-toast-update-ready')?.remove(); });
 
-    it('nothing playing or held: the waiting build takes over at once', async () => {
-      const w = fakeWorker();
-      mockWithMessages(null);
-      registerServiceWorker();
-      await flush();
-      window.dispatchEvent(new Event('pointerdown'));
-      const reg = await navigator.serviceWorker.register();
-      reg.waiting = w;
-      deliver({ data: { type: 'ANOTHER_BUILD' } });
-      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    });
-
-    it('while a recording plays: one tap on "A newer version is ready" takes it, nothing reloads by itself', async () => {
-      if (!(/** @type {any} */ (navigator).mediaSession)) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
-      const w = fakeWorker();
-      const reg = mockWithMessages(null);
-      registerServiceWorker();
-      await flush();
-      reg.waiting = w;
-      navigator.mediaSession.playbackState = 'playing';
-      deliver({ data: { type: 'ANOTHER_BUILD' } });
-      deliver({ data: { type: 'ANOTHER_BUILD' } });
-      expect(w.postMessage).not.toHaveBeenCalled();
-      const el = document.getElementById('vot-toast-update-ready');
-      expect(el && el.textContent).toBe('A newer version is ready. Tap to update.');
-      el.click();
-      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    });
-
-    it('a build that finishes installing AFTER the failure is offered, never taken unasked (up1 r2)', async () => {
+    it('a build that finishes installing is asked to take over at once, three hours into a read', async () => {
+      let now = 5_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
       const incoming = fakeWorker();
-      let regListeners = {};
-      const reg = { waiting: null, installing: incoming, addEventListener: (t, cb) => { regListeners[t] = cb; }, update: () => {} };
-      Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
-        controller: {}, register: () => Promise.resolve(reg),
-        addEventListener: (type, cb) => { if (type === 'message') deliver = cb; },
-      }});
-      registerServiceWorker();
-      await flush();
+      const reg = await open({ installing: incoming });
       window.dispatchEvent(new Event('pointerdown'));
-      deliver({ data: { type: 'ANOTHER_BUILD' } });   // nothing waiting yet
-      regListeners.updatefound();
-      reg.waiting = incoming;
+      window.dispatchEvent(new Event('keydown'));
+      now += 3 * 60 * 60 * 1000;
+      reg._fire('updatefound');
       incoming.fireState('installed');
-      expect(incoming.postMessage).not.toHaveBeenCalled();
-      const el = document.getElementById('vot-toast-update-ready');
-      expect(el && el.textContent).toBe('A newer version is ready. Tap to update.');
-      el.click();
       expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
     });
 
-    it('answers the worker BUSY question with whether it plays or holds', async () => {
-      mockWithMessages(null);
-      registerServiceWorker();
-      await flush();
+    it('while a recording plays and a note is open: asked all the same (the note holds the reload, never the takeover)', async () => {
+      if (!(/** @type {any} */ (navigator).mediaSession)) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
+      const incoming = fakeWorker();
+      const reg = await open({ installing: incoming });
+      navigator.mediaSession.playbackState = 'playing';
+      const release = holdUpdateReload('note');
+      reg._fire('updatefound');
+      incoming.fireState('installed');
+      release();
+      expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('not before it has installed', async () => {
+      const incoming = fakeWorker();
+      const reg = await open({ installing: incoming });
+      reg._fire('updatefound');
+      incoming.fireState('installing');
+      expect(incoming.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('a build found waiting when the app comes back on screen is asked, however short the time away', async () => {
+      const reg = await open();
+      const w = fakeWorker();
+      reg.waiting = w;                 // left waiting by an older worker, or its own skipWaiting failed
+      setVisibility('hidden');
+      setVisibility('visible');
+      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('ANOTHER_BUILD (this build could not serve what the reader asked for, W27): a waiting build is asked, playing or not', async () => {
+      if (!(/** @type {any} */ (navigator).mediaSession)) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
+      const reg = await open();
+      const w = fakeWorker();
+      reg.waiting = w;
+      navigator.mediaSession.playbackState = 'playing';
+      deliver({ data: { type: 'ANOTHER_BUILD' } });
+      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+      expect(document.getElementById('vot-toast-update-ready'), 'nothing is offered: nothing is left to ask the reader').toBeNull();
+    });
+
+    it('ANOTHER_BUILD with nothing waiting yet: nothing to ask; the build is asked when it has installed', async () => {
+      const incoming = fakeWorker();
+      const reg = await open({ installing: incoming });
+      deliver({ data: { type: 'ANOTHER_BUILD' } });
+      expect(incoming.postMessage).not.toHaveBeenCalled();
+      reg._fire('updatefound');
+      incoming.fireState('installed');
+      expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('a worker from the up1 weeks asks BUSY before it takes over: the answer is no, whatever plays or is held', async () => {
+      if (!(/** @type {any} */ (navigator).mediaSession)) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
+      await open();
       const answers = [];
       const port = { postMessage: (m) => answers.push(m.busy) };
       deliver({ data: { type: 'BUSY' }, ports: [port] });
+      navigator.mediaSession.playbackState = 'playing';
       const release = holdUpdateReload('recording');
       deliver({ data: { type: 'BUSY' }, ports: [port] });
       release();
-      expect(answers).toEqual([false, true]);
+      expect(answers).toEqual([false, false]);
     });
   });
 
