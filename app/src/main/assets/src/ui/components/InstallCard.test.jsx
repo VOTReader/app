@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { InstallCard, InstallRow, _resetInstallCardSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
+import { InstallCard, InstallRow, InstallPopup, ownBrowserUrl, _resetInstallCardSession, _resetInstallPopupSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
 import { attachInstallCapture, _resetInstallCapture } from '../../utils/install-offer.js';
 
 const UA = {
@@ -17,6 +17,12 @@ const UA = {
   android: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
   samsung: 'Mozilla/5.0 (Linux; Android 14; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36',
   firefoxDesktop: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0',
+  chromeDesktop: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+  firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0',
+  iphoneChrome: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/154.0 Mobile/15E148 Safari/604.1',
+  macSafari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Safari/605.1.15',
+  messengerAndroid: 'Mozilla/5.0 (Linux; Android 14; SM-S901U Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/480.0.0.0.0;]',
+  messengerIphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/500.0.0;FBDV/iPhone15,2;FBSN/iOS;FBSV/18.5]',
 };
 const KEY = 'vot-install-offer';
 let ua = UA.iphone;
@@ -97,6 +103,16 @@ describe('InstallCard: the steps', () => {
     expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
   });
 
+  /* Focus used to go to Done, the first control, at the sheet's foot: a sheet taller than the screen opened
+     scrolled to its last step (seen at 200% text, 2026-11-20). The sheet takes focus itself. */
+  it('opens at its first step: focus is on the sheet, not on Done at its foot', () => {
+    const { container } = render(<InstallCard unitKey="a" />);
+    act(() => { fireEvent.click(card(container).querySelector('.install-card-primary')); });
+    const sheet = document.querySelector('.install-steps');
+    expect(document.activeElement).toBe(sheet);
+    expect(sheet.getAttribute('aria-labelledby')).toBe(sheet.querySelector('.install-steps-title').id);
+  });
+
   it('Samsung Internet and Android Chrome without the install event get their own steps', () => {
     ua = UA.samsung;
     let v = render(<InstallCard unitKey="a" />);
@@ -106,8 +122,17 @@ describe('InstallCard: the steps', () => {
     ua = UA.android;
     v = render(<InstallCard unitKey="a" />);
     act(() => { fireEvent.click(card(v.container).querySelector('.install-card-primary')); });
+    // Walked on a real Chrome (2026-11-20): four taps, and the last one is the phone's own box.
     expect([...document.querySelectorAll('.install-step img')].map((i) => i.getAttribute('src')))
-      .toEqual(['install/android-1.jpg', 'install/android-2.jpg', 'install/android-3.jpg']);
+      .toEqual(['install/android-1.jpg', 'install/android-2.jpg', 'install/android-3.jpg', 'install/android-4.jpg']);
+    expect([...document.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+      .toEqual(['Tap the menu', 'Tap Add to Home screen', 'Tap Install', 'Tap Add to home screen']);
+  });
+
+  it('never in an in-app browser (the Settings row is where that reader is told what to do)', () => {
+    ua = UA.messengerAndroid;
+    const { container } = render(<InstallCard unitKey="a" />);
+    expect(card(container)).toBeNull();
   });
 });
 
@@ -333,6 +358,205 @@ describe('InstallCard: says when it is on screen', () => {
 });
 
 /* PO2 19: the offer left the reading flow; Settings > Help carries the one install row. */
+/* THE INSTALL POPUP (Corbin 2026-11-20: "many apps these days or websites simply have the popup to install on
+   home screen as app happen automatically", "no walkthrough's or rigamarole"). It comes up by itself on Home
+   when the browser has handed over its install event; Install opens the browser's own dialog. */
+describe('InstallPopup: it comes up by itself', () => {
+  const handOver = (outcome = 'accepted') => {
+    attachInstallCapture(window);
+    const e = new Event('beforeinstallprompt');
+    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome });
+    act(() => { window.dispatchEvent(e); });
+    return e;
+  };
+  const ask = () => document.querySelector('.install-ask');
+  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); ua = UA.android; });
+  afterEach(() => { vi.useRealTimers(); delete globalThis.TourController; });
+
+  it('on Home, a moment after the browser says the app can be installed: the icon, one line, Install and Not now', () => {
+    handOver();
+    render(<InstallPopup screen="home" />);
+    expect(ask()).toBeNull();                       // not in the same breath as the page
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().getAttribute('role')).toBe('dialog');
+    expect(ask().querySelector('.install-steps-title').textContent).toBe('Install VOTReader');
+    expect(ask().querySelector('.install-steps-intro').textContent).toBe('Keep it on your home screen. It opens full screen, like an app.');
+    expect(ask().querySelector('img.install-ask-icon').getAttribute('src')).toBe('icons/icon-192.png');
+    expect([...ask().querySelectorAll('button, a')].map((b) => b.textContent)).toEqual(['Install', 'Not now']);
+    expect(ask().querySelectorAll('.install-step').length).toBe(0);   // no walkthrough
+  });
+
+  it('Install is one tap to the browser\'s own dialog; on a phone the reader is then told what the phone asks next', async () => {
+    const e = handOver('accepted');
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    await act(async () => { fireEvent.click(ask().querySelector('.install-ask-go')); await Promise.resolve(); await Promise.resolve(); });
+    expect(e.prompt).toHaveBeenCalledTimes(1);
+    expect(ask()).toBeNull();
+    expect(document.querySelector('.install-steps-title').textContent).toBe('Almost done');
+    // Chrome's yes is not yet an icon on a phone: this browser is asked again in 21 days, not never.
+    const s = JSON.parse(localStorage.getItem(KEY));
+    expect(s.never).toBeUndefined();
+    expect(s.snoozeUntil).toBeGreaterThan(Date.now());
+  });
+
+  it('on a computer Install is the whole of it: nothing more is shown and it never asks again', async () => {
+    ua = UA.chromeDesktop;
+    handOver('accepted');
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().querySelector('.install-steps-intro').textContent).toMatch(/on this computer/);
+    await act(async () => { fireEvent.click(ask().querySelector('.install-ask-go')); await Promise.resolve(); await Promise.resolve(); });
+    expect(document.querySelector('.install-steps')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+  });
+
+  it('Not now closes it, waits 21 days, and it does not come back this session', () => {
+    handOver();
+    const v = render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
+    expect(ask()).toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+    v.rerender(<InstallPopup screen="letter" />);
+    v.rerender(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+  });
+
+  it('a later session inside the 21 days does not ask; after them it does', () => {
+    handOver();
+    localStorage.setItem(KEY, JSON.stringify({ dismissals: 1, snoozeUntil: Date.now() + 86400000 }));
+    let v = render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+    v.unmount();
+    localStorage.setItem(KEY, JSON.stringify({ dismissals: 1, snoozeUntil: Date.now() - 1000 }));
+    v = render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask()).not.toBeNull();
+  });
+
+  it('never over a reading page: it waits for Home', () => {
+    handOver();
+    const v = render(<InstallPopup screen="letter" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+    v.rerender(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask()).not.toBeNull();
+  });
+
+  it('not over the tour or another dialog: the next arrival on Home asks instead', () => {
+    handOver();
+    globalThis.TourController = { getState: () => ({ active: true }) };
+    const v = render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+    globalThis.TourController = { getState: () => ({ active: false }) };
+    v.rerender(<InstallPopup screen="settings" />);
+    v.rerender(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask()).not.toBeNull();
+  });
+
+  it('nothing in the APK or in an installed app', () => {
+    handOver();
+    globalThis.PlatformBridge.isAndroid = true;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+    cleanup();
+    globalThis.PlatformBridge.isAndroid = false;
+    globalThis.StorageHealth._isStandalone = () => true;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+  });
+
+  /* Corbin 2026-11-20: "build the same popup feature for safari and other browsers (not walkthroughs)". Only
+     Chromium gives a page an install it can start; elsewhere the same popup says in one line where the
+     browser's own is. */
+  it('Safari on an iPhone: the same popup, one line saying where Safari keeps it, and Got it (no steps, no dead button)', () => {
+    ua = UA.iphone;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().querySelector('.install-steps-title').textContent).toBe('Install VOTReader');
+    expect(ask().querySelector('.install-steps-intro').textContent).toBe('Keep it on your home screen. It opens full screen, like an app.');
+    expect(ask().querySelector('.install-ask-how').textContent).toBe('In Safari, tap Share (it may be under •••), then Add to Home Screen.');
+    expect(ask().querySelector('.install-ask-go')).toBeNull();
+    expect([...ask().querySelectorAll('button, a')].map((b) => b.textContent)).toEqual(['Got it']);
+    expect(ask().querySelectorAll('.install-step').length).toBe(0);
+    act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
+    expect(ask()).toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+  });
+
+  it('each other browser gets its own line', () => {
+    const lineFor = (agent) => {
+      ua = agent; _resetInstallPopupSession(); localStorage.removeItem(KEY);
+      render(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(8100); });
+      const t = ask() && ask().querySelector('.install-ask-how').textContent;
+      cleanup();
+      return t;
+    };
+    expect(lineFor(UA.samsung)).toBe('Tap the three lines at the bottom right, then Add page to, then Home screen.');
+    expect(lineFor(UA.android)).toBe('Tap the three dots at the top right, then Add to Home screen, then Install.');
+    expect(lineFor(UA.firefoxAndroid)).toBe('Tap the three dots, then Add app to Home screen. It may say Install.');
+    expect(lineFor(UA.iphoneChrome)).toBe('In your browser, tap Share, then Add to Home Screen.');
+    expect(lineFor(UA.macSafari)).toBe('In the menu bar, choose File, then Add to Dock.');
+    expect(lineFor(UA.chromeDesktop)).toBe('Click the install icon at the right end of the address bar, then Install.');
+  });
+
+  it('a Chromium is given time to hand over its install event; if it comes while the line is up, the line becomes the button', () => {
+    ua = UA.android;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();                         // still waiting for the event, not yet describing the menu
+    act(() => { vi.advanceTimersByTime(3500); });
+    expect(ask().querySelector('.install-ask-how')).not.toBeNull();
+    expect(ask().querySelector('.install-ask-go')).toBeNull();
+    handOver();
+    expect(ask().querySelector('.install-ask-how')).toBeNull();
+    expect(ask().querySelector('.install-ask-go').textContent).toBe('Install');
+  });
+
+  it('Firefox on a computer has no install: no popup', () => {
+    ua = UA.firefoxDesktop;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(ask()).toBeNull();
+  });
+
+  /* A link tapped in Messenger opens in Messenger's own browser, which cannot install anything (a reader,
+     2026-11-20: "it showed up but didn't install to my phone"). The popup is the way out. */
+  it('in Messenger\'s browser it offers Chrome: a link that opens this page there, and the words for when it does not', () => {
+    ua = UA.messengerAndroid;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().querySelector('.install-steps-intro').textContent).toMatch(/inside another app, such as Messenger\. It cannot install apps\. Open VOTReader in Chrome/);
+    const go = ask().querySelector('a.install-ask-go');
+    expect(go.textContent).toBe('Open in Chrome');
+    expect(go.getAttribute('href')).toBe(ownBrowserUrl('in-app-android', location.href));
+    expect(ask().querySelector('.install-ask-note').textContent).toBe('If nothing happens, tap the three dots at the top of this screen, then Open in Chrome.');
+  });
+
+  it('the way out is this page in the phone\'s own browser: an intent link for Chrome, x-safari for Safari', () => {
+    expect(ownBrowserUrl('in-app-android', 'https://votreader.github.io/app/?p=letter%3Achristmas%3A1#top'))
+      .toBe('intent://votreader.github.io/app/?p=letter%3Achristmas%3A1#Intent;scheme=https;package=com.android.chrome;end');
+    expect(ownBrowserUrl('in-app-ios', 'https://votreader.github.io/app/')).toBe('x-safari-https://votreader.github.io/app/');
+  });
+
+  it('on an iPhone in Messenger it says Safari', () => {
+    ua = UA.messengerIphone;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().querySelector('a.install-ask-go').textContent).toBe('Open in Safari');
+    expect(ask().querySelector('a.install-ask-go').getAttribute('href')).toMatch(/^x-safari-http/);
+  });
+});
+
 describe('InstallRow: Settings > Help > Install VOTReader', () => {
   it('shows where this browser can install, and opens the steps for it', () => {
     const { getByRole } = render(<InstallRow />);
@@ -341,7 +565,7 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     expect(document.querySelector('.install-steps-title').textContent).toBe('Add to Home Screen');
   });
 
-  it('shows no row in the APK, an installed app, Firefox desktop, or after an install', () => {
+  it('shows no row in the APK, an installed app or Firefox desktop; on a computer it goes once Chrome says installed', () => {
     globalThis.PlatformBridge.isAndroid = true;
     let v = render(<InstallRow />);
     expect(v.container.querySelector('.settings-help-install')).toBeNull(); cleanup();
@@ -353,12 +577,23 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     ua = UA.firefoxDesktop;
     v = render(<InstallRow />);
     expect(v.container.querySelector('.settings-help-install')).toBeNull(); cleanup();
-    ua = UA.android;
+    ua = UA.chromeDesktop;
     attachInstallCapture(window);
     v = render(<InstallRow />);
     expect(v.container.querySelector('.settings-help-install')).not.toBeNull();
     act(() => { window.dispatchEvent(new Event('appinstalled')); });
     expect(v.container.querySelector('.settings-help-install')).toBeNull();
+  });
+
+  /* 2026-11-20, walked on Android 16 / Chrome 133 / Pixel launcher: Chrome answers accepted and fires
+     appinstalled BEFORE the phone's own "Add to home screen" box is answered; Cancel or Back there leaves no
+     icon. The row used to vanish at that moment and the reader was left with nothing. */
+  it('on Android the row stays after Chrome says installed: the phone may not have added the icon', () => {
+    ua = UA.android;
+    attachInstallCapture(window);
+    const v = render(<InstallRow />);
+    act(() => { window.dispatchEvent(new Event('appinstalled')); });
+    expect(v.container.querySelector('.settings-help-install')).not.toBeNull();
   });
 
   it('with the browser own prompt in hand, a tap opens that dialog', async () => {
@@ -371,6 +606,72 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     const { getByRole } = render(<InstallRow />);
     await act(async () => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    // On a phone Chrome's yes is not yet an icon: the offer waits 21 days, it does not end.
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+    expect(JSON.parse(localStorage.getItem(KEY)).never).toBeUndefined();
+  });
+
+  it('Android, after Install: says what the phone asks next and where the icon lands; the row stays for a second try', async () => {
+    ua = UA.android;
+    attachInstallCapture(window);
+    const e = new Event('beforeinstallprompt');
+    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => { window.dispatchEvent(e); });
+    const { getByRole, container } = render(<InstallRow />);
+    await act(async () => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
+    act(() => { window.dispatchEvent(new Event('appinstalled')); });   // Chrome fires it before the phone's box is answered
+    const sheet = document.querySelector('.install-steps');
+    expect(sheet.getAttribute('role')).toBe('dialog');
+    expect(sheet.querySelector('.install-steps-title').textContent).toBe('Almost done');
+    expect([...sheet.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+      .toEqual(['Tap Add to home screen', 'Look on your home screen', 'Still not there?']);
+    expect(sheet.querySelector('.install-step-note').textContent).toMatch(/Cancel leaves no icon/);
+    expect(sheet.querySelectorAll('.install-step-note')[2].textContent).toBe('Go to Settings and tap Install VOTReader. It shows each step with a picture.');
+    expect(sheet.querySelectorAll('.install-step-note')[1].textContent).toMatch(/list of apps/);
+    // The phone's own box is pictured; the second step is words only and takes the picture's room.
+    expect([...sheet.querySelectorAll('.install-step img')].map((i) => i.getAttribute('src'))).toEqual(['install/android-4.jpg']);
+    expect(sheet.querySelectorAll('.install-step')[1].classList.contains('install-step-plain')).toBe(true);
+    act(() => { fireEvent.click(sheet.querySelector('.install-steps-done')); });
+    expect(document.querySelector('.install-steps')).toBeNull();
+    // Chrome's event is used up: a second tap shows the steps by hand.
+    expect(container.querySelector('.settings-help-install')).not.toBeNull();
+    act(() => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); });
+    expect(document.querySelectorAll('.install-step').length).toBe(4);
+  });
+
+  it('a computer, after Install: nothing more to say (Chrome opens the app in its own window)', async () => {
+    ua = UA.chromeDesktop;
+    attachInstallCapture(window);
+    const e = new Event('beforeinstallprompt');
+    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => { window.dispatchEvent(e); });
+    const { getByRole } = render(<InstallRow />);
+    await act(async () => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
+    expect(document.querySelector('.install-steps')).toBeNull();
+  });
+
+  /* 2026-11-20: a reader tapped the link in Messenger: the app "showed up but didn't install", and Settings had
+     no Install row at all. Messenger's browser cannot install; the row now says where to go. */
+  it('in Messenger\'s browser the row is there and sends the reader to Chrome, in words (no pictures)', () => {
+    ua = UA.messengerAndroid;
+    const { getByRole } = render(<InstallRow />);
+    act(() => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); });
+    const sheet = document.querySelector('.install-steps');
+    expect(sheet.querySelector('.install-steps-title').textContent).toBe('Open in Chrome first');
+    expect(sheet.querySelector('.install-steps-intro').textContent).toMatch(/Messenger or Facebook.*cannot add VOTReader/);
+    expect([...sheet.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+      .toEqual(['Tap the menu', 'Tap Open in Chrome', 'Come back here in Chrome']);
+    expect(sheet.querySelectorAll('.install-step img').length).toBe(0);
+    expect(sheet.querySelectorAll('.install-step-plain').length).toBe(3);
+  });
+
+  it('on an iPhone in Messenger it says Safari', () => {
+    ua = UA.messengerIphone;
+    const { getByRole } = render(<InstallRow />);
+    act(() => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); });
+    expect(document.querySelector('.install-steps-title').textContent).toBe('Open in Safari first');
+    expect(document.querySelectorAll('.install-step-note')[2].textContent).toBe('Settings, then Install VOTReader.');
+    expect([...document.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+      .toEqual(['Tap the menu', 'Tap Open in Safari', 'Come back here in Safari']);
   });
 });

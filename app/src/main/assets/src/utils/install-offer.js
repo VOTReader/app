@@ -7,9 +7,13 @@
 
    installFlow   which way this browser installs: 'prompt' (Chromium handed us
                  its beforeinstallprompt, so a real Install button works),
-                 else picture steps for 'android-chrome', 'samsung',
-                 'ios-safari' or 'desktop', else null (never offered: the APK,
-                 an installed app, Firefox desktop, in-app webviews).
+                 else the browser's own way, in words: 'android-chrome',
+                 'samsung', 'firefox-android', 'ios-safari', 'ios-other' (the
+                 other iPhone browsers), 'mac-safari' or 'desktop';
+                 'in-app-android' / 'in-app-ios'
+                 for an in-app browser, which cannot install and is told to
+                 open the page in the phone's own browser; else null (never
+                 offered: the APK, an installed app, Firefox desktop).
    shouldOffer   the trigger rules: engaged first (a finished chapter), at
                  most once a session, "Maybe later" snoozes 21 days, three
                  dismissals or "Don't ask again" end it for good.
@@ -23,26 +27,34 @@ const MAX_DISMISSALS = 3;
 /**
  * @param {string} ua
  * @param {{ hasPrompt?: boolean, isApk?: boolean, standalone?: boolean, touchMac?: boolean }} env
- * @returns {'prompt' | 'android-chrome' | 'samsung' | 'ios-safari' | 'desktop' | null}
+ * @returns {'prompt' | 'android-chrome' | 'samsung' | 'firefox-android' | 'ios-safari' | 'ios-other' | 'mac-safari' | 'desktop' | 'in-app-android' | 'in-app-ios' | null}
  */
 export function installFlow(ua, env) {
   if (env.isApk || env.standalone) return null;
   ua = ua || '';
-  // In-app webviews (Facebook, Instagram, Gmail's GSA, WeChat, Line) cannot install anything; nor can any
-  // other app's browser built on the system Android WebView, which names no app but carries '; wv)'.
-  if (/FBAN|FBAV|FB_IAB|Instagram|GSA\/|MicroMessenger|\bLine\//i.test(ua)) return null;
-  if (/Android/.test(ua) && /;\s*wv\)/.test(ua)) return null;
+  const ios = /iPhone|iPad|iPod/.test(ua) || !!env.touchMac;
+  // In-app webviews (Facebook and Messenger, Instagram, Gmail's GSA, WeChat, Line) cannot install anything; nor
+  // can any other app's browser built on the system Android WebView, which names no app but carries '; wv)'.
+  // A link tapped in Messenger opens there, so this is where many readers first meet the app: the way out is
+  // the phone's own browser, whatever install event this webview claims to have.
+  if (/FBAN|FBAV|FB_IAB|Instagram|GSA\/|MicroMessenger|\bLine\//i.test(ua) || (/Android/.test(ua) && /;\s*wv\)/.test(ua))) {
+    return ios ? 'in-app-ios' : 'in-app-android';
+  }
   if (env.hasPrompt) return 'prompt';
   if (/SamsungBrowser\//.test(ua)) return 'samsung';
-  const ios = /iPhone|iPad|iPod/.test(ua) || !!env.touchMac;
   if (ios) {
-    // Real Safari only: the other iOS browsers carry their own token.
-    return /AppleWebKit/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/.test(ua)
-      ? 'ios-safari' : null;
+    if (!/AppleWebKit/.test(ua) || !/Safari/.test(ua)) return null;
+    // Real Safari carries no other browser's token. Chrome, Firefox and Edge on an iPhone have had Add to Home
+    // Screen in their own Share menu since iOS 16.4; the rest are not known to.
+    if (/CriOS|FxiOS|EdgiOS/.test(ua)) return 'ios-other';
+    return /OPiOS|DuckDuckGo|YaBrowser/.test(ua) ? null : 'ios-safari';
   }
   const chromium = /Chrome\//.test(ua) && !/OPR\/|YaBrowser/.test(ua);
-  if (/Android/.test(ua)) return chromium ? 'android-chrome' : null;
-  return chromium ? 'desktop' : null;   // Chrome / Edge on a computer; Firefox desktop has no install
+  if (/Android/.test(ua)) return chromium ? 'android-chrome' : /Firefox\//.test(ua) ? 'firefox-android' : null;
+  if (chromium) return 'desktop';   // Chrome / Edge on a computer
+  // Safari on a Mac has File > Add to Dock since Safari 17. Firefox on a computer has no install.
+  const safari = /Macintosh/.test(ua) && /Safari\//.test(ua) && /Version\/(\d+)/.exec(ua);
+  return safari && Number(safari[1]) >= 17 ? 'mac-safari' : null;
 }
 
 /**

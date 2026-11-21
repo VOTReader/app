@@ -1844,6 +1844,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             <div className="ui-group ws1-root-card">
               <ListRow icon="help" title="Show me around" onClick={startTour}
                 meta={'A short tour: ' + (_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes')} />
+              {/* PO2 19: the one place to install. It lived only in the Help group below, which the root never
+                  opens, so since st-root (2026-11-11) no reader could reach it (found 2026-11-20). */}
+              <InstallRow Row={ListRow} />
               {typeof onAbout === 'function' ? (
                 <AboutRootRow onAbout={onAbout} />
               ) : null}
@@ -1854,7 +1857,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
         {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
         {mode !== 'root' && <SettingsGroup sub={glance.help} {...groupProps('help')}>
-          <Findable text="show me around tour guide help welcome about votreader version credits">
+          <Findable text="show me around tour guide help welcome about votreader version credits install home screen app">
           <div className="settings-card settings-help-body">
             <button type="button" className="settings-help-btn" onClick={startTour}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no

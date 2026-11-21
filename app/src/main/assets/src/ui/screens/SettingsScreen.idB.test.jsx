@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, cleanup, fireEvent, act } from '@testing-library/react';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings, groupHeads, groupHead, row } from './settings-harness.jsx';
+import * as ReactDOM from 'react-dom';
 
 beforeEach(() => { setupSettingsGlobals(); });
 afterEach(() => { cleanup(); teardownSettingsGlobals(); });
@@ -133,6 +134,39 @@ describe('Install VOTReader in Help (PO2 19)', () => {
     Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => iphone });
     try {
       renderSettings({}, {});
+      expect(screen.getByRole('button', { name: /Install VOTReader/ })).toBeTruthy();
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => was });
+    }
+  });
+
+  /* 2026-11-20: the test above mounts Settings with every group open. The Settings a reader opens is the root,
+     and the root never opens the Help group, so from st-root (2026-11-11) the app had no way to install at all:
+     a reader who uninstalled could not find how she had installed it. The row is a root row now. */
+  it('the Settings a reader opens (the root, no group open) has the row, beside Show me around and About', () => {
+    const was = navigator.userAgent;
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => iphone });
+    try {
+      globalThis.ReactDOM = ReactDOM;   // the app's global (bundle-a): the steps sheet is a portal
+      renderSettings({}, { onAbout: () => {} }, { expandGroups: false });
+      const help = document.querySelector('[data-settings-group="help"]');
+      const titles = [...help.querySelectorAll('.ui-row-title')].map((t) => t.textContent);
+      expect(titles).toEqual(['Show me around', 'Install VOTReader', 'About VOTReader']);
+      const install = screen.getByRole('button', { name: /Install VOTReader/ });
+      expect(install.textContent).toContain('Keep it on your home screen');
+      fireEvent.click(install);
+      expect(document.querySelector('.install-steps-title').textContent).toBe('Add to Home Screen');
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => was });
+    }
+  });
+
+  it('typing "install" in Find a setting finds it', () => {
+    const was = navigator.userAgent;
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => iphone });
+    try {
+      renderSettings({}, { onAbout: () => {} }, { expandGroups: false });
+      fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'install' } });
       expect(screen.getByRole('button', { name: /Install VOTReader/ })).toBeTruthy();
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => was });

@@ -17,6 +17,11 @@ const UA = {
   facebook: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0 Mobile Safari/537.36 [FBAN/EMA;FBAV/400.0]',
   // Any other app's in-app browser built on the system Android WebView: the '; wv)' token, no app name.
   webview: 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A.240205.004; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.230 Mobile Safari/537.36',
+  // A link tapped in Messenger opens in Messenger's own browser.
+  messengerAndroid: 'Mozilla/5.0 (Linux; Android 14; SM-S901U Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/480.0.0.0.0;]',
+  firefoxAndroid: 'Mozilla/5.0 (Android 15; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0',
+  oldMacSafari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15',
+  messengerIphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/500.0.0;FBDV/iPhone15,2;FBSN/iOS;FBSV/18.5]',
 };
 
 describe('installFlow', () => {
@@ -36,13 +41,28 @@ describe('installFlow', () => {
     expect(installFlow(UA.iphoneSafari, {})).toBe('ios-safari');
     expect(installFlow(UA.macSafari, { touchMac: true })).toBe('ios-safari');
   });
+  /* Corbin 2026-11-20: "build the same popup feature for safari and other browsers". Every browser that has a
+     way to install has a flow, so the popup has something true to say there. */
+  it('the other browsers that can install: Chrome on an iPhone, Firefox on Android, Safari on a Mac', () => {
+    expect(installFlow(UA.iphoneChrome, {})).toBe('ios-other');
+    expect(installFlow(UA.firefoxAndroid, {})).toBe('firefox-android');
+    expect(installFlow(UA.macSafari, {})).toBe('mac-safari');
+  });
   it('nothing where there is no way to install', () => {
-    expect(installFlow(UA.iphoneChrome, {})).toBeNull();
     expect(installFlow(UA.winFirefox, {})).toBeNull();
-    expect(installFlow(UA.macSafari, {})).toBeNull();
-    expect(installFlow(UA.facebook, { hasPrompt: true })).toBeNull();
+    expect(installFlow(UA.oldMacSafari, {})).toBeNull();   // Add to Dock came with Safari 17
+  });
+  /* 2026-11-20: a reader tapped the link in Messenger, the app "showed up but didn't install", and the app had
+     nothing to say there (this used to answer null). An in-app browser cannot install; it is sent to the phone's
+     own browser, whatever install event the webview claims to have. */
+  it('an in-app browser is sent to the phone\'s own browser', () => {
+    expect(installFlow(UA.facebook, { hasPrompt: true })).toBe('in-app-android');
+    expect(installFlow(UA.messengerAndroid, {})).toBe('in-app-android');
+    expect(installFlow(UA.messengerIphone, {})).toBe('in-app-ios');
     // Sweep mw12: a WebView that names no app reached the Android branch and got Chrome's menu steps.
-    expect(installFlow(UA.webview, {})).toBeNull();
+    expect(installFlow(UA.webview, {})).toBe('in-app-android');
+    // The APK's own WebView is not an in-app browser to leave.
+    expect(installFlow(UA.webview, { isApk: true })).toBeNull();
   });
 });
 

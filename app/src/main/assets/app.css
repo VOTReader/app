@@ -9037,6 +9037,23 @@ body.light .install-step-num { color: #fff; }
 .install-step-title { font-size: var(--fs-18); font-weight: 600; line-height: 1.25; color: var(--cream); }
 .install-step-note { margin-top: 0.25rem; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
 .install-step-pic { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--gold-border); }
+.install-step-plain .install-step-text { grid-column: 2 / -1; }   /* a step with no picture: its words take that room */
+/* The install popup: the same sheet, the app's icon, one line, Install and Not now. */
+.install-ask { text-align: center; }
+.install-ask-icon { display: block; width: 3.5rem; height: 3.5rem; margin: 0 auto 0.6rem; border-radius: 22%; }
+.install-ask-go {
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 52px; margin-top: 0.5rem;
+  padding: 0.4rem 16px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold); color: #000; cursor: pointer; text-decoration: none;
+  font-family: var(--font-cinzel); font-size: var(--fs-16); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+}
+body.light .install-ask-go { color: #fff; }
+.install-ask-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.install-ask-how { margin: 0.2rem 0 0; padding: 0.8rem 0.9rem; border: 1px solid var(--gold-border); border-radius: 10px; font-size: var(--fs-18); font-weight: 600; line-height: 1.35; color: var(--cream); }
+.install-ask-note { margin: 0.7rem 0 0; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
+.install-steps:focus { outline: none; }   /* the sheet takes focus itself so it opens at step 1; it is not a control */
+/* Large text: beside the picture the words ran one to a line ("Tap / Add / to / home / screen"); the picture goes under them. */
+.vot-large-text .install-step { grid-template-columns: 2.25rem 1fr; }
+.vot-large-text .install-step-pic { grid-column: 2; max-width: 22rem; }
 .install-steps-done { margin-top: 0.9rem; background: transparent; color: var(--gold); border: 1px solid var(--gold); }
 
 /* U01.1: "Mark as read" at a letter's end, "✓ Read · Undo" once it is. Quiet: a link, not a card. */

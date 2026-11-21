@@ -29,6 +29,7 @@ import { UiIcon } from './UiIcon.jsx';
 import { navOriginLabel } from '../../utils/tabs.js';
 import { BarTextAction } from './RootNav.jsx';
 import { OPEN_YOUR_DATA_EVENT } from '../../utils/your-data-link.js';
+import { InstallPopup } from './InstallCard.jsx';
 
 export function AppShellOverlays({
   // Tabs overview + TabActionSheet
@@ -102,6 +103,8 @@ export function AppShellOverlays({
       <StorageHealthBanner onNavigateSettings={() => toSettingsRef.current()} />
       <Safari7DayModal />
       <IosPwaWelcomeCard onNavigateSettings={() => setScreen('settings')} />
+      {/* The install popup comes up by itself on Home when the browser can install the app (Corbin 2026-11-20). */}
+      <InstallPopup screen={screen} />
       {/* The audio mini-player is app.jsx's, after the screen: here, before it, Tab and a screen reader met its
           controls ahead of the page's own (sweep W66). */}
 
