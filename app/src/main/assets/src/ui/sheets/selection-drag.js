@@ -74,6 +74,12 @@ export const SPEED_MAX = 320;
 export const SCROLL_LEASE_MS = 1500;
 /** ... and for this long, whatever the end: the drag is over, as if lifted (a safety net). */
 export const LEASE_MS = 8000;
+/** ... but only this long on a browser that has sent no contextmenu for a touch (iPhone and iPad Safari send none
+    for a long-press or at a lift): there nothing but the lease ends a drag whose lift was not heard, and for 8 s
+    the selection sheet either stayed away or sat on screen taking no touches, so a tap on Copy went through it to
+    the page and cleared the selection (a reader's report, 2026-11-20). Chrome on Android sends the long-press's
+    own contextmenu before any drag can start, so it keeps LEASE_MS. */
+export const NO_MENU_LEASE_MS = 1200;
 
 /** The swipe previews: inert clones of the neighbour pages (ScreenLayout). */
 const OFF_PAGE = '[inert], .pager-peek';
@@ -204,6 +210,7 @@ export function startSelectionDrag(deps = {}) {
   let mouseDown = false;
   let keyAt = -Infinity;            // a key went down: Shift+arrows move the end, leave them be
   let menuAt = -Infinity;           // the last contextmenu: the long-press's own, or the lift after a drag
+  let touchMenus = false;           // this browser sends a contextmenu for a touch (so one will tell of a lift)
   let wheelAt = -Infinity;          // the wheel turned: a mouse drag's column may move by it
   /** Where the finger is, as far as the page can know: the end the browser last put down, or the edge the end
       was lost past; for a mouse, the pointer. */
@@ -234,7 +241,7 @@ export function startSelectionDrag(deps = {}) {
   };
   const armLease = () => {
     if (leaseTimer) clearTimeout(leaseTimer);
-    leaseTimer = setTimeout(() => { leaseTimer = null; if (!mouseDown) { pinEnd(); endDrag(); } }, LEASE_MS);
+    leaseTimer = setTimeout(() => { leaseTimer = null; if (!mouseDown) { pinEnd(); endDrag(); } }, touchMenus ? LEASE_MS : NO_MENU_LEASE_MS);
   };
 
   /** Put the selection's end on the caret `c`, keeping its anchor. */
@@ -396,6 +403,7 @@ export function startSelectionDrag(deps = {}) {
   const onWheel = () => { wheelAt = now(); };
   const onContextMenu = () => {
     menuAt = now();
+    if (pointer !== 'mouse') touchMenus = true;
     if (pointer === 'mouse' || !dragging) return;
     // The lift after a handle drag: the drag is over, so the end may be set now.
     pinEnd();
@@ -412,8 +420,18 @@ export function startSelectionDrag(deps = {}) {
       if (c && mouseDown) { col = c; knownTop = c.scrollTop; finger = { x: e.clientX, y: e.clientY, at: now() }; setDragging(true); }
     }
   };
-  const onPointerUp = () => {
-    if (!mouseDown) return;
+  // A finger's lift the page does hear (where the browser leaves a press-and-slide's touch to the page): the drag
+  // is over at once, so the sheet that rises at this lift takes its taps. A pointercancel is no lift: Chrome sends
+  // one when its long-press takes the touch, with the finger still down.
+  const onTouchLift = (/** @type {Event} */ e) => {
+    if (mouseDown || !dragging) return;
+    const t = /** @type {any} */ (e);
+    if (e.type === 'pointerup' ? t.pointerType === 'mouse' : !!(t.touches && t.touches.length)) return;
+    pinEnd();
+    endDrag();
+  };
+  const onPointerUp = (/** @type {Event} */ e) => {
+    if (!mouseDown) { if (e && e.type === 'pointerup') onTouchLift(e); return; }
     mouseDown = false;
     pinEnd();
     endDrag();
@@ -427,6 +445,7 @@ export function startSelectionDrag(deps = {}) {
   doc.addEventListener('pointermove', onPointerMove, { capture: true, passive: true });
   doc.addEventListener('pointerup', onPointerUp, true);
   doc.addEventListener('pointercancel', onPointerUp, true);
+  doc.addEventListener('touchend', onTouchLift, true);
   doc.addEventListener('wheel', onWheel, { capture: true, passive: true });
   doc.addEventListener('keydown', onKey, true);
   return () => {
@@ -438,6 +457,7 @@ export function startSelectionDrag(deps = {}) {
     doc.removeEventListener('pointermove', onPointerMove, true);
     doc.removeEventListener('pointerup', onPointerUp, true);
     doc.removeEventListener('pointercancel', onPointerUp, true);
+    doc.removeEventListener('touchend', onTouchLift, true);
     doc.removeEventListener('wheel', onWheel, true);
     doc.removeEventListener('keydown', onKey, true);
   };

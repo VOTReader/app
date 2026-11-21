@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   startSelectionDrag, edgeScrollSpeed, readingEdges, liveColumnOf, selectionDragging,
-  DRAG_BAND, SPEED_MIN, SPEED_MAX, SCROLL_LEASE_MS, LEASE_MS,
+  DRAG_BAND, SPEED_MIN, SPEED_MAX, SCROLL_LEASE_MS, LEASE_MS, NO_MENU_LEASE_MS,
 } from './selection-drag.js';
 
 const LINE = 28;
@@ -535,6 +535,64 @@ describe('a handle drag on a phone', () => {
     browserMovesEnd(b, 3);
     expect(dragging()).toBe(false);
     expect(sel.sets).toBe(0);
+  });
+});
+
+/* A reader's report, 2026-11-20: "I highlight, it brings up the pop up, I hit copy and nothing happens. Then the
+   highlighted area is deselected." Where no contextmenu tells of the lift (iPhone Safari sends none), a press that
+   slid to take in more words left the drag on for LEASE_MS: the sheet was up and took no touches. */
+describe('a browser that sends no contextmenu for a touch', () => {
+  /** A press that selects a word and slides on to a later line, with no contextmenu anywhere. */
+  function pressAndSlide() {
+    pointer('pointerdown', textOn(10).parentElement, 'touch');
+    browserSelects(textOn(10), 6, textOn(10), 11);
+    clock += 300;
+    browserMovesEnd(textOn(12), 4);
+  }
+  const touchEnd = (/** @type {number} */ left) => {
+    const e = new Event('touchend', { bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'touches', { value: { length: left } });
+    document.dispatchEvent(e);
+  };
+
+  it('the lift the page hears ends the drag at once: the sheet that rises takes its taps', () => {
+    pressAndSlide();
+    expect(dragging()).toBe(true);
+    pointer('pointerup', textOn(12).parentElement, 'touch');
+    expect(dragging()).toBe(false);
+  });
+
+  it('a touchend with no finger left ends it too; one with a finger still down does not', () => {
+    pressAndSlide();
+    touchEnd(1);
+    expect(dragging()).toBe(true);
+    touchEnd(0);
+    expect(dragging()).toBe(false);
+  });
+
+  it('a pointercancel is no lift (the browser took the touch, the finger is still down)', () => {
+    pressAndSlide();
+    pointer('pointercancel', textOn(12).parentElement, 'touch');
+    expect(dragging()).toBe(true);
+  });
+
+  it(`with no lift heard, the drag ends ${NO_MENU_LEASE_MS} ms after the end last moved, not ${LEASE_MS}`, () => {
+    pressAndSlide();
+    pointer('pointercancel', textOn(12).parentElement, 'touch');
+    vi.advanceTimersByTime(NO_MENU_LEASE_MS - 100);
+    expect(dragging()).toBe(true);
+    browserMovesEnd(textOn(13), 2);   // still sliding: a new lease
+    vi.advanceTimersByTime(NO_MENU_LEASE_MS - 100);
+    expect(dragging()).toBe(true);
+    vi.advanceTimersByTime(200);
+    expect(dragging()).toBe(false);
+  });
+
+  it('once a touch has brought a contextmenu (Chrome on Android), the long lease stands', () => {
+    longPress(10);
+    browserMovesEnd(textOn(12), 4);
+    vi.advanceTimersByTime(NO_MENU_LEASE_MS + 500);
+    expect(dragging()).toBe(true);
   });
 });
 
