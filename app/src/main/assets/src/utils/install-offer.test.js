@@ -1,7 +1,7 @@
 /* ip1 — when and how to offer "install as an app" (utils/install-offer.js). */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, SNOOZE_DAYS, attachInstallCapture, hasInstallPrompt, wasInstalled,
+  installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, SNOOZE_DAYS, HAVE_DAYS, attachInstallCapture, hasInstallPrompt, wasInstalled,
   subscribeInstall, promptInstall, _resetInstallCapture,
 } from './install-offer.js';
 
@@ -181,5 +181,25 @@ describe('capture', () => {
     vi.resetModules();
     const other = await import('./install-offer.js');
     expect(other.hasInstallPrompt()).toBe(true);
+  });
+});
+
+/* Corbin 2026-11-21: "Be careful with firefox and safari, we don't want to install over a preexisting pwa". Safari and
+   Firefox tell a page nothing about an installed app (no getInstalledRelatedApps, no install event; an iPhone's
+   home-screen app does not even share storage with Safari), so there the reader is the only one who knows. */
+describe('the reader says the app is here already', () => {
+  const now = 1800000000000;
+  const DAY = 86400000;
+  const ctx = { flow: 'ios-safari', engaged: true, shownThisSession: false, now };
+  it('"I already have it" is written down and holds the offer back 180 days, not 21', () => {
+    expect(HAVE_DAYS).toBe(180);
+    const s = dismiss({ dismissals: 1 }, 'have', now);
+    expect(s).toEqual({ dismissals: 1, haveAt: now, snoozeUntil: now + HAVE_DAYS * DAY });
+    expect(shouldOffer(s, { ...ctx, now: now + 22 * DAY })).toBe(false);
+    expect(shouldOffer(s, { ...ctx, now: now + 179 * DAY })).toBe(false);
+    expect(shouldOffer(s, { ...ctx, now: now + 180 * DAY })).toBe(true);
+  });
+  it('it is no Not now: the count of those does not move', () => {
+    expect(dismiss(null, 'have', now).dismissals).toBeUndefined();
   });
 });

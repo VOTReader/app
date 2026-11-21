@@ -414,6 +414,21 @@ const ASK_HOW = {
   'firefox-android': 'Tap the three dots, then Add app to Home screen. It may say Install.',
   'mac-safari': 'In the menu bar, choose File, then Add to Dock.',
 };
+/* Corbin 2026-11-21: "Be careful with firefox and safari, we don't want to install over a preexisting pwa". Looked
+   up that day (caniuse and MDN for getInstalledRelatedApps; WebKit's Safari 17.2 notes on Home Screen storage): only
+   Chromium tells a page that the app is installed. Safari and Firefox have no such call and no install event, and an
+   iPhone's or a Mac's installed copy keeps storage of its own (cookies are copied once, when it is added), so a
+   Safari tab cannot even leave itself a note. Adding it again there makes a second copy, and that copy starts
+   empty. So wherever the popup can only say where the browser keeps its install, it also says what to do if the
+   app is there already, and takes the reader's word for it ("I already have it", 180 days). */
+const ASK_HAVE = {
+  'ios-safari': 'Already on your Home Screen? Open it there. Adding it again makes a second copy that starts empty.',
+  'ios-other': 'Already on your Home Screen? Open it there. Adding it again makes a second copy that starts empty.',
+  'mac-safari': 'Already in your Dock? Open it there. Adding it again makes a second copy that starts empty.',
+  'android-chrome': 'Already on your Home screen? Open it there.',
+  samsung: 'Already on your Home screen? Open it there.',
+  'firefox-android': 'Already on your Home screen? Open it there.',
+};
 const POPUP_DELAY_MS = 1500;
 /* A Chromium hands its install event over some seconds after the page is up (the worker and the manifest are
    checked first). Until it has, the popup could only describe the menu; it waits this long for the button. */
@@ -526,6 +541,7 @@ export function InstallPopup({ screen }) {
   const shown = kind && _eventMayCome(kind) && flow === 'prompt' ? 'prompt' : kind;
 
   const later = React.useCallback(() => { _writeState(dismiss(_readState(), 'later', Date.now())); setKind(null); }, []);
+  const have = React.useCallback(() => { _writeState(dismiss(_readState(), 'have', Date.now())); setKind(null); }, []);
   const install = React.useCallback(async () => {
     setKind(null);
     const outcome = await promptInstall();
@@ -541,22 +557,23 @@ export function InstallPopup({ screen }) {
   if (stepsFor && STEPS[/** @type {keyof typeof STEPS} */ (stepsFor)]) {
     return <InstallSteps flow={/** @type {keyof typeof STEPS} */ (stepsFor)} onDone={() => setStepsFor(null)} onClose={() => setStepsFor(null)} />;
   }
-  return shown ? <InstallAsk kind={shown} onInstall={install} onLater={later} /> : null;
+  return shown ? <InstallAsk kind={shown} onInstall={install} onLater={later} onHave={have} /> : null;
 }
 
 /**
  * The popup itself: the app's icon, one line, and Install where the browser lets a page start one (or the way
  * out of an in-app browser) with Not now; where the browser keeps its install to itself, the line saying where,
- * and Got it.
- * @param {{ kind: string, onInstall: () => void, onLater: () => void }} props
+ * and Got it, with what to do if the app is there already and "I already have it".
+ * @param {{ kind: string, onInstall: () => void, onLater: () => void, onHave: () => void }} props
  */
-function InstallAsk({ kind, onInstall, onLater }) {
+function InstallAsk({ kind, onInstall, onLater, onHave }) {
   const trapRef = useFocusTrap(true);
   const id = React.useId();
   useModalRegistry({ id: 'install-ask:' + id, dismiss: onLater, active: true });
   const inApp = /^in-app/.test(kind);
   const browser = kind === 'in-app-ios' ? 'Safari' : 'Chrome';
   const how = ASK_HOW[/** @type {keyof typeof ASK_HOW} */ (kind)] || null;
+  const haveNote = how ? ASK_HAVE[/** @type {keyof typeof ASK_HAVE} */ (kind)] || null : null;
   const computer = !inApp && (kind === 'desktop' || kind === 'mac-safari' || (kind === 'prompt' && !/Android|iPhone|iPad/.test(_ua())));
   const line = inApp ? 'This is the browser inside another app, such as Messenger. It cannot install apps. Open VOTReader in ' + browser + ' and install it there.'
     : computer ? 'Keep it on this computer. It opens in its own window, like an app.'
@@ -568,6 +585,7 @@ function InstallAsk({ kind, onInstall, onLater }) {
         <h2 className="install-steps-title" id={'install-ask-title-' + id}>Install VOTReader</h2>
         <p className="install-steps-intro">{line}</p>
         {how ? <p className="install-ask-how">{how}</p> : null}
+        {haveNote ? <p className="install-ask-note install-ask-have-note">{haveNote}</p> : null}
         {inApp ? <p className="install-ask-note">If the button does nothing, tap the three dots at the top of this screen, then Open in {browser}.</p> : null}
         {/* The buttons stay at the foot of the sheet while its words scroll: at the largest text the words alone
             are taller than a small screen. */}
@@ -576,6 +594,7 @@ function InstallAsk({ kind, onInstall, onLater }) {
             ? <a className="install-ask-go" href={ownBrowserUrl(kind, typeof location !== 'undefined' ? location.href : '')}>Open in {browser}</a>
             : <button type="button" className="install-ask-go" onClick={onInstall}>Install</button>}
           <button type="button" className="install-steps-done" onClick={onLater}>{how ? 'Got it' : 'Not now'}</button>
+          {haveNote ? <button type="button" className="install-ask-have" onClick={onHave}>I already have it</button> : null}
         </div>
       </div>
     </div>,

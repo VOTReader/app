@@ -533,7 +533,7 @@ describe('InstallPopup: it comes up by itself', () => {
     expect(ask().querySelector('.install-steps-intro').textContent).toBe('Keep it on your home screen. It opens full screen, like an app.');
     expect(ask().querySelector('.install-ask-how').textContent).toBe('In Safari, tap Share (it may be under •••), then Add to Home Screen.');
     expect(ask().querySelector('.install-ask-go')).toBeNull();
-    expect([...ask().querySelectorAll('button, a')].map((b) => b.textContent)).toEqual(['Got it']);
+    expect([...ask().querySelectorAll('button, a')].map((b) => b.textContent)).toEqual(['Got it', 'I already have it']);
     expect(ask().querySelectorAll('.install-step').length).toBe(0);
     act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
     expect(ask()).toBeNull();
@@ -909,5 +909,68 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     expect(document.querySelectorAll('.install-step-note')[2].textContent).toBe('Settings, then Install VOTReader.');
     expect([...document.querySelectorAll('.install-step-title')].map((t) => t.textContent))
       .toEqual(['Tap the menu', 'Tap Open in Safari', 'Come back here in Safari']);
+  });
+});
+
+/* Corbin 2026-11-21: "Be careful with firefox and safari, we don't want to install over a preexisting pwa". Looked up
+   the same day: only Chromium answers getInstalledRelatedApps or sends an install event; Safari and Firefox tell a page
+   nothing, and an iPhone's or a Mac's installed copy keeps its own storage, so a Safari tab cannot even leave itself a
+   note. Adding it again there makes a second copy that starts empty. So where the browser cannot say, the popup warns
+   about a second copy and takes the reader's word. */
+describe('InstallPopup: where the browser cannot say whether the app is installed', () => {
+  const DAY = 86400000;
+  const ask = () => document.querySelector('.install-ask');
+  const have = () => [...ask().querySelectorAll('button')].find((b) => b.textContent === 'I already have it');
+  const popup = (state) => {
+    cleanup(); _resetInstallPopupSession(); _resetInstallCapture();
+    if (state) localStorage.setItem(KEY, JSON.stringify(state)); else localStorage.removeItem(KEY);
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(9000); });
+    return ask();
+  };
+  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('Safari on an iPhone warns that adding it again makes a second, empty copy', () => {
+    ua = UA.iphone;
+    expect(popup(null).querySelector('.install-ask-have-note').textContent)
+      .toBe('Already on your Home Screen? Open it there. Adding it again makes a second copy that starts empty.');
+  });
+  it('Safari on a Mac says Dock', () => {
+    ua = UA.macSafari;
+    expect(popup(null).querySelector('.install-ask-have-note').textContent)
+      .toBe('Already in your Dock? Open it there. Adding it again makes a second copy that starts empty.');
+  });
+  it('Firefox on Android says only to open the one that is there', () => {
+    ua = UA.firefoxAndroid;
+    expect(popup(null).querySelector('.install-ask-have-note').textContent).toBe('Already on your Home screen? Open it there.');
+  });
+  it('"I already have it" closes the popup, is written down, and is no Not now', () => {
+    ua = UA.iphone;
+    popup({ dismissals: 2 });
+    act(() => { fireEvent.click(have()); });
+    expect(ask()).toBeNull();
+    const s = JSON.parse(localStorage.getItem(KEY));
+    expect(s.dismissals).toBe(2);
+    expect(s.haveAt).toBeGreaterThan(0);
+    expect(s.snoozeUntil).toBeGreaterThan(Date.now() + 179 * DAY);
+  });
+  it('a reader who said so is not asked again at 21 days, and is at 180', () => {
+    ua = UA.iphone;
+    const at = Date.now();
+    expect(popup({ haveAt: at - 22 * DAY, snoozeUntil: at + 158 * DAY })).toBeNull();
+    expect(popup({ haveAt: at - 181 * DAY, snoozeUntil: at - DAY })).not.toBeNull();
+  });
+  it('a browser that hands over its install is not asked for the reader\'s word: it can tell', () => {
+    ua = UA.android;
+    cleanup(); _resetInstallPopupSession(); _resetInstallCapture();
+    attachInstallCapture(window);
+    const e = new Event('beforeinstallprompt');
+    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'dismissed' });
+    act(() => { window.dispatchEvent(e); });
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(9000); });
+    expect([...ask().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Install', 'Not now']);
+    expect(ask().querySelector('.install-ask-have-note')).toBeNull();
   });
 });

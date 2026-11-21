@@ -9058,6 +9058,9 @@ body.light .install-ask-go { color: #fff; }
 .install-ask-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .install-ask-how { margin: 0.2rem 0 0; padding: 0.8rem 0.9rem; border: 1px solid var(--gold-border); border-radius: 10px; font-size: var(--fs-18); font-weight: 600; line-height: 1.35; color: var(--cream); }
 .install-ask-note { margin: 0.7rem 0 0; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
+/* Where the browser cannot say whether the app is installed (Safari, Firefox): the reader's own answer, a quiet text
+   button under Got it. */
+.install-ask-have { display: block; width: 100%; min-height: 44px; margin-top: 0.3rem; padding: 0 0.5rem; background: none; border: 0; cursor: pointer; font-family: var(--font-body); font-size: var(--fs-16); color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
 .install-steps:focus { outline: none; }   /* the sheet takes focus itself so it opens at step 1; it is not a control */
 /* Large text: beside the picture the words ran one to a line ("Tap / Add / to / home / screen"); the picture goes under them. */
 .vot-large-text .install-step { grid-template-columns: 2.25rem 1fr; }

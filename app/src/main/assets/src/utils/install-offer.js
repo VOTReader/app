@@ -21,12 +21,19 @@
                  offers it, then reoffers it every so often".
    dismiss       the next persisted state after "Not now" or an install:
                  either way the offer waits 21 days and then looks again.
+                 "I already have it" (asked only where the browser cannot
+                 say) waits 180 days.
    seemsInstalled / markStandalone
                  a browser tab does not ask a reader who has the app already.
    capture       holds the deferred beforeinstallprompt event, from boot.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const SNOOZE_DAYS = 21;
+/* How long a reader's own "I already have it" holds the offer back. Safari and Firefox tell a page nothing about an
+   installed app, and an iPhone's or a Mac's installed copy keeps storage of its own, so a tab there cannot even
+   leave itself a note: the reader's word is all there is (Corbin 2026-11-21: "Be careful with firefox and safari,
+   we don't want to install over a preexisting pwa"). Half a year, not for ever: an app can be removed. */
+export const HAVE_DAYS = 180;
 
 /**
  * @param {string} ua
@@ -63,10 +70,10 @@ export function installFlow(ua, env) {
 
 /**
  * dismissals: how many times the reader said "Not now" (kept as a count; it ends nothing). installedAt: the last
- * time this browser said the app was installed. never: written until 2026-11-21 for "installed", read by nothing
+ * time this browser said the app was installed. haveAt: the last time the reader said so. never: written until 2026-11-21 for "installed", read by nothing
  * now: an install was ended "for good" on Chrome's word alone, and Chrome says yes on a phone before the icon
  * exists (and where the phone then added none, the reader was never asked again).
- * @typedef {{ dismissals?: number, snoozeUntil?: number, installedAt?: number, standaloneAt?: number, real?: boolean, never?: boolean }} InstallOfferState
+ * @typedef {{ dismissals?: number, snoozeUntil?: number, installedAt?: number, haveAt?: number, standaloneAt?: number, real?: boolean, never?: boolean }} InstallOfferState
  */
 
 /**
@@ -82,15 +89,16 @@ export function shouldOffer(state, ctx) {
 
 /**
  * @param {InstallOfferState | null | undefined} state
- * @param {'later' | 'installed'} how
+ * @param {'later' | 'installed' | 'have'} how
  * @param {number} now
  * @returns {InstallOfferState}
  */
 export function dismiss(state, how, now) {
   const s = Object.assign({}, state || {});
   delete s.never;
-  s.snoozeUntil = now + SNOOZE_DAYS * 86400000;
-  if (how === 'installed') s.installedAt = now;
+  s.snoozeUntil = now + (how === 'have' ? HAVE_DAYS : SNOOZE_DAYS) * 86400000;
+  if (how === 'have') s.haveAt = now;
+  else if (how === 'installed') s.installedAt = now;
   else s.dismissals = (s.dismissals || 0) + 1;
   return s;
 }
@@ -111,7 +119,8 @@ export function dismiss(state, how, now) {
    Chrome offering to install), else 21 days after the icon was last used. A phone without Google Play pins a
    home-screen icon that is no app the browser can see, and its Chrome offers to install whether or not the icon
    is there: only the 21 days speak for it. Safari and Firefox tell a page nothing: there the offer comes back
-   every 21 days in a tab and never in the app's own window. */
+   every 21 days in a tab and never in the app's own window, it warns about a second copy, and the reader can
+   say "I already have it", which holds it back 180 days. */
 
 /**
  * The state after a run from the app's own icon.
