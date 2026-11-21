@@ -13,8 +13,9 @@
      - after a finished chapter (a read item, or the reader scrolled to
        this chapter's end with mark-as-read off: their own scroll, not a
        search jump that lands there, search200 UX B1);
-     - one place a session; Not now snoozes it 21 days, three of them end
-       it; an install ends it.
+     - one place a session; Not now snoozes it 21 days and then it is
+       offered again, for as long as the app is not installed; after an
+       install it waits 21 days and looks again (install-offer).
    Chromium that handed over beforeinstallprompt gets a real INSTALL
    VOTREADER button (the browser's own dialog). Everyone else gets SHOW ME
    HOW: numbered steps, each with a picture (install/*.jpg, cropped from
@@ -33,8 +34,10 @@ const STATE_KEY = 'vot-install-offer';
 let _sessionUnit = /** @type {string | null} */ (null);
 /** Whether this session has shown "Almost done" (one sheet, whoever saw the install first). */
 let _afterTold = false;
+/** Whether this session has written down that the browser said "installed" (once, whoever heard it first). */
+let _installNoted = false;
 /** Tests only. */
-export function _resetInstallCardSession() { _sessionUnit = null; _afterTold = false; }
+export function _resetInstallCardSession() { _sessionUnit = null; _afterTold = false; _installNoted = false; }
 
 /* On screen (search200 UX B1): the long-press tip (AnnotationHint) waits while a card is in view, or the
    pill sits on the card's heading (both live at the bottom of a chapter's end). One id per card in view. */
@@ -58,6 +61,19 @@ function _readState() {
 /** @param {object} s */
 function _writeState(s) {
   try { localStorage.setItem(STATE_KEY, JSON.stringify(s)); } catch (_e) { /* storage blocked: it asks again next session */ }
+}
+
+/**
+ * The browser said the app was installed (our button, or its own menu): the offer waits 21 days and then looks
+ * again, since on a phone that yes is not yet an icon. Written once a session.
+ * @returns {import('../../utils/install-offer.js').InstallOfferState}
+ */
+function _noteInstalled() {
+  if (_installNoted) return _readState();
+  _installNoted = true;
+  const next = dismiss(_readState(), 'installed', Date.now());
+  _writeState(next);
+  return next;
 }
 
 /** Which way this browser installs, from the live environment. */
@@ -271,9 +287,10 @@ export function InstallCard({ unitKey, inert = false }) {
     return () => io.disconnect();
   }, [show, unitKey]);
 
-  const end = React.useCallback((/** @type {'later'|'never'|'installed'} */ how) => {
-    const next = dismiss(_readState(), how, Date.now());
-    _writeState(next);
+  const end = React.useCallback((/** @type {'later'|'installed'} */ how) => {
+    let next;
+    if (how === 'installed') next = _noteInstalled();
+    else { next = dismiss(_readState(), 'later', Date.now()); _writeState(next); }
     setState(next);
     setStepsFor(null);
     setGone(true);
@@ -282,10 +299,10 @@ export function InstallCard({ unitKey, inert = false }) {
   /* W56: an install from the browser's own menu (or the address-bar icon) fires appinstalled and nothing
      else; the card only lost its event and fell back to SHOW ME HOW for an app already installed, then asked
      again in the browser tab every session. An install this window saw hides the card at once (`show`) and
-     ends the offer for good, here or on the next card to mount. */
+     is written down, here or on the next card to mount: the offer waits 21 days and then looks again. */
   React.useEffect(() => {
-    if (installed && !inert && !state.never) end('installed');
-  }, [installed, inert, state.never, end]);
+    if (installed && !inert && !_installNoted) end('installed');
+  }, [installed, inert, end]);
 
   const onPrimary = React.useCallback(async () => {
     if (flow !== 'prompt') { setStepsFor(flow); return; }
@@ -349,7 +366,7 @@ export function InstallRow({ Row = null }) {
     const outcome = await promptInstall();
     if (outcome === 'accepted') {
       if (_isAndroid()) _tellAfter(setStepsFor);
-      else _writeState(dismiss(_readState(), 'installed', Date.now()));
+      else _noteInstalled();
     } else if (outcome !== 'dismissed') setStepsFor(PROMPT_FALLBACK());
   };
   if (!flow || (installed && !_isAndroid())) return null;
@@ -378,7 +395,11 @@ export function InstallRow({ Row = null }) {
    that day: with beforeinstallprompt left alone, nothing appears), so the popup those sites show is their own,
    and this is ours: it comes up by itself on Home once the browser has said the app can be installed. Install
    opens the browser's own dialog, and that is the whole install. Not on a reading page (PO2 19), not over the
-   tour or another dialog, once a session; Not now waits 21 days and the third one ends it (install-offer).
+   tour or another dialog, once a session. Not now waits 21 days and then it asks again, for as long as the app
+   is not installed (Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers
+   it, then reoffers it every so often"); what a page can know of "installed" is install-offer's seemsInstalled.
+   A computer's Chrome or Edge is asked only with the button in hand: no install event from it means the app is
+   there already, so it is not told about the address bar.
    In an in-app browser (Messenger, Facebook) nothing can be installed, and a link tapped in Messenger opens
    there: the same popup offers the way out, the phone's own browser, as a link and in words.
    Safari and the other browsers (Corbin, the same day: "build the same popup feature for safari and other
@@ -391,7 +412,6 @@ const ASK_HOW = {
   'android-chrome': 'Tap the three dots at the top right, then Add to Home screen, then Install.',
   samsung: 'Tap the three lines at the bottom right, then Add page to, then Home screen.',
   'firefox-android': 'Tap the three dots, then Add app to Home screen. It may say Install.',
-  desktop: 'Click the install icon at the right end of the address bar, then Install.',
   'mac-safari': 'In the menu bar, choose File, then Add to Dock.',
 };
 const POPUP_DELAY_MS = 1500;
@@ -423,19 +443,19 @@ const _standalone = () => {
 const _eventMayCome = (/** @type {string | null} */ f) => f === 'android-chrome' || f === 'samsung' || f === 'desktop';
 let _popupSeen = false;
 /** Tests only. */
-export function _resetInstallPopupSession() { _popupSeen = false; _related = null; _afterTold = false; }
+export function _resetInstallPopupSession() { _popupSeen = false; _related = null; _afterTold = false; _installNoted = false; }
 
 /**
  * After Install on a phone, however it was started (our popup, the Settings row, or Chrome's own menu): say once
  * what the phone asks next and where the icon lands, and do not ask again for 21 days. A phone's yes is not yet
- * an icon (see InstallRow), so the offer waits instead of ending.
+ * an icon (see InstallRow): after the 21 days a tab asks again unless the icon has been used.
  * @param {(flow: string) => void} show the caller's own setStepsFor
  */
 function _tellAfter(show) {
   if (_afterTold) return;
   _afterTold = true;
   _popupSeen = true;
-  _writeState(dismiss(_readState(), 'later', Date.now()));
+  _noteInstalled();
   show('android-after');
 }
 
@@ -482,7 +502,7 @@ export function InstallPopup({ screen }) {
     if (!due) return undefined;
     const t = setTimeout(() => {
       if (_popupSeen || _screenTaken()) return;   // the next arrival on Home asks instead
-      if (seemsInstalled(_readState(), { now: Date.now(), related: _related, hasPrompt: hasInstallPrompt(), android: _isAndroid() })) return;
+      if (seemsInstalled(_readState(), { now: Date.now(), related: _related, hasPrompt: hasInstallPrompt(), android: _isAndroid(), flow: offer })) return;
       _popupSeen = true;
       setKind(offer);
     }, _eventMayCome(offer) ? POPUP_EVENT_WAIT_MS : POPUP_DELAY_MS);
@@ -497,9 +517,10 @@ export function InstallPopup({ screen }) {
      done when Chrome says so. */
   const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
   React.useEffect(() => {
-    if (!installed || !_isAndroid() || _standalone()) return;
+    if (!installed || _standalone()) return;
     setKind(null);
-    _tellAfter(setStepsFor);
+    if (_isAndroid()) _tellAfter(setStepsFor);
+    else _noteInstalled();
   }, [installed]);
   // The event arrived while the popup was describing the menu: it gets its button.
   const shown = kind && _eventMayCome(kind) && flow === 'prompt' ? 'prompt' : kind;
@@ -509,10 +530,10 @@ export function InstallPopup({ screen }) {
     setKind(null);
     const outcome = await promptInstall();
     if (outcome === 'accepted') {
-      // A computer's yes is the install. A phone's is not yet an icon (see InstallRow): say what comes next, and
-      // ask again in 21 days if this browser can still install then.
+      // A computer's yes is the install. A phone's is not yet an icon (see InstallRow): say what comes next. Either
+      // way the offer waits 21 days and then looks again.
       if (_isAndroid()) _tellAfter(setStepsFor);
-      else _writeState(dismiss(_readState(), 'installed', Date.now()));
+      else _noteInstalled();
     } else if (outcome === 'dismissed') _writeState(dismiss(_readState(), 'later', Date.now()));
     else setStepsFor(PROMPT_FALLBACK());
   }, []);

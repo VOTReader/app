@@ -150,13 +150,16 @@ describe('InstallCard: the browser\'s own install', () => {
     await act(async () => { fireEvent.click(btn); await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledTimes(1);
     expect(card(container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    const s = JSON.parse(localStorage.getItem(KEY));
+    expect(s.never).toBeUndefined();
+    expect(s.installedAt).toBeGreaterThan(0);
+    expect(s.snoozeUntil).toBeGreaterThan(Date.now());
   });
 
   /* W56 (sweep 2026-10-13): an install from the browser's own menu (or the address-bar icon) fires appinstalled
      and nothing else. The card only lost its event, so it fell back to SHOW ME HOW for an app already on the
      home screen, and with nothing stored it asked again in the browser tab every session. */
-  it('installed from the browser menu while the card is up: it goes, and later sessions never ask', () => {
+  it('installed from the browser menu while the card is up: it goes, later sessions do not ask for 21 days, and then it looks again', () => {
     ua = UA.android;
     attachInstallCapture(window);
     const e = new Event('beforeinstallprompt');
@@ -166,10 +169,17 @@ describe('InstallCard: the browser\'s own install', () => {
     expect(card(v.container).querySelector('.install-card-primary').textContent).toBe('Install');
     act(() => { window.dispatchEvent(new Event('appinstalled')); });
     expect(card(v.container), 'no SHOW ME HOW for an app already installed').toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    const s = JSON.parse(localStorage.getItem(KEY));
+    expect(s.never).toBeUndefined();
+    expect(s.installedAt).toBeGreaterThan(0);
     cleanup(); _resetInstallCardSession(); _resetInstallCapture();
     v = render(<InstallCard unitKey="b" />);
     expect(card(v.container), 'the browser tab, next session').toBeNull();
+    // 21 days on, a phone whose icon never came (nothing says the app is there) is offered it again
+    cleanup(); _resetInstallCardSession(); _resetInstallCapture();
+    localStorage.setItem(KEY, JSON.stringify({ ...s, snoozeUntil: Date.now() - 1000 }));
+    v = render(<InstallCard unitKey="c" />);
+    expect(card(v.container), '21 days later').not.toBeNull();
   });
 
   it('installed while no card was on screen: the next card to mount records it and stays away', () => {
@@ -178,7 +188,8 @@ describe('InstallCard: the browser\'s own install', () => {
     act(() => { window.dispatchEvent(new Event('appinstalled')); });
     const v = render(<InstallCard unitKey="a" />);
     expect(card(v.container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    expect(JSON.parse(localStorage.getItem(KEY)).installedAt).toBeGreaterThan(0);
+    expect(JSON.parse(localStorage.getItem(KEY)).never).toBeUndefined();
   });
 });
 
@@ -400,7 +411,7 @@ describe('InstallPopup: it comes up by itself', () => {
     expect(s.snoozeUntil).toBeGreaterThan(Date.now());
   });
 
-  it('on a computer Install is the whole of it: nothing more is shown and it never asks again', async () => {
+  it('on a computer Install is the whole of it: nothing more is shown, and it is written down', async () => {
     ua = UA.chromeDesktop;
     handOver('accepted');
     render(<InstallPopup screen="home" />);
@@ -408,7 +419,44 @@ describe('InstallPopup: it comes up by itself', () => {
     expect(ask().querySelector('.install-steps-intro').textContent).toMatch(/on this computer/);
     await act(async () => { fireEvent.click(ask().querySelector('.install-ask-go')); await Promise.resolve(); await Promise.resolve(); });
     expect(document.querySelector('.install-steps')).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    const s = JSON.parse(localStorage.getItem(KEY));
+    expect(s.never).toBeUndefined();
+    expect(s.installedAt).toBeGreaterThan(0);
+    expect(s.snoozeUntil).toBeGreaterThan(Date.now());
+  });
+
+  /* Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers it, then reoffers
+     it every so often". */
+  describe('it comes back every 21 days for as long as the app is not installed', () => {
+    const DAY = 86400000;
+    const popupAfter = (state, wait = 1600) => {
+      cleanup(); _resetInstallPopupSession(); _resetInstallCapture();
+      localStorage.setItem(KEY, JSON.stringify(state));
+      handOver();
+      render(<InstallPopup screen="home" />);
+      act(() => { vi.advanceTimersByTime(wait); });
+      return ask();
+    };
+    it('a reader who has said Not now seven times is asked again once the 21 days are up', () => {
+      expect(popupAfter({ dismissals: 7, snoozeUntil: Date.now() + DAY })).toBeNull();
+      expect(popupAfter({ dismissals: 7, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+    });
+    it('a browser the old rules had ended "for good" (three Not nows, or one "installed") is asked again', () => {
+      expect(popupAfter({ dismissals: 3, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+      expect(popupAfter({ never: true })).not.toBeNull();
+    });
+    it('a phone that said "installed" 21 days ago and has never run from an icon is asked again; one that has is not', async () => {
+      const said = { installedAt: Date.now() - 22 * DAY, snoozeUntil: Date.now() - DAY };
+      expect(popupAfter(said), 'no icon was ever used').not.toBeNull();
+      expect(popupAfter({ ...said, standaloneAt: Date.now() - 2 * DAY, real: false }), 'the icon was used two days ago').toBeNull();
+    });
+    it('each Not now is another 21 days, not an end', () => {
+      expect(popupAfter({ dismissals: 5, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+      act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
+      const s = JSON.parse(localStorage.getItem(KEY));
+      expect(s.dismissals).toBe(6);
+      expect(s.snoozeUntil).toBeGreaterThan(Date.now() + 20 * DAY);
+    });
   });
 
   it('Not now closes it, waits 21 days, and it does not come back this session', () => {
@@ -506,7 +554,22 @@ describe('InstallPopup: it comes up by itself', () => {
     expect(lineFor(UA.firefoxAndroid)).toBe('Tap the three dots, then Add app to Home screen. It may say Install.');
     expect(lineFor(UA.iphoneChrome)).toBe('In your browser, tap Share, then Add to Home Screen.');
     expect(lineFor(UA.macSafari)).toBe('In the menu bar, choose File, then Add to Dock.');
-    expect(lineFor(UA.chromeDesktop)).toBe('Click the install icon at the right end of the address bar, then Install.');
+  });
+
+  /* A computer's Chrome or Edge hands a page its install event whenever the app can be installed and is not. No
+     event after its time to send one: the app is there already (or the window is a private one), and the popup
+     used to tell that reader to click an install icon the address bar no longer has. */
+  it('a computer\'s Chrome with no install event is not asked: it has the app; when the event comes, it is asked with the button', () => {
+    ua = UA.chromeDesktop;
+    render(<InstallPopup screen="home" />);
+    act(() => { vi.advanceTimersByTime(8100); });
+    expect(ask(), 'no event: installed already').toBeNull();
+    act(() => { vi.advanceTimersByTime(60000); });
+    expect(ask()).toBeNull();
+    handOver();                                       // the app was removed, or the browser has only now made up its mind
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(ask().querySelector('.install-ask-go').textContent).toBe('Install');
+    expect(ask().querySelector('.install-ask-how')).toBeNull();
   });
 
   it('a Chromium is given time to hand over its install event; if it comes while the line is up, the line becomes the button', () => {
@@ -599,7 +662,7 @@ describe('InstallPopup: it comes up by itself', () => {
       const v = render(<InstallPopup screen="letter" />);
       act(() => { window.dispatchEvent(new Event('appinstalled')); });
       expect(after().length).toBe(1);
-      expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+      expect(JSON.parse(localStorage.getItem(KEY)).installedAt).toBeGreaterThan(0);   // written down; no "Not now" is counted
       act(() => { fireEvent.click(document.querySelector('.install-steps .install-steps-done')); });
       expect(after().length).toBe(0);
       v.rerender(<InstallPopup screen="home" />);
@@ -629,7 +692,8 @@ describe('InstallPopup: it comes up by itself', () => {
       act(() => { window.dispatchEvent(new Event('appinstalled')); });   // Chrome may say this first
       await act(async () => { fireEvent.click(v.getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
       expect(after().length).toBe(1);
-      expect(JSON.parse(localStorage.getItem(KEY)).dismissals).toBe(1);
+      expect(JSON.parse(localStorage.getItem(KEY)).installedAt).toBeGreaterThan(0);
+      expect(JSON.parse(localStorage.getItem(KEY)).dismissals).toBeUndefined();
       expect(e.prompt).toHaveBeenCalledTimes(0);       // the event went with the install; the row shows its steps
     });
   });
@@ -775,7 +839,8 @@ describe('InstallRow: Settings > Help > Install VOTReader', () => {
     await act(async () => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledTimes(1);
     // On a phone Chrome's yes is not yet an icon: the offer waits 21 days, it does not end.
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+    expect(JSON.parse(localStorage.getItem(KEY)).installedAt).toBeGreaterThan(0);
+    expect(JSON.parse(localStorage.getItem(KEY)).snoozeUntil).toBeGreaterThan(Date.now());
     expect(JSON.parse(localStorage.getItem(KEY)).never).toBeUndefined();
   });
 

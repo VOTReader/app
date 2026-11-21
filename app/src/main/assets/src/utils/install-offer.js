@@ -15,16 +15,18 @@
                  open the page in the phone's own browser; else null (never
                  offered: the APK, an installed app, Firefox desktop).
    shouldOffer   the trigger rules: engaged first (a finished chapter), at
-                 most once a session, "Maybe later" snoozes 21 days, three
-                 dismissals or "Don't ask again" end it for good.
-   dismiss       the next persisted state after a dismissal.
+                 most once a session, and not inside the 21 days after the
+                 last answer. Nothing ends it: Corbin 2026-11-21, "detects
+                 somehow if the pwa is installed on the device, and if not
+                 offers it, then reoffers it every so often".
+   dismiss       the next persisted state after "Not now" or an install:
+                 either way the offer waits 21 days and then looks again.
    seemsInstalled / markStandalone
                  a browser tab does not ask a reader who has the app already.
    capture       holds the deferred beforeinstallprompt event, from boot.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const SNOOZE_DAYS = 21;
-const MAX_DISMISSALS = 3;
 
 /**
  * @param {string} ua
@@ -60,7 +62,11 @@ export function installFlow(ua, env) {
 }
 
 /**
- * @typedef {{ never?: boolean, dismissals?: number, snoozeUntil?: number, standaloneAt?: number, real?: boolean }} InstallOfferState
+ * dismissals: how many times the reader said "Not now" (kept as a count; it ends nothing). installedAt: the last
+ * time this browser said the app was installed. never: written until 2026-11-21 for "installed", read by nothing
+ * now: an install was ended "for good" on Chrome's word alone, and Chrome says yes on a phone before the icon
+ * exists (and where the phone then added none, the reader was never asked again).
+ * @typedef {{ dismissals?: number, snoozeUntil?: number, installedAt?: number, standaloneAt?: number, real?: boolean, never?: boolean }} InstallOfferState
  */
 
 /**
@@ -71,36 +77,41 @@ export function installFlow(ua, env) {
 export function shouldOffer(state, ctx) {
   const s = state || {};
   if (!ctx.flow || !ctx.engaged || ctx.shownThisSession) return false;
-  if (s.never || (s.dismissals || 0) >= MAX_DISMISSALS) return false;
   return !(s.snoozeUntil && ctx.now < s.snoozeUntil);
 }
 
 /**
  * @param {InstallOfferState | null | undefined} state
- * @param {'later' | 'never' | 'installed'} how
+ * @param {'later' | 'installed'} how
  * @param {number} now
  * @returns {InstallOfferState}
  */
 export function dismiss(state, how, now) {
   const s = Object.assign({}, state || {});
-  if (how === 'never' || how === 'installed') { s.never = true; return s; }
-  s.dismissals = (s.dismissals || 0) + 1;
+  delete s.never;
   s.snoozeUntil = now + SNOOZE_DAYS * 86400000;
+  if (how === 'installed') s.installedAt = now;
+  else s.dismissals = (s.dismissals || 0) + 1;
   return s;
 }
 
 /* ── installed already? ──────────────────────────────────────────────────
-   A page in a browser tab cannot ask whether its icon is on the home screen. It can know two things:
+   A page in a browser tab cannot ask whether its icon is on the home screen. It can know three things:
      related        what navigator.getInstalledRelatedApps() answered: true, the browser sees the installed app
                     (Chrome on Android, for a real app it had Google Play install, once the manifest names itself
                     under related_applications); false, it sees none; null, it cannot say.
      standaloneAt   the last time the app ran from its own icon. That window shares this browser's storage on
                     Android and on a computer (not on an iPhone, where the home-screen app keeps its own).
                     `real` is what the browser answered about itself in that window.
-   So a reader who uses the icon is not asked in a tab, and one who removed the app is asked again as soon as
-   the browser can tell (a real app that is gone; a computer's Chrome offering to install), else 21 days after
-   the icon was last used. A phone without Google Play pins a home-screen icon that is no app the browser can
-   see, and its Chrome offers to install whether or not the icon is there: only the 21 days speak for it. */
+     the install event   a computer's Chrome or Edge hands a page its install event whenever the app can be
+                    installed and is not. Flow 'desktop' is that browser with no event after its time to send
+                    one: the app is installed there, or that window cannot install (a private or guest window).
+   So a reader who uses the icon is not asked in a tab, a computer that has the app is not asked at all, and one
+   who removed the app is asked again as soon as the browser can tell (a real app that is gone; a computer's
+   Chrome offering to install), else 21 days after the icon was last used. A phone without Google Play pins a
+   home-screen icon that is no app the browser can see, and its Chrome offers to install whether or not the icon
+   is there: only the 21 days speak for it. Safari and Firefox tell a page nothing: there the offer comes back
+   every 21 days in a tab and never in the app's own window. */
 
 /**
  * The state after a run from the app's own icon.
@@ -115,11 +126,12 @@ export function markStandalone(state, now, real) {
 
 /**
  * @param {InstallOfferState | null | undefined} state
- * @param {{ now: number, related: boolean | null, hasPrompt: boolean, android: boolean }} ctx
+ * @param {{ now: number, related: boolean | null, hasPrompt: boolean, android: boolean, flow?: string | null }} ctx
  * @returns {boolean}
  */
 export function seemsInstalled(state, ctx) {
   if (ctx.related === true) return true;
+  if (ctx.flow === 'desktop') return true;           // a computer's Chromium that does not offer install: it has the app
   const s = state || {};
   if (!s.standaloneAt || ctx.now - s.standaloneAt >= SNOOZE_DAYS * 86400000) return false;
   if (s.real === true && ctx.related === false) return false;   // it was a real app, and the browser says it is gone

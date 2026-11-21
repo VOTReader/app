@@ -75,17 +75,29 @@ describe('shouldOffer + dismiss', () => {
     expect(shouldOffer(null, { ...ctx, shownThisSession: true })).toBe(false);
     expect(shouldOffer(null, { ...ctx, flow: null })).toBe(false);
   });
-  it('"Maybe later" waits 21 days; the third dismissal ends it', () => {
+  /* Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers it, then reoffers
+     it every so often". Until then the third "Not now" ended the offer for good, and so did one "installed" from
+     the browser, which a phone says before any icon exists. */
+  it('"Not now" waits 21 days and then it is offered again, however often the reader has said it', () => {
     let s = dismiss(null, 'later', now);
     expect(shouldOffer(s, { ...ctx, now: now + (SNOOZE_DAYS - 1) * 86400000 })).toBe(false);
     expect(shouldOffer(s, { ...ctx, now: now + SNOOZE_DAYS * 86400000 })).toBe(true);
-    s = dismiss(dismiss(s, 'later', now), 'later', now);
-    expect(s.dismissals).toBe(3);
-    expect(shouldOffer(s, { ...ctx, now: now + 365 * 86400000 })).toBe(false);
+    let at = now;
+    for (let i = 0; i < 6; i++) { at += SNOOZE_DAYS * 86400000; s = dismiss(s, 'later', at); }
+    expect(s.dismissals).toBe(7);
+    expect(shouldOffer(s, { ...ctx, now: at + (SNOOZE_DAYS - 1) * 86400000 })).toBe(false);
+    expect(shouldOffer(s, { ...ctx, now: at + SNOOZE_DAYS * 86400000 })).toBe(true);
   });
-  it('"Don\'t ask again" and an install end it for good', () => {
-    expect(shouldOffer(dismiss(null, 'never', now), { ...ctx, now: now + 1e12 })).toBe(false);
-    expect(shouldOffer(dismiss(null, 'installed', now), ctx)).toBe(false);
+  it('an install waits 21 days too, is written down, and ends nothing', () => {
+    const s = dismiss({ dismissals: 2 }, 'installed', now);
+    expect(s).toEqual({ dismissals: 2, installedAt: now, snoozeUntil: now + SNOOZE_DAYS * 86400000 });
+    expect(shouldOffer(s, ctx)).toBe(false);
+    expect(shouldOffer(s, { ...ctx, now: now + SNOOZE_DAYS * 86400000 })).toBe(true);   // whether it IS installed is seemsInstalled's to say
+  });
+  it('a browser that was ended "for good" before 2026-11-21 is offered again', () => {
+    expect(shouldOffer({ never: true }, ctx)).toBe(true);
+    expect(shouldOffer({ dismissals: 3, snoozeUntil: now - 1 }, ctx)).toBe(true);
+    expect(dismiss({ never: true }, 'later', now).never).toBeUndefined();
   });
 });
 
@@ -120,6 +132,14 @@ describe('seemsInstalled + markStandalone', () => {
     const s = markStandalone(null, now - DAY, undefined);
     expect(seemsInstalled(s, { ...tab, android: false, hasPrompt: true })).toBe(false);
     expect(seemsInstalled(s, { ...tab, android: false, hasPrompt: false })).toBe(true);
+  });
+  it('a computer\'s Chrome or Edge with no install event has the app (or a window that cannot install), with nothing written down', () => {
+    expect(seemsInstalled(null, { ...tab, android: false, hasPrompt: false, flow: 'desktop' })).toBe(true);
+    expect(seemsInstalled({ installedAt: now - 400 * DAY }, { ...tab, android: false, hasPrompt: false, flow: 'desktop' })).toBe(true);
+    // CONTROL: the same computer once its Chrome hands the event over, and a phone's Chrome without it
+    expect(seemsInstalled(null, { ...tab, android: false, hasPrompt: true, flow: 'prompt' })).toBe(false);
+    expect(seemsInstalled(null, { ...tab, flow: 'android-chrome' })).toBe(false);
+    expect(seemsInstalled(null, { ...tab, android: false, flow: 'ios-safari' })).toBe(false);
   });
 });
 
