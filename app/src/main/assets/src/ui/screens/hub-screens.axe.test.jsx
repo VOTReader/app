@@ -11,7 +11,7 @@
    are drawn by AudioSongsScreen with the player's state and the player's
    buttons, so they belong to the audio group, not this file. */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { seriousViolations } from '../a11y/axe-run.js';
@@ -212,26 +212,31 @@ describe('axe — Reading plans and the plan builder', () => {
   });
 
   it('a plan running late: the list (Catch up beside it), its page, Manage plan, Catch up, the schedule and a day sheet', async () => {
-    plans();
-    let run = startCatalogPlan('bible-year', null, daysAgo(4));
-    for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
-    ReadingPlanStore.put(run);
-    const { getByRole, getAllByRole } = screenOf();
-    await check();
-    fireEvent.click(getByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ }));   // the plan's own page
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Manage plan' }));
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Done' }));
-    fireEvent.click(getByRole('button', { name: 'Catch up' }));
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(getAllByRole('button', { name: 'Whole schedule' })[0]);
-    await check();
-    fireEvent.click(getByRole('tab', { name: 'What I’ve read' }));
-    await check();
-    fireEvent.click(getAllByRole('button', { name: /^Day 1,/ })[0]);   // the day sheet
-    await check();
+    // Pinned to a Sunday: daysAgo(4) is week-boundary arithmetic on the real clock,
+    // so this test's shape changed with the weekday (tests-4 clock sweep).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T12:00:00') });
+    try {
+      plans();
+      let run = startCatalogPlan('bible-year', null, daysAgo(4));
+      for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
+      ReadingPlanStore.put(run);
+      const { getByRole, getAllByRole } = screenOf();
+      await check();
+      fireEvent.click(getByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ }));   // the plan's own page
+      await check();
+      fireEvent.click(getByRole('button', { name: 'Manage plan' }));
+      await check();
+      fireEvent.click(getByRole('button', { name: 'Done' }));
+      fireEvent.click(getByRole('button', { name: 'Catch up' }));
+      await check();
+      fireEvent.click(getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(getAllByRole('button', { name: 'Whole schedule' })[0]);
+      await check();
+      fireEvent.click(getByRole('tab', { name: 'What I’ve read' }));
+      await check();
+      fireEvent.click(getAllByRole('button', { name: /^Day 1,/ })[0]);   // the day sheet
+      await check();
+    } finally { vi.useRealTimers(); }
   });
 
   it('a plan before it starts (the preview)', async () => {

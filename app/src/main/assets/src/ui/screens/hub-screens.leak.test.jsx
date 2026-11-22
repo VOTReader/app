@@ -9,7 +9,7 @@
    Fixtures and globals mirror hub-screens.axe.test.jsx. The harness is installed
    after a test's globals, so it sees their subscribe() too. */
 import 'fake-indexeddb/auto';
-import { describe, it, beforeEach, afterEach } from 'vitest';
+import { describe, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { installLeakHarness, expectNoLeaks } from '../leak/leak-harness.js';
@@ -165,14 +165,19 @@ describe('leaks — Reading plans', () => {
   };
   const screenOf = () => render(<ReadingPlansScreen readingPlans={[]} isRead={() => false} onPlansMoved={noop} onStartSession={noop} onBack={noop} />);
   it('a plan running, its details open', async () => {
-    plans();
-    let run = startCatalogPlan('bible-year', null, daysAgo(4));
-    for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
-    ReadingPlanStore.put(run);
-    await leakFree('ReadingPlansScreen', screenOf, (r) => {
-      fireEvent.click(r.getAllByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ })[0]);
-      fireEvent.click(r.getAllByRole('button', { name: 'Manage plan' })[0]);
-    });
+    // Pinned to a Sunday: daysAgo(4) is week-boundary arithmetic on the real clock,
+    // so this test's shape changed with the weekday (tests-4 clock sweep).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T12:00:00') });
+    try {
+      plans();
+      let run = startCatalogPlan('bible-year', null, daysAgo(4));
+      for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
+      ReadingPlanStore.put(run);
+      await leakFree('ReadingPlansScreen', screenOf, (r) => {
+        fireEvent.click(r.getAllByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind/ })[0]);
+        fireEvent.click(r.getAllByRole('button', { name: 'Manage plan' })[0]);
+      });
+    } finally { vi.useRealTimers(); }
   });
   it('the plan builder open', async () => {
     plans();
