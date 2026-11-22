@@ -68,7 +68,7 @@ describe('plan runs the shipping build (dc31d3e27) wrote, opened by this build',
     const v0 = ReadingPlanStore.getVersion();
     try {
       _resetPlanNavForTests();
-      const rows = ReadingPlanStore.active().map((r) => runRow(r, new Date()));
+      const rows = ReadingPlanStore.active().map((r) => runRow(r, NOW));
       render(<><TodayCard rows={rows} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={vi.fn()} />
         <PlansHub readingPlans={[]} isRead={() => false} onStartSession={vi.fn()} onBack={vi.fn()} /></>);
       expect(document.querySelectorAll('.plan-run-row').length).toBe(7);
