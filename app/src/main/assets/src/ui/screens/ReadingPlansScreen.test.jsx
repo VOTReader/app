@@ -198,6 +198,9 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
   });
 
   it('behind (2235): the same status on the list and the page; Catch up keeps the daily amount and it is On track', () => {
+    // Pinned to a Wednesday: on a Sunday the week strip holds no missed day (streak() weeks run Sun-Sat).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-18T12:00:00') });
+    try {
     ReadingPlanStore.put(lateRun());
     render(<PlansHub {...base()} />);
     const row = screen.getByRole('button', { name: /^Bible in a Year: [0-9]+ days? behind · finishes / });
@@ -216,6 +219,7 @@ describe('Reading plans: the plan page (3.3, 3.8)', () => {
     expect(document.querySelector('.plan-status b').textContent).toBe('On track');
     // the dates that went unread stay on the week strip as history
     expect(screen.getByRole('group', { name: 'This week' }).querySelectorAll('[data-missed="1"]').length).toBeGreaterThan(0);
+    } finally { vi.useRealTimers(); }
   });
 
   // One rule for a plan's dates: the year shows when it is not this year's, the same in the head and in Catch up.
