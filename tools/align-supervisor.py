@@ -280,6 +280,7 @@ def main():
                 if m:
                     state["unit"] = m.group(1)
             code = p.wait()
+            p.stdout.close()
             stop.set()
             t.join(timeout=a.sample_s + 5)
             over = state["over"]
