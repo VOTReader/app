@@ -6795,7 +6795,7 @@ var LETTERS_FLOCK = [
           },
           {
             "t": "italic",
-            "v": "A gift of love is accepted, a gift of worship is well pleasing in My sight, a gift of thanksgiving is a very wise offering indeed."
+            "v": "A gift of love is accepted, a gift of worship is well-pleasing in My sight, a gift of thanksgiving is a very wise offering indeed."
           },
           {
             "t": "text",

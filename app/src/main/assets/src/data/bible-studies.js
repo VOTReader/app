@@ -53479,7 +53479,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "text",
-                "v": "? (Mentioned 25 times in the NKJV) How does that fit with"
+                "v": "? (Mentioned 41 times in the NKJV) How does that fit with"
               },
               {
                 "t": "bold-italic",

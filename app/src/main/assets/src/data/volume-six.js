@@ -98,7 +98,11 @@ var LETTERS_V6 = [
         "segments": [
           {
             "t": "text",
-            "v": "Little flock, have you learned nothing from My Word? Have you so quickly forgotten My Letters, in where I have taught you the way in which you should walk? Indeed, who you choose defines what you do, as I have already told you."
+            "v": "Little flock, have you learned nothing from My Word? Have you so quickly forgotten My Letters, in where I have taught you the way in which you should walk?"
+          },
+          {
+            "t": "italic",
+            "v": "Indeed, who you choose defines what you do, as I have already told you."
           },
           {
             "t": "fn",

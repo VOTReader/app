@@ -2432,7 +2432,19 @@ var LETTERS_V4 = [
           },
           {
             "t": "text",
-            "v": "Who among you has committed no murder, whether in heart or in action? Who among you has committed no adultery, whether in heart or in action? Who among you, O peoples of the earth, has committed no sin?! Behold, all have fallen short of the Glory of God, all have failed utterly in their attempts to gain righteousness; even the works of the most righteous among you are but filthy rags before Me. And for this reason did I come into the world, manifest in the flesh, to bear the full weight of the sin of this world - Immanu El."
+            "v": "Who among you has committed no murder, whether in heart or in action? Who among you has committed no adultery, whether in heart or in action?"
+          },
+          {
+            "t": "italic",
+            "v": "Who among you, O peoples of the earth, has committed no sin?! Behold, all have fallen short of the Glory of God, all have failed utterly in their attempts to gain righteousness; even the works of the most righteous among you are but filthy rags before Me."
+          },
+          {
+            "t": "fn",
+            "v": "4"
+          },
+          {
+            "t": "text",
+            "v": "And for this reason did I come into the world, manifest in the flesh, to bear the full weight of the sin of this world - Immanu El."
           }
         ]
       },
@@ -2487,12 +2499,17 @@ var LETTERS_V4 = [
       "3": {
         "type": "scripture",
         "ref": "Revelation 14:12"
+      },
+      "4": {
+        "type": "scripture",
+        "ref": "Isaiah 64:5-6"
       }
     },
     "nkjv": {
       "Psalms 118:26, Matthew 23:39": "Psalms 118:26 — Blessed is he who comes in the name of the LORD! We have blessed you from the house of the LORD. | Matthew 23:39 — for I say to you, you shall see Me no more till you say, ‘Blessed is He who comes in the name of the LORD!’ ”",
       "Isaiah 52:7, Romans 10:15": "Isaiah 52:7 — How beautiful upon the mountains Are the feet of him who brings good news, Who proclaims peace, Who brings glad tidings of good things, Who proclaims salvation, Who says to Zion, “Your God reigns!” | Romans 10:15 — And how shall they preach unless they are sent? As it is written: “How beautiful are the feet of those who preach the gospel of peace, Who bring glad tidings of good things!”",
-      "Revelation 14:12": "Here is the patience of the saints; here are those who keep the commandments of God and the faith of Jesus."
+      "Revelation 14:12": "Here is the patience of the saints; here are those who keep the commandments of God and the faith of Jesus.",
+      "Isaiah 64:5-6": "5. You meet him who rejoices and does righteousness, Who remembers You in Your ways. You are indeed angry, for we have sinned— In these ways we continue; And we need to be saved. 6. But we are all like an unclean thing, And all our righteousnesses are like filthy rags; We all fade as a leaf, And our iniquities, like the wind, Have taken us away."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/discernment",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=9zp-ONYIO4I&list=PLE8FlkxQPQkMkjV_V68yjBNVY-LTyD5Xy&index=16",

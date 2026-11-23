@@ -1603,7 +1603,7 @@ var LETTERS_V1 = [
     "nkjv": {},
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/and-he-shall-be-called-i-am-5",
     "soundcloudUrl": "https://soundcloud.com/the-volumes-of-truth/and-he-shall-be-called-i-am?in=the-volumes-of-truth/sets/volume-one",
-    "videoVoiceUrl": "https://www.youtube.com/watch?v=MVOupBDuvBw&list=PLE8FlkxQPQkNhyk7QOplwIcW788ErwTRh&index=12",
+    "videoVoiceUrl": "https://www.youtube.com/watch?v=TZjPvGBgraw&list=PLE8FlkxQPQkNhyk7QOplwIcW788ErwTRh&index=12",
     "videoMusicUrl": "https://www.youtube.com/watch?v=drJFOywutVg&list=PLSVchFJ22QYLFnEgsgioj_Lej_q1CzyfH&index=5",
     "relatedTopics": [
       {

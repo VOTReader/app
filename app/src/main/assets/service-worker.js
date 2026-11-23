@@ -49,7 +49,7 @@
  */
 
 const CACHE_VERSION = 'v1.0.2-deea192f33';
-const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -343,7 +343,7 @@ const ASSET_REVISIONS = {
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'e88268c42ae19fca4c02ac78177a47602936a0313ca59f3e6cc25a9c7976e58c',
-  './dist/bundle-a-vot.js': 'c97c3543bc460a0d15b6e5d157c847a7474df379357a2dafa2b491d6d54cbae2',
+  './dist/bundle-a-vot.js': '7ebe2b4e0f8d79959a34d49389629e26ca27717b8d437b627b73b564650edaa5',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
@@ -420,7 +420,7 @@ const ASSET_REVISIONS = {
   './src/data/answers.js': 'a291d3608d84d6d2bcf5dfd2c6d0524e2103d5c7bc3b657cd113d2ac518ba6eb',
   './src/data/audio-lengths.js': 'c0476aeafb8e2e5a892d63b072943ad1b6dd4648b8f9b1d5cefb29ccb510055a',
   './src/data/audio-sync-sections.js': 'a48bd0c2f2352ca5ef21b903fe0f5dc9a6048f0b0492b6cf15d845edd54547ac',
-  './src/data/audio-sync.js': 'f5a527c5504ca24d2e8761a286eb2a07928584124680f50a47ed661d0830b686',
+  './src/data/audio-sync.js': '366fb6efe7caa941235c6e146d95f136a0da3ae92f2ea07fcd5b3f09edd69bf2',
   './src/data/bible-asv.js': '552b7ae92a206f103f53f51f33cc8b90365156244aab6b7c47f8da5d16d6a34b',
   './src/data/bible-bsb.js': 'c6298eeaaba6bf491a0cbfe6f22ba3d19357ad29c6c88acd6f5bf4791347a6bd',
   './src/data/bible-hnv.js': '582c866ccba90aa63170c958bda79d554f32dc5749a6949bb289aa51f96eeead',
@@ -429,15 +429,15 @@ const ASSET_REVISIONS = {
   './src/data/bible-rkjv.js': '8aff1bbb50beaee6f9e6e215ca1de0dcaef61ce75fb637522c43aa6c3f94ed57',
   './src/data/bible-rnkjv.js': 'fba44c03cc99eb2532009df85f41bddb8a587972090915bd2776c7734fa61c5e',
   './src/data/bible-rvr.js': '6c7451ca2517f4b5ea69bb37daf10f88d19bd68b600793f99b4f1ff650e3bca8',
-  './src/data/bible-studies.js': '853d7ad0fb9be9295de0fa6b4d9a845952c857fd937e61fefd3484cf937b63be',
+  './src/data/bible-studies.js': 'a630995899b63b2f9206b0aec51212195cf5c67ab81cbd388586018cba64f209',
   './src/data/bible-sync-brm-kjv.js': '0d107fa0e256a67b46112a5d2a47e4d6abcd7e239bda3263c04528e6351db3fa',
   './src/data/bible-sync-tsot-matthew.js': 'cb5f612b25cdca8c1d2cc4bc713377fe754fca989d00ed8e53220b3ac5309444',
   './src/data/bible-sync-web-ebible.js': 'accb68464a6f17e4e9c581daa3a5f6056f788114e955bbaee35d343d99733e7f',
   './src/data/bible-sync-wop-nkjv.js': 'e3540f79031a09c45eb7d39c23c9a83892df100846af47c615a85d45f961989a',
   './src/data/bible-web.js': '22b119d895aa329b2f62e6ba7b1b5978f1fbcf13fc474d1de5d9b72c9a3558c2',
   './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
-  './src/data/scripture-web-data.js': '759923bdcc27c24c2c378038ceff546c3348f0c37450c3544f05b0b2bcc56cd9',
-  './src/data/verse-cites.js': '1e6fe22779e310c69ca2ad7b801a06e5aef21535ec758088115195b6c9fb72f1',
+  './src/data/scripture-web-data.js': 'f67ad078de2a52ad2641ccf8033b80bd2db87b45983d72aeccd3bb6bc3a3ec86',
+  './src/data/verse-cites.js': 'b576bc4326140a47666bc417f5d4daba061f2e588e6069fc58bfb61f1c73e506',
   './study-chart-chronology.jpg': '61013f42aee0e01fb088f0704d00b40f4db90a32742ccad5e617035175801f50',
   './study-cover-lamb.jpg': 'f5d01352c5d83ed33851bdf674a2ddd2b839b4b5dc75b0e09140769ad90ac7ca',
   './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',
