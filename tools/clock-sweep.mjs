@@ -21,7 +21,12 @@
    plus one file-level rule:
      - a file is WEEKDAY when it talks streaks (or week starts) AND reads
        the live clock anywhere unpinned — the streak stores' shape, where
-       the weekday dependence is the file's subject, not one line;
+       the weekday dependence is the file's subject, not one line. The
+       "talks streaks" half is scoped (item 9): the live clock must sit
+       in a streak/week-start-named describe or it, or the file itself must be
+       a streak file — a mocked streak store beside an unrelated live
+       clock (useMarkAsRead, backup, study-screens, MyProgressScreen)
+       is not the file's subject;
      - a line is FIXED when the clock value is pinned to a literal: a
        string or numeric argument to `new Date(...)`, `Date.UTC(...)`, or
        a `FIX.now` / `FIXED_` anchor on the line;
@@ -89,6 +94,35 @@ const LIVE_CLOCK = /new Date\s*\(\s*\)|Date\.now\s*\(|\btoday\b|\bnow\b/;
 // FIX.now / FIXED_ anchor (the repo's fixed-clock convention).
 const FIXED_VALUE = /new Date\s*\(\s*(['"]|\d)|Date\.UTC\s*\(|FIX\.now|FIXED_/;
 
+
+// Identifiers bound to a fixed date: const NOW = new Date(FIX.now) /
+// new Date('2026-11-16') / new Date(2026, 10, 16). A date built from one
+// is fixed, not a live read (item 9: plan-runs-edit-2310 NOW).
+const FIXED_ANCHOR_DEF = /^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Date\(\s*(?:['"]|\d|FIX\.now|FIXED_)/;
+
+// daysAgo / lateRun defined from a fixed anchor or literal: the helper
+// calls are fixed dates too (item 9: plan-runs-edit-2310 daysAgo from
+// FIX.now). A helper defined from the live clock stays live.
+const FIXED_HELPER_DEF = /^\s*(?:const|let|var)\s+(daysAgo|lateRun)\s*=/;
+
+function collectFixed(lines) {
+  const anchors = new Set();
+  for (const raw of lines) {
+    const m = raw.match(FIXED_ANCHOR_DEF);
+    if (m) anchors.add(m[1]);
+  }
+  const helpers = new Set();
+  for (const raw of lines) {
+    const m = raw.match(FIXED_HELPER_DEF);
+    if (!m) continue;
+    const arg = raw.match(/new Date\s*\(\s*([A-Za-z_$][\w$]*|['"]|\d|FIX\.now|FIXED_)/);
+    if (!arg) continue;
+    const first = arg[1];
+    if (first.startsWith("'") || first.startsWith('"') || /^\d/.test(first) || first === 'FIX' || anchors.has(first)) helpers.add(m[1]);
+  }
+  return { anchors, helpers };
+}
+
 const PINNED = /useFakeTimers|setSystemTime/;
 const IGNORE_MARKER = /clock-sweep-ignore/;
 const TEST_FILE = /\.test\.(js|jsx|ts|tsx)$/;
@@ -96,32 +130,70 @@ const SKIP_DIRS = new Set([
   'node_modules', '.git', '.claude', 'coverage', 'dist', '.vite', '.vitest-cache', '.vite-temp',
 ]);
 
-function hitKind(line) {
+function hitKind(line, fixed) {
   if (FIXED_VALUE.test(line)) return 'benign';
+  if (fixed) {
+    // A date built from a fixed anchor is a fixed date, not a live read
+    // (plan-runs-edit-2310: NOW = new Date(FIX.now)).
+    for (const a of fixed.anchors) {
+      if (line.includes('new Date(' + a) || line.includes('new Date( ' + a)) return 'benign';
+    }
+    // A daysAgo / lateRun call is a fixed date when the helper itself is
+    // defined from a fixed anchor — unless the line also carries a bare
+    // live read of its own.
+    for (const h of fixed.helpers) {
+      const re = h === 'daysAgo' ? /\bdaysAgo\s*\(/ : /\blateRun\s*\(/;
+      if (re.test(line) && !LIVE_CLOCK.test(line)) return 'benign';
+    }
+  }
   if (WEEKDAY_ALONE.some((re) => re.test(line))) return 'weekday';
   if (WEEKDAY_WITH_LIVE_CLOCK.some((re) => re.test(line)) && LIVE_CLOCK.test(line)) return 'weekday';
   return 'benign';
 }
 
 /** Classify one test file's text. Returns { file, verdict, hits }. */
+/** The name of the describe / it a line sits in, or null. Plain string
+    work, not a regex: header names hold quotes the sweep must not trip on. */
+function headerName(line, kw) {
+  const s = line.trim();
+  if (!s.startsWith(kw + '(')) return null;
+  const rest = s.slice(kw.length + 1).trim();
+  const q = rest[0];
+  if (q !== "'" && q !== '"' && q !== String.fromCharCode(96)) return null;
+  const end = rest.indexOf(q, 1);
+  return end < 0 ? null : rest.slice(1, end);
+}
+
 export function classifyFile(file, text) {
   const lines = text.split('\n');
   if (lines.some((l) => IGNORE_MARKER.test(l))) return { file, verdict: 'IGNORED', hits: [] };
   if (PINNED.test(text)) return { file, verdict: 'SAFE', hits: [] };
+  const fixed = collectFixed(lines);
   const hits = [];
+  // Nearest enclosing describe / it name, for the scoped file-level rule.
+  // Approximate: the last header seen while scanning down the file.
+  let curDescribe = '';
+  let curIt = '';
   lines.forEach((raw, i) => {
     const line = raw.trim();
+    const dn = headerName(line, 'describe');
+    if (dn !== null) { curDescribe = dn; curIt = ''; }
+    const tn = headerName(line, 'it') ?? headerName(line, 'test');
+    if (tn !== null) curIt = tn;
     if (!line || line.startsWith('//')) return;
     if (!CLOCK_PATTERNS.some((re) => re.test(line))) return;
-    hits.push({ line: i + 1, text: line.slice(0, 160), kind: hitKind(line) });
+    const scoped = /streak|weekStart|startOfWeek|week strip|week-start/i.test(curDescribe) || /streak|weekStart|startOfWeek|week strip|week-start/i.test(curIt);
+    hits.push({ line: i + 1, text: line.slice(0, 160), kind: hitKind(line, fixed), scoped });
   });
   if (hits.length === 0) return { file, verdict: 'CLEAN', hits };
   if (hits.some((h) => h.kind === 'weekday')) return { file, verdict: 'WEEKDAY', hits };
-  // File-level rule: streak / week-start arithmetic on a live clock read
-  // anywhere in the file is weekday-sensitive even when no single hit line
-  // carries both (reading-streak-store's shape).
+  // File-level rule: streak / week arithmetic on a live clock read is
+  // weekday-sensitive even when no single hit line carries both
+  // (reading-streak-store's shape) — but only where the live clock sits
+  // in a streak/week-named test, or the file itself is a streak file.
   const liveClockHit = hits.some((h) => /new Date\s*\(\s*\)|Date\.now\s*\(/.test(h.text));
-  if (liveClockHit && /streak|weekStart|startOfWeek/i.test(text)) {
+  const streakSubject = /streak/i.test(file) || hits.some((h) => h.scoped);
+  if (liveClockHit && streakSubject) {
     return { file, verdict: 'WEEKDAY', hits };
   }
   return { file, verdict: 'BENIGN', hits };

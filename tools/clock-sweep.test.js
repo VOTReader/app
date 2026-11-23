@@ -92,6 +92,100 @@ describe('streak', () => {
 });
 `;
 
+// A daysAgo helper defined from a fixed anchor (plan-runs-edit-2310): the
+// calls are fixed dates, not live reads.
+const FIXED_ANCHOR_DAYSAGO = `
+import { describe, it, expect } from 'vitest';
+import FIX from './plan-runs-dc31d3e27.fixture.json';
+const NOW = new Date(FIX.now);
+const daysAgo = (n) => new Date(NOW.getTime() - n * 864e5);
+describe('the plan keeps its pace', () => {
+  it('a length is the whole plan', () => {
+    const run = { startedAt: daysAgo(4) };
+    expect(run.startedAt.getFullYear()).toBe(2026);
+  });
+});
+`;
+
+// A mocked streak store beside an unrelated live clock (useMarkAsRead):
+// the streak word is a mock, the clock is a plan start, not streak math.
+const MOCKED_STREAK_HOOK = `
+import { describe, it, expect, vi } from 'vitest';
+vi.mock('../stores/reading-streak-store.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return { ...real };
+});
+describe('useReadProgress — reading plans tick', () => {
+  it('a completed read ticks the running plan', () => {
+    const run = { startedAt: new Date(), pace: { mode: 'days', n: 3 } };
+    expect(run.pace.n).toBe(3);
+  });
+  it('credits the CHAPTER key space and feeds the streak', () => {
+    expect(window.ReadingStreakStore.recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+});
+`;
+
+// Today as fixture data (replace-all / backup): lastEntryDate is 'today'
+// so the streak subscriber sees a current entry; the assertions are
+// relative-day, not weekday.
+const FIXTURE_TODAY = `
+import { describe, it, expect } from 'vitest';
+describe('JournalStatsStore.replaceAll', () => {
+  const _today = (() => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  })();
+  const payload = { totalEntries: 42, currentStreak: 7, lastEntryDate: _today };
+  it('replaces the full stats object with a valid payload', () => {
+    expect(payload.currentStreak).toBe(7);
+    expect(payload.lastEntryDate).toBe(_today);
+  });
+});
+`;
+
+// Relative history timestamps (study-screens): Date.now() minus a
+// duration, streaks only in mocked store gets.
+const RELATIVE_HISTORY = `
+import { describe, it, expect } from 'vitest';
+put('ReadingStreakStore', mkStore({ get: () => ({}) }));
+describe('axe — History', () => {
+  it('populated, an older year opened', () => {
+    const now = Date.now();
+    const HISTORY = [
+      { type: 'chapter', ts: now - 5 * 60000 },
+      { type: 'chapter', ts: now - 400 * 86400000 },
+    ];
+    expect(HISTORY.length).toBe(2);
+  });
+});
+`;
+
+// A plan started today (MyProgressScreen): the plan's day-1 status is
+// weekday-independent; the streaks are mocked stores.
+const PLAN_STARTED_TODAY = `
+import { describe, it, expect } from 'vitest';
+globalThis.ReadingStreakStore = { get: () => ({ currentStreak: 12 }) };
+describe('MyProgressScreen — reading plans', () => {
+  it('a line per plan with its day and counts', () => {
+    const today = todayKey(new Date());
+    const run = startCatalogPlan('bible-year', null, new Date());
+    expect(run.status).toBe('On track');
+  });
+});
+`;
+
+// The backstop still fires: a live clock inside a streak-named test.
+const STREAK_SCOPED = `
+import { describe, it, expect } from 'vitest';
+describe('JournalStatsStore — recomputeFromLoad', () => {
+  it('breaks streak when the last entry is stale', () => {
+    const d = new Date();
+    expect(d).toBeDefined();
+  });
+});
+`;
+
 const mirrors = [];
 afterEach(() => { for (const m of mirrors.splice(0)) rmSync(m, { recursive: true, force: true }); });
 
@@ -147,6 +241,41 @@ describe('classifyFile', () => {
     expect(r.verdict).toBe('CLEAN');
   });
 
+  it('passes a daysAgo helper defined from a fixed anchor as BENIGN', () => {
+    const r = classifyFile('plan-runs-edit-2310.test.jsx', FIXED_ANCHOR_DAYSAGO);
+    expect(r.verdict).toBe('BENIGN');
+  });
+
+  it('passes a mocked streak store beside an unrelated live clock as BENIGN', () => {
+    const r = classifyFile('useMarkAsRead.test.js', MOCKED_STREAK_HOOK);
+    expect(r.verdict).toBe('BENIGN');
+  });
+
+  it('passes a today fixture date as BENIGN', () => {
+    const r = classifyFile('replace-all.test.js', FIXTURE_TODAY);
+    expect(r.verdict).toBe('BENIGN');
+  });
+
+  it('passes relative history timestamps as BENIGN', () => {
+    const r = classifyFile('study-screens.axe.test.jsx', RELATIVE_HISTORY);
+    expect(r.verdict).toBe('BENIGN');
+  });
+
+  it('passes a plan started today as BENIGN', () => {
+    const r = classifyFile('MyProgressScreen.test.jsx', PLAN_STARTED_TODAY);
+    expect(r.verdict).toBe('BENIGN');
+  });
+
+  it('flags a live clock inside a streak-named test as WEEKDAY', () => {
+    const r = classifyFile('journal-stats-store.test.js', STREAK_SCOPED);
+    expect(r.verdict).toBe('WEEKDAY');
+  });
+
+  it('flags a module-level live clock in a streak-named file as WEEKDAY', () => {
+    const r = classifyFile('reading-streak-store.test.js', 'const d = new Date();');
+    expect(r.verdict).toBe('WEEKDAY');
+  });
+
   it('skips a file carrying the ignore marker', () => {
     const r = classifyFile('clock-sweep.test.js', '// clock-sweep-ignore\nconst d = new Date();\n');
     expect(r.verdict).toBe('IGNORED');
@@ -164,6 +293,27 @@ describe('scanTree + CLI', () => {
     writeFileSync(join(srcDir, 'c.test.js'), FIXED_DATES);
     const { counts } = scanTree(root);
     expect(counts).toEqual({ SAFE: 1, BENIGN: 1, WEEKDAY: 1, CLEAN: 0, IGNORED: 0 });
+  });
+
+  it('counts a tree of only the triaged false positives: 0 WEEKDAY', () => {
+    const root = mkdtempSync(join(tmpdir(), 'vot-clock-sweep-fp-'));
+    mirrors.push(root);
+    const srcDir = join(root, 'app', 'src', 'main', 'assets', 'src');
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(join(srcDir, 'a.test.js'), FIXED_ANCHOR_DAYSAGO);
+    writeFileSync(join(srcDir, 'b.test.js'), MOCKED_STREAK_HOOK);
+    writeFileSync(join(srcDir, 'c.test.js'), FIXTURE_TODAY);
+    writeFileSync(join(srcDir, 'd.test.js'), RELATIVE_HISTORY);
+    writeFileSync(join(srcDir, 'e.test.js'), PLAN_STARTED_TODAY);
+    const { counts } = scanTree(root);
+    expect(counts).toEqual({ SAFE: 0, BENIGN: 5, WEEKDAY: 0, CLEAN: 0, IGNORED: 0 });
+  });
+
+  it('exits 0 for a tree holding only a fixed-anchor file', () => {
+    const { root } = mirror(FIXED_ANCHOR_DAYSAGO);
+    const r = runGate(root);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('0 WEEKDAY');
   });
 
   it('exits 1 and names the weekday file for an unpinned tree', () => {
