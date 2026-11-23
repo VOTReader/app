@@ -259,9 +259,13 @@ jobs:
         # ride the same call (2026-11-22, votreader-tests-5 item 9): the VOT PDF audit legs on
         # fixtures (vision-sample adjudication, edition shingle crosscheck, seeded fidelity plan
         # + difflib score; no real corpus, no real PDF).
+        # test_vot_pdf_extract.py and test_vot_pdf_render.py ride the same call
+        # (2026-11-22, votreader-tests-5 item 10): the VOT PDF extract + render legs on
+        # fitz-generated fixture PDFs (clean/folio/edge/column/flags/main; render every/named/
+        # dpi/skip-existing; no real corpus, no real PDF).
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_gen_audio_lengths test_gen_vot_glyphs test_css_dead_base test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers test_build_semantic test_vot_es_report test_audit_compare test_audit_extract_html test_audit_fmtb_html test_audit_bible_belts test_restamp_bible_belts test_wordnet_pairs test_validate_bible_sync test_extract_occasion_lines test_audio_archive_hashes test_align_supervisor test_msb_pdf_diff test_vot_app_vs_pdf test_vot_pdf_adjudicate test_vot_pdf_crosscheck test_vot_pdf_fidelity -v
+          python -m unittest test_check_balance test_gen_audio_lengths test_gen_vot_glyphs test_css_dead_base test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers test_build_semantic test_vot_es_report test_audit_compare test_audit_extract_html test_audit_fmtb_html test_audit_bible_belts test_restamp_bible_belts test_wordnet_pairs test_validate_bible_sync test_extract_occasion_lines test_audio_archive_hashes test_align_supervisor test_msb_pdf_diff test_vot_app_vs_pdf test_vot_pdf_adjudicate test_vot_pdf_crosscheck test_vot_pdf_fidelity test_vot_pdf_extract test_vot_pdf_render -v
           python check_balance.py --strict
 
       - name: Check App() size budget (P11 canary)
