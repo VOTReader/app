@@ -15,8 +15,22 @@
 */
 
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { ReadingStatsStore } from './reading-stats-store.js';
+
+// tests-4 item 5: pin the clock for the whole file. Only one test asserts
+// actual calendar dates (the DST-safe wordsForDays test, computed from
+// "today" on both sides), but the store stamps "today" into wordsByDay on
+// every completion, so the suite runs against one fixed day, not the real
+// clock. Sunday 2026-11-22, noon local, the same pin item 2 uses. Only
+// Date is faked; IDB and timers keep the real clock.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T12:00:00') });
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   localStorage.clear();
