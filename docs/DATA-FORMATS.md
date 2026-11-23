@@ -121,7 +121,7 @@ Counted from the data files (the arrays, by evaluation; 2026-09-25, n8-04): an "
 | Volume Six | 31 | ✅ |
 | Volume Seven | 67 + preface ("The Indignation of The Lord") | ✅ |
 | The Lord's Rebuke | 30 + preface ("A Warning") | ✅ |
-| Letters to the Flock | 61 + preface ("Be My Examples") | ✅ |
+| Letters to the Flock | 66 + preface ("Be My Examples") | ✅ |
 | Letters from Timothy | 14 + preface ("Put All Your Trust in The Holy One") | ✅ |
 | WTLB Part One | 148 + intro | ✅ |
 | WTLB Part Two | 203 (incl. intro) | ✅ |

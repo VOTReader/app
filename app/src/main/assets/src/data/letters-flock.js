@@ -7350,6 +7350,710 @@ var LETTERS_FLOCK = [
       "id": "self-evident",
       "title": "Self-Evident"
     },
+    "nextLetter": {
+      "id": "together-in-one-place",
+      "title": "Together in One Place"
+    }
+  },
+  {
+    "id": "together-in-one-place",
+    "title": "Together in One Place",
+    "date": "10/20/23",
+    "from": "From YahuShua HaMashiach, Our Lord and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding online fellowship)",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "See, I have gathered you together in one place once again, according to My will and in accord with My servant's willingness to see to your further edification, to the nurturing of that which has sprouted within you, and according to the one among you who asked. Thus those of you who wish to see with new eyes and restored vision shall indeed see. And those of you who long to hear shall indeed hear. For it is time. It is time to ask, it is time to listen with all attentiveness... And know, that I AM HE—He who sees, yes He, who knows. For it is not My will that one of you be left, that not one of you falter before the time. Rather it is My will that you rise up in Me, even as I shall arise in you, that I may gather you to Myself, that you may be with Me where I am, always. Yet YOU must choose."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Therefore again I say to you, ask, and it shall surely be given you; eat and be satisfied, for I am with you, yes, even to the end of this age, which is upon you. Yes My beloved ones, the time has come, the Day is here! Therefore prepare and make ready, even deep within your hearts. For the Great Day has indeed come."
+          }
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "It is time for The Father to glorify His name"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Once again, as in the days of old…"
+            }
+          ],
+          [
+            {
+              "t": "stanza-break"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "To strike fear into the hearts of all nations,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "To cause His name to resound in all the earth,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "To lead a great multitude to repentance, before the time…"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "closing",
+        "text": "Says The Lord YahuShua."
+      }
+    ],
+    "footnotes": {},
+    "nkjv": {},
+    "num": 62,
+    "prevLetter": {
+      "id": "by-order-of-magnitude",
+      "title": "By Order of Magnitude"
+    },
+    "nextLetter": {
+      "id": "intrinsically-and-intimately-intertwined",
+      "title": "Intrinsically and Intimately Intertwined"
+    }
+  },
+  {
+    "id": "intrinsically-and-intimately-intertwined",
+    "title": "Intrinsically and Intimately Intertwined",
+    "date": "10/11/24",
+    "from": "From YahuShua HaMashiach, Our Lord and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "For a sister in Christ, who is being accused of living as an adulterer because she was previously married and divorced and is now remarried.",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "bold-italic",
+            "v": "Thus says The Lord YahuShua:"
+          },
+          {
+            "t": "text",
+            "v": "Is it right to destroy a new life for the sake of an old one? Is it right to murder a child in the womb, in an effort to regain a path which was only imagined, a life which is yet to be and has not yet been? For you know not what tomorrow will bring; nor can one grab hold of the future as though they can shape it to their own liking, for they know not what tomorrow will bring."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Dreams and aspirations are indeed good, a gift given you when I made you at the first, when I set you apart from every living creature that dwells upon the earth. And what of the path of the new person, shall you prevent them from walking it? What of the dreams and aspirations of the person not yet born from the womb, are theirs any less valid, because they have yet to consider them? Is it right to rob them of their life, because someone has told you that it is your body, your choice?"
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "In the same way, is it right to destroy the life you have for the sake of that which has been or for fear of that which might be, though only imagined? Are there not other lives involved, yea, many who are affected by your decisions? Or is it YOUR life, YOUR choice, by which you selfishly invalidate the lives of those connected to yours? For I tell you the truth, they are intrinsically and intimately intertwined."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Therefore, again I say to you, see with greater eyes! For as it is written:"
+          },
+          {
+            "t": "italic",
+            "v": "The very moment one has a change of heart do they pass from judgment into life"
+          },
+          {
+            "t": "fn",
+            "v": "1"
+          },
+          {
+            "t": "text",
+            "v": ", the same moment when all that went before is remembered no more, the moment when all who come to me in sincere repentance are made new; becoming a caretaker of that which is and shall be, a wise servant who is careful not to repeat their sins of the past as they look to the Day, their eyes fixed upon The Goal."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Therefore let no one steal from My glory, nor pollute My name, anymore. Let no one attempt to make My sacrifice of no effect, for they know not on whose behalf they speak, unaware of whose mouthpiece they have become. Rather pray for them, yet listen not to their dark speeches. For they do always bear false witness of Me as they cease not from misusing the Scriptures, lacking knowledge, stumbling always over the letter; focused only on the accusation, though they themselves are guilty of the same; forgetting that"
+          },
+          {
+            "t": "italic",
+            "v": "you are washed, that you are sanctified, justified in My Name"
+          },
+          {
+            "t": "fn",
+            "v": "2"
+          },
+          {
+            "t": "text",
+            "v": ", as it is written."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "I AM THE LORD."
+          }
+        ]
+      }
+    ],
+    "footnotes": {
+      "1": {
+        "type": "note",
+        "text": "See: \"Death and Deliverance\"",
+        "url": "https://www.thevolumesoftruth.com/Death_and_Deliverance#:~:text=I%20tell%20you%20the%20truth%2C%20the%20very%20moment%20one%20has%0AA%20change%20of%20heart%20do%20they%20pass%20from%20judgment%20into%20life...",
+        "link": { "collection": "Volume Three", "letterTitle": "Death and Deliverance", "excerpt": "I tell you the truth, the very moment one has A change of heart do they pass from judgment into life..." }
+      },
+      "2": {
+        "type": "scripture",
+        "ref": "1 Corinthians 6:11"
+      }
+    },
+    "nkjv": {
+      "1 Corinthians 6:11": "And such were some of you. But you were washed, but you were sanctified, but you were justified in the name of the Lord Jesus and by the Spirit of our God."
+    },
+    "num": 63,
+    "prevLetter": {
+      "id": "together-in-one-place",
+      "title": "Together in One Place"
+    },
+    "nextLetter": {
+      "id": "without-compromise",
+      "title": "Without Compromise"
+    }
+  },
+  {
+    "id": "without-compromise",
+    "title": "Without Compromise",
+    "date": "12/13/25",
+    "from": "From The Lord, Our God and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "bold-italic",
+            "v": "Thus says The Lord:"
+          },
+          {
+            "t": "text",
+            "v": "Much have I asked of My people, and much will be required of them. Yet true obedience is rare, and just a very few keep their covenants with Me. And of those who accept My words in The Volumes, I do indeed ask more, yea much is required of them"
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Yet both the lukewarm and the committed rationalize their every decision, and weigh their obedience in the balances with deceptive weights; conceding when they should take a stand, proceeding when they should err on the side of devotion, even of caution—disobedience that weakens their commitment, preventing them from entering into a deeper and more profound covenant with Me. Yet the flesh is weak and the mind easily swayed by the perceived pressures of this world, as they shut their ears to the true leading of My spirit, the still small voice all but silent. Thus I tell you plainly, there are some here who assert they are true followers of The Way, yet continually betray their own hearts and break their every covenant with Me. Yes, even among this little flock, there are still some who forsake My Sabbaths, and others who abandon every good and upright stance for the sake of convenience or in an effort not to offend."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Beloved ones, self-justification is not at all becoming of a servant of The Lord, and has no place at My feet. False rationale and the Word of The Lord are incompatible. Indeed, disobedience is irreconcilable with true devotion."
+          },
+          {
+            "t": "italic",
+            "v": "And I have already told you that one who has stepped in front of Me can by no means walk in My footsteps."
+          },
+          {
+            "t": "fn",
+            "v": "1"
+          },
+          {
+            "t": "text",
+            "v": "And still you fail to discern. Instead you rationalize your every decision, and seek to justify your every action, when you know I have spoken to the contrary. Or have you forgotten, it is Who you choose that defines what you do? Discern! Search and discern. And if you remain unsure, ask. And if you still lack understanding or remain at an impasse, I ask you, is there not a prophet among you? Yet you remain hesitant for fear of an answer that will not be to your liking, a proclamation that flies in the face of your preconceived notions and self-affirmations of righteousness—a house of cards which you have built up by vanity, easily toppled by that which you know to be true in your heart already, ignoring it in an effort to relieve the short term pressures of this world; a world which seeks only to weaken your stance and chip away at your integrity, that you might betray your faith, rejoicing when you stumble, taking much pride in your fall."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Therefore, as I spoke to those in the churches, so I speak to you; that you may begin again in Me and be renewed; that you may continue to bear much fruit in My name until the time, the day I finish you:"
+          }
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Beloved, listen closely"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And take My words to heart,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "All you who call of yourselves Christian:"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "I ask you, do you really love Me?..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Then follow Me..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Beloved ones, listen closely"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And take My words to heart,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "All you who call of yourselves Christian:"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Do you really love Me?..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Then obey My Word! Follow Me!..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Beloved, listen closely"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And take My words to heart,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "All you who call of yourselves Christian:"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Do you really love Me?!..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Then heed My voice and come out!..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "FOLLOW ME!"
+            },
+            {
+              "t": "fn",
+              "v": "2"
+            }
+          ]
+        ]
+      }
+    ],
+    "footnotes": {
+      "1": {
+        "type": "note",
+        "text": "See: \"Pride Goes Before a Fall\"",
+        "url": "https://www.thevolumesoftruth.com/Pride_Goes_Before_a_Fall#:~:text=And%20how%20can%20one%20who%20has%20stepped%20in%20front%20of%20Me%20walk%20in%20My%20footsteps%3F",
+        "link": { "collection": "Volume Five", "letterTitle": "Pride Goes Before a Fall", "excerpt": "And how can one who has stepped in front of Me walk in My footsteps?" }
+      },
+      "2": {
+        "type": "note",
+        "text": "See: \"Follow Me\"",
+        "url": "https://www.thevolumesoftruth.com/Follow_Me#:~:text=gnashing%20of%20teeth.-,Therefore%20listen%20closely%0AAnd%20take%20My%20words%20to%20heart%2C%0AAll,FOLLOW%20ME!,-Jump%20up",
+        "link": { "collection": "Volume Three", "letterTitle": "Follow Me", "excerpt": "Therefore listen closely And take My words to heart, All you who call of yourselves Christian:" }
+      }
+    },
+    "nkjv": {},
+    "num": 64,
+    "prevLetter": {
+      "id": "intrinsically-and-intimately-intertwined",
+      "title": "Intrinsically and Intimately Intertwined"
+    },
+    "nextLetter": {
+      "id": "revelation",
+      "title": "Revelation"
+    }
+  },
+  {
+    "id": "revelation",
+    "title": "Revelation",
+    "date": "5/10/26",
+    "from": "From The Lord, Our God and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "I am The Lord your God; therefore heed My words, and prepare. For I have drawn very close to awaken the hearts of My elect, those who have sought Me and in whom I am known. For these recognize My words, and acknowledge My works, and give Me glory. They know the sound of My voice and recognize those I send and the fruit thereof. For I had made a covenant with them, that in the fullness of time I would make Myself known to them, declaring My Word as I reveal My glory—at an acceptable time, on a Day and also an hour."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "And so it begins. Deceptions have come forth, veiled and covered over and obscured before the people. Yet all is known to Me. Yes, even that which is hidden or obscured by both man and spirit is before My eyes—as one sitting at a table who looks upon that in front of him, or as a rich man who is aware of which of his servants have turned against him, aware of those who make plans and devise evil schemes in secret, to poison him, to defame him, and to take away his life, that they might grab hold of his possessions and steal his inheritance."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Yet I AM THE LORD. From the foundation of the world, from time immemorial, from everlasting to everlasting, I AM HE!—Creator of all things, known and unknown, seen and unseen, things near and things distant. Yes, I am He who created all these worlds and those who dwell upon them, those of the earth and those not of the earth, each after their own kind according to the place they were brought forth. And so it is revealed, yet also remains hidden, cloaked in deception, to the darkness of many faces. For the disingenuous chatter, and those who scheme seek to gain advantage, even to discredit that which is and shall be. For the others do indeed watch, close at hand and from afar off, taking account, some for good and some for evil; even as the spiritual pass through the barriers, some to do good and others evil; yea, even as those bound in darkness must be set free for a short season. For the days are evil, and that which is written by My servants must come to pass, both the former and the latter."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Yet again I say, I am The Lord, and this is MY earth and MY children—MY WILL shall be done! And woe, even three times woe, to those who attempt to interfere! Woe to all who lead my people astray! For death waits at the door and the mouth of Sheol is open, ready to receive them; death for those below, and destruction for those above, even as those who pass in between shall be destroyed in the light of My Glory. For I set the boundaries and declare My judgments and execute the punishment; I rebuke and bring forth conviction, give correction and implement the discipline. And who is able to deliver themselves from My hand or escape the strength of My arm when it is stretched out in anger? Neither those below, nor those above, nor those who pass in between; ALL are subject to My will and My judgment."
+          }
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "For I have indeed set the line"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And established the boundary,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And woe to those who refuse to follow it"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And to those who pass over it..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Yet those who acknowledge Me shall find respite,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And those who turn back to Me in sincere"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Unyielding repentance shall be sheltered."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Yet only those who embrace"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "The Holy One of Israel, in spirit and in truth,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "shall escape all these things..."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "closing",
+        "text": "Says The Lord."
+      }
+    ],
+    "footnotes": {},
+    "nkjv": {},
+    "num": 65,
+    "prevLetter": {
+      "id": "without-compromise",
+      "title": "Without Compromise"
+    },
+    "nextLetter": {
+      "id": "a-division-in-spirit",
+      "title": "A Division in Spirit"
+    }
+  },
+  {
+    "id": "a-division-in-spirit",
+    "title": "A Division in Spirit",
+    "date": "11/13/26",
+    "from": "From YahuShua HaMashiach, Our Lord and Savior",
+    "spoken": "The Word of The Lord Spoken to Timothy",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding Spouses—believing and unbelieving)",
+    "blocks": [
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "When those of a faithful heart dwell with a spouse who openly ridicules and rejects My Word in The Volumes of Truth, a division occurs on earth and in Heaven."
+          },
+          {
+            "t": "italic",
+            "v": "And though they are two of one flesh by marriage, a division in spirit has also occurred, as it is written;"
+          },
+          {
+            "t": "fn",
+            "v": "1"
+          },
+          {
+            "t": "text",
+            "v": "the final division leading to a multitude of tears on earth and in Heaven. And when those who strive to obey My Word dwell with a spouse who does not, though they claim to believe, a similar division also occurs, the consequence of which is the same as those who do not believe. For I tell you the truth, one who knowingly disobeys one of My commands disobeys the whole, and one who does not strive to obey lacks belief, honoring Me with their lips though their love has begun to wane; as one who for a pretense appears to walk with Me, yet only in an effort to keep the peace, for fear of upsetting the status quo. They have forgotten how to follow Me, how to walk in My footsteps, or even beside Me as a close friend, but now walk at a distance, glancing My way only at certain times and during certain seasons, having loved another more than Me, even themselves."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Yet I tell you, it is not My will that any write a bill of divorcement in either situation (only for abuse may one separate). Yet if an unbelieving spouse wishes to depart and sever the bond, let them do so, let them go their way. Yet if they wish to stay, let them stay, yet do not take part in any of their deeds which grieve The Lord, nor have any part in their rebellion. And though you remain together, remain separate according to obedience. Be an example of true devotion and faithfulness,"
+          },
+          {
+            "t": "italic",
+            "v": "that by your example they may in time come to see, as I have already told you."
+          },
+          {
+            "t": "fn",
+            "v": "2"
+          },
+          {
+            "t": "text",
+            "v": "And regarding the children, keep them separate from the scoffer and unbeliever, as you are able. Make your case, and follow My leading, yet there is no need for bitter discourse. Keep the peace and remember the fruit of the Spirit, for the sake of your children, especially the young ones, for they are Mine. Yet of the older children, those who are of age and understand, they may choose for themselves, whether to embrace The Way or flee from it, until which time I bring them back again, the day they come running."
+          }
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "For there are many who scoff,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And many who remain lukewarm,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "A great multitude who make excuses."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "Yet the Glory of The Lord"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Shall render all points moot,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Setting every heart on fire,"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "Bringing forth much wailing"
+            }
+          ],
+          [
+            {
+              "t": "italic",
+              "v": "And gnashing of teeth."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "poetry",
+        "lines": [
+          [
+            {
+              "t": "italic",
+              "v": "I AM THE LORD."
+            }
+          ]
+        ]
+      }
+    ],
+    "footnotes": {
+      "1": {
+        "type": "note",
+        "text": "See: \"Devotion\"",
+        "url": "https://www.thevolumesoftruth.com/Devotion#:~:text=For%20though%20you%20are%20two%20of%20one%20flesh%20by%20marriage%2C%20a%20division%20in%20spirit%20has%20occurred.",
+        "link": { "collection": "Letters to The Lord's Little Flock", "letterTitle": "Devotion", "excerpt": "For though you are two of one flesh by marriage, a division in spirit has occurred." }
+      },
+      "2": {
+        "type": "note",
+        "text": "See: \"Discord\"",
+        "url": "https://www.thevolumesoftruth.com/Discord#:~:text=that%20by%20your%20example%20they%20may%20in%20time%20come%20to%20see.",
+        "link": { "collection": "Letters to The Lord's Little Flock", "letterTitle": "Discord", "excerpt": "that by your example they may in time come to see." }
+      }
+    },
+    "nkjv": {},
+    "num": 66,
+    "prevLetter": {
+      "id": "revelation",
+      "title": "Revelation"
+    },
     "nextLetter": null
   }
 ];

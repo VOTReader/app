@@ -48,8 +48,8 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-c74a0d7434';
-const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CACHE_VERSION = 'v1.0.2-deea192f33';
+const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -321,7 +321,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'edc25a07b32952ab4ade6f8e10ffa2b0efc4822629f190c0cc60d6f8b8f669e5',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': '6c81e03e1cb1bb6113c4d7db0c88feb948c661cfb896c6ca01330567edd4544c',
+  './dist/bundle-d.js': 'bc1d0a4e7a2693a4d2ee8d028ac89a12f7181ac7896211feb404f64022eb0885',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './index.html': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './manifest.json': '03184e4a7e1e6f5bb544bbbaa536127cf9c41468946c6c423d05202144f336e4',
@@ -343,7 +343,7 @@ const ASSET_REVISIONS = {
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'e88268c42ae19fca4c02ac78177a47602936a0313ca59f3e6cc25a9c7976e58c',
-  './dist/bundle-a-vot.js': '5772b4609eebad196ccd083b81a056fcef90c3253bdc3f0730a5d42f2d50d562',
+  './dist/bundle-a-vot.js': 'c97c3543bc460a0d15b6e5d157c847a7474df379357a2dafa2b491d6d54cbae2',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
@@ -436,8 +436,8 @@ const ASSET_REVISIONS = {
   './src/data/bible-sync-wop-nkjv.js': 'e3540f79031a09c45eb7d39c23c9a83892df100846af47c615a85d45f961989a',
   './src/data/bible-web.js': '22b119d895aa329b2f62e6ba7b1b5978f1fbcf13fc474d1de5d9b72c9a3558c2',
   './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
-  './src/data/scripture-web-data.js': '033ec47bbbbae873d457463f0ec9f5f7696b66f8e3ff24e35d15c22c02e81022',
-  './src/data/verse-cites.js': '0f40e34c1038cb12fa3a3464f3d30c79c481dc96f6f484839ad7e6040460f584',
+  './src/data/scripture-web-data.js': '759923bdcc27c24c2c378038ceff546c3348f0c37450c3544f05b0b2bcc56cd9',
+  './src/data/verse-cites.js': '1e6fe22779e310c69ca2ad7b801a06e5aef21535ec758088115195b6c9fb72f1',
   './study-chart-chronology.jpg': '61013f42aee0e01fb088f0704d00b40f4db90a32742ccad5e617035175801f50',
   './study-cover-lamb.jpg': 'f5d01352c5d83ed33851bdf674a2ddd2b839b4b5dc75b0e09140769ad90ac7ca',
   './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',
