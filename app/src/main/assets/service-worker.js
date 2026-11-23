@@ -49,7 +49,7 @@
  */
 
 const CACHE_VERSION = 'v1.0.2-deea192f33';
-const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video and the Related Topic "The Name of The Lord"), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -343,7 +343,7 @@ const ASSET_REVISIONS = {
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'e88268c42ae19fca4c02ac78177a47602936a0313ca59f3e6cc25a9c7976e58c',
-  './dist/bundle-a-vot.js': '7ebe2b4e0f8d79959a34d49389629e26ca27717b8d437b627b73b564650edaa5',
+  './dist/bundle-a-vot.js': '4e6d5d1242118ceac175fbfc07d7531f5bc67beb4a6d1cedd67e4612fec3acb3',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
