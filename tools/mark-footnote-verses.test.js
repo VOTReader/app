@@ -220,10 +220,10 @@ describe('mark-footnote-verses', () => {
       expect(readValue(wtlb, ref)).toBe(marked);
     }
     // Stripping the inserted markers reproduces the marker-less originals.
-    for (const [ref, marked] of Object.entries(VOLUME_TWO_MARKED)) {
+    for (const ref of Object.keys(VOLUME_TWO_MARKED)) {
       expect(stripMarkers(ref, readValue(v2, ref))).toBe(VOLUME_TWO[ref]);
     }
-    for (const [ref, marked] of Object.entries(WTLB_MARKED)) {
+    for (const ref of Object.keys(WTLB_MARKED)) {
       expect(stripMarkers(ref, readValue(wtlb, ref))).toBe(WTLB[ref]);
     }
   });

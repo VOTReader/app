@@ -186,7 +186,7 @@ describe('extract-audio-fragments', () => {
       'wtlb1:wtlb-entry-1',
       'wtlb2:wtlb-entry-2',
     ].sort());
-    for (const [key, entry] of Object.entries(out)) {
+    for (const entry of Object.values(out)) {
       expect(['A', 'B']).toContain(entry.format);
       expect(Array.isArray(entry.fragments)).toBe(true);
     }

@@ -31,7 +31,6 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(HERE, '..');
 const SCRIPT = resolve(HERE, 'gen-audio-manifest.mjs');
 const LIB = resolve(HERE, 'audio-renditions-lib.mjs');
 

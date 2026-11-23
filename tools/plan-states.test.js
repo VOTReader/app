@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import { planStates, STATES } from './plan-states.mjs';
 import { runStatus } from '../app/src/main/assets/src/data/plan-engine.js';
-import { join, resolve, dirname } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
