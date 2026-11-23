@@ -21,12 +21,26 @@
 */
 
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import {
   JournalStatsStore,
   _jrnDateStr,
   _jrnDaysBetween,
 } from './journal-stats-store.js';
+
+// tests-4 item 6: pin the clock for the whole file. The streak tests anchor
+// to "today" via _tsRelative (new Date() + day offsets) and the module-level
+// recomputeFromLoad subscriber compares lastEntryDate against the real
+// today's date, so the suite runs against one fixed day, not the real
+// clock. Sunday 2026-11-22, noon local, the same pin item 2 uses. Only
+// Date is faked; IDB and timers keep the real clock.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T12:00:00') });
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   localStorage.clear();
