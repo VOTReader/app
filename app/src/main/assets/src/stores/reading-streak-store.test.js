@@ -17,8 +17,23 @@
 */
 
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { ReadingStreakStore } from './reading-streak-store.js';
+
+// tests-4 item 5: pin the clock for the whole file. Every test seeds days
+// relative to "today" (_tsRelative) and the store's recompute compares
+// against "today" too, so the suite must run against one fixed day, not the
+// real clock — otherwise the file is weekday-sensitive (the sweep's Sunday
+// shape). Sunday 2026-11-22, noon local, the same pin item 2 uses. Only
+// Date is faked; IDB and timers keep the real clock. Registered first so
+// the pin is live before the subscriber-spending beforeAll below.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T12:00:00') });
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 // The module wires a one-shot subscriber that runs recomputeFromLoad on the store's first change once
 // loaded (in the app: the hydration). Spend it here, or it fires inside whichever test writes first and
