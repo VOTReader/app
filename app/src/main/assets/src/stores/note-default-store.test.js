@@ -38,3 +38,51 @@ describe('NoteDefaultStore', () => {
     expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'blank' });
   });
 });
+
+/* get() — partial or unparseable stored records fall back per field. */
+describe('NoteDefaultStore — get() fallbacks', () => {
+  it('returns the default shape when the stored value parses to null', () => {
+    localStorage.setItem('vot-note-default', 'null');
+    expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'blank' });
+  });
+
+  it('fills in missing fields from a partial stored record', () => {
+    /** @type {any} */ (NoteDefaultStore)._cache = {};
+    expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'blank' });
+    /** @type {any} */ (NoteDefaultStore)._cache = { style: 'squiggle' };
+    expect(NoteDefaultStore.get()).toEqual({ style: 'squiggle', color: 'blank' });
+    /** @type {any} */ (NoteDefaultStore)._cache = { color: 'green' };
+    expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'green' });
+  });
+});
+
+/* set() while pending — deferred, queued, visible in the overlay. */
+describe('NoteDefaultStore — deferred set() while pending', () => {
+  it('queues the write and shows it in the overlay without touching the real cache', () => {
+    NoteDefaultStore._resetForTests();
+    expect(NoteDefaultStore.getState()).toBe('pending');
+    NoteDefaultStore.set('squiggle', 'green');
+    expect(NoteDefaultStore.get()).toEqual({ style: 'squiggle', color: 'green' });
+    expect(/** @type {any} */ (NoteDefaultStore)._cache).toBe(null);
+    expect(/** @type {any} */ (NoteDefaultStore)._queue.length).toBe(1);
+  });
+});
+
+/* replaceAll() — the backup-import seam, routes through set() so a
+   hand-edited backup lands normalized. */
+describe('NoteDefaultStore — replaceAll()', () => {
+  it('replaces with a full record, normalizing blank to yellow for non-highlight styles', () => {
+    NoteDefaultStore.replaceAll({ style: 'squiggle', color: 'blank' });
+    expect(NoteDefaultStore.get()).toEqual({ style: 'squiggle', color: 'yellow' });
+  });
+
+  it('falls back to the default for null data', () => {
+    NoteDefaultStore.replaceAll(null);
+    expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'blank' });
+  });
+
+  it('falls back to the default for non-object data', () => {
+    NoteDefaultStore.replaceAll('not-an-object');
+    expect(NoteDefaultStore.get()).toEqual({ style: 'highlight', color: 'blank' });
+  });
+});

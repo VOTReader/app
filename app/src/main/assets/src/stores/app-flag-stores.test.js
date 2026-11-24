@@ -175,3 +175,31 @@ describe('TourDoneFlagStore', () => {
     expect(TourDoneFlagStore.is()).toBe(true);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   Deferred writes — set()/clear() while the store is still pending
+   (hydration not finished): the op queues for rebase and shows in the
+   pending overlay, without touching the real cache.
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('AppFlagStores — deferred writes while pending', () => {
+  it('set() while pending shows the flag in the overlay, cache untouched, op queued', () => {
+    WelcomedFlagStore._resetForTests();
+    expect(WelcomedFlagStore.getState()).toBe('pending');
+    expect(WelcomedFlagStore.is()).toBe(false);
+    WelcomedFlagStore.set();
+    expect(WelcomedFlagStore.is()).toBe(true);
+    expect(/** @type {any} */ (WelcomedFlagStore)._cache).toBe(null);
+    expect(/** @type {any} */ (WelcomedFlagStore)._queue.length).toBe(1);
+  });
+
+  it('clear() while pending shows the flag cleared in the overlay, cache untouched, op queued', () => {
+    WelcomedFlagStore._resetForTests();
+    WelcomedFlagStore.set();
+    expect(WelcomedFlagStore.is()).toBe(true);
+    WelcomedFlagStore.clear();
+    expect(WelcomedFlagStore.is()).toBe(false);
+    expect(/** @type {any} */ (WelcomedFlagStore)._cache).toBe(null);
+    expect(/** @type {any} */ (WelcomedFlagStore)._queue.length).toBe(2);
+  });
+});
