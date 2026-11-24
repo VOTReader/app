@@ -87,4 +87,35 @@ describe('useLazyBundles (PF6)', () => {
     delete window.__bibleCorpus;
     expect(() => render(<Probe />)).not.toThrow();
   });
+
+  it.each(['__matthewCorpus', '__votCorpus', '__answersCorpus'])(
+    'is inert (no throw) when %s is absent — its subscribe/snapshot fallbacks run',
+    (name) => {
+      delete window[name];
+      expect(() => render(<Probe />)).not.toThrow();
+    },
+  );
+
+  describe('PlatformBridge.onAppReady handshake (first painted frame)', () => {
+    afterEach(() => { delete window.PlatformBridge; });
+
+    it('calls PlatformBridge.onAppReady after the first frame', async () => {
+      const onAppReady = vi.fn();
+      window.PlatformBridge = { onAppReady };
+      render(<Probe />);
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+      expect(onAppReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('is inert when PlatformBridge is absent', async () => {
+      render(<Probe />);
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    });
+
+    it('swallows an onAppReady throw (best-effort handshake)', async () => {
+      window.PlatformBridge = { onAppReady: () => { throw new Error('native splash gone'); } };
+      render(<Probe />);
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    });
+  });
 });
