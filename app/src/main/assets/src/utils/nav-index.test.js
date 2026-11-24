@@ -178,3 +178,176 @@ describe('buildNavTree — Browse drill-down grouping', () => {
     expect(buildNavTree().bibleBooks.map((b) => b.bookId)).toEqual(['genesis', 'exodus', 'zeta', 'alpha']);
   });
 });
+
+describe('buildNavIndex — the rest of the corpus shapes', () => {
+  it('skips a null book and a book with no chapters', () => {
+    stubCorpora();
+    g._allBooks = () => ({
+      genesis: null,
+      exodus: { id: 'exodus', title: 'Exodus' },
+      judah: { id: 'judah', title: 'Judah', chapters: [{ num: 1 }] },
+    });
+    const items = buildNavIndex();
+    expect(items.filter((i) => i.kind === 'bible-chapter').map((i) => i.bookId)).toEqual(['judah']);
+  });
+
+  it('skips the Hidden Manna collection (volKey hm)', () => {
+    stubCorpora();
+    g.COLLECTIONS = [
+      { volKey: 'hm', kind: 'letter', label: 'Hidden Manna', letterScreen: 'hm' },
+      { volKey: 'one', kind: 'letter', label: 'Volume One', letterScreen: 'vot-one-letter' },
+    ];
+    const items = buildNavIndex();
+    expect(items.some((i) => i.collection === 'Hidden Manna')).toBe(false);
+    expect(items.some((i) => i.collection === 'Volume One')).toBe(true);
+  });
+
+  it('maps a non-registry kind to letter, with no volume number for a volKey-less volume', () => {
+    stubCorpora();
+    g.COLLECTIONS = [{ volKey: 'timothy', kind: 'essay', label: 'Timothy', letterScreen: 'tim' }];
+    g.colLetterArr = () => [{ id: 't1', num: 1, title: 'T One' }];
+    const item = buildNavIndex().find((i) => i.letterId === 't1');
+    expect(item).toMatchObject({ kind: 'letter', letterId: 't1', letterNum: 1, collection: 'Timothy', volKey: 'timothy' });
+    expect(item.aliases).toContain('timothy 1');
+    expect(item.aliases).not.toContain('timothy #1');
+  });
+
+  it('adds a preface, with volume preface aliases when the volume has a number', () => {
+    stubCorpora();
+    g.colPreface = () => ({ id: 'pref-one', title: 'Preface' });
+    const item = buildNavIndex().find((i) => i.letterId === 'pref-one');
+    expect(item).toMatchObject({ kind: 'letter', letterId: 'pref-one', letterNum: 0, label: 'Preface' });
+    expect(item.aliases).toEqual(['preface', 'volume one preface', 'v1 preface']);
+  });
+
+  it('adds a preface with alias-base preface aliases when the volume has no number', () => {
+    stubCorpora();
+    g.COLLECTIONS = [{ volKey: 'timothy', kind: 'letter', label: 'Timothy', letterScreen: 'tim' }];
+    g.colPreface = () => ({ id: 'pref-tim', title: 'Preface' });
+    const item = buildNavIndex().find((i) => i.letterId === 'pref-tim');
+    expect(item.aliases).toEqual(['preface', 'timothy preface', 'tim preface', 'letters from timothy preface', 'lft preface']);
+  });
+
+  it('gives WTLB, Blessed and Holy Days entries entryIds and their own kinds', () => {
+    stubCorpora();
+    g.COLLECTIONS = [
+      { volKey: 'wtlb1', kind: 'wtlb', label: 'WTLB One', letterScreen: 'wtlb-one' },
+      { volKey: 'blessed', kind: 'blessed', label: 'The Blessed', letterScreen: 'blessed' },
+      { volKey: 'holydays', kind: 'holy-days', label: 'Regarding The Holy Days', letterScreen: 'hd' },
+    ];
+    g.colLetterArr = () => [{ id: 'e1', num: 2, title: 'Entry Two' }];
+    const items = buildNavIndex();
+    const wtlb = items.find((i) => i.collection === 'WTLB One');
+    expect(wtlb).toMatchObject({ kind: 'wtlb-entry', entryId: 'e1', entryNum: 2 });
+    expect(wtlb.aliases).toContain('wtlb1 #2');
+    expect(wtlb.aliases).toContain('wtlb1 2');
+    expect(items.find((i) => i.collection === 'The Blessed')).toMatchObject({ kind: 'blessed-entry', entryId: 'e1' });
+    expect(items.find((i) => i.collection === 'Regarding The Holy Days')).toMatchObject({ kind: 'holy-days-entry', entryId: 'e1', category: 'Holy Days' });
+  });
+
+  it('handles entries with no number (aliases end at the base, no number glued on)', () => {
+    stubCorpora();
+    g.COLLECTIONS = [{ volKey: 'timothy', kind: 'letter', label: 'Timothy', letterScreen: 'tim' }];
+    g.colLetterArr = () => [{ id: 't9', title: 'Unnumbered' }];
+    const item = buildNavIndex().find((i) => i.letterId === 't9');
+    expect(item.aliases).toEqual(['unnumbered', 'timothy ', 'tim ', 'letters from timothy ', 'lft ']);
+  });
+
+  it('indexes Bible Study chapters with slug, id and title fallbacks', () => {
+    stubCorpora();
+    g.BIBLE_STUDIES = [
+      { slug: 'more-than-a-man', title: 'More Than a Man', chapters: [{ id: 'mtam-1', num: 1, title: 'Section One' }, { id: 'mtam-2' }] },
+      { id: 'lamb-of-god', chapters: [{ id: 'log-1', num: 1 }] },
+      { title: 'Nameless', chapters: [{ id: 'n-1', num: 1 }] },
+      null,
+      { slug: 'broken', title: 'Broken', chapters: 'not-an-array' },
+      { slug: 'empty', title: 'Empty', chapters: [{ title: 'No Id' }] },
+    ];
+    const items = buildNavIndex().filter((i) => i.kind === 'study-letter-chapter');
+    expect(items.map((i) => i.studyChapterId)).toEqual(['mtam-1', 'mtam-2', 'log-1', 'n-1']);
+    expect(items[0]).toMatchObject({ studyId: 'more-than-a-man', label: 'Section One' });
+    expect(items[0].aliases).toContain('more-than-a-man 1');
+    expect(items[1]).toMatchObject({ label: 'Chapter mtam-2' });
+    expect(items[2]).toMatchObject({ studyId: 'lamb-of-god', collection: 'Bible Study', label: 'Chapter 1' });
+    expect(items[3]).toMatchObject({ studyChapterId: 'n-1', label: 'Chapter 1' });
+  });
+
+  it('indexes Matthew Study Bible chapters, with and without titles', () => {
+    stubCorpora();
+    g._matthew = () => ({ id: 'matthew', chapters: [{ num: 5, title: 'The Sermon' }, { num: 6 }] });
+    const items = buildNavIndex().filter((i) => i.kind === 'study-chapter');
+    expect(items.map((i) => i.chapter)).toEqual([5, 6]);
+    expect(items[0]).toMatchObject({ label: 'Matthew Study Bible — Chapter 5: The Sermon', title: 'The Sermon' });
+    expect(items[1]).toMatchObject({ label: 'Matthew Study Bible — Chapter 6', title: 'Chapter 6' });
+  });
+
+  it('fails loudly when the COLLECTIONS registry is missing, instead of indexing nothing', () => {
+    stubCorpora();
+    delete g.COLLECTIONS;
+    expect(() => buildNavIndex()).toThrow();
+  });
+});
+
+describe('contentDocToNavItem — entry kinds and fallbacks', () => {
+  function entryCorpora() {
+    stubCorpora();
+    g.COLLECTIONS = [
+      { volKey: 'wtlb1', kind: 'wtlb', label: 'WTLB One', letterScreen: 'wtlb-one' },
+      { volKey: 'blessed', kind: 'blessed', label: 'The Blessed', letterScreen: 'blessed' },
+      { volKey: 'holydays', kind: 'holy-days', label: 'Regarding The Holy Days', letterScreen: 'hd' },
+    ];
+    g.colLetterArr = () => [{ id: 'devotion', num: 1, title: 'Devotion' }];
+  }
+
+  it('returns null for a missing doc', () => {
+    stubCorpora();
+    expect(contentDocToNavItem(null)).toBeNull();
+    expect(contentDocToNavItem(undefined)).toBeNull();
+  });
+
+  it('resolves entry docs by entryId, preferring the heading match', () => {
+    entryCorpora();
+    expect(contentDocToNavItem({ kind: 'wtlb', letterId: 'devotion', heading: 'WTLB One' }))
+      .toMatchObject({ kind: 'wtlb-entry', entryId: 'devotion', collection: 'WTLB One' });
+    expect(contentDocToNavItem({ kind: 'blessed', letterId: 'devotion', heading: 'The Blessed' }))
+      .toMatchObject({ kind: 'blessed-entry', entryId: 'devotion', collection: 'The Blessed' });
+    expect(contentDocToNavItem({ kind: 'holy-day', letterId: 'devotion', heading: 'Regarding The Holy Days' }))
+      .toMatchObject({ kind: 'holy-days-entry', entryId: 'devotion' });
+    // 'answers' shares the wtlb key space.
+    expect(contentDocToNavItem({ kind: 'answers', letterId: 'devotion', heading: 'WTLB One' }))
+      .toMatchObject({ kind: 'wtlb-entry', entryId: 'devotion' });
+    // No heading match: falls back to the first entry with that id.
+    expect(contentDocToNavItem({ kind: 'wtlb', letterId: 'devotion', heading: 'Nowhere' }))
+      .toMatchObject({ kind: 'wtlb-entry', entryId: 'devotion', collection: 'WTLB One' });
+    // No entry with that id at all.
+    expect(contentDocToNavItem({ kind: 'wtlb', letterId: 'nope', heading: 'WTLB One' })).toBeNull();
+  });
+
+  it('resolves a bible-study doc and returns null when the chapter is missing', () => {
+    stubCorpora();
+    g.BIBLE_STUDIES = [{ slug: 'more-than-a-man', title: 'More Than a Man', chapters: [{ id: 'mtam-1', num: 1, title: 'Section One' }] }];
+    expect(contentDocToNavItem({ kind: 'bible-study', letterId: 'more-than-a-man', chapterNum: 1 }))
+      .toMatchObject({ kind: 'study-letter-chapter', studyId: 'more-than-a-man', studyChapterId: 'mtam-1' });
+    expect(contentDocToNavItem({ kind: 'bible-study', letterId: 'more-than-a-man', chapterNum: 9 })).toBeNull();
+    expect(contentDocToNavItem({ kind: 'bible-study', letterId: 'nope', chapterNum: 1 })).toBeNull();
+  });
+
+  it('returns null for a kind it does not know', () => {
+    stubCorpora();
+    expect(contentDocToNavItem({ kind: 'song', letterId: 'x' })).toBeNull();
+  });
+});
+
+describe('buildNavTree — study roots', () => {
+  it('lists Matthew study chapters and Bible Study chapters under their own roots', () => {
+    stubCorpora();
+    g._matthew = () => ({ id: 'matthew', chapters: [{ num: 5, title: 'The Sermon' }] });
+    g.BIBLE_STUDIES = [{ slug: 'more-than-a-man', title: 'More Than a Man', chapters: [{ id: 'mtam-1', num: 1, title: 'Section One' }, { id: 'mtam-2', num: 2, title: 'Section Two' }] }];
+    const tree = buildNavTree();
+    expect(tree.matthewChapters.map((c) => c.chapter)).toEqual([5]);
+    expect(tree.studies).toHaveLength(1);
+    expect(tree.studies[0].label).toBe('More Than a Man');
+    expect(tree.studies[0].chapters.map((c) => c.studyChapterId)).toEqual(['mtam-1', 'mtam-2']);
+    expect(tree.collections[0].entries[0]).toMatchObject({ kind: 'letter', letterId: 'first-letter' });
+  });
+});
