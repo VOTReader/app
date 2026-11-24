@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markDay, newRun, pauseRun } from '../data/plan-engine.js';
 import { AUDIO_RELEASE_PREFIX } from './audio-track.js';
-import { _resetAutoDownload, autoDownloadPass, planWeekRefs, starredTracks, unmeteredNow, upNextTracks } from './auto-download.js';
+import { _resetAutoDownload, autoDownloadPass, planWeekRefs, setAutoDownloads, starredTracks, unmeteredNow, upNextTracks } from './auto-download.js';
 
 const at = (key) => new Date(key + 'T09:00:00');
 /** A 30-day plan of one chapter a day: Psalms 1..30. */
@@ -25,6 +25,42 @@ function store(status = {}) {
 }
 const track = (n) => ({ url: AUDIO_RELEASE_PREFIX + 'psalms-p' + n + '.mp3', key: 'k:' + n, title: 'Psalms ' + n, partLabel: null });
 const SONG = 'https://votreader.github.io/songs-1/27009c0316ce.mp3';
+/* The watcher talks to the real download store and player; these doubles stand in for
+   them so a pass can run in jsdom (no network, no service worker, no Android bridge). */
+const watcherMocks = vi.hoisted(() => {
+  const off = {
+    available: true,
+    status: {},
+    downloads: [],
+    cancels: [],
+    taken: [],
+    isPaused: false,
+    subs: [],
+  };
+  const player = { state: { queue: [], qi: 0 }, subs: [] };
+  return {
+    off,
+    player,
+    OfflineAudio: {
+      available: () => off.available,
+      subscribe: (cb) => { off.subs.push(cb); return () => {}; },
+      statusOf: (url) => off.status[url] || 'none',
+      items: () => Object.keys(off.status).filter((u) => off.status[u] === 'saved').map((url) => ({ url })),
+      sizeOf: (url) => (url.endsWith('-p2.mp3') ? 4_000_000 : null),
+      paused: () => off.isPaused,
+      download: (list) => { off.downloads.push(list); for (const it of list) off.status[it.url] = 'queued'; return true; },
+      cancel: (urls) => { off.cancels.push(urls); off.taken.push(...urls); for (const u of urls) delete off.status[u]; },
+      takeCancels: () => { const out = off.taken; off.taken = []; return out; },
+    },
+    AudioPlayer: {
+      getState: () => player.state,
+      subscribe: (cb) => { player.subs.push(cb); return () => {}; },
+    },
+  };
+});
+vi.mock('./offline-audio.js', () => ({ OfflineAudio: watcherMocks.OfflineAudio }));
+vi.mock('./audio-player.js', () => ({ AudioPlayer: watcherMocks.AudioPlayer }));
+
 
 describe('auto-download - what is wanted (dl-d5)', () => {
   it('a running plan wants its next 7 days from the day it is on, rolling as days are read', () => {
@@ -132,6 +168,22 @@ describe('auto-download - a pass (dl-d5)', () => {
     expect(off.downloads[off.downloads.length - 1].map((it) => it.url)).toEqual([track(3).url]);
   });
 
+  it('a corrupt kept-list reads as empty', () => {
+    const off = store();
+    localStorage.setItem('vot-auto-downloads', 'not json{');
+    expect(autoDownloadPass({ off, tracks: [1].map(track), unmetered: true }).queued).toBe(1);
+    localStorage.setItem('vot-auto-downloads', '{"a":1}');
+    expect(autoDownloadPass({ off, tracks: [], unmetered: true }).queued).toBe(0);
+  });
+
+  it('only string urls survive the kept-list read', () => {
+    const kept = 'https://x/kept.mp3';
+    const off = store({ [kept]: 'queued' });
+    localStorage.setItem('vot-auto-downloads', JSON.stringify([kept, 7, null]));
+    autoDownloadPass({ off, tracks: [2].map(track), unmetered: true });
+    expect(JSON.parse(localStorage.getItem('vot-auto-downloads'))).toEqual([kept, track(2).url]);
+  });
+
   it('with downloads paused it adds nothing', () => {
     const off = store();
     off.isPaused = true;
@@ -170,3 +222,167 @@ describe('starredTracks', () => {
     expect(starredTracks({})).toEqual([]);
   });
 });
+/* The watcher (setAutoDownloads / _run / _start): the pass runs on a timer after any
+   change, and only where downloads work. The module's watcher state is per-import, so
+   these run in order: the first hand-over starts it, later ones only flip switches. */
+describe('auto-download - the watcher (dl-d5)', () => {
+  const { off, player } = watcherMocks;
+  const connCalls = [];
+  const planSubs = [];
+  const libSubs = [];
+  let connHad;
+  let run;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    _resetAutoDownload();
+    off.available = true;
+    off.status = {};
+    off.downloads = [];
+    off.cancels = [];
+    off.taken = [];
+    off.isPaused = false;
+    player.state = { queue: [], qi: 0 };
+    window.AndroidBridge = { offlineAudioUnmetered: () => true };
+    delete /** @type {any} */ (globalThis).ReadingPlanStore;
+    delete /** @type {any} */ (globalThis).AudioLibraryStore;
+    connHad = Object.getOwnPropertyDescriptor(navigator, 'connection');
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    delete window.AndroidBridge;
+    delete /** @type {any} */ (globalThis).ReadingPlanStore;
+    delete /** @type {any} */ (globalThis).AudioLibraryStore;
+    if (connHad) Object.defineProperty(navigator, 'connection', connHad);
+    else delete /** @type {any} */ (navigator).connection;
+  });
+
+  const tracksOf = (refs) => refs.map((r) => track(20 + r.cid));
+  const flush = () => vi.advanceTimersByTime(2000);
+
+  it('does not start where downloads are not available', () => {
+    off.available = false;
+    setAutoDownloads(tracksOf, true);
+    expect(off.subs).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('starts on the first hand-over and runs a pass after the settle', () => {
+    Object.defineProperty(navigator, 'connection', {
+      configurable: true,
+      value: { addEventListener: (...args) => connCalls.push(args) },
+    });
+    setAutoDownloads(() => [track(1)], true);
+    expect(off.subs).toHaveLength(1);
+    expect(connCalls).toEqual([['change', expect.any(Function)]]);
+    expect(vi.getTimerCount()).toBe(2);   // the settle timeout + the once-a-minute interval
+    flush();
+    expect(off.downloads).toEqual([
+      [{ url: track(1).url, key: 'k:1', title: 'Psalms 1', wifi: true }],
+    ]);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('a flip schedules another pass, a repeat hand-over does not', () => {
+    setAutoDownloads(tracksOf, true);   // Keep-next already on: no flip, no pass
+    expect(vi.getTimerCount()).toBe(0);
+    setAutoDownloads(tracksOf, false);  // flipped: a pass is scheduled
+    expect(vi.getTimerCount()).toBe(1);
+    setAutoDownloads(tracksOf, true);   // flipped again, but the pass is already scheduled
+    expect(vi.getTimerCount()).toBe(1);
+    flush();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a new track playing schedules a pass only when Keep-next is on', () => {
+    const onPlayer = player.subs[0];
+    expect(typeof onPlayer).toBe('function');
+    player.state = { queue: [track(1), track(2)], qi: 0 };
+    onPlayer();   // a new track: a pass is scheduled
+    expect(vi.getTimerCount()).toBe(1);
+    onPlayer();   // the same track: nothing scheduled
+    expect(vi.getTimerCount()).toBe(1);
+    flush();      // the pass runs: up-next track(2) is queued
+    expect(off.downloads.flat().map((it) => it.url)).toContain(track(2).url);
+    expect(vi.getTimerCount()).toBe(0);
+    setAutoDownloads(tracksOf, false);   // Keep-next off
+    flush();
+    player.state = { queue: [track(1), track(2)], qi: 1 };
+    onPlayer();   // a new track, but Keep-next is off: nothing scheduled
+    expect(vi.getTimerCount()).toBe(0);
+    player.state = { queue: [], qi: 0 };
+    onPlayer();   // nothing playing: the empty side of the same check
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('hears the plan store once it appears, and only once', () => {
+    run = psalms(new Date());
+    /** @type {any} */ (globalThis).ReadingPlanStore = {
+      all: () => [run],
+      subscribe: (cb) => { planSubs.push(cb); return () => {}; },
+    };
+    setAutoDownloads(tracksOf, true);   // flipped: Keep-next was off
+    flush();
+    expect(planSubs).toHaveLength(1);
+    expect(off.downloads.flat().map((it) => it.url)).toEqual(
+      [21, 22, 23, 24, 25, 26, 27].map((n) => track(n).url),
+    );
+    planSubs[0]();   // the store changed: another pass, but no second subscribe
+    flush();
+    expect(planSubs).toHaveLength(1);
+    expect(off.downloads).toHaveLength(1);   // nothing new: all seven already asked for
+  });
+
+  it('a hand-over that throws waits for the next pass', () => {
+    /** @type {any} */ (globalThis).ReadingPlanStore = {
+      all: () => [run],
+      subscribe: () => () => {},
+    };
+    setAutoDownloads(() => { throw new Error('boom'); }, false);   // flipped: Keep-next was on
+    expect(() => flush()).not.toThrow();
+    expect(off.downloads).toHaveLength(0);
+    setAutoDownloads(tracksOf, true);   // a good hand-over again
+    flush();
+    expect(off.downloads.flat().map((it) => it.url)).toEqual(
+      [21, 22, 23, 24, 25, 26, 27].map((n) => track(n).url),
+    );
+  });
+
+  it('hears the library when it appears, and a star is queued like a plan day', () => {
+    /** @type {any} */ (globalThis).AudioLibraryStore = { saved: () => [track(31)] };   // no subscribe: still read
+    setAutoDownloads(tracksOf, true, true);   // flipped: Keep-starred was off
+    flush();
+    expect(off.downloads.flat().map((it) => it.url)).toContain(track(31).url);
+    /** @type {any} */ (globalThis).AudioLibraryStore = {
+      saved: () => [track(32)],
+      subscribe: (cb) => { libSubs.push(cb); return () => {}; },
+    };
+    const onPlayer = player.subs[0];
+    player.state = { queue: [track(1), track(2)], qi: 0 };
+    onPlayer();   // a new track schedules the pass that finds the library
+    flush();
+    expect(libSubs).toHaveLength(1);
+    expect(off.downloads.flat().map((it) => it.url)).toContain(track(32).url);
+    libSubs[0]();   // a new star: another pass, but no second subscribe
+    flush();
+    expect(libSubs).toHaveLength(1);
+    expect(off.downloads).toHaveLength(2);
+    setAutoDownloads(tracksOf, true, false);   // Keep-starred off
+    flush();
+    libSubs[0]();   // a new star, but Keep-starred is off: nothing scheduled
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a plan store without all() and a library without saved() are ignored', () => {
+    /** @type {any} */ (globalThis).ReadingPlanStore = {};
+    /** @type {any} */ (globalThis).AudioLibraryStore = {};
+    player.state = { queue: [], qi: 0 };
+    setAutoDownloads(tracksOf, true, true);   // flipped: Keep-starred was off
+    flush();
+    expect(off.downloads).toHaveLength(0);
+  });
+});
+
