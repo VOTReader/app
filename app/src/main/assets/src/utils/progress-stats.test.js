@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
   countReadFor, groupBooks, tallyGroup,
-  annotationSourceForKey, mostAnnotatedSources, groupWordStats,
+  annotationSourceForKey, mostAnnotatedSources, groupWordStats, bookItemsFor,
 } from './progress-stats.js';
 
 /* Every Bible book id the group table dereferences on BOOKS. */
@@ -315,5 +315,244 @@ describe('groupWordStats — words-based progress (2026-08-03)', () => {
   it('degrades to zeros without the counter global (guard path)', () => {
     const grp = { id: 'x', label: 'X', genres: [{ label: 'g', books: [{ id: 'volume-one', label: 'V1', total: 1 }] }] };
     expect(groupWordStats({}, grp)).toEqual({ wordsRead: 0, wordsTotal: 0 });
+  });
+});
+
+describe('bookItemsFor — full case sweep (tests-6 item 4)', () => {
+  it('maps every volume/collection id to its corpus items when loaded', () => {
+    seedCorpora();
+    globalThis.LETTERS_V3 = [{ id: 'v3a' }];
+    globalThis.LETTERS_V4 = [{ id: 'v4a' }, { id: 'v4b' }];
+    globalThis.LETTERS_V5 = [{ id: 'v5a' }];
+    globalThis.LETTERS_V6 = [{ id: 'v6a' }];
+    globalThis.LETTERS_V7 = [{ id: 'v7a' }];
+    globalThis.LETTERS_TIMOTHY = [{ id: 't1' }];
+    globalThis.LETTERS_FLOCK = [{ id: 'f1' }];
+    globalThis.LETTERS_FLOCK_PREFACE = { id: 'f0' };
+    expect(bookItemsFor('volume-one').map((x) => x.key)).toEqual(['l1', 'l2']);
+    expect(bookItemsFor('volume-two').map((x) => x.key)).toEqual(['l3']);
+    expect(bookItemsFor('volume-three').map((x) => x.key)).toEqual(['v3a']);
+    expect(bookItemsFor('volume-four').map((x) => x.key)).toEqual(['v4a', 'v4b']);
+    expect(bookItemsFor('volume-five').map((x) => x.key)).toEqual(['v5a']);
+    expect(bookItemsFor('volume-six').map((x) => x.key)).toEqual(['v6a']);
+    expect(bookItemsFor('volume-seven').map((x) => x.key)).toEqual(['v7a']);
+    expect(bookItemsFor('letters-timothy').map((x) => x.key)).toEqual(['t1']);
+    expect(bookItemsFor('little-flock').map((x) => x.key)).toEqual(['f1', 'f0']);
+    expect(bookItemsFor('lords-rebuke').map((x) => x.key)).toEqual(['r1', 'r0']);
+    expect(bookItemsFor('wtlb-one').map((x) => x.key)).toEqual(['w1', 'w2', 'w3']);
+    expect(bookItemsFor('wtlb-two')).toEqual([]);
+    expect(bookItemsFor('the-blessed')).toEqual([]);
+    expect(bookItemsFor('holy-days')).toEqual([]);
+  });
+
+  it('little-flock / lords-rebuke skip a null preface, and every id is [] unloaded', () => {
+    seedCorpora(); // flock preface null, rebuke preface { id: 'r0' }
+    expect(bookItemsFor('little-flock')).toEqual([]);
+    expect(bookItemsFor('lords-rebuke').map((x) => x.key)).toEqual(['r1', 'r0']);
+    ['LETTERS_V1', 'LETTERS', 'LETTERS_V3', 'LETTERS_V4', 'LETTERS_V5',
+      'LETTERS_V6', 'LETTERS_V7', 'LETTERS_TIMOTHY', 'LETTERS_FLOCK',
+      'LETTERS_FLOCK_PREFACE', 'LETTERS_REBUKE', 'LETTERS_REBUKE_PREFACE',
+      'COL_BY_KEY', 'colLetterArr'].forEach((k) => { delete globalThis[k]; });
+    for (const id of ['volume-one', 'volume-two', 'volume-three', 'volume-four',
+      'volume-five', 'volume-six', 'volume-seven', 'letters-timothy',
+      'little-flock', 'lords-rebuke', 'wtlb-one', 'wtlb-two', 'the-blessed', 'holy-days']) {
+      expect(bookItemsFor(id)).toEqual([]);
+    }
+  });
+
+  it('matthew and bible-study ids degrade when their loaders are missing or empty', () => {
+    expect(bookItemsFor('matthew')).toEqual([]); // _matthew undefined
+    globalThis._matthew = () => null;
+    expect(bookItemsFor('matthew')).toEqual([]);
+    globalThis._matthew = () => ({ chapters: 'not-an-array' });
+    expect(bookItemsFor('matthew')).toEqual([]);
+    globalThis._matthew = () => ({ chapters: [{ num: 1 }, { num: 2 }] });
+    expect(bookItemsFor('matthew').map((x) => x.key)).toEqual([1, 2]);
+
+    expect(bookItemsFor('bible-study-faith')).toEqual([]); // _studies undefined
+    globalThis._studies = () => [null, { slug: 'faith', chapters: 'not-an-array' }, { slug: 'empty', chapters: [] }];
+    expect(bookItemsFor('bible-study-faith')).toEqual([]);
+    expect(bookItemsFor('bible-study-empty')).toEqual([]);
+    expect(bookItemsFor('bible-study-missing')).toEqual([]);
+    globalThis._studies = () => [{ slug: 'faith', chapters: [{ id: 'a' }, { id: 'b' }] }];
+    expect(bookItemsFor('bible-study-faith').map((x) => x.key)).toEqual(['a', 'b']);
+  });
+
+  it('bible-book ids read chapters off BOOKS, and [] when the book is absent', () => {
+    expect(bookItemsFor('mark')).toEqual([]); // BOOKS undefined
+    globalThis.BOOKS = { mark: { chapters: [{ num: 1 }, { num: 2 }] }, ruth: {} };
+    expect(bookItemsFor('mark').map((x) => x.key)).toEqual([1, 2]);
+    expect(bookItemsFor('ruth')).toEqual([]); // book without chapters
+    globalThis.BOOKS = null;
+    expect(bookItemsFor('mark')).toEqual([]);
+  });
+});
+
+describe('buildProgressGroups — non-empty collections and loader edges (tests-6 item 4)', () => {
+  it('includes non-empty later volumes, timothy, flock, and the wtlb/blessed/holy-days collections', () => {
+    seedCorpora();
+    globalThis.LETTERS_V3 = [{ id: 'v3a' }];
+    globalThis.LETTERS_V4 = [{ id: 'v4a' }];
+    globalThis.LETTERS_V5 = [{ id: 'v5a' }];
+    globalThis.LETTERS_V6 = [{ id: 'v6a' }];
+    globalThis.LETTERS_V7 = [{ id: 'v7a' }];
+    globalThis.LETTERS_TIMOTHY = [{ id: 't1' }];
+    globalThis.LETTERS_FLOCK = [{ id: 'f1' }];
+    globalThis.LETTERS_FLOCK_PREFACE = { id: 'f0' };
+    globalThis.LETTERS_REBUKE_PREFACE = null;
+    globalThis.colLetterArr = (col) => {
+      if (!col) return [];
+      if (col.globalName === 'WTLB_ONE') return [{ id: 'w1' }];
+      if (col.globalName === 'WTLB_TWO') return [{ id: 'w2a' }, { id: 'w2b' }];
+      if (col.globalName === 'THE_BLESSED') return [{ id: 'b1' }];
+      if (col.globalName === 'HOLY_DAYS') return [{ id: 'h1' }];
+      if (col.globalName === 'HIDDEN_MANNA') return [{ id: 'woe-to-dallas' }];
+      return [];
+    };
+    const volumes = groupBooks(buildProgressGroups()[0]);
+    expect(volumes.find((b) => b.id === 'volume-three').total).toBe(1);
+    expect(volumes.find((b) => b.id === 'volume-seven').total).toBe(1);
+    expect(volumes.find((b) => b.id === 'letters-timothy').total).toBe(1);
+    expect(volumes.find((b) => b.id === 'little-flock').total).toBe(2); // + preface
+    expect(volumes.find((b) => b.id === 'lords-rebuke').total).toBe(1); // preface now null
+    expect(volumes.find((b) => b.id === 'wtlb-two').total).toBe(2);
+    expect(volumes.find((b) => b.id === 'the-blessed').total).toBe(1);
+    expect(volumes.find((b) => b.id === 'holy-days').total).toBe(1);
+  });
+
+  it('matthew with no chapters scores 0, and a studies list with no open study drops the genre', () => {
+    seedCorpora();
+    globalThis._matthew = () => null;
+    globalThis._studies = () => [
+      { slug: 'locked', title: 'L', locked: true, chapters: [{}] },
+      { slug: 'noch', title: 'N', locked: false },
+      { slug: 'empty', title: 'E', locked: false, chapters: [] },
+    ];
+    const studies = groupBooks(buildProgressGroups()[3]);
+    expect(studies.find((b) => b.id === 'matthew').total).toBe(0);
+    expect(studies.find((b) => b.id.startsWith('bible-study-'))).toBeUndefined();
+  });
+
+  it('drops empty rebuke/wtlb collections and counts a preface-less flock at its length', () => {
+    seedCorpora();
+    globalThis.LETTERS_REBUKE = [];
+    globalThis.LETTERS_FLOCK = [{ id: 'f1' }]; // preface stays null from seed
+    globalThis.colLetterArr = (col) => {
+      if (!col) return [];
+      if (col.globalName === 'WTLB_TWO') return [{ id: 'w2a' }];
+      return []; // WTLB_ONE empty here
+    };
+    const volumes = groupBooks(buildProgressGroups()[0]);
+    expect(volumes.find((b) => b.id === 'lords-rebuke')).toBeUndefined();
+    expect(volumes.find((b) => b.id === 'little-flock').total).toBe(1);
+    expect(volumes.find((b) => b.id === 'wtlb-one')).toBeUndefined();
+    expect(volumes.find((b) => b.id === 'wtlb-two').total).toBe(1);
+  });
+});
+
+describe('progressCorporaReady — loaded:false and null BOOKS (tests-6 item 4)', () => {
+  it('is false when the VOT corpus is present but not loaded, and when BOOKS is null', () => {
+    globalThis.BOOKS = { genesis: { chapters: [{}] } };
+    window.__votCorpus = { loaded: false };
+    expect(progressCorporaReady()).toBe(false);
+    window.__votCorpus = { loaded: true };
+    expect(progressCorporaReady()).toBe(true);
+    globalThis.BOOKS = null;
+    expect(progressCorporaReady()).toBe(false);
+  });
+});
+
+describe('annotationSourceForKey — guard branches (tests-6 item 4)', () => {
+  it('bible keys without a book and study keys without a chapter number resolve to null', () => {
+    expect(annotationSourceForKey('bible:')).toBeNull();
+    expect(annotationSourceForKey('bible')).toBeNull();
+    expect(annotationSourceForKey('study:')).toBeNull();
+    expect(annotationSourceForKey('study:matthew')).toBeNull();
+    expect(annotationSourceForKey('letter::0')).toBeNull();
+  });
+
+  it('letter keys resolve to null when findEntryContext is absent', () => {
+    // No findEntryContext global at all (and no COL_BY_KEY, so the Hidden
+    // Manna guard takes its early-false path).
+    expect(annotationSourceForKey('letter:grafted-in:0')).toBeNull();
+  });
+
+  it('defaults a missing collection to an empty string', () => {
+    globalThis.findEntryContext = () => ({ title: 'Title Only' }); // no collection
+    expect(annotationSourceForKey('letter:title-only:0')).toEqual({
+      key: 'letter:title-only', label: 'Title Only', collection: '',
+    });
+  });
+
+  it('Hidden Manna guard returns false when the hm collection is missing or colLetterArr is absent', () => {
+    seedCorpora();
+    globalThis.COL_BY_KEY = new Map(); // no 'hm' entry
+    globalThis.findEntryContext = () => ({ title: 'Woe to Dallas', collection: 'Hidden Manna' });
+    expect(annotationSourceForKey('letter:woe-to-dallas:0')).toEqual({
+      key: 'letter:woe-to-dallas', label: 'Woe to Dallas', collection: 'Hidden Manna',
+    });
+    delete globalThis.colLetterArr;
+    globalThis.COL_BY_KEY = new Map([['hm', { volKey: 'hm' }]]);
+    expect(annotationSourceForKey('letter:woe-to-dallas:0')).toEqual({
+      key: 'letter:woe-to-dallas', label: 'Woe to Dallas', collection: 'Hidden Manna',
+    });
+  });
+});
+
+describe('mostAnnotatedSources — word-count and segment paths (tests-6 item 4)', () => {
+  afterEach(() => { delete globalThis.countItemWords; });
+
+  it('sums bible chapters for density when countItemWords is set', () => {
+    globalThis.BOOKS = { psalms: { chapters: [{ num: 1, w: 100 }, { num: 2, w: 200 }] } };
+    globalThis.countItemWords = (it) => (it && it.w) || 0;
+    const out = mostAnnotatedSources({ 'bible:psalms:23:1': [{ id: 'a1', groupId: 'g1' }] });
+    expect(out).toEqual([
+      { key: 'bible:psalms', label: 'Psalms', collection: 'Scripture', hlKey: 'bible:psalms:23:1', count: 1, words: 300, per1k: 3.3 },
+    ]);
+  });
+
+  it('letter sources with an unresolvable or wordless entry carry per1k 0', () => {
+    globalThis.findEntryContext = (id, _kind) => {
+      if (id === 'no-entry') return { title: 'No Entry', collection: 'V1' }; // no entry
+      if (id === 'has-entry') return { title: 'Has Entry', collection: 'V1', entry: { id, w: 400 } };
+      return null;
+    };
+    globalThis.countItemWords = (it) => (it && it.w) || 0;
+    const ann = {
+      'letter:no-entry:0': [{ id: 'n1', groupId: 'n1' }],
+      'letter:has-entry:0': [{ id: 'h1', groupId: 'h1' }],
+      'letter:ghost:0': [{ id: 'g1', groupId: 'g1' }],
+    };
+    const out = mostAnnotatedSources(ann);
+    // ghost never resolves (findEntryContext null) so it is dropped;
+    // no-entry resolves but has no entry → words 0, per1k 0.
+    expect(out.map((s) => s.key)).toEqual(['letter:has-entry', 'letter:no-entry']);
+    expect(out[0]).toMatchObject({ words: 400, per1k: 2.5 });
+    expect(out[1]).toMatchObject({ words: 0, per1k: 0 });
+  });
+
+  it('skips falsy segments and non-array segment lists, and rejects non-object input', () => {
+    const out = mostAnnotatedSources({ 'bible:mark:1:1': [null, { id: 'm1', groupId: 'm1' }, undefined] });
+    expect(out).toEqual([
+      { key: 'bible:mark', label: 'Mark', collection: 'Scripture', hlKey: 'bible:mark:1:1', count: 1, words: 0, per1k: 0 },
+    ]);
+    const out2 = mostAnnotatedSources({
+      'bible:mark:1:1': 'not-an-array',
+      'bible:luke:1:1': [{ id: 'l1', groupId: 'l1' }],
+    });
+    expect(out2.map((s) => s.key)).toEqual(['bible:luke']);
+    expect(mostAnnotatedSources('not-an-object')).toEqual([]);
+    expect(mostAnnotatedSources(42)).toEqual([]);
+  });
+});
+
+describe('groupWordStats — null readItems (tests-6 item 4)', () => {
+  afterEach(() => { delete globalThis.countItemWords; });
+
+  it('counts zero words read when readItems is null', () => {
+    globalThis.countItemWords = (it) => it.w;
+    globalThis.LETTERS_V1 = [{ id: 'a', w: 100 }];
+    const grp = { id: 'vot', label: 'VOT', genres: [{ label: 'g', books: [{ id: 'volume-one', label: 'Volume One', total: 1 }] }] };
+    expect(groupWordStats(null, grp)).toEqual({ wordsRead: 0, wordsTotal: 100 });
   });
 });
