@@ -1,6 +1,6 @@
 // A06.6 / U06.2 (ideas audit n85, n343): a removed mark or link comes back with Undo; a new mark comes off with it.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { snapshotGroups, offerUndoRemoved, offerUndoAdded, offerUndoLinkRemoved, removeBookmarkWithUndo, removeLinkWithUndo } from './annotation-undo.js';
+import { snapshotGroups, restoreGroups, offerUndoRemoved, offerUndoAdded, offerUndoLinkRemoved, removeBookmarkWithUndo, removeLinkWithUndo } from './annotation-undo.js';
 import { _resetToasts } from './toast.js';
 
 const G = /** @type {any} */ (globalThis);
@@ -95,5 +95,101 @@ describe('link delete Undo keeps the stored order (0610)', () => {
     undo('vot-toast-link-removed').click();
     expect(links).toEqual([{ id: 'l1' }, { id: 'l2', created: 5 }, { id: 'l3' }]);
     expect(G.LinkStore.add).not.toHaveBeenCalled();
+  });
+});
+
+describe('annotation undo — branch coverage (tests-6 item 6)', () => {
+  it('snapshotGroups with no NoteStore records a null note', () => {
+    delete G.NoteStore;
+    const snaps = snapshotGroups(['g']);
+    expect(snaps).toEqual([
+      { gid: 'g', segs: [{ key: 'k1', ann: data.k1[0] }, { key: 'k2', ann: data.k2[0] }], note: null },
+    ]);
+  });
+
+  it('snapshotGroups falls back to [] when getByGroup returns nothing', () => {
+    G.AnnotationStore.getByGroup = () => null;
+    const snaps = snapshotGroups(['g']);
+    expect(snaps[0].segs).toEqual([]);
+  });
+
+  it('restoreGroups with a note-less snap skips the note write', () => {
+    const snap = [{ gid: 'g', segs: [{ key: 'k1', ann: data.k1[0] }], note: null }];
+    restoreGroups(snap);
+    expect(data.k1.map((h) => h.id)).toEqual(['a', 'a']);
+    expect(G.NoteStore.set).not.toHaveBeenCalled();
+  });
+
+  it('offerUndoRemoved without text uses the default label', () => {
+    const gone = snapshotGroups(['g']);
+    G.AnnotationStore.removeGroup('g');
+    offerUndoRemoved(gone);
+    expect(document.getElementById('vot-toast-mark-removed').textContent).toBe('Highlight removedUndo');
+  });
+
+  it('offerUndoAdded without text uses the default label', () => {
+    offerUndoAdded('g');
+    expect(document.getElementById('vot-toast-mark-added').textContent).toBe('HighlightedUndo');
+  });
+
+  it('removeBookmarkWithUndo with no BookmarkStore returns quietly', () => {
+    delete G.BookmarkStore;
+    expect(() => removeBookmarkWithUndo('b1')).not.toThrow();
+    expect(document.getElementById('vot-toast-bookmark-removed')).toBeNull();
+  });
+
+  it('removeBookmarkWithUndo with an empty store returns quietly', () => {
+    G.BookmarkStore = { all: () => null, remove: vi.fn(), restore: vi.fn() };
+    removeBookmarkWithUndo('b1');
+    expect(G.BookmarkStore.remove).not.toHaveBeenCalled();
+    expect(document.getElementById('vot-toast-bookmark-removed')).toBeNull();
+  });
+
+  it('removeLinkWithUndo with no LinkStore returns quietly', () => {
+    delete G.LinkStore;
+    expect(() => removeLinkWithUndo('l1')).not.toThrow();
+    expect(document.getElementById('vot-toast-link-removed')).toBeNull();
+  });
+
+  it('removeLinkWithUndo with an empty store returns quietly', () => {
+    G.LinkStore = { all: () => null, remove: vi.fn(), restore: vi.fn(), add: vi.fn() };
+    removeLinkWithUndo('l1');
+    expect(G.LinkStore.remove).not.toHaveBeenCalled();
+    expect(document.getElementById('vot-toast-link-removed')).toBeNull();
+  });
+
+  it('removeLinkWithUndo with an unknown id offers nothing', () => {
+    let links = [{ id: 'l1' }];
+    G.LinkStore = {
+      all: () => links,
+      remove: vi.fn((id) => { links = links.filter((l) => l.id !== id); }),
+      restore: vi.fn(),
+      add: vi.fn(),
+    };
+    removeLinkWithUndo('nope');
+    expect(G.LinkStore.remove).not.toHaveBeenCalled();
+    expect(document.getElementById('vot-toast-link-removed')).toBeNull();
+  });
+
+  it('Undo without a restore function falls back to add', () => {
+    let links = [{ id: 'l1' }, { id: 'l2' }];
+    G.LinkStore = {
+      all: () => links,
+      remove: vi.fn((id) => { links = links.filter((l) => l.id !== id); }),
+      add: vi.fn((rec) => { links.push(rec); }),
+    };
+    removeLinkWithUndo('l2');
+    expect(links.map((l) => l.id)).toEqual(['l1']);
+    undo('vot-toast-link-removed').click();
+    expect(G.LinkStore.add).toHaveBeenCalledWith({ id: 'l2' });
+    expect(links.map((l) => l.id)).toEqual(['l1', 'l2']);
+  });
+
+  it('offerUndoLinkRemoved with no link or no store offers nothing', () => {
+    offerUndoLinkRemoved(null);
+    expect(document.getElementById('vot-toast-link-removed')).toBeNull();
+    delete G.LinkStore;
+    offerUndoLinkRemoved({ id: 'l1' });
+    expect(document.getElementById('vot-toast-link-removed')).toBeNull();
   });
 });

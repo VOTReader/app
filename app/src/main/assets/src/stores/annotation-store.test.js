@@ -256,3 +256,101 @@ describe('AnnotationStore — replaceAll drops malformed segments (ds5 s09.2)', 
     expect(AnnotationStore.get('b-1-1')).toEqual([{ groupId: 'g2' }]);
   });
 });
+
+describe('AnnotationStore — branch coverage (tests-6 item 6)', () => {
+  /** @param {string} id @param {string} groupId @param {number} [start] @param {number} [end] @returns {{ id: string, groupId: string, kind: 'highlight', color: string, start: number, end: number, text: string }} */
+  const ann = (id, groupId, start = 0, end = 10) => ({
+    id, groupId, kind: 'highlight', color: 'yellow', start, end, text: id,
+  });
+
+  it('add keeps caller-supplied groupId, kind and created stamps', () => {
+    AnnotationStore.add('k:stamps', { ...ann('s1', 'g1'), kind: 'underline', created: 12345 });
+    const [stored] = AnnotationStore.get('k:stamps');
+    expect(stored.groupId).toBe('g1');
+    expect(stored.kind).toBe('underline');
+    expect(stored.created).toBe(12345);
+    expect(stored.updated).toEqual(expect.any(Number));
+  });
+
+  it('add to an existing bucket appends instead of replacing', () => {
+    AnnotationStore.add('k:pair', ann('p1', 'g1'));
+    AnnotationStore.add('k:pair', ann('p2', 'g1'));
+    expect(AnnotationStore.get('k:pair').map((h) => h.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('update on an unknown key and an unknown id are no-ops', () => {
+    expect(() => AnnotationStore.update('no-key', 'x', { color: 'red' })).not.toThrow();
+    AnnotationStore.add('k:upd', ann('u1', 'g1'));
+    AnnotationStore.update('k:upd', 'nope', { color: 'red' });
+    expect(AnnotationStore.get('k:upd')[0].color).toBe('yellow');
+    expect(AnnotationStore.get('k:upd')).toHaveLength(1);
+  });
+
+  it('remove on an unknown key is a no-op; removing one of two keeps the bucket', () => {
+    expect(() => AnnotationStore.remove('no-key', 'x')).not.toThrow();
+    AnnotationStore.add('k:rem', ann('r1', 'g1'));
+    AnnotationStore.add('k:rem', ann('r2', 'g1'));
+    AnnotationStore.remove('k:rem', 'r1');
+    expect(AnnotationStore.get('k:rem').map((h) => h.id)).toEqual(['r2']);
+    expect(Object.keys(AnnotationStore.all())).toContain('k:rem');
+  });
+
+  it('removeAllForKey drops the whole bucket', () => {
+    AnnotationStore.add('k:all', ann('a1', 'g1'));
+    AnnotationStore.add('k:other', ann('a2', 'g1'));
+    AnnotationStore.removeAllForKey('k:all');
+    expect(AnnotationStore.get('k:all')).toEqual([]);
+    expect(AnnotationStore.get('k:other')).toHaveLength(1);
+  });
+
+  it('getByGroup gathers only the matching group across keys', () => {
+    AnnotationStore.add('k:g1a', ann('g1a', 'g1'));
+    AnnotationStore.add('k:g2', ann('g2a', 'g2'));
+    AnnotationStore.add('k:g1b', ann('g1b', 'g1'));
+    const found = AnnotationStore.getByGroup('g1');
+    expect(found.map((f) => f.ann.id).sort()).toEqual(['g1a', 'g1b']);
+    expect(found.map((f) => f.key).sort()).toEqual(['k:g1a', 'k:g1b']);
+  });
+
+  it('recolorGroup touches only the matching group', () => {
+    AnnotationStore.add('k:rc', ann('c1', 'g1'));
+    AnnotationStore.add('k:rc', ann('c2', 'g2'));
+    AnnotationStore.recolorGroup('g1', 'blue');
+    const [one, two] = AnnotationStore.get('k:rc');
+    expect(one.color).toBe('blue');
+    expect(two.color).toBe('yellow');
+  });
+
+  it('convertGroup touches only the matching group', () => {
+    AnnotationStore.add('k:cv', ann('v1', 'g1'));
+    AnnotationStore.add('k:cv', ann('v2', 'g2'));
+    AnnotationStore.convertGroup('g1', 'note');
+    const [one, two] = AnnotationStore.get('k:cv');
+    expect(one.kind).toBe('note');
+    expect(two.kind).toBe('highlight');
+  });
+
+  it('groupAt finds the covering segment and returns null otherwise', () => {
+    AnnotationStore.add('k:at', ann('at1', 'g1', 0, 10));
+    expect(AnnotationStore.groupAt('k:at', 2, 5).id).toBe('at1');
+    expect(AnnotationStore.groupAt('k:at', 20, 30)).toBeNull();
+    AnnotationStore.add('k:late', ann('at2', 'g1', 10, 20));
+    expect(AnnotationStore.groupAt('k:late', 0, 5)).toBeNull();
+  });
+
+  it('replaceAll(null) clears to an empty map', () => {
+    AnnotationStore.add('k:ra', ann('ra1', 'g1'));
+    AnnotationStore.replaceAll(null);
+    expect(AnnotationStore.all()).toEqual({});
+    expect(AnnotationStore.get('k:ra')).toEqual([]);
+  });
+});
+
+describe('AnnotationStore — default stamps (tests-6 item 6)', () => {
+  it('add without groupId or kind stamps groupId from id and kind highlight', () => {
+    AnnotationStore.add('k:defaults', { id: 'd1', start: 0, end: 5, text: 'd' });
+    const [stored] = AnnotationStore.get('k:defaults');
+    expect(stored.groupId).toBe('d1');
+    expect(stored.kind).toBe('highlight');
+  });
+});
