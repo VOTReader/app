@@ -30,7 +30,7 @@ beforeEach(() => {
     _bookmarkSourceLabel: window._bookmarkSourceLabel,
     hideSelectionToolbar: window.__hideSelectionToolbar,
   };
-  window.BookmarkStore = { get: vi.fn((id) => (id === 'bk1' ? { id: 'bk1', hlKey: 'bible:genesis:1:1', label: 'L', thought: 'T' } : null)) };
+  window.BookmarkStore = { get: vi.fn((id) => (id === 'bk1' ? { id: 'bk1', hlKey: 'bible:genesis:1:1', label: 'L', thought: 'T' } : id === 'bk2' ? { id: 'bk2', hlKey: 'bible:exodus:2:2' } : null)) };
   window._bookmarkSourceLabel = () => 'Genesis 1:1';
   window.__hideSelectionToolbar = vi.fn();
 });
@@ -119,5 +119,62 @@ describe('extracted link-picker surface is spread into the return', () => {
     expect(typeof result.current.openLinkSidebar).toBe('function');
     expect(typeof result.current.closeLinkPicker).toBe('function');
     expect(result.current).toHaveProperty('linkPickerOnPickRef');
+  });
+});
+
+describe('falsy / missing-value branches', () => {
+  it('__bookmarkCreate(null) clears the pending bookmark', () => {
+    const { result } = setup();
+    act(() => window.__bookmarkCreate({ hlKey: 'k', defaultLabel: 'D' }));
+    expect(result.current.bookmarkCreatePending).toEqual({ hlKey: 'k', defaultLabel: 'D' });
+    act(() => window.__bookmarkCreate(null));
+    expect(result.current.bookmarkCreatePending).toBeNull();
+  });
+
+  it('__openJournalInbound with a falsy refKey clears the payload', () => {
+    const { result } = setup();
+    act(() => window.__openJournalInbound('letter:two/x', 'X'));
+    expect(result.current.inboundJournalPayload).toEqual({ refKey: 'letter:two/x', label: 'X' });
+    act(() => window.__openJournalInbound(null, 'X'));
+    expect(result.current.inboundJournalPayload).toBeNull();
+  });
+
+  it('__bookmarkEdit with no id or an unknown id leaves pending untouched', () => {
+    const { result } = setup();
+    act(() => window.__bookmarkEdit());
+    expect(result.current.bookmarkCreatePending).toBeNull();
+    act(() => window.__bookmarkEdit('no-such-id'));
+    expect(result.current.bookmarkCreatePending).toBeNull();
+  });
+
+  it('__bookmarkEdit without _bookmarkSourceLabel falls back to an empty source label', () => {
+    const { result } = setup();
+    delete window._bookmarkSourceLabel;
+    act(() => window.__bookmarkEdit('bk1'));
+    expect(result.current.bookmarkCreatePending).toMatchObject({
+      editId: 'bk1', hlKey: 'bible:genesis:1:1', sourceLabel: '', atSource: false,
+    });
+  });
+
+  it('__bookmarkEdit with a label-less, thought-less record defaults both to empty strings', () => {
+    const { result } = setup();
+    act(() => window.__bookmarkEdit('bk2'));
+    expect(result.current.bookmarkCreatePending).toMatchObject({
+      editId: 'bk2', hlKey: 'bible:exodus:2:2',
+      defaultLabel: '', currentLabel: '', currentThought: '', atSource: false,
+    });
+  });
+});
+
+describe('auto-dismiss without __hideSelectionToolbar', () => {
+  it('still clears overlays when __hideSelectionToolbar is not a function', () => {
+    const { result, rerender } = setup();
+    act(() => { result.current.openNoteSheet('g'); window.__showAnnChip(1, 1, 'k', 'g'); });
+    expect(result.current.noteSheetTarget).not.toBeNull();
+    expect(result.current.annChip).not.toBeNull();
+    delete window.__hideSelectionToolbar;
+    act(() => rerender(baseArgs({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 })));
+    expect(result.current.noteSheetTarget).toBeNull();
+    expect(result.current.annChip).toBeNull();
   });
 });
