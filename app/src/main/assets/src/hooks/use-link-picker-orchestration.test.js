@@ -130,3 +130,67 @@ describe('window bridges', () => {
     expect(window.__openLinkSidebar).toBeUndefined();
   });
 });
+
+describe('openLinkPicker — label fallbacks', () => {
+  it('bible key with an unknown book falls back to the book id', () => {
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('bible:unknownbook:2:3'));
+    expect(result.current.linkPickerSource.label).toBe('unknownbook 2:3');
+  });
+
+  it('study key with no chapter suffix keeps the raw key as label', () => {
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('study:matthew:7'));
+    expect(result.current.linkPickerSource.label).toBe('study:matthew:7');
+  });
+
+  it('letter key with no entry context keeps the raw key as label', () => {
+    window.findEntryContext = () => null;
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('letter:nowhere:0'));
+    expect(result.current.linkPickerSource.label).toBe('letter:nowhere:0');
+  });
+
+  it('an unknown prefix keeps the raw key as label', () => {
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('bookmark:somewhere:0'));
+    expect(result.current.linkPickerSource.label).toBe('bookmark:somewhere:0');
+  });
+
+  it('journal key without JournalStore keeps the raw key as label', () => {
+    window.JournalStore = undefined;
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('journal:j_1:0'));
+    expect(result.current.linkPickerSource.label).toBe('journal:j_1:0');
+  });
+
+  it('journal key for a missing entry keeps the raw key as label', () => {
+    window.JournalStore = { get: () => null };
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('journal:j_gone:0'));
+    expect(result.current.linkPickerSource.label).toBe('journal:j_gone:0');
+  });
+
+  it('journal key without JournalHelpers keeps the raw key as label', () => {
+    window.JournalHelpers = undefined;
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('journal:j_1:0'));
+    expect(result.current.linkPickerSource.label).toBe('journal:j_1:0');
+  });
+
+  it('journal entry with no display title falls back to Untitled', () => {
+    window.JournalHelpers = { entryDisplayTitle: () => '' };
+    const { result } = setup();
+    act(() => result.current.openLinkPicker('journal:j_1:0'));
+    expect(result.current.linkPickerSource.label).toBe('Journal · Untitled');
+  });
+});
+
+describe('target-picker defaults', () => {
+  it('no mode defaults to card and a non-function onPick leaves the ref null', () => {
+    const { result } = setup();
+    act(() => result.current.openLinkPickerForTarget());
+    expect(result.current.linkPickerMode).toBe('card');
+    expect(result.current.linkPickerOnPickRef.current).toBeNull();
+  });
+});

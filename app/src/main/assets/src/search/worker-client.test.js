@@ -191,3 +191,86 @@ describe('a worker that fails', () => {
     expect(asked.length, 'meaning-start sent to a worker').toBe(1);
   });
 });
+
+describe('requests without the extras', () => {
+  it('a bare request (no data, no onPart, no quiet limit) still resolves, parts dropped', async () => {
+    script.echo = (_m, post) => { post({ part: 1 }); post({ done: true, ok: 1 }); };
+    const r = watch(/** @type {any} */ (searchWorker()).request('echo'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.state).toEqual({ value: expect.objectContaining({ done: true, ok: 1 }) });
+  });
+
+  it('a request on a worker that is gone is refused at once', async () => {
+    const c = /** @type {any} */ (searchWorker());
+    await vi.advanceTimersByTimeAsync(0);
+    made.onerror();
+    const r = watch(c.request('echo', {}));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.state).toEqual({ error: 'search worker gone' });
+  });
+
+  it('a part the caller cannot take ends only its request', async () => {
+    script.boom = (_m, post) => post({ part: 1 });
+    const r = watch(/** @type {any} */ (searchWorker()).request('boom', {}, () => { throw new Error('cannot take it'); }, 20000));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.state).toEqual({ error: 'cannot take it' });
+    expect(made.terminated, 'the worker itself is not given up').toBe(false);
+    expect(searchWorker()).not.toBeNull();
+  });
+
+  it('messages with no data or an unknown id are ignored', async () => {
+    searchWorker();
+    await vi.advanceTimersByTimeAsync(0);
+    made.onmessage({});
+    made.onmessage({ data: undefined });
+    made.onmessage({ data: { id: 424242, done: true } });
+    expect(made.terminated).toBe(false);
+    expect(searchWorker()).not.toBeNull();
+  });
+});
+
+describe('a page that cannot have a worker', () => {
+  it('no Worker constructor at all → null', () => {
+    vi.stubGlobal('Worker', undefined);
+    expect(searchWorker()).toBeNull();
+  });
+
+  it('a Worker constructor that throws → null, and off for the session', async () => {
+    class BoomWorker { constructor() { throw new Error('no workers here'); } }
+    vi.stubGlobal('Worker', BoomWorker);
+    expect(searchWorker()).toBeNull();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(searchWorker()).toBeNull();
+  });
+});
+
+describe('more ways a worker is given up', () => {
+  it('a message that cannot be read gives the worker up', async () => {
+    searchWorker();
+    await vi.advanceTimersByTimeAsync(0);
+    made.onmessageerror();
+    expect(made.terminated).toBe(true);
+    expect(searchWorker()).toBeNull();
+  });
+
+  it('a hello answered after the worker was already given up does not count as ran', async () => {
+    searchWorker();
+    await Promise.resolve(); // the hello answer lands; its .then is queued behind this
+    made.onerror(); // given up before that .then runs
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(searchWorker(), 'never counted as ran: no comeback').toBeNull();
+  });
+
+  it('a stale quiet timer from before a reset does not fail the next worker', async () => {
+    script.restore = () => {};
+    const c = /** @type {any} */ (searchWorker());
+    watch(c.request('restore', {}, () => {}, 20000));
+    resetSearchWorker();
+    const again = searchWorker();
+    expect(again).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(made.terminated, 'the new worker survives the old request timer').toBe(false);
+    expect(searchWorker()).not.toBeNull();
+  });
+});
