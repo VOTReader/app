@@ -6,10 +6,16 @@
  * whose tests depend on real frames cannot pin its own dt/ramp arithmetic.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
 import {
   createAutoScroll, clampEndDwell, clampLpm, computeEndTarget, measureLineHeight, touchLiftEnds,
+  useAutoScroll,
 } from './use-autoscroll.js';
+
+// The hook hands the page turn to the pager's own commit; the nav itself is
+// another module's contract, so the hook tests drive it through a passthrough.
+vi.mock('./use-pager-gesture.js', () => ({ commitReadingNav: (fn) => fn() }));
 
 // ── Harness ────────────────────────────────────────────────────────────
 function makeEl({ scrollHeight = 5000, clientHeight = 800, endTop = null, lineHeight = 24 } = {}) {
@@ -1230,5 +1236,539 @@ describe('tests-6 item 13a: controller branches', () => {
     runTimers(state, 6000);                              // dwell fires, advance throws
     expect(ctrl.getState()).toMatchObject({ state: 'ended', pauseReason: 'advance-failed' });
     ctrl.destroy();
+  });
+});
+
+// ── React hook useAutoScroll + peekNext (13b) ───────────────────────────
+// The controller tests above drive createAutoScroll directly; these drive
+// the React wrapper — its effects, its DOM listeners, and the I/O closures
+// it builds from opts — through renderHook with fake timers and a real
+// jsdom element. The page is short (scrollHeight == clientHeight), so the
+// end is reached on the first frames and the dwell/advance path is quick.
+
+describe('useAutoScroll hook', () => {
+  let els = [];
+
+  function makeScrollEl({ scrollHeight = 800, clientHeight = 800, endTop = 800 } = {}) {
+    const el = document.createElement('div');
+    el.className = 'screen-scroll';
+    Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true });
+    Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true });
+    const end = document.createElement('div');
+    end.className = 'reading-end';
+    end.getBoundingClientRect = () => ({
+      top: endTop - el.scrollTop, left: 0, right: 0, bottom: 0, width: 0, height: 0,
+      x: 0, y: endTop - el.scrollTop, toJSON: () => ({}),
+    });
+    el.appendChild(end);
+    const hl = document.createElement('p');
+    hl.setAttribute('data-hl-key', 'x');
+    hl.textContent = 'The quick brown fox jumps over the lazy dog.';
+    el.appendChild(hl);
+    el.getBoundingClientRect = () => ({
+      top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0,
+      x: 0, y: 0, toJSON: () => ({}),
+    });
+    document.body.appendChild(el);
+    els.push(el);
+    return el;
+  }
+
+  function makePager({ kind = 'screen', onNext = vi.fn() } = {}) {
+    return { peek: vi.fn(() => ({ kind })), onNext };
+  }
+
+  function baseOpts(overrides = {}) {
+    return {
+      enabled: true, speedLpm: 40, autoNext: false, endDwellMs: 0,
+      keepScreenOnPref: false, placeKey: 'p1', pager: null, ...overrides,
+    };
+  }
+
+  function mountHook(el, opts) {
+    const ref = { current: el };
+    const hook = renderHook(({ r, o }) => useAutoScroll(r, o), {
+      initialProps: { r: ref, o: opts },
+    });
+    return { hook, ref };
+  }
+
+  function timers(ms) {
+    act(() => { vi.advanceTimersByTime(ms); });
+  }
+
+  function driveToDwell(hook) {
+    act(() => { hook.result.current.start(); });
+    expect(hook.result.current.state).toBe('running');
+    timers(100);
+    expect(hook.result.current.state).toBe('enddwell');
+    expect(hook.result.current.advanceAt).toBeGreaterThan(0);
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Deterministic frame source: the setTimeout fallback, never jsdom's rAF.
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    vi.stubGlobal('cancelAnimationFrame', undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    const sel = window.getSelection && window.getSelection();
+    if (sel) sel.removeAllRanges();
+    document.body.classList.remove('scroll-restoring', 'autoscroll-running');
+    delete /** @type {any} */ (document).visibilityState;
+    els.forEach((el) => el.remove());
+    els = [];
+    vi.useRealTimers();
+  });
+
+  it('mounts idle and exposes the control surface', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    expect(hook.result.current.state).toBe('idle');
+    expect(hook.result.current.running).toBe(false);
+    expect(hook.result.current.advanceAt).toBe(0);
+    expect(hook.result.current.pauseReason).toBeNull();
+    expect(typeof hook.result.current.toggle).toBe('function');
+    expect(typeof hook.result.current.start).toBe('function');
+    expect(typeof hook.result.current.stop).toBe('function');
+    expect(hook.result.current.getProgress()).toEqual({ remainingMs: 0, atEnd: true });
+    hook.unmount();
+  });
+
+  it('does nothing without an element, and nothing while disabled', () => {
+    const { hook } = mountHook(null, baseOpts());
+    act(() => { hook.result.current.start(); });
+    act(() => { hook.result.current.toggle(); });
+    act(() => { hook.result.current.stop(); });
+    expect(hook.result.current.state).toBe('idle');
+    expect(hook.result.current.getProgress()).toEqual({ remainingMs: 0, atEnd: true });
+    hook.unmount();
+
+    const el = makeScrollEl();
+    const second = mountHook(el, baseOpts({ enabled: false }));
+    act(() => { second.hook.result.current.start(); });
+    expect(second.hook.result.current.state).toBe('idle');
+    // A placeKey / speed / dwell rerender with no controller is a no-op.
+    act(() => {
+      second.hook.rerender({
+        r: second.ref,
+        o: baseOpts({ enabled: false, placeKey: 'p2', speedLpm: 20, endDwellMs: 500 }),
+      });
+    });
+    expect(second.hook.result.current.state).toBe('idle');
+    // Enabling later mounts the controller.
+    act(() => {
+      second.hook.rerender({ r: second.ref, o: baseOpts({ placeKey: 'p2' }) });
+    });
+    act(() => { second.hook.result.current.start(); });
+    expect(second.hook.result.current.state).toBe('running');
+    second.hook.unmount();
+  });
+
+  it('starts motion, shows the running class, and stops on demand', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    expect(hook.result.current.state).toBe('running');
+    expect(hook.result.current.running).toBe(true);
+    expect(document.body.classList.contains('autoscroll-running')).toBe(true);
+    act(() => { hook.result.current.stop(); });
+    timers(1000);
+    expect(hook.result.current.state).toBe('paused');
+    expect(hook.result.current.pauseReason).toBe('user');
+    expect(document.body.classList.contains('autoscroll-running')).toBe(false);
+    hook.unmount();
+    expect(document.body.classList.contains('autoscroll-running')).toBe(false);
+  });
+
+  it('toggle stops a run and starts a paused one', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.toggle(); });
+    expect(hook.result.current.state).toBe('running');
+    act(() => { hook.result.current.toggle(); });
+    timers(1000);
+    expect(hook.result.current.state).toBe('paused');
+    act(() => { hook.result.current.toggle(); });
+    expect(hook.result.current.state).toBe('running');
+    hook.unmount();
+  });
+
+  it('a finger down pauses instantly; a lift with a finger still down does not resume', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    act(() => { el.dispatchEvent(new Event('touchstart')); });
+    expect(hook.result.current.state).toBe('paused');
+    expect(hook.result.current.pauseReason).toBe('touch');
+    const stillDown = new Event('touchend');
+    Object.defineProperty(stillDown, 'touches', { value: [{}] });
+    act(() => { document.dispatchEvent(stillDown); });
+    expect(hook.result.current.state).toBe('paused');
+    act(() => { document.dispatchEvent(new Event('touchend')); });
+    timers(1200);
+    expect(hook.result.current.state).toBe('running');
+    // A mouse down is the same yield, and mouseup lifts it.
+    act(() => { el.dispatchEvent(new Event('mousedown')); });
+    expect(hook.result.current.state).toBe('paused');
+    act(() => { document.dispatchEvent(new Event('mouseup')); });
+    timers(1200);
+    expect(hook.result.current.state).toBe('running');
+    hook.unmount();
+  });
+
+  it('a wheel event yields and then resumes', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    act(() => { el.dispatchEvent(new Event('wheel')); });
+    expect(hook.result.current.state).toBe('paused');
+    expect(hook.result.current.pauseReason).toBe('touch');
+    timers(1200);
+    expect(hook.result.current.state).toBe('running');
+    hook.unmount();
+  });
+
+  it('hiding the tab pauses and never resumes unwatched', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(hook.result.current.state).toBe('paused');
+    expect(hook.result.current.pauseReason).toBe('hidden');
+    timers(5000);
+    expect(hook.result.current.state).toBe('paused');
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(hook.result.current.state).toBe('paused');
+    hook.unmount();
+  });
+
+  it('a navigation the reader drove is a hard stop', () => {
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    expect(hook.result.current.state).toBe('running');
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ placeKey: 'p2' }) });
+    });
+    expect(hook.result.current.state).toBe('paused');
+    expect(hook.result.current.pauseReason).toBe('nav');
+    hook.unmount();
+  });
+
+  it('live speed and dwell edits reach the running controller', () => {
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ speedLpm: 20 }) });
+    });
+    expect(hook.result.current.state).toBe('running');
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ speedLpm: 20, endDwellMs: 5000 }) });
+    });
+    expect(hook.result.current.state).toBe('running');
+    hook.unmount();
+  });
+
+  it('an open modal blocks start; a missing or throwing registry does not', () => {
+    const el = makeScrollEl();
+    vi.stubGlobal('modalRegistry', { isAnyOpen: () => true });
+    const blocked = mountHook(el, baseOpts());
+    act(() => { blocked.hook.result.current.start(); });
+    expect(blocked.hook.result.current.state).toBe('paused');
+    expect(blocked.hook.result.current.pauseReason).toBe('blocked');
+    blocked.hook.unmount();
+
+    vi.stubGlobal('modalRegistry', undefined);
+    const missing = mountHook(el, baseOpts());
+    act(() => { missing.hook.result.current.start(); });
+    expect(missing.hook.result.current.state).toBe('running');
+    missing.hook.unmount();
+
+    vi.stubGlobal('modalRegistry', { isAnyOpen: () => { throw new Error('registry down'); } });
+    const throwing = mountHook(el, baseOpts());
+    act(() => { throwing.hook.result.current.start(); });
+    expect(throwing.hook.result.current.state).toBe('running');
+    throwing.hook.unmount();
+  });
+
+  it('a live selection blocks start; a missing or throwing getSelection does not', () => {
+    const el = makeScrollEl();
+    const sel = window.getSelection();
+    sel.selectAllChildren(el);
+    expect(String(window.getSelection())).not.toBe('');
+    const blocked = mountHook(el, baseOpts());
+    act(() => { blocked.hook.result.current.start(); });
+    expect(blocked.hook.result.current.state).toBe('paused');
+    expect(blocked.hook.result.current.pauseReason).toBe('blocked');
+    blocked.hook.unmount();
+    sel.removeAllRanges();
+
+    vi.stubGlobal('getSelection', undefined);
+    const missing = mountHook(el, baseOpts());
+    act(() => { missing.hook.result.current.start(); });
+    expect(missing.hook.result.current.state).toBe('running');
+    missing.hook.unmount();
+
+    vi.stubGlobal('getSelection', () => { throw new Error('selection down'); });
+    const throwing = mountHook(el, baseOpts());
+    act(() => { throwing.hook.result.current.start(); });
+    expect(throwing.hook.result.current.state).toBe('running');
+    throwing.hook.unmount();
+  });
+
+  it('a scroll restore in progress holds the position instead of writing', () => {
+    const el = makeScrollEl();
+    document.body.classList.add('scroll-restoring');
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    timers(100);
+    expect(hook.result.current.state).toBe('running');
+    expect(el.scrollTop).toBe(0);
+    document.body.classList.remove('scroll-restoring');
+    timers(100);
+    expect(hook.result.current.state).toBe('ended');
+    hook.unmount();
+  });
+
+  it('reduced motion still starts, and a missing matchMedia is no preference', () => {
+    const el = makeScrollEl();
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true, addEventListener: () => {}, removeEventListener: () => {},
+    }));
+    const reduced = mountHook(el, baseOpts());
+    act(() => { reduced.hook.result.current.start(); });
+    expect(reduced.hook.result.current.state).toBe('running');
+    reduced.hook.unmount();
+
+    vi.stubGlobal('matchMedia', undefined);
+    const missing = mountHook(el, baseOpts());
+    act(() => { missing.hook.result.current.start(); });
+    expect(missing.hook.result.current.state).toBe('running');
+    missing.hook.unmount();
+  });
+
+  it('keep-screen-on follows the run and re-asserts the saved preference on release', () => {
+    const setKeepScreenOn = vi.fn();
+    vi.stubGlobal('PlatformBridge', { setKeepScreenOn });
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts({ keepScreenOnPref: true }));
+    act(() => { hook.result.current.start(); });
+    expect(setKeepScreenOn).toHaveBeenCalledWith(true);
+    act(() => { hook.result.current.stop(); });
+    timers(1000);
+    expect(hook.result.current.state).toBe('paused');
+    expect(setKeepScreenOn).toHaveBeenLastCalledWith(true);
+    hook.unmount();
+
+    setKeepScreenOn.mockClear();
+    const off = mountHook(el, baseOpts({ keepScreenOnPref: false }));
+    act(() => { off.hook.result.current.start(); });
+    expect(setKeepScreenOn).toHaveBeenCalledWith(true);
+    act(() => { off.hook.result.current.stop(); });
+    timers(1000);
+    expect(setKeepScreenOn).toHaveBeenLastCalledWith(false);
+    off.hook.unmount();
+
+    // A throwing bridge never wedges the run.
+    vi.stubGlobal('PlatformBridge', { setKeepScreenOn: () => { throw new Error('bridge down'); } });
+    const throwing = mountHook(el, baseOpts());
+    act(() => { throwing.hook.result.current.start(); });
+    expect(throwing.hook.result.current.state).toBe('running');
+    throwing.hook.unmount();
+  });
+
+  it('uses requestAnimationFrame when the platform provides it', () => {
+    const raf = vi.fn((cb) => setTimeout(() => cb(Date.now()), 16));
+    const cancel = vi.fn((tok) => clearTimeout(tok));
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    expect(raf).toHaveBeenCalled();
+    hook.unmount();
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it('unmount removes listeners and destroys the controller', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts());
+    act(() => { hook.result.current.start(); });
+    expect(document.body.classList.contains('autoscroll-running')).toBe(true);
+    hook.unmount();
+    expect(document.body.classList.contains('autoscroll-running')).toBe(false);
+    // Listeners are gone: touches after unmount throw nothing and move nothing.
+    act(() => { el.dispatchEvent(new Event('touchstart')); });
+    act(() => { document.dispatchEvent(new Event('touchend')); });
+    timers(2000);
+  });
+
+  it('ends the page when auto-advance is off', () => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts({ autoNext: false }));
+    act(() => { hook.result.current.start(); });
+    timers(100);
+    expect(hook.result.current.state).toBe('ended');
+    expect(hook.result.current.pauseReason).toBe('end-of-page');
+    hook.unmount();
+  });
+
+  it.each([
+    ['no pager', null],
+    ['a pager with no peek', {}],
+    ['a peek that throws', { peek: () => { throw new Error('nope'); }, onNext: vi.fn() }],
+    ['a peek with no next page', { peek: () => null, onNext: vi.fn() }],
+  ])('ends at a boundary when there is %s', (_label, pager) => {
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    act(() => { hook.result.current.start(); });
+    timers(100);
+    expect(hook.result.current.state).toBe('ended');
+    expect(hook.result.current.pauseReason).toBe('boundary');
+    hook.unmount();
+  });
+
+  it('advances at the end of the page, and a dwell edit mid-countdown re-arms', () => {
+    const onNext = vi.fn();
+    const pager = makePager({ kind: 'screen', onNext });
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(hook);
+    const firstAdvanceAt = hook.result.current.advanceAt;
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ autoNext: true, pager, endDwellMs: 9000 }) });
+    });
+    expect(hook.result.current.advanceAt).toBeGreaterThan(firstAdvanceAt);
+    timers(5000);
+    expect(onNext).not.toHaveBeenCalled();
+    expect(hook.result.current.state).toBe('enddwell');
+    timers(4100);
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.state).not.toBe('ended');
+    hook.unmount();
+  });
+
+  it('carries a boundary run to the next screen, and only while fresh', () => {
+    const onNext = vi.fn();
+    const pager = makePager({ kind: 'boundary', onNext });
+    const el = makeScrollEl();
+    const first = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(first.hook);
+    // Stop just past the dwell: the advance fired, but the settle step (16ms
+    // later) has not — in the app the page turns here and this controller
+    // unmounts, so `carried` survives for the next screen.
+    timers(3900);
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(first.hook.result.current.state).toBe('advancing');
+    first.hook.unmount();
+    // Fresh hand-over (well inside CARRY_MS): the new screen resumes unprompted.
+    const second = mountHook(el, baseOpts({ autoNext: true, pager }));
+    timers(20);
+    expect(second.hook.result.current.state).toBe('running');
+    second.hook.unmount();
+    // Re-drive the first screen so `carried` is set again, then let it age.
+    const third = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(third.hook);
+    timers(3900);
+    expect(onNext).toHaveBeenCalledTimes(2);
+    expect(third.hook.result.current.state).toBe('advancing');
+    third.hook.unmount();
+    timers(3100);
+    const fourth = mountHook(el, baseOpts({ autoNext: true, pager }));
+    timers(100);
+    expect(fourth.hook.result.current.state).toBe('idle');
+    fourth.hook.unmount();
+  });
+
+  it('an advance with no pager at fire time turns nothing', () => {
+    const onNext = vi.fn();
+    const pager = makePager({ kind: 'screen', onNext });
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(hook);
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ autoNext: true, pager: null }) });
+    });
+    timers(4100);
+    expect(onNext).not.toHaveBeenCalled();
+    // The no-op advance still settles and runs again — and with the pager
+    // gone the second end is a boundary, not another dwell.
+    expect(hook.result.current.state).toBe('ended');
+    expect(hook.result.current.pauseReason).toBe('boundary');
+    hook.unmount();
+  });
+
+  it('an advance whose pager lost onNext at fire time turns nothing', () => {
+    const pager = makePager({ kind: 'screen', onNext: vi.fn() });
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(hook);
+    const noNext = { peek: pager.peek };
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ autoNext: true, pager: noNext }) });
+    });
+    timers(4100);
+    expect(pager.onNext).not.toHaveBeenCalled();
+    expect(hook.result.current.state).toBe('enddwell');
+    hook.unmount();
+  });
+
+  it('an advance whose peek went dead at fire time still turns the page but carries nothing', () => {
+    const onNext = vi.fn();
+    const pager = { peek: vi.fn(() => ({ kind: 'boundary' })), onNext };
+    const el = makeScrollEl();
+    const { hook, ref } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(hook);
+    const deadPeek = { peek: vi.fn(() => null), onNext };
+    act(() => {
+      hook.rerender({ r: ref, o: baseOpts({ autoNext: true, pager: deadPeek }) });
+    });
+    timers(4100);
+    expect(onNext).toHaveBeenCalledTimes(1);
+    hook.unmount();
+    // Nothing was carried: the next screen does not resume.
+    const next = mountHook(el, baseOpts({ autoNext: true, pager }));
+    timers(100);
+    expect(next.hook.result.current.state).toBe('idle');
+    next.hook.unmount();
+  });
+
+  it('a throwing advance is traced, and a missing log sink never wedges it', () => {
+    const error = vi.fn();
+    vi.stubGlobal('DiagnosticLog', { error });
+    const onNext = vi.fn(() => { throw new Error('boom'); });
+    const pager = makePager({ kind: 'screen', onNext });
+    const el = makeScrollEl();
+    const { hook } = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(hook);
+    timers(4100);
+    expect(hook.result.current.state).toBe('ended');
+    expect(hook.result.current.pauseReason).toBe('advance-failed');
+    expect(error).toHaveBeenCalledWith('autoscroll', expect.stringContaining('advance threw'));
+    hook.unmount();
+
+    // No error sink at all: the same failure still lands cleanly.
+    vi.stubGlobal('DiagnosticLog', {});
+    const second = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(second.hook);
+    timers(4100);
+    expect(second.hook.result.current.state).toBe('ended');
+    expect(second.hook.result.current.pauseReason).toBe('advance-failed');
+    second.hook.unmount();
+
+    // A throwing sink is swallowed too.
+    vi.stubGlobal('DiagnosticLog', { error: () => { throw new Error('log boom'); } });
+    const third = mountHook(el, baseOpts({ autoNext: true, pager }));
+    driveToDwell(third.hook);
+    timers(4100);
+    expect(third.hook.result.current.state).toBe('ended');
+    expect(third.hook.result.current.pauseReason).toBe('advance-failed');
+    third.hook.unmount();
   });
 });
