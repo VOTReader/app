@@ -95,9 +95,13 @@ class RssAndCommitReads(unittest.TestCase):
                          "the tree readers walk the live process table on Windows only")
     def test_the_tree_reads_at_least_the_process_itself(self):
         mine = os.getpid()
-        self.assertGreaterEqual(sup.tree_rss_gb(mine), sup.rss_gb(mine))
+        # Each reader samples this LIVE process at a different instant, and its working set and commit move
+        # between the two calls (28 KB once, landing 2026-11-24), so the two reads get 16 MB of slack: the
+        # tree must still hold the process itself, which is the claim; the exact sums are the fake-tree tests'.
+        slack = 1 / 64
+        self.assertGreaterEqual(sup.tree_rss_gb(mine) + slack, sup.rss_gb(mine))
         self.assertGreater(sup.tree_rss_gb(mine), 0.0)
-        self.assertGreaterEqual(sup.tree_commit_gb(mine), sup.commit_gb(mine))
+        self.assertGreaterEqual(sup.tree_commit_gb(mine) + slack, sup.commit_gb(mine))
         self.assertGreater(sup.tree_commit_gb(mine), 0.0)
 
 
