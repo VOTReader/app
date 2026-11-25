@@ -59,6 +59,8 @@ class ChildrenOfWalksTheTree(unittest.TestCase):
 class PidTreeReadsTheSystem(unittest.TestCase):
     """_pid_tree returns a pid -> [child pids] map; empty where ctypes is absent."""
 
+    @unittest.skipUnless(sys.platform == "win32",
+                         "align-supervisor.py reads the process table through the Windows API (ctypes.windll)")
     def test_it_returns_a_map(self):
         tree = sup._pid_tree()
         self.assertIsInstance(tree, dict)
@@ -78,6 +80,8 @@ class PidTreeReadsTheSystem(unittest.TestCase):
 class RssAndCommitReads(unittest.TestCase):
     """rss_gb / commit_gb / tree_*_gb: real numbers for live pids, 0.0 for dead ones."""
 
+    @unittest.skipUnless(sys.platform == "win32",
+                         "align-supervisor.py reads the process table through the Windows API (ctypes.windll)")
     def test_a_dead_pid_reads_zero(self):
         self.assertEqual(sup.rss_gb(DEAD_PID), 0.0)
         self.assertEqual(sup.commit_gb(DEAD_PID), 0.0)
