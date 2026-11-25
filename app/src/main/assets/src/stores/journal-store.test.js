@@ -27,13 +27,14 @@
 
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { JournalStore } from './journal-store.js';
+import { JournalStore, JournalNotebookStore } from './journal-store.js';
 import { AnnotationStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
 import { BookmarkStore } from './bookmark-store.js';
 import { LinkStore } from './link-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
+import { JournalHelpers } from '../data/journal-helpers.js';
 import { mergeListStore } from './store-merge.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
@@ -54,6 +55,7 @@ beforeEach(() => {
   LinkStore._resetForTests({ forceLoaded: true });
   JournalIndexStore._resetForTests({ forceLoaded: true });
   JournalStatsStore._resetForTests({ forceLoaded: true });
+  JournalNotebookStore._resetForTests({ forceLoaded: true });
 
   // journal-store.js uses bare-name lookups guarded by `typeof X !== 'undefined'`.
   // In production _entry-b.js populates these on window; in jsdom we have to
@@ -731,3 +733,431 @@ describe('JournalStore - a squiggle is counted as a squiggle (ds5 s35.1)', () =>
     expect(JournalStore.associatedDataSummary(j.id)).toBe('1 squiggle');
   });
 });
+/* ──────────────────────────────────────────────────────────────
+   tests-6 item 14a: JournalStore CRUD fallbacks + pins/notebook
+   toggles + media helpers + clear/replaceAll + JournalNotebookStore.
+   The cascade machinery (_scanAssociated / rekeyMarks / summary /
+   purge) is item 14b — this half is the store surface itself.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore - CRUD fallbacks (tests-6 item 14a)', () => {
+  it('all() sorts by updated, falling back to created, then 0', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'a', title: 'A', blocks: [], tags: [], notebookIds: [], pinned: false, updated: 5, created: 1 },
+      { id: 'b', title: 'B', blocks: [], tags: [], notebookIds: [], pinned: false, created: 9 },
+      { id: 'c', title: 'C', blocks: [], tags: [], notebookIds: [], pinned: false },
+    ] });
+    expect(JournalStore.all().map((e) => e.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('get() returns null for a falsy id and for a missing id', () => {
+    expect(JournalStore.get(null)).toBeNull();
+    expect(JournalStore.get('')).toBeNull();
+    expect(JournalStore.get(undefined)).toBeNull();
+    expect(JournalStore.get('j_nope')).toBeNull();
+  });
+
+  it('count()/all()/get() tolerate a cache with no list', () => {
+    JournalStore._cache = {};
+    expect(JournalStore.count()).toBe(0);
+    expect(JournalStore.all()).toEqual([]);
+    expect(JournalStore.get('x')).toBeNull();
+  });
+
+  it('add() honours a full seed and defaults the rest', () => {
+    const e = JournalStore.add({ id: 'j_fixed', title: 'T', mood: 'deep', tags: ['prayer'], notebookIds: ['n1'], pinned: true, created: 111, updated: 222, blocks: [{ id: 'b1', type: 'p', text: 'x' }] });
+    expect(e).toMatchObject({ id: 'j_fixed', title: 'T', mood: 'deep', tags: ['prayer'], notebookIds: ['n1'], pinned: true, created: 111, updated: 222 });
+    expect(e.blocks).toEqual([{ id: 'b1', type: 'p', text: 'x' }]);
+    expect(JournalStore.get('j_fixed')).not.toBeNull();
+  });
+
+  it('add() with no seed mints an id and default blocks', () => {
+    const e = JournalStore.add();
+    expect(e.id).toMatch(/^j_/);
+    expect(Array.isArray(e.blocks)).toBe(true);
+    expect(e.title).toBe('');
+    expect(e.mood).toBeNull();
+    expect(e.tags).toEqual([]);
+    expect(e.notebookIds).toEqual([]);
+    expect(e.pinned).toBe(false);
+    const e2 = JournalStore.add(null);
+    expect(e2.id).toMatch(/^j_/);
+  });
+
+  it('add() falls back on non-array tags/notebookIds/blocks', () => {
+    const e = JournalStore.add({ title: 'x', tags: 'nope', notebookIds: 'nope', blocks: 'nope' });
+    expect(e.tags).toEqual([]);
+    expect(e.notebookIds).toEqual([]);
+    expect(Array.isArray(e.blocks)).toBe(true);
+  });
+
+  it('add() mints ids for id-less blocks and keeps the rest as-is', () => {
+    const e = JournalStore.add({ title: 'x', blocks: [{ type: 'p', text: 'new' }, null, 'str', { id: 'kept', type: 'p' }] });
+    expect(e.blocks[0].id).toMatch(/^b_/);
+    expect(e.blocks[1]).toBeNull();
+    expect(e.blocks[2]).toBe('str');
+    expect(e.blocks[3].id).toBe('kept');
+  });
+
+  it('update() returns null for a falsy id, a missing patch, or an unknown id', () => {
+    const e = JournalStore.add({ title: 'x' });
+    expect(JournalStore.update(null, { title: 'y' })).toBeNull();
+    expect(JournalStore.update('', { title: 'y' })).toBeNull();
+    expect(JournalStore.update(e.id, null)).toBeNull();
+    expect(JournalStore.update(e.id, undefined)).toBeNull();
+    expect(JournalStore.update('j_nope', { title: 'y' })).toBeNull();
+  });
+
+  it('update() with keepDate moves the stamp 1 ms past the entry stamp', () => {
+    JournalStore.replaceAll({ list: [{ id: 'k', title: 'K', blocks: [], tags: [], notebookIds: [], pinned: false, created: 1000, updated: 1000 }] });
+    const out = JournalStore.update('k', { title: 'K2' }, { keepDate: true });
+    expect(out.updated).toBe(1001);
+    expect(out.title).toBe('K2');
+    const out2 = JournalStore.update('k', { title: 'K3' });
+    expect(out2.updated).toBeGreaterThan(1001);
+  });
+
+  it('update() with blocks reindexes; without blocks it does not', () => {
+    const spy = vi.spyOn(JournalIndexStore, 'rebuildForEntry');
+    const e = JournalStore.add({ title: 'x' });
+    spy.mockClear();
+    JournalStore.update(e.id, { title: 'y' });
+    expect(spy).not.toHaveBeenCalled();
+    JournalStore.update(e.id, { blocks: [{ id: 'b1', type: 'p', text: 'z' }] });
+    expect(spy).toHaveBeenCalledWith(e.id, expect.anything());
+    spy.mockRestore();
+  });
+});
+
+describe('JournalStore - pins and notebook toggles (tests-6 item 14a)', () => {
+  it('setPinned keeps the date (keepDate) and returns null for an unknown id', () => {
+    expect(JournalStore.setPinned('j_nope', true)).toBeNull();
+    JournalStore.replaceAll({ list: [{ id: 'p', title: 'P', blocks: [], tags: [], notebookIds: [], pinned: false, created: 500, updated: 500 }] });
+    const out = JournalStore.setPinned('p', true);
+    expect(out.pinned).toBe(true);
+    expect(out.updated).toBe(501);
+  });
+
+  it('togglePin flips and returns null for an unknown id', () => {
+    expect(JournalStore.togglePin('j_nope')).toBeNull();
+    const e = JournalStore.add({ title: 'x' });
+    expect(JournalStore.togglePin(e.id).pinned).toBe(true);
+    expect(JournalStore.togglePin(e.id).pinned).toBe(false);
+  });
+
+  it('toggleNotebook adds then removes a membership; guards falsy ids', () => {
+    expect(JournalStore.toggleNotebook('j_nope', 'n1')).toBeNull();
+    const e = JournalStore.add({ title: 'x' });
+    expect(JournalStore.toggleNotebook(e.id, '')).toBeNull();
+    expect(JournalStore.toggleNotebook(e.id)).toBeNull();
+    expect(JournalStore.toggleNotebook(e.id, 'n1').notebookIds).toEqual(['n1']);
+    expect(JournalStore.toggleNotebook(e.id, 'n2').notebookIds).toEqual(['n1', 'n2']);
+    expect(JournalStore.toggleNotebook(e.id, 'n1').notebookIds).toEqual(['n2']);
+  });
+
+  it('toggleNotebook tolerates an entry with no notebookIds field', () => {
+    JournalStore.replaceAll({ list: [{ id: 'm', title: 'M', blocks: [], tags: [], pinned: false, created: 1, updated: 1 }] });
+    expect(JournalStore.toggleNotebook('m', 'n9').notebookIds).toEqual(['n9']);
+  });
+});
+
+describe('JournalStore - pruneNotebook (tests-6 item 14a)', () => {
+  it('is a no-op for a falsy notebook id', () => {
+    const e = JournalStore.add({ title: 'x', notebookIds: ['n1'] });
+    JournalStore.pruneNotebook('');
+    JournalStore.pruneNotebook(null);
+    expect(JournalStore.get(e.id).notebookIds).toEqual(['n1']);
+  });
+
+  it('strips the id, bumps only changed entries, and skips entries without the field', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'a', title: 'A', blocks: [], tags: [], notebookIds: ['n1', 'n2'], pinned: false, created: 1, updated: 10 },
+      { id: 'b', title: 'B', blocks: [], tags: [], notebookIds: ['n2'], pinned: false, created: 1, updated: 20 },
+      { id: 'c', title: 'C', blocks: [], tags: [], pinned: false, created: 1, updated: 30 },
+      { id: 'd', title: 'D', blocks: [], tags: [], notebookIds: [], pinned: false, created: 1, updated: 40 },
+    ] });
+    const saveSpy = vi.spyOn(JournalStore, '_save');
+    JournalStore.pruneNotebook('n1');
+    expect(JournalStore.get('a').notebookIds).toEqual(['n2']);
+    expect(JournalStore.get('a').updated).toBe(11);
+    expect(JournalStore.get('b').notebookIds).toEqual(['n2']);
+    expect(JournalStore.get('b').updated).toBe(20);
+    expect(JournalStore.get('c').updated).toBe(30);
+    expect(saveSpy).toHaveBeenCalled();
+    saveSpy.mockClear();
+    JournalStore.pruneNotebook('nX');
+    expect(saveSpy).not.toHaveBeenCalled();
+    expect(JournalStore.get('a').updated).toBe(11);
+    saveSpy.mockRestore();
+  });
+});
+
+describe('JournalStore - media helpers (tests-6 item 14a)', () => {
+  const seed = () => JournalStore.replaceAll({ list: [
+    { id: 'a', title: 'A', blocks: [{ type: 'image', mediaId: 'm1' }, { type: 'audio', mediaId: 'm2' }, { type: 'image' }, { type: 'p', text: 'x', mediaId: 'mX' }], tags: [], notebookIds: [], pinned: false, created: 1, updated: 1 },
+    { id: 'b', title: 'B', blocks: [{ type: 'audio', mediaId: 'm1' }], tags: [], notebookIds: [], pinned: false, created: 1, updated: 1 },
+    { id: 'c', title: 'C', tags: [], notebookIds: [], pinned: false, created: 1, updated: 1 },
+  ] });
+
+  it('collectAllMediaIds returns every image/audio mediaId, in order', () => {
+    seed();
+    expect(JournalStore.collectAllMediaIds()).toEqual(['m1', 'm2', 'm1']);
+  });
+
+  it('isMediaReferencedElsewhere guards falsy ids and honours the exception', () => {
+    seed();
+    expect(JournalStore.isMediaReferencedElsewhere(null)).toBe(false);
+    expect(JournalStore.isMediaReferencedElsewhere('')).toBe(false);
+    expect(JournalStore.isMediaReferencedElsewhere('m_nope', 'a')).toBe(false);
+    expect(JournalStore.isMediaReferencedElsewhere('m1', 'a')).toBe(true);
+    expect(JournalStore.isMediaReferencedElsewhere('m2', 'a')).toBe(false);
+    expect(JournalStore.isMediaReferencedElsewhere('m1', 'b')).toBe(true);
+  });
+});
+
+describe('JournalStore - _reindex, clear, replaceAll (tests-6 item 14a)', () => {
+  it('_reindex never throws when the index rebuild fails', () => {
+    const spy = vi.spyOn(JournalHelpers, 'collectRefs').mockImplementation(() => { throw new Error('boom'); });
+    const e = JournalStore.add({ title: 'x' });
+    expect(JournalStore.get(e.id)).not.toBeNull();
+    spy.mockRestore();
+  });
+
+  it('clear() empties the journal', () => {
+    JournalStore.add({ title: 'one' });
+    JournalStore.add({ title: 'two' });
+    expect(JournalStore.count()).toBe(2);
+    JournalStore.clear();
+    expect(JournalStore.count()).toBe(0);
+    expect(JournalStore.all()).toEqual([]);
+  });
+
+  it('clear() while pending wipes the overlay immediately (clear is not a deferred op)', () => {
+    JournalStore._resetForTests();
+    expect(JournalStore.getState()).toBe('pending');
+    const e = JournalStore.add({ title: 'x' });
+    expect(JournalStore.get(e.id)).not.toBeNull();
+    JournalStore.clear();
+    expect(JournalStore.get(e.id)).toBeNull();
+    expect(JournalStore.count()).toBe(0);
+  });
+
+  it('replaceAll() tolerates null, non-object and list-less payloads', () => {
+    JournalStore.add({ title: 'x' });
+    JournalStore.replaceAll(null);
+    expect(JournalStore.count()).toBe(0);
+    JournalStore.replaceAll('nope');
+    expect(JournalStore.count()).toBe(0);
+    JournalStore.replaceAll({});
+    expect(JournalStore.count()).toBe(0);
+    JournalStore.replaceAll({ list: 'nope' });
+    expect(JournalStore.count()).toBe(0);
+    JournalStore.replaceAll({ list: [{ id: 'r1', title: 'R', blocks: [], tags: [], notebookIds: [], pinned: false, created: 1, updated: 1 }] });
+    expect(JournalStore.count()).toBe(1);
+    expect(JournalStore.get('r1').title).toBe('R');
+  });
+});
+
+describe('JournalStore - remove() options and purgeOrphanMarks (tests-6 item 14a)', () => {
+  it('remove(id, { skipStats: true }) skips the stats decrement', () => {
+    const spy = vi.spyOn(JournalStatsStore, 'recordDeletion');
+    const e = JournalStore.add({ title: 'x' });
+    spy.mockClear();
+    JournalStore.remove(e.id, { skipStats: true });
+    expect(spy).not.toHaveBeenCalled();
+    const e2 = JournalStore.add({ title: 'y' });
+    spy.mockClear();
+    JournalStore.remove(e2.id);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('remove(id, { keepMarks: true }) leaves the marks until purgeOrphanMarks', () => {
+    const e = JournalStore.add({ title: 'x' });
+    AnnotationStore.add('journal:' + e.id + ':0', { id: 'hl_k', start: 0, end: 5, kind: 'highlight', color: 'yellow' });
+    JournalStore.remove(e.id, { keepMarks: true });
+    expect(JournalStore.get(e.id)).toBeNull();
+    expect(AnnotationStore.get('journal:' + e.id + ':0')).toHaveLength(1);
+    JournalStore.purgeOrphanMarks(e.id);
+    expect(AnnotationStore.get('journal:' + e.id + ':0')).toEqual([]);
+  });
+
+  it('purgeOrphanMarks is a no-op for a falsy id or an entry that is back', () => {
+    expect(() => JournalStore.purgeOrphanMarks('')).not.toThrow();
+    expect(() => JournalStore.purgeOrphanMarks(null)).not.toThrow();
+    const e = JournalStore.add({ title: 'x' });
+    AnnotationStore.add('journal:' + e.id + ':0', { id: 'hl_b', start: 0, end: 5, kind: 'highlight', color: 'yellow' });
+    JournalStore.purgeOrphanMarks(e.id);
+    expect(AnnotationStore.get('journal:' + e.id + ':0')).toHaveLength(1);
+    expect(JournalStore.get(e.id)).not.toBeNull();
+  });
+
+  it('purgeOrphanMarks on an unknown id scans and purges nothing', () => {
+    expect(() => JournalStore.purgeOrphanMarks('j_nope')).not.toThrow();
+  });
+});
+
+describe('JournalNotebookStore (tests-6 item 14a)', () => {
+  it('list() sorts by sortIndex, then created', () => {
+    JournalNotebookStore.replaceAll({ list: [
+      { id: 'n1', name: 'B', sortIndex: 1, created: 5, updated: 5 },
+      { id: 'n2', name: 'A', sortIndex: 1, created: 2, updated: 2 },
+      { id: 'n3', name: 'C', created: 9, updated: 9 },
+      { id: 'n4', name: 'D', updated: 9 },
+    ] });
+    expect(JournalNotebookStore.list().map((n) => n.id)).toEqual(['n4', 'n3', 'n2', 'n1']);
+  });
+
+  it('get() returns null for an unknown id', () => {
+    expect(JournalNotebookStore.get('nb_nope')).toBeNull();
+  });
+
+  it('add() rejects blank names and numbers notebooks by position', () => {
+    JournalNotebookStore.replaceAll({ list: [] });
+    expect(JournalNotebookStore.add('')).toBeNull();
+    expect(JournalNotebookStore.add(null)).toBeNull();
+    expect(JournalNotebookStore.add('   ')).toBeNull();
+    const a = JournalNotebookStore.add('  Work  ');
+    expect(a.name).toBe('Work');
+    expect(a.id).toMatch(/^jnb_/);
+    expect(a.sortIndex).toBe(0);
+    const b = JournalNotebookStore.add('Home');
+    expect(b.sortIndex).toBe(1);
+  });
+
+  it('rename() ignores blank names and unknown ids, and renames in place', () => {
+    JournalNotebookStore.replaceAll({ list: [] });
+    const nb = JournalNotebookStore.add('Old');
+    JournalNotebookStore.rename(nb.id, '');
+    JournalNotebookStore.rename(nb.id, '   ');
+    JournalNotebookStore.rename(nb.id, null);
+    expect(JournalNotebookStore.get(nb.id).name).toBe('Old');
+    JournalNotebookStore.rename('nb_nope', 'New');
+    expect(JournalNotebookStore.list()).toHaveLength(1);
+    const before = JournalNotebookStore.get(nb.id).updated;
+    JournalNotebookStore.rename(nb.id, 'New');
+    expect(JournalNotebookStore.get(nb.id).name).toBe('New');
+    expect(JournalNotebookStore.get(nb.id).updated).toBeGreaterThanOrEqual(before);
+  });
+
+  it('remove() deletes the notebook and prunes it from entries', () => {
+    JournalNotebookStore.replaceAll({ list: [] });
+    const nb = JournalNotebookStore.add('Gone');
+    const e = JournalStore.add({ title: 'x', notebookIds: [nb.id, 'keep'] });
+    JournalNotebookStore.remove(nb.id);
+    expect(JournalNotebookStore.get(nb.id)).toBeNull();
+    expect(JournalStore.get(e.id).notebookIds).toEqual(['keep']);
+  });
+
+  it('replaceAll() tolerates null, non-object and list-less payloads', () => {
+    JournalNotebookStore.add('x');
+    JournalNotebookStore.replaceAll(null);
+    expect(JournalNotebookStore.list()).toEqual([]);
+    JournalNotebookStore.replaceAll('nope');
+    expect(JournalNotebookStore.list()).toEqual([]);
+    JournalNotebookStore.replaceAll({});
+    expect(JournalNotebookStore.list()).toEqual([]);
+    JournalNotebookStore.replaceAll({ list: 'nope' });
+    expect(JournalNotebookStore.list()).toEqual([]);
+    JournalNotebookStore.replaceAll({ list: [{ id: 'r1', name: 'R', sortIndex: 0, created: 1, updated: 1 }] });
+    expect(JournalNotebookStore.list()).toHaveLength(1);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────
+   tests-6 item 14a, round 2: the cheap stragglers the first pass
+   left — sort-comparator falsy sides, keepDate/prune stamp
+   fallbacks, _cache-with-no-list reads, and the pending-state
+   _shouldDefer sides. The scan/rekey/summary/purge internals
+   (journal-store.js:299-348, 391-419, 480-484, 498-535) stay 14b.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore - 14a stragglers', () => {
+  it('all() covers the both-missing sort side with a two-entry list', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'c', title: 'C', blocks: [], tags: [], notebookIds: [], pinned: false, created: 3, updated: 3 },
+      { id: 'n', title: 'N', blocks: [], tags: [], notebookIds: [], pinned: false },
+    ] });
+    expect(JournalStore.all().map((e) => e.id)).toEqual(['c', 'n']);
+  });
+
+  it('all() covers the first-operand sort side with the neither-entry first', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'n', title: 'N', blocks: [], tags: [], notebookIds: [], pinned: false },
+      { id: 'c', title: 'C', blocks: [], tags: [], notebookIds: [], pinned: false, created: 3, updated: 3 },
+    ] });
+    expect(JournalStore.all().map((e) => e.id)).toEqual(['c', 'n']);
+  });
+
+  it('keepDate stamps from created, then 0, when updated is missing', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'k1', title: 'K1', blocks: [], tags: [], notebookIds: [], pinned: false, created: 50 },
+      { id: 'k2', title: 'K2', blocks: [], tags: [], notebookIds: [], pinned: false },
+    ] });
+    expect(JournalStore.setPinned('k1', true).updated).toBe(51);
+    expect(JournalStore.setPinned('k2', true).updated).toBe(1);
+  });
+
+  it('pruneNotebook bumps from created, then 0, when updated is missing', () => {
+    JournalStore.replaceAll({ list: [
+      { id: 'a', title: 'A', blocks: [], tags: [], notebookIds: ['n1'], pinned: false, created: 7 },
+      { id: 'b', title: 'B', blocks: [], tags: [], notebookIds: ['n1'], pinned: false },
+    ] });
+    JournalStore.pruneNotebook('n1');
+    expect(JournalStore.get('a').updated).toBe(8);
+    expect(JournalStore.get('b').updated).toBe(1);
+  });
+
+  it('reads tolerate a cache with no list', () => {
+    JournalStore._cache = {};
+    expect(JournalStore.collectAllMediaIds()).toEqual([]);
+    expect(JournalStore.isMediaReferencedElsewhere('m', 'x')).toBe(false);
+    expect(() => JournalStore.pruneNotebook('n')).not.toThrow();
+    JournalNotebookStore._cache = {};
+    expect(JournalNotebookStore.list()).toEqual([]);
+    expect(JournalNotebookStore.get('x')).toBeNull();
+    expect(() => JournalNotebookStore.rename('x', 'y')).not.toThrow();
+    expect(() => JournalNotebookStore.remove('x')).not.toThrow();
+    const nb = JournalNotebookStore.add('Fresh');
+    expect(nb).not.toBeNull();
+    expect(nb.sortIndex).toBe(0);
+  });
+
+  it('notebook list() covers the missing-created sort side with two entries', () => {
+    JournalNotebookStore.replaceAll({ list: [
+      { id: 'a', name: 'A', sortIndex: 0, created: 5, updated: 5 },
+      { id: 'b', name: 'B', sortIndex: 0, updated: 5 },
+    ] });
+    expect(JournalNotebookStore.list().map((n) => n.id)).toEqual(['b', 'a']);
+  });
+
+  it('notebook list() covers the first-operand sort side with the dateless notebook first', () => {
+    JournalNotebookStore.replaceAll({ list: [
+      { id: 'b', name: 'B', sortIndex: 0, updated: 5 },
+      { id: 'a', name: 'A', sortIndex: 0, created: 5, updated: 5 },
+    ] });
+    expect(JournalNotebookStore.list().map((n) => n.id)).toEqual(['b', 'a']);
+  });
+
+  it('pending-state calls reach the _shouldDefer sides', () => {
+    JournalStore._resetForTests();
+    expect(JournalStore.getState()).toBe('pending');
+    expect(() => JournalStore.pruneNotebook('n')).not.toThrow();
+    expect(() => JournalStore.replaceAll({ list: [] })).not.toThrow();
+    expect(() => JournalStore.purgeOrphanMarks('x')).not.toThrow();
+    JournalNotebookStore._resetForTests();
+    expect(JournalNotebookStore.getState()).toBe('pending');
+    JournalNotebookStore.add('x');
+    JournalNotebookStore.rename('x', 'y');
+    JournalNotebookStore.remove('x');
+    JournalNotebookStore.replaceAll(null);
+  });
+
+  it('purgeBlockMarks guards falsy ids and a missing entry, and skips the purge at zero marks', () => {
+    expect(JournalStore.purgeBlockMarks('', 'b_a')).toBe(0);
+    expect(JournalStore.purgeBlockMarks('j_x', '')).toBe(0);
+    expect(JournalStore.purgeBlockMarks('j_nope', 'b_a')).toBe(0);
+    const j = JournalStore.add({ title: 'E', blocks: [{ id: 'b_a', type: 'p', text: 'one' }, { id: 'b_b', type: 'p', text: 'two' }] });
+    JournalStore.update(j.id, { blocks: [{ id: 'b_b', type: 'p', text: 'two' }] });
+    expect(JournalStore.purgeBlockMarks(j.id, 'b_a')).toBe(0);
+  });
+});
+
