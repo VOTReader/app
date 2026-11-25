@@ -18,6 +18,7 @@ const B1 = 'bbbbbbbbbbb1';
 
 let SongKeep;
 let Songs;
+let formatSongBytes;
 
 /** An in-memory offline-songs store with the real one's API. */
 function fakeStore() {
@@ -62,7 +63,9 @@ let persist;
 
 async function load() {
   vi.resetModules();
-  SongKeep = (await import('./song-keep.js')).SongKeep;
+  const m = await import('./song-keep.js');
+  SongKeep = m.SongKeep;
+  formatSongBytes = m.formatSongBytes;
   Songs = await import('./song-catalog.js');
   Songs.adoptSongCatalog(SONG_FIXTURE);
 }
@@ -527,5 +530,321 @@ describe('song-keep on the web — Download only on Wi-Fi (ra6)', () => {
     conn.move('wifi');
     await new Promise((r) => setTimeout(r, 20));
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+/* votreader-tests-7 item 4: the edges the first suites did not reach — sizes in
+   words, refusals, bad input, a store that fails, and the phone's own edges. */
+describe('song-keep — the edges: sizes, refusals and bad input', () => {
+  const A3 = 'aaaaaaaaaaa3';   // hidden duplicate in the fixture
+  const D1 = 'ddddddddddd1';   // no shard in the fixture
+  const E1 = 'eeeeeeeeeee1';   // a well-formed id the catalog does not know
+
+  it('formatSongBytes: 0 MB for nothing, GB at a billion, one decimal under 10 MB, whole above', () => {
+    expect(formatSongBytes(0)).toBe('0 MB');
+    expect(formatSongBytes(-5)).toBe('0 MB');
+    expect(formatSongBytes(NaN)).toBe('0 MB');
+    expect(formatSongBytes(1e9)).toBe('1 GB');
+    expect(formatSongBytes(3.8e9)).toBe('3.8 GB');
+    expect(formatSongBytes(1e6)).toBe('1 MB');
+    expect(formatSongBytes(3_400_000)).toBe('3.4 MB');
+    expect(formatSongBytes(10.4e6)).toBe('10 MB');
+    expect(formatSongBytes(64e6)).toBe('64 MB');
+  });
+
+  it('bad ids are not kept, have no status and no object URL', () => {
+    expect(SongKeep.isKept('x')).toBe(false);
+    expect(SongKeep.isKept(null)).toBe(false);
+    expect(SongKeep.isKept(42)).toBe(false);
+    expect(SongKeep.statusOf('')).toBe('none');
+    expect(SongKeep.statusOf(undefined)).toBe('none');
+    expect(SongKeep.objectUrlFor('x')).toBe('');
+    expect(SongKeep.objectUrlFor(null)).toBe('');
+  });
+
+  it('keep of nothing keepable starts nothing and says nothing', async () => {
+    const res = await SongKeep.keep([E1, A3, D1, 'bad'], 'k');
+    expect(res).toEqual({ ok: true, text: '' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keep with no list at all starts nothing', async () => {
+    expect(await SongKeep.keep(null)).toEqual({ ok: true, text: '' });
+    expect(await SongKeep.keep('nope')).toEqual({ ok: true, text: '' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a duplicate id in one keep is fetched once', async () => {
+    await SongKeep.keep([A1, A1, A1]);
+    await settled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(SongKeep.isKept(A1)).toBe(true);
+  });
+
+  it('a browser without the store cannot keep songs, and says so', async () => {
+    delete globalThis.OfflineSongsStore;
+    expect(SongKeep.availability()).toBe('none');
+    const res = await SongKeep.keep([A1], 'k');
+    expect(res.text).toBe('This browser cannot keep songs.');
+    expect(SongKeep.noteFor('k')).toBe('This browser cannot keep songs.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a browser without crypto.subtle cannot keep songs', async () => {
+    vi.stubGlobal('crypto', {});
+    try {
+      expect(SongKeep.availability()).toBe('none');
+      const res = await SongKeep.keep([A1], 'k');
+      expect(res.text).toBe('This browser cannot keep songs.');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('an installed app (standalone display) may keep songs even on iOS', () => {
+    const orig = window.matchMedia;
+    Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: false });
+    window.matchMedia = vi.fn(() => ({ matches: true, media: '(display-mode: standalone)', addEventListener() {}, removeEventListener() {} }));
+    try {
+      expect(SongKeep.availability()).toBe('ok');
+    } finally {
+      window.matchMedia = orig;
+    }
+  });
+
+  it('the stored list may hold junk: bad records are skipped', async () => {
+    store.all = vi.fn(async () => [null, { id: 'bad' }, { id: A1, blob: new Blob([bytes(1000)]), bytes: 1000, keptAt: 1 }]);
+    await SongKeep.ready();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    expect(SongKeep.keptIds()).toEqual([A1]);
+  });
+
+  it('a stored list that is not a list reads as empty, not an error', async () => {
+    store.all = vi.fn(async () => 'junk');
+    await SongKeep.ready();
+    expect(SongKeep.keptIds()).toEqual([]);
+  });
+
+  it('a store with no all() leaves the kept list empty, not an error', async () => {
+    globalThis.OfflineSongsStore = { get: async () => null, put: async () => {}, delete: async () => {} };
+    await SongKeep.ready();
+    expect(SongKeep.isKept(A1)).toBe(false);
+    expect(SongKeep.keptIds()).toEqual([]);
+  });
+
+  it('a download the server refuses is a network failure, not kept', async () => {
+    fetchMock.mockImplementation(async () => ({ ok: false, arrayBuffer: async () => bytes(1000).buffer }));
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(false);
+    expect(SongKeep.statusOf(A1)).toBe('failed');
+    expect(store.map.has(A1)).toBe(false);
+  });
+
+  it('a full store fails the keep and stores nothing', async () => {
+    const e = new Error('full');
+    e.name = 'QuotaExceededError';
+    store.put = vi.fn(async () => { throw e; });
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.statusOf(A1)).toBe('failed');
+    expect(SongKeep.isKept(A1)).toBe(false);
+    expect(store.map.has(A1)).toBe(false);
+  });
+
+  it('a store that fails otherwise fails the keep and stores nothing', async () => {
+    store.put = vi.fn(async () => { throw new Error('disk gone'); });
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.statusOf(A1)).toBe('failed');
+    expect(SongKeep.isKept(A1)).toBe(false);
+  });
+
+  it('a read-back that never matches fails after the second try, nothing left stored', async () => {
+    store.corruptNextGet = 5;
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(SongKeep.statusOf(A1)).toBe('failed');
+    expect(store.map.has(A1)).toBe(false);
+    expect(lib.kept).toEqual([]);
+  });
+
+  it('keeping works with no library bridge: kept, just not listed', async () => {
+    delete globalThis.AudioLibraryStore;
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    await SongKeep.remove([A1]);
+    expect(SongKeep.isKept(A1)).toBe(false);
+  });
+
+  it('the first keep without storage.persist still keeps', async () => {
+    Object.defineProperty(window.navigator, 'storage', { configurable: true, value: { estimate } });
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('bytesOf: the catalog size wins; a kept song the catalog dropped counts its own bytes; unknown counts 0', async () => {
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.bytesOf([A1])).toBe(1000);
+    Songs.adoptSongCatalog({ ...SONG_FIXTURE, songs: SONG_FIXTURE.songs.map((s) => ({ ...s, b: s.id === A1 ? 0 : 1000 })) });
+    expect(SongKeep.bytesOf([A1])).toBe(1000);   // its own stored bytes, the catalog no longer states a size
+    expect(SongKeep.bytesOf([E1])).toBe(0);
+    expect(SongKeep.bytesOf([])).toBe(0);
+  });
+
+  it('progressOf of no list is all zeros', () => {
+    const zero = { total: 0, kept: 0, busy: 0, failed: 0, bytes: 0, needBytes: 0 };
+    expect(SongKeep.progressOf(null)).toEqual(zero);
+    expect(SongKeep.progressOf('x')).toEqual(zero);
+    expect(SongKeep.progressOf([A1, A1, 'bad'])).toMatchObject({ total: 1 });
+  });
+
+  it('cancel and remove of no list do nothing', async () => {
+    await SongKeep.keep([A1]);
+    await settled();
+    SongKeep.cancel(null);
+    await SongKeep.remove(null);
+    await SongKeep.remove([]);
+    await SongKeep.remove(['bad']);
+    expect(SongKeep.isKept(A1)).toBe(true);
+  });
+
+  it('clearNote: a shown note clears with a notify; clearing nothing notifies nobody', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    await SongKeep.keep([A1], 'k');
+    expect(SongKeep.noteFor('k')).toBe('Keeping songs needs a connection.');
+    let notes = 0;
+    SongKeep.subscribe(() => { notes++; });
+    SongKeep.clearNote('k');
+    expect(SongKeep.noteFor('k')).toBe('');
+    expect(notes).toBe(1);
+    SongKeep.clearNote('k');
+    SongKeep.clearNote('never');
+    expect(notes).toBe(1);
+  });
+
+  it('releaseObjectUrl with nothing live is a no-op', () => {
+    expect(() => SongKeep.releaseObjectUrl()).not.toThrow();
+  });
+
+  it('missing() before the stored list loads is empty, then names what is gone; without a library it is empty', async () => {
+    lib.kept = [A1];
+    expect(SongKeep.missing()).toEqual([]);   // not loaded yet: it asks, and answers nothing
+    await SongKeep.ready();
+    expect(SongKeep.missing()).toEqual([A1]);
+    delete globalThis.AudioLibraryStore;
+    expect(SongKeep.missing()).toEqual([]);
+  });
+
+  it('objectUrlFor without createObjectURL is empty even for a kept song', async () => {
+    await SongKeep.keep([A1]);
+    await settled();
+    const orig = URL.createObjectURL;
+    URL.createObjectURL = undefined;
+    try {
+      expect(SongKeep.objectUrlFor(A1)).toBe('');
+    } finally {
+      URL.createObjectURL = orig;
+    }
+  });
+
+  it('_reset empties everything after a keep', async () => {
+    await SongKeep.keep([A1]);
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    SongKeep._reset();
+    expect(SongKeep.keptIds()).toEqual([]);
+    expect(SongKeep.isKept(A1)).toBe(false);
+    expect(SongKeep.waiting()).toBe(false);
+  });
+});
+
+describe('song-keep in the phone app — the edges', () => {
+  const E1 = 'eeeeeeeeeee1';
+  let native;
+  function bridge() {
+    native = { items: [], freeBytes: 5e9, queued: [], active: null };
+    const b = {
+      offlineAudioState: vi.fn(() => JSON.stringify({
+        items: native.items, totalBytes: native.items.reduce((n, i) => n + i.bytes, 0), freeBytes: native.freeBytes,
+        active: native.active, queued: native.queued,
+      })),
+      offlineAudioSave: vi.fn(),
+      offlineAudioRemove: vi.fn(),
+      offlineAudioCancel: vi.fn(),
+      offlineAudioSizes: vi.fn(),
+    };
+    window.AndroidBridge = b;
+    return b;
+  }
+  const send = (o) => window.__votOfflineAudio(JSON.stringify(o));
+
+  it('statusOf a song the catalog does not know is none; waiting asks the phone', async () => {
+    bridge();
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    expect(SongKeep.statusOf(E1)).toBe('none');
+    expect(SongKeep.waiting()).toBe(false);
+  });
+
+  it('cancel of a song not on its way calls no cancel on the phone', async () => {
+    const b = bridge();
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    SongKeep.cancel([A1]);
+    expect(b.offlineAudioCancel).not.toHaveBeenCalled();
+    SongKeep.cancel(null);
+    expect(b.offlineAudioCancel).not.toHaveBeenCalled();
+  });
+
+  it('remove of a song the phone does not hold removes nothing there', async () => {
+    const b = bridge();
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    await SongKeep.remove([A1]);
+    expect(b.offlineAudioRemove).not.toHaveBeenCalled();
+  });
+
+  it('the phone saying it cannot measure free room does not block a keep', async () => {
+    const b = bridge();
+    native.freeBytes = -1;
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    const res = await SongKeep.keep([A1], 'k');
+    expect(res).toEqual({ ok: true, text: '' });
+    expect(b.offlineAudioSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('bytesOf counts the phone bytes for a song the catalog dropped', async () => {
+    bridge();
+    await load();
+    Songs.adoptSongCatalog({ ...SONG_FIXTURE, songs: SONG_FIXTURE.songs.map((s) => ({ ...s, b: s.id === A1 ? 0 : 1000 })) });
+    native.items = [{ url: SONG_URL(1, A1), key: 'song:' + A1, title: 't', bytes: 1000, savedAt: 5 }];
+    send({ type: 'done', url: SONG_URL(1, A1), bytes: 1000 });
+    expect(SongKeep.bytesOf([A1])).toBe(1000);
+  });
+
+  it('a second wrong size is a failure, not a third try', async () => {
+    const b = bridge();
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    SongKeep.subscribe(() => {});
+    native.items = [{ url: SONG_URL(1, A1), key: 'song:' + A1, title: 't', bytes: 777, savedAt: 5 }];
+    send({ type: 'done', url: SONG_URL(1, A1), bytes: 777 });
+    native.items = [];
+    send({ type: 'removed', urls: [SONG_URL(1, A1)] });
+    expect(b.offlineAudioSave).toHaveBeenCalledTimes(1);   // fetched once more
+    native.items = [{ url: SONG_URL(1, A1), key: 'song:' + A1, title: 't', bytes: 888, savedAt: 6 }];
+    send({ type: 'done', url: SONG_URL(1, A1), bytes: 888 });
+    expect(b.offlineAudioSave).toHaveBeenCalledTimes(1);   // no third try
+    native.items = [];   // the phone takes the wrong-sized copy off, as it was told
+    send({ type: 'removed', urls: [SONG_URL(1, A1)] });
+    expect(SongKeep.statusOf(A1)).toBe('failed');
+    expect(lib.kept).toEqual([]);
   });
 });
