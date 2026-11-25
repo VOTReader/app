@@ -1711,3 +1711,693 @@ describe('PlatformBridge — Web pickImportFile (DOM input fallback)', () => {
     await expect(p).resolves.toBeNull();
   });
 });
+
+
+// ─────────────────────────────────────────────────────────────────────
+// tests-6 item 12 — platform-bridge branch gaps (74.13% -> >=80%)
+// ─────────────────────────────────────────────────────────────────────
+// Baseline re-checked at claim-time base: 74.13% branch (192/259), 139
+// tests passing. Target >=80% (208/259). The gaps cluster in the
+// error/fallback sides: message-less errors (`|| e`), console-absent
+// guards, promise-less fullscreen returns, wake-lock release races,
+// FileReader edges, the v3 picker rejection paths, and the recording
+// throw paths. The three escape-won races (602:1, 619-inner:1, 620:1)
+// are NOT covered here — they need the slow-offer timer to win first;
+// recorded as the known gap in LOG.md.
+describe('PlatformBridge — tests-6 item 12 branch gaps', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let warnSpy;
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const W = () => /** @type {any} */ (globalThis.window);
+
+  async function loadWeb() {
+    delete W().AndroidBridge;
+    bridge = await importBridge();
+    return bridge;
+  }
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    const w = W();
+    delete w.AndroidBridge;
+    delete w.showSaveFilePicker;
+    delete w.showOpenFilePicker;
+    delete w.__onImportFile;
+    delete w.__onExportComplete;
+    delete w.__onMicPermissionResult;
+    delete w.__onNativeRecordingComplete;
+    delete w.AudioContext;
+    delete w.webkitAudioContext;
+    delete /** @type {any} */ (globalThis).MediaRecorder;
+    delete /** @type {any} */ (globalThis.navigator).wakeLock;
+    delete /** @type {any} */ (globalThis.navigator).mediaDevices;
+    delete /** @type {any} */ (document).visibilityState;
+    delete /** @type {any} */ (document.documentElement).requestFullscreen;
+    delete /** @type {any} */ (document).exitFullscreen;
+    delete /** @type {any} */ (document).fullscreenElement;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  // ── getCrashLog merge (Android) ──
+
+  it('android: an empty native log string takes the || [] side (no throw, JS-only)', async () => {
+    W().AndroidBridge = { getCrashLog: () => '' };
+    bridge = await importBridge();
+    expect(JSON.parse(bridge.getCrashLog())).toEqual([]);
+  });
+
+  it('android: native entries without t sort as 0 (both || 0 sides)', async () => {
+    W().AndroidBridge = {
+      getCrashLog: () => JSON.stringify([
+        { t: 9, lvl: 'I', tag: 'n', msg: 'late' },
+        { lvl: 'W', tag: 'n', msg: 'notime' },
+        { t: 5, lvl: 'I', tag: 'n', msg: 'early' },
+      ]),
+    };
+    bridge = await importBridge();
+    const merged = JSON.parse(bridge.getCrashLog());
+    expect(merged.map((/** @type {any} */ e) => e.msg)).toEqual(['notime', 'early', 'late']);
+  });
+
+  // ── haptic NYI guard ──
+
+  it('haptic() with console.warn absent is a silent no-op (no throw)', async () => {
+    await loadWeb();
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      expect(() => bridge.haptic(1)).not.toThrow();
+    } finally {
+      console.warn = origWarn;
+    }
+  });
+
+  // ── WakeLock ──
+
+  function setupWakeLock() {
+    const mockRelease = vi.fn(() => Promise.resolve());
+    const mockSentinel = { released: false, release: mockRelease };
+    const mockRequest = vi.fn(() => Promise.resolve(mockSentinel));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    return { mockRelease, mockSentinel, mockRequest };
+  }
+
+  it('a WakeLock failure without .message reports String(e) (the || String(e) side)', async () => {
+    const mockRequest = vi.fn(() => Promise.reject('wake denied'));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    await loadWeb();
+    bridge.setKeepScreenOn(true);
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('wake denied');
+  });
+
+  it('a WakeLock failure with console.warn absent still records it (no throw)', async () => {
+    const mockRequest = vi.fn(() => Promise.reject(new Error('wake boom')));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    await loadWeb();
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      bridge.setKeepScreenOn(true);
+      await flush();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lock arriving after off whose release() returns no promise is released, not awaited', async () => {
+    /** @type {(value: any) => void} */ let resolveFn = () => {};
+    const mockRelease = vi.fn(() => undefined);
+    const mockSentinel = { released: false, release: mockRelease };
+    const mockRequest = vi.fn(() => new Promise((resolve) => { resolveFn = resolve; }));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    await loadWeb();
+    bridge.setKeepScreenOn(true);
+    bridge.setKeepScreenOn(false);
+    resolveFn(mockSentinel);
+    await flush();
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it("a stale sentinel's release event is a no-op once a newer lock holds the slot", async () => {
+    /** @type {any} */ let releaseHandler = null;
+    const mockRelease = vi.fn(() => Promise.resolve());
+    const mockSentinel = {
+      released: false,
+      release: mockRelease,
+      addEventListener: vi.fn((/** @type {string} */ type, /** @type {any} */ fn) => { if (type === 'release') releaseHandler = fn; }),
+    };
+    const mockRequest = vi.fn(() => Promise.resolve(mockSentinel));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    await loadWeb();
+    bridge.setKeepScreenOn(true);
+    await flush();
+    expect(typeof releaseHandler).toBe('function');
+    bridge.setKeepScreenOn(false);
+    await flush();
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+    releaseHandler();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('a visibilitychange with navigator.wakeLock gone does not re-request', async () => {
+    const { mockRequest } = setupWakeLock();
+    await loadWeb();
+    bridge.setKeepScreenOn(true);
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    delete /** @type {any} */ (globalThis.navigator).wakeLock;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('turning Keep screen on off releases a sentinel whose release() returns no promise', async () => {
+    const { mockRelease } = setupWakeLock();
+    await loadWeb();
+    bridge.setKeepScreenOn(true);
+    await flush();
+    mockRelease.mockReturnValue(undefined);
+    bridge.setKeepScreenOn(false);
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  // ── setImmersiveMode (Fullscreen API) ──
+
+  function setupFullscreen() {
+    const mockRequestFullscreen = vi.fn(() => Promise.resolve());
+    const mockExitFullscreen = vi.fn(() => Promise.resolve());
+    /** @type {any} */ (document.documentElement).requestFullscreen = mockRequestFullscreen;
+    /** @type {any} */ (document).exitFullscreen = mockExitFullscreen;
+    /** @type {any} */ (document).fullscreenElement = null;
+    return { mockRequestFullscreen, mockExitFullscreen };
+  }
+
+  it('navigator absent takes the null side of _mayRequestFullscreen and still asks', async () => {
+    const { mockRequestFullscreen } = setupFullscreen();
+    await loadWeb();
+    vi.stubGlobal('navigator', undefined);
+    try {
+      bridge.setImmersiveMode(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(mockRequestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('requestFullscreen returning no promise is a silent no-op (no .catch)', async () => {
+    const { mockRequestFullscreen } = setupFullscreen();
+    await loadWeb();
+    mockRequestFullscreen.mockReturnValue(undefined);
+    expect(() => bridge.setImmersiveMode(true)).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a message-less requestFullscreen rejection warns with the rejection itself (the || e side)', async () => {
+    const { mockRequestFullscreen } = setupFullscreen();
+    await loadWeb();
+    mockRequestFullscreen.mockImplementation(() => Promise.reject('plain-string'));
+    bridge.setImmersiveMode(true);
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('plain-string');
+  });
+
+  it('a requestFullscreen rejection with console.warn absent is swallowed silently', async () => {
+    const { mockRequestFullscreen } = setupFullscreen();
+    await loadWeb();
+    mockRequestFullscreen.mockImplementation(() => Promise.reject(new Error('blocked')));
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      bridge.setImmersiveMode(true);
+      await flush();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(mockRequestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('exitFullscreen returning no promise is a silent no-op (no .catch)', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockReturnValue(undefined);
+    expect(() => bridge.setImmersiveMode(false)).not.toThrow();
+    expect(mockExitFullscreen).toHaveBeenCalledTimes(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a rejecting exitFullscreen warns with the Error message', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => Promise.reject(new Error('exit blocked')));
+    bridge.setImmersiveMode(false);
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('exit blocked');
+  });
+
+  it('a message-less exitFullscreen rejection warns with the rejection itself', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => Promise.reject('exit string'));
+    bridge.setImmersiveMode(false);
+    await flush();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('exit string');
+  });
+
+  it('an exitFullscreen rejection with console.warn absent is swallowed silently', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => Promise.reject(new Error('exit blocked')));
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      bridge.setImmersiveMode(false);
+      await flush();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(mockExitFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('a synchronously throwing exitFullscreen warns with the Error message (outer catch)', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => { throw new Error('sync boom'); });
+    expect(() => bridge.setImmersiveMode(false)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('sync boom');
+  });
+
+  it('a message-less synchronous exitFullscreen throw warns with the thrown value', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => { throw 'sync string'; });
+    expect(() => bridge.setImmersiveMode(false)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][1]).toBe('sync string');
+  });
+
+  it('a synchronous exitFullscreen throw with console.warn absent is swallowed silently', async () => {
+    const { mockExitFullscreen } = setupFullscreen();
+    await loadWeb();
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    mockExitFullscreen.mockImplementation(() => { throw new Error('sync boom'); });
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      expect(() => bridge.setImmersiveMode(false)).not.toThrow();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(mockExitFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  // ── openFilePicker (DOM input + FileReader) ──
+
+  function setupFileInput() {
+    const inputEl = /** @type {any} */ ({ type: '', accept: '', onchange: null, click: vi.fn() });
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => (tag === 'input' ? inputEl : realCreate(tag)));
+    return { inputEl };
+  }
+
+  /**
+   * @param {any} result
+   * @param {string} mode
+   */
+  function mockFileReader(result, mode) {
+    const orig = globalThis.FileReader;
+    /** @this {any} */
+    function Mock() {
+      /** @type {any} */ const self = this;
+      self.readAsDataURL = () => {
+        setTimeout(() => {
+          if (mode === 'load' && self.onload) self.onload({ target: { result } });
+          if (mode === 'error' && self.onerror) self.onerror();
+        }, 0);
+      };
+    }
+    /** @type {any} */ (globalThis).FileReader = Mock;
+    return () => { /** @type {any} */ (globalThis).FileReader = orig; };
+  }
+
+  it('an oversize pick with no __onImportFile installed is a silent no-op', async () => {
+    const { inputEl } = setupFileInput();
+    await loadWeb();
+    delete W().__onImportFile;
+    bridge.openFilePicker();
+    expect(() => /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'huge.json', size: 51 * 1024 * 1024 }] } })).not.toThrow();
+  });
+
+  it('a FileReader result of null fires __onImportFile with an empty string', async () => {
+    const cb = vi.fn();
+    W().__onImportFile = cb;
+    const { inputEl } = setupFileInput();
+    await loadWeb();
+    const restore = mockFileReader(null, 'load');
+    try {
+      bridge.openFilePicker();
+      /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x.json' }] } });
+      await new Promise((r) => setTimeout(r, 5));
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith('');
+    } finally { restore(); }
+  });
+
+  it('a FileReader result with no data-URL comma passes the whole string through', async () => {
+    const cb = vi.fn();
+    W().__onImportFile = cb;
+    const { inputEl } = setupFileInput();
+    await loadWeb();
+    const restore = mockFileReader('plain-no-comma', 'load');
+    try {
+      bridge.openFilePicker();
+      /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x.json' }] } });
+      await new Promise((r) => setTimeout(r, 5));
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith('plain-no-comma');
+    } finally { restore(); }
+  });
+
+  it('a FileReader load with no __onImportFile installed is a silent no-op', async () => {
+    const { inputEl } = setupFileInput();
+    await loadWeb();
+    delete W().__onImportFile;
+    const restore = mockFileReader('data:application/json;base64,eyJhIjoxfQ==', 'load');
+    try {
+      bridge.openFilePicker();
+      /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x.json' }] } });
+      await new Promise((r) => setTimeout(r, 5));
+    } finally { restore(); }
+  });
+
+  it('a FileReader error with no __onImportFile installed is a silent no-op', async () => {
+    const { inputEl } = setupFileInput();
+    await loadWeb();
+    delete W().__onImportFile;
+    const restore = mockFileReader(null, 'error');
+    try {
+      bridge.openFilePicker();
+      /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x.json' }] } });
+      await new Promise((r) => setTimeout(r, 5));
+    } finally { restore(); }
+  });
+
+  // ── saveToFile ──
+
+  it('a message-less failure in the download path reports error:<value>', async () => {
+    await loadWeb();
+    const cb = vi.fn();
+    W().__onExportComplete = cb;
+    const origCreate = globalThis.URL.createObjectURL;
+    /** @type {any} */ (globalThis.URL).createObjectURL = () => { throw 'blob fail'; };
+    try {
+      bridge.saveToFile('backup.json', '{}');
+    } finally {
+      /** @type {any} */ (globalThis.URL).createObjectURL = origCreate;
+    }
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith('error:blob fail');
+  });
+
+  // ── v3 backup I/O (web) ──
+
+  it('openExportSink rejects when createWritable() throws (claim free)', async () => {
+    await loadWeb();
+    W().showSaveFilePicker = vi.fn(() => Promise.resolve({ createWritable: vi.fn(() => Promise.reject(new Error('no writable'))) }));
+    await expect(bridge.openExportSink('x.votbak')).rejects.toThrow('no writable');
+  });
+
+  it('openExportSink rejects a non-AbortError picker failure (not a cancel)', async () => {
+    await loadWeb();
+    W().showSaveFilePicker = vi.fn(() => Promise.reject(new Error('picker denied')));
+    await expect(bridge.openExportSink('x.votbak')).rejects.toThrow('picker denied');
+  });
+
+  it('pickImportFile returns null when the open picker resolves with no handles', async () => {
+    await loadWeb();
+    W().showOpenFilePicker = vi.fn(() => Promise.resolve([]));
+    await expect(bridge.pickImportFile()).resolves.toBeNull();
+  });
+
+  it('pickImportFile rethrows a non-AbortError open-picker failure', async () => {
+    await loadWeb();
+    W().showOpenFilePicker = vi.fn(() => Promise.reject(new Error('open denied')));
+    await expect(bridge.pickImportFile()).rejects.toThrow('open denied');
+  });
+
+  it('pickImportFile fallback resolves null when the change fires with no file', async () => {
+    /** @type {Record<string, Function>} */ const listeners = {};
+    const inputEl = /** @type {any} */ ({
+      type: '', accept: '', onchange: null, click: vi.fn(),
+      addEventListener: (/** @type {string} */ t, /** @type {Function} */ cb) => { listeners[t] = cb; },
+    });
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => (tag === 'input' ? inputEl : realCreate(tag)));
+    delete W().showOpenFilePicker;
+    await loadWeb();
+    const p = bridge.pickImportFile();
+    /** @type {any} */ (inputEl).onchange({ target: { files: [] } });
+    await expect(p).resolves.toBeNull();
+  });
+
+  // ── recording (MediaRecorder + AnalyserNode) ──
+
+  /**
+   * @param {string[]} [supported]
+   */
+  function setupRecording(supported) {
+    /** @type {any} */ let mockRecorder = null;
+    /** @type {any} */ let onData = null;
+    /** @type {any} */ let onStop = null;
+    /** @type {any} */ const mockTracks = [{ stop: vi.fn(), kind: 'audio' }];
+    const mockStream = { getTracks: vi.fn(() => mockTracks) };
+    /** @type {any} */ (globalThis.navigator).mediaDevices = { getUserMedia: vi.fn(() => Promise.resolve(mockStream)) };
+    W().__onMicPermissionResult = vi.fn();
+    /** @type {any} */ (globalThis).MediaRecorder = function (/** @type {any} */ stream, /** @type {any} */ opts) {
+      mockRecorder = {
+        state: 'inactive',
+        mimeType: (opts && opts.mimeType) || 'audio/webm',
+        set ondataavailable(fn) { onData = fn; },
+        set onstop(fn) { onStop = fn; },
+        start: vi.fn(function () { mockRecorder.state = 'recording'; }),
+        pause: vi.fn(function () { mockRecorder.state = 'paused'; }),
+        resume: vi.fn(function () { mockRecorder.state = 'recording'; }),
+        stop: vi.fn(function () { mockRecorder.state = 'inactive'; if (onStop) setTimeout(() => onStop(), 0); }),
+      };
+      return mockRecorder;
+    };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = (/** @type {string} */ m) => (supported || ['audio/webm;codecs=opus']).indexOf(m) >= 0;
+    const mockAnalyser = { fftSize: 0, frequencyBinCount: 128, getByteTimeDomainData: vi.fn() };
+    const mockSource = { connect: vi.fn() };
+    const mockClose = vi.fn();
+    W().AudioContext = function () {
+      /** @type {any} */ (this).createMediaStreamSource = vi.fn(() => mockSource);
+      /** @type {any} */ (this).createAnalyser = vi.fn(() => mockAnalyser);
+      /** @type {any} */ (this).close = mockClose;
+    };
+    return {
+      get recorder() { return mockRecorder; },
+      get onData() { return onData; },
+      get onStop() { return onStop; },
+      mockTracks, mockStream, mockAnalyser, mockSource, mockClose,
+    };
+  }
+
+  async function grantMic() {
+    bridge.requestMicPermission();
+    await flush();
+  }
+
+  it('requestMicPermission with no listener installed is a silent no-op', async () => {
+    await loadWeb();
+    delete /** @type {any} */ (globalThis.navigator).mediaDevices;
+    delete W().__onMicPermissionResult;
+    expect(() => bridge.requestMicPermission()).not.toThrow();
+  });
+
+  it('nativeRecordStart returns error:no-MediaRecorder when the constructor is absent', async () => {
+    setupRecording();
+    await loadWeb();
+    delete /** @type {any} */ (globalThis).MediaRecorder;
+    expect(bridge.nativeRecordStart()).toBe('error:no-MediaRecorder');
+  });
+
+  it('nativeRecordStart returns error:<value> when the MediaRecorder constructor throws message-less', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    await grantMic();
+    /** @type {any} */ (globalThis).MediaRecorder = function () { throw 'ctor boom'; };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = (/** @type {string} */ m) => m === 'audio/webm;codecs=opus';
+    expect(bridge.nativeRecordStart()).toBe('error:ctor boom');
+    expect(rec.mockTracks[0].stop).toHaveBeenCalled();
+  });
+
+  it('an empty ondataavailable (null data / zero-size data) pushes no chunk', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    const completeCb = vi.fn();
+    W().__onNativeRecordingComplete = completeCb;
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    if (rec.onData) rec.onData({ data: null });
+    if (rec.onData) rec.onData({ data: { size: 0 } });
+    bridge.nativeRecordStop();
+    await vi.waitFor(() => expect(completeCb).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    expect(completeCb.mock.calls[0][3].size).toBe(0);
+  });
+
+  it('an onstop after a failed start takes the || mime fallback (mime was cleared)', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    const completeCb = vi.fn();
+    W().__onNativeRecordingComplete = completeCb;
+    await grantMic();
+    const Real = /** @type {any} */ (globalThis).MediaRecorder;
+    /** @type {any} */ (globalThis).MediaRecorder = function (/** @type {any} */ stream, /** @type {any} */ opts) {
+      const r = new Real(stream, opts);
+      r.start = vi.fn(() => { throw new Error('track ended'); });
+      return r;
+    };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = Real.isTypeSupported;
+    expect(bridge.nativeRecordStart()).toBe('error:track ended');
+    expect(typeof rec.onStop).toBe('function');
+    rec.onStop();
+    expect(completeCb).toHaveBeenCalledTimes(1);
+    expect(completeCb.mock.calls[0][2]).toBe('audio/webm;codecs=opus');
+  });
+
+  it('nativeRecordStart falls back to webkitAudioContext when AudioContext is absent', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    await grantMic();
+    const RealAudio = W().AudioContext;
+    delete W().AudioContext;
+    W().webkitAudioContext = RealAudio;
+    try {
+      expect(bridge.nativeRecordStart()).toBe('ok');
+      expect(rec.mockAnalyser.fftSize).toBe(256);
+    } finally {
+      delete W().webkitAudioContext;
+    }
+  });
+
+  it('nativeRecordStart returns error:<value> when start() throws message-less', async () => {
+    setupRecording();
+    await loadWeb();
+    await grantMic();
+    const Real = /** @type {any} */ (globalThis).MediaRecorder;
+    /** @type {any} */ (globalThis).MediaRecorder = function (/** @type {any} */ stream, /** @type {any} */ opts) {
+      const r = new Real(stream, opts);
+      r.start = vi.fn(() => { throw 'start boom'; });
+      return r;
+    };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = Real.isTypeSupported;
+    expect(bridge.nativeRecordStart()).toBe('error:start boom');
+  });
+
+  it('nativeRecordPause returns error:<value> when pause() throws message-less', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    rec.recorder.pause.mockImplementation(() => { throw 'pause boom'; });
+    expect(bridge.nativeRecordPause()).toBe('error:pause boom');
+  });
+
+  it('nativeRecordResume returns error:<value> when resume() throws message-less', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    expect(bridge.nativeRecordPause()).toBe('ok');
+    rec.recorder.resume.mockImplementation(() => { throw 'resume boom'; });
+    expect(bridge.nativeRecordResume()).toBe('error:resume boom');
+  });
+
+  it('nativeRecordStop with no recorder is a silent no-op', async () => {
+    await loadWeb();
+    expect(bridge.nativeRecordStop()).toBeUndefined();
+  });
+
+  it('nativeRecordStop while paused skips the duration accumulate and still fires the callback', async () => {
+    setupRecording();
+    await loadWeb();
+    const completeCb = vi.fn();
+    W().__onNativeRecordingComplete = completeCb;
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    expect(bridge.nativeRecordPause()).toBe('ok');
+    bridge.nativeRecordStop();
+    await vi.waitFor(() => expect(completeCb).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    expect(typeof completeCb.mock.calls[0][1]).toBe('number');
+  });
+
+  it('nativeRecordCancel with an inactive recorder skips stop() but still cleans up', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    rec.recorder.state = 'inactive';
+    bridge.nativeRecordCancel();
+    expect(rec.recorder.stop).not.toHaveBeenCalled();
+    expect(rec.mockTracks[0].stop).toHaveBeenCalled();
+  });
+
+  it('a throwing __onNativeRecordingComplete consumer is warned about, not thrown', async () => {
+    const rec = setupRecording();
+    await loadWeb();
+    W().__onNativeRecordingComplete = () => { throw new Error('consumer boom'); };
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    if (rec.onData) rec.onData({ data: new Blob(['x'], { type: 'audio/webm' }) });
+    bridge.nativeRecordStop();
+    await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    expect(warnSpy.mock.calls[0][1]).toBe('consumer boom');
+  });
+
+  it('a message-less throwing consumer is warned about with the thrown value', async () => {
+    setupRecording();
+    await loadWeb();
+    W().__onNativeRecordingComplete = () => { throw 'consumer string'; };
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    bridge.nativeRecordStop();
+    await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    expect(warnSpy.mock.calls[0][1]).toBe('consumer string');
+  });
+
+  it('a throwing consumer with console.warn absent is swallowed silently', async () => {
+    setupRecording();
+    await loadWeb();
+    W().__onNativeRecordingComplete = () => { throw new Error('consumer boom'); };
+    await grantMic();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    const origWarn = console.warn;
+    /** @type {any} */ (console).warn = undefined;
+    try {
+      bridge.nativeRecordStop();
+      await new Promise((r) => setTimeout(r, 10));
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
