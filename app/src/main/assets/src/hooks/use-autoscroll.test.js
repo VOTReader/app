@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  createAutoScroll, clampLpm, computeEndTarget, measureLineHeight, touchLiftEnds,
+  createAutoScroll, clampEndDwell, clampLpm, computeEndTarget, measureLineHeight, touchLiftEnds,
 } from './use-autoscroll.js';
 
 // ── Harness ────────────────────────────────────────────────────────────
@@ -789,5 +789,446 @@ describe('W45: footnotes, an open menu, a second finger', () => {
     expect(touchLiftEnds({ touches: [{}] })).toBe(false);
     expect(touchLiftEnds({ touches: [] })).toBe(true);
     expect(touchLiftEnds({})).toBe(true);                                     // mouseup
+  });
+});
+
+// ── tests-6 item 13a: controller + helper branches ────────────────────────
+// The draft's 75.43% was the tests-5 FULL-SUITE figure: other suites exercise
+// this file incidentally. This file alone measures 58.29% (204/350), so 13a
+// raises the controller + pure helpers through this file's own harness; 13b
+// (next tick) takes the React hook useAutoScroll + peekNext (762-921), which
+// needs renderHook. The item target stays >=82% on this file's Check.
+describe('tests-6 item 13a: helper branches', () => {
+  it('clampEndDwell clamps into range and survives junk', () => {
+    expect(clampEndDwell('junk')).toBe(2500);
+    expect(clampEndDwell(-5)).toBe(0);
+    expect(clampEndDwell(99999)).toBe(15000);
+    expect(clampEndDwell(4000)).toBe(4000);
+  });
+
+  it('measureLineHeight returns null without a container or a probe', () => {
+    expect(measureLineHeight(null)).toBeNull();
+    expect(measureLineHeight({})).toBeNull();
+    expect(measureLineHeight({ querySelector: () => null })).toBeNull();
+  });
+
+  it('lineHeightOf survives a hostile getComputedStyle', () => {
+    const keep = globalThis.getComputedStyle;
+    try {
+      globalThis.getComputedStyle = () => { throw new Error('boom'); };
+      expect(measureLineHeight(makeEl())).toBeNull();
+      globalThis.getComputedStyle = /** @type {any} */ (() => null);
+      expect(measureLineHeight(makeEl())).toBeNull();
+      globalThis.getComputedStyle = /** @type {any} */ (() => ({ lineHeight: 'normal', fontSize: '16px' }));
+      expect(measureLineHeight(makeEl())).toBe(24);
+      globalThis.getComputedStyle = /** @type {any} */ (() => ({ lineHeight: 'normal', fontSize: 'bogus' }));
+      expect(measureLineHeight(makeEl())).toBeNull();
+      delete globalThis.getComputedStyle;
+      expect(measureLineHeight(makeEl())).toBeNull();
+    } finally {
+      globalThis.getComputedStyle = keep;
+    }
+  });
+
+  it('computeEndTarget falls back on null, missing probes and falsy dims', () => {
+    expect(computeEndTarget(null)).toBe(0);
+    expect(computeEndTarget({ scrollHeight: 5000, clientHeight: 800 })).toBe(4200);
+    expect(computeEndTarget({ scrollHeight: 0, clientHeight: 800, querySelector: () => null })).toBe(0);
+    expect(computeEndTarget({ scrollHeight: 5000, clientHeight: 0, querySelector: () => null })).toBe(5000);
+  });
+});
+
+describe('tests-6 item 13a: controller branches', () => {
+  /** A page whose end is 100px away, so the run reaches the end in ~150 frames. */
+  function shortPage(overrides = {}) {
+    const { io, state } = makeIo(overrides);
+    state.el = makeEl({ scrollHeight: 900, clientHeight: 800 });
+    state.autoNext = true;
+    return { io, state, ctrl: createAutoScroll(io) };
+  }
+  /** Drive a short page to the end dwell. */
+  function toEndDwell() {
+    const s = shortPage();
+    s.ctrl.start();
+    runFrames(s.state, 300, 50);
+    expect(s.ctrl.getState().state).toBe('enddwell');
+    return s;
+  }
+
+  it('start() is a no-op when already running or destroyed, and blocked by a modal', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    const snaps = state.snaps.length;
+    ctrl.start();                                        // already running
+    expect(state.snaps.length).toBe(snaps);
+    state.modal = true;
+    ctrl.stop();                                         // ramp-out, then paused
+    runFrames(state, 30, 50);
+    expect(ctrl.getState().state).toBe('paused');
+    const snaps2 = state.snaps.length;
+    ctrl.start();                                        // modal blocks the restart
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'blocked' });
+    ctrl.start();                                        // same state + reason: setState early-returns
+    expect(state.snaps.length).toBe(snaps2 + 1);
+    ctrl.destroy();
+    ctrl.start();                                        // destroyed: nothing happens
+    expect(state.snaps.length).toBe(snaps2 + 1);
+  });
+
+  it('stop() when idle pauses, and toggle() flips both ways', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.stop();
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'user' });
+    ctrl.toggle();                                       // idle-ish -> start
+    expect(ctrl.getState().state).toBe('running');
+    ctrl.toggle();                                       // running -> stop (ramp)
+    runFrames(state, 30, 50);
+    expect(ctrl.getState().state).toBe('paused');
+    ctrl.destroy();
+  });
+
+  it('toggle() during the end dwell stops instead of restarting', () => {
+    const s = toEndDwell();
+    s.ctrl.toggle();
+    expect(s.ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'user' });
+    s.ctrl.destroy();
+  });
+
+  it('toggle() during an advance stops too', () => {
+    const s = toEndDwell();
+    runTimers(s.state, 6000);                            // dwell fires -> advancing
+    expect(s.ctrl.getState().state).toBe('advancing');
+    s.ctrl.toggle();
+    expect(s.ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'user' });
+    s.ctrl.destroy();
+  });
+
+  it('pointerDown/Up, hidden, stop and setSpeed are no-ops when destroyed', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.pointerUp();                                    // idle: nothing to resume
+    expect(ctrl.getState().state).toBe('idle');
+    ctrl.hidden();                                       // idle: stays idle
+    expect(ctrl.getState().state).toBe('idle');
+    ctrl.destroy();
+    ctrl.pointerDown();
+    ctrl.pointerUp();
+    ctrl.hidden();
+    ctrl.stop();
+    ctrl.setSpeed();
+    expect(ctrl.getState().state).toBe('idle');
+    expect(state.snaps.length).toBe(0);
+  });
+
+  it('pointerUp after a blocked pause does not resume', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    state.modal = true;
+    ctrl.start();                                        // blocked before it ever ran
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'blocked' });
+    ctrl.pointerUp();                                    // reason is not 'touch'
+    runTimers(state, 5000);
+    expect(ctrl.getState().state).toBe('paused');
+    ctrl.destroy();
+  });
+
+  it('a second pointerUp cancels the first soft-resume timer', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    ctrl.pointerDown();                                  // touch pause
+    ctrl.pointerUp();                                    // resume armed
+    ctrl.pointerUp();                                    // re-arms: first token cancelled
+    expect(state.timers.filter(Boolean).length).toBe(1);
+    runTimers(state, 5000);
+    expect(ctrl.getState().state).toBe('running');
+    ctrl.destroy();
+  });
+
+  it('a finger down during the soft-resume wait cancels the resume', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    ctrl.pointerDown();
+    ctrl.pointerUp();                                    // resume armed
+    expect(state.timers.filter(Boolean).length).toBe(1);
+    ctrl.pointerDown();                                  // cancels the resume, stays paused
+    expect(state.timers.filter(Boolean).length).toBe(0);
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'touch' });
+    ctrl.destroy();
+  });
+
+  it('a resume timer fired after a navigation returns without resuming', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    ctrl.pointerDown();
+    ctrl.pointerUp();                                    // resume armed
+    const resumeFn = state.timers.find(Boolean).fn;      // pin the defensive guard:
+    ctrl.externalNav();                                  // cancels the timer, reason 'nav'
+    resumeFn();                                          // fired late: must not resume
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'nav' });
+    ctrl.destroy();
+  });
+
+  it('a navigation during the soft-resume wait clears the pending timer', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    ctrl.pointerDown();
+    ctrl.pointerUp();                                    // resume armed
+    expect(state.timers.filter(Boolean).length).toBe(1);
+    ctrl.externalNav();                                  // clearTimers cancels it
+    expect(state.timers.filter(Boolean).length).toBe(0);
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'nav' });
+    ctrl.destroy();
+  });
+
+  it('externalNav on an idle controller changes nothing', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.externalNav();
+    expect(state.snaps.length).toBe(0);
+    expect(ctrl.getState().state).toBe('idle');
+    ctrl.destroy();
+    ctrl.externalNav();                                  // destroyed: no-op
+    expect(state.snaps.length).toBe(0);
+  });
+
+  it('setSpeed refreshes metrics live and getProgress reports the remainder', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    const snaps = state.snaps.length;
+    ctrl.setSpeed();                                     // live edit: re-measures + emits
+    expect(state.snaps.length).toBe(snaps + 1);
+    const p = ctrl.getProgress();
+    expect(p.atEnd).toBe(false);
+    expect(p.remainingMs).toBeGreaterThan(0);
+    ctrl.destroy();
+    ctrl.setSpeed();                                     // destroyed: no-op
+    expect(state.snaps.length).toBe(snaps + 1);
+  });
+
+  it('getProgress without a container reports zero and at-end', () => {
+    let gone = false;
+    const { io, state } = makeIo({ getScrollEl: () => (gone ? null : state.el) });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    expect(ctrl.getProgress().atEnd).toBe(false);
+    gone = true;
+    ctrl.setSpeed();                                     // no container: skips the refresh
+    expect(ctrl.getProgress()).toEqual({ remainingMs: 0, atEnd: true });
+    ctrl.destroy();
+  });
+
+  it('a run starting below the end with falsy dims still resolves the target', () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 0, clientHeight: 0, endTop: 100 });
+    state.el.scrollTop = 50;                             // below the (zero) end
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    expect(ctrl._internals().endTarget).toBe(0);
+    ctrl.destroy();
+  });
+
+  it('a missing line-height probe falls back to 24px and still scrolls', () => {
+    const { io, state } = makeIo();
+    state.el.querySelector = (sel) => (sel === '.reading-end' ? null : null);
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    expect(ctrl._internals().lineHeight).toBe(0);
+    runFrames(state, 10);
+    expect(state.el.scrollTop).toBeGreaterThan(0);
+    ctrl.destroy();
+  });
+
+  it('a second stop during the ramp-out re-arms the watchdog instead of wedging', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 5);
+    ctrl.stop();                                         // ramp-out + watchdog armed
+    ctrl.stop();                                         // still running: re-arms (cancels the first)
+    expect(state.timers.filter(Boolean).length).toBe(1);
+    runTimers(state, 1000);
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'user' });
+    ctrl.destroy();
+  });
+
+  it('a watchdog fired after the ramp already committed is a silent no-op', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 5);
+    ctrl.stop();                                         // ramp-out + watchdog armed
+    const watchdog = state.timers.find(Boolean).fn;      // pin the defensive guard
+    runFrames(state, 30, 50);                           // ramp completes normally
+    expect(ctrl.getState().state).toBe('paused');
+    watchdog();                                          // fired late: pendingState is gone
+    expect(ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'user' });
+    ctrl.destroy();
+  });
+
+  it('a dwell timer fired after destroy or after a pause never advances', () => {
+    const s = toEndDwell();
+    const dwellFn = s.state.timers.find(Boolean).fn;     // pin the defensive guard
+    s.ctrl.destroy();
+    dwellFn();
+    expect(s.state.advanced).toBe(0);
+    expect(s.ctrl.getState().state).toBe('enddwell');
+
+    const s2 = toEndDwell();
+    const dwellFn2 = s2.state.timers.find(Boolean).fn;
+    s2.ctrl.pointerDown();                               // enddwell -> touch pause, timer cancelled
+    dwellFn2();
+    expect(s2.state.advanced).toBe(0);
+    expect(s2.ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'touch' });
+    s2.ctrl.destroy();
+  });
+
+  it('a settle step fired after the run was paused returns without resuming', () => {
+    const s = toEndDwell();
+    runTimers(s.state, 6000);                            // dwell fires -> advancing
+    expect(s.ctrl.getState().state).toBe('advancing');
+    const step = s.state.frames.find(Boolean);           // pin the defensive guard
+    s.ctrl.pointerDown();                                // advancing -> touch pause
+    step();
+    expect(s.ctrl.getState()).toMatchObject({ state: 'paused', pauseReason: 'touch' });
+    s.ctrl.destroy();
+  });
+
+  it('a restoring page that never settles resumes once the deadline passes', () => {
+    const s = toEndDwell();
+    runTimers(s.state, 6000);                            // advancing, settle loop running
+    s.state.restoring = true;
+    runFrames(s.state, 130, 50);                         // 6.5s > 2s settle deadline
+    expect(s.ctrl.getState().state).toBe('running');
+    s.ctrl.destroy();
+  });
+
+  it('a vanished container during the settle ends the run at the deadline', () => {
+    let gone = false;
+    const { io, state } = makeIo({ getScrollEl: () => (gone ? null : state.el) });
+    state.el = makeEl({ scrollHeight: 900, clientHeight: 800 });
+    state.autoNext = true;
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 300, 50);
+    expect(ctrl.getState().state).toBe('enddwell');
+    runTimers(state, 6000);                              // advancing
+    gone = true;
+    runFrames(state, 130, 50);                           // past the 2s settle deadline
+    expect(ctrl.getState()).toMatchObject({ state: 'ended', pauseReason: 'no-container' });
+    ctrl.destroy();
+  });
+
+  it('a frame fired after destroy is a silent no-op', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    const frame = state.frames.find(Boolean);            // pin the defensive guard
+    ctrl.destroy();
+    frame(state.t);
+    expect(ctrl.getState().state).toBe('running');       // destroy keeps the last state; the frame changed nothing
+    expect(state.snaps.length).toBe(1);                  // only the start snapshot
+  });
+
+  it('a vanished container mid-run ends the run instead of throwing', () => {
+    let gone = false;
+    const { io, state } = makeIo({ getScrollEl: () => (gone ? null : state.el) });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    gone = true;
+    runFrames(state, 1);
+    expect(ctrl.getState()).toMatchObject({ state: 'ended', pauseReason: 'no-container' });
+    ctrl.destroy();
+  });
+
+  it('a frame without a timestamp falls back to the clock', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    const frame = state.frames.find(Boolean);
+    frame(undefined);                                    // no ts: uses io.now()
+    expect(ctrl.getState().state).toBe('running');
+    ctrl.destroy();
+  });
+
+  it('a restore in progress holds the position instead of writing', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    state.restoring = true;
+    state.el.scrollTop = 0;                              // the restore owns scrollTop now
+    runFrames(state, 2);
+    expect(ctrl._internals().pos).toBe(0);
+    expect(ctrl.getState().state).toBe('running');
+    ctrl.destroy();
+  });
+
+  it('an external scroll write is absorbed, not fought', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    state.el.scrollTop = 300;                            // the reader dragged ahead
+    runFrames(state, 1);
+    expect(ctrl._internals().pos).toBeGreaterThanOrEqual(300);
+    ctrl.destroy();
+  });
+
+  it('a negative scrollTop is clamped, never carried', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 2);
+    state.el.scrollTop = -10;
+    runFrames(state, 1);
+    expect(ctrl._internals().pos).toBeGreaterThanOrEqual(0);
+    expect(state.el.scrollTop).toBe(0);
+    ctrl.destroy();
+  });
+
+  it('resumeAdvance ignores a running controller and takes a zero chain', () => {
+    const { io } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    ctrl.resumeAdvance(3);                               // already running: no-op
+    expect(ctrl._internals().chain).toBe(0);
+    ctrl.destroy();
+    const ctrl2 = createAutoScroll(io);
+    ctrl2.resumeAdvance(0);                              // chain 0: a fresh run, no carry
+    expect(ctrl2._internals().chain).toBe(0);
+    expect(ctrl2.getState().state).toBe('advancing');
+    ctrl2.destroy();
+  });
+
+  it('a throwing advance is reported even with no trace or state sink', () => {
+    const { io, state } = makeIo({
+      advance: () => { throw new Error('boom'); },
+      trace: undefined,
+      onState: undefined,
+    });
+    state.autoNext = true;
+    state.el = makeEl({ scrollHeight: 900, clientHeight: 800 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 300, 50);
+    expect(ctrl.getState().state).toBe('enddwell');
+    runTimers(state, 6000);                              // dwell fires, advance throws
+    expect(ctrl.getState()).toMatchObject({ state: 'ended', pauseReason: 'advance-failed' });
+    ctrl.destroy();
   });
 });
