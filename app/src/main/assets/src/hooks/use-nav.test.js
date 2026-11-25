@@ -405,3 +405,36 @@ describe('useNav — minimality (helpers only call their documented setters)', (
     expect(fired.map(([k]) => k).sort()).toEqual(['setGardenPage', 'setScreen']);
   });
 });
+
+describe('useNav — goHome without the optional breadcrumb setters (tests-7 item 1)', () => {
+  it('goHome still completes when setFromSurprise/setFromStudies/setFromMatthewCh are absent', () => {
+    // Older callers do not pass these three setters; the typeof guards must
+    // skip them silently while the rest of the goHome cleanup still runs.
+    const { result, setters } = setup({
+      setFromSurprise: undefined,
+      setFromStudies: undefined,
+      setFromMatthewCh: undefined,
+    });
+    expect(() => result.current.goHome()).not.toThrow();
+    expect(setters.setFromSearch).toHaveBeenCalledWith(false);
+    expect(setters.setFromWtlb).toHaveBeenCalledWith(null);
+    expect(setters.setFromLetterStack).toHaveBeenCalledWith([]);
+    expect(setters.setScreen).toHaveBeenCalledWith('home');
+    expect(setters.setBookId).toHaveBeenCalledWith(null);
+    expect(setters.setChapterNum).toHaveBeenCalledWith(null);
+  });
+
+  it('goReadingPlans captures origin + switches to reading-plans', () => {
+    const { result, setters } = setup();
+    result.current.goReadingPlans();
+    expect(setters.setNavOrigin).toHaveBeenCalledWith({
+      screen: 'screen-sentinel',
+      bookId: 'bookId-sentinel',
+      chapterNum: 5,
+      letterId: 'letterId-sentinel',
+      studyId: 'studyId-sentinel',
+      studyChapterId: 'studyChapterId-sentinel',
+    });
+    expect(setters.setScreen).toHaveBeenCalledWith('reading-plans');
+  });
+});

@@ -314,3 +314,97 @@ describe('NoteStore — APP1 keyed reactivity', () => {
     expect(NoteStore.getVersionForKey(K)).not.toBe(ka);
   });
 });
+
+describe("NoteStore — replaceAll (W2.6 import path; tests-7 item 1)", () => {
+  it("replaces the whole map with a valid object", () => {
+    NoteStore.set("g_old", { body: "old" });
+    NoteStore.replaceAll(/** @type {any} */ ({
+      g_new: { groupId: "g_new", notebookIds: [], body: "imported", color: "yellow", fullText: "", keys: [], created: 1, updated: 2 },
+    }));
+    expect(NoteStore.get("g_old")).toBeNull();
+    expect(NoteStore.get("g_new").body).toBe("imported");
+    expect(NoteStore.count()).toBe(1);
+  });
+
+  it("null clears to an empty map", () => {
+    NoteStore.set("g_1", { body: "A" });
+    NoteStore.replaceAll(null);
+    expect(NoteStore.count()).toBe(0);
+  });
+
+  it("an array clears to an empty map (arrays are not note maps)", () => {
+    NoteStore.set("g_1", { body: "A" });
+    NoteStore.replaceAll(/** @type {any} */ ([{ groupId: "g_x" }]));
+    expect(NoteStore.count()).toBe(0);
+  });
+
+  it("a non-object clears to an empty map", () => {
+    NoteStore.set("g_1", { body: "A" });
+    NoteStore.replaceAll(/** @type {any} */ ("not a map"));
+    expect(NoteStore.count()).toBe(0);
+  });
+});
+
+describe("NoteStore — stamp fallbacks (tests-7 item 1)", () => {
+  it("list() sorts by created when updated is missing, and by 0 when both are", () => {
+    // Legacy/imported rows can lack updated (or both stamps); the sort key is
+    // (updated || created || 0) on BOTH operands, so seed rows that force
+    // each fallback on each side of the comparison.
+    /** @type {any} */
+    const data = NoteStore._load();
+    data["g_full"] = { groupId: "g_full", notebookIds: [], keys: [], created: 100, updated: 300 };
+    data["g_created_only"] = { groupId: "g_created_only", notebookIds: [], keys: [], created: 200 };
+    data["g_no_stamps"] = { groupId: "g_no_stamps", notebookIds: [], keys: [] };
+    NoteStore._save();
+    expect(NoteStore.list().map((n) => n.groupId)).toEqual(["g_full", "g_created_only", "g_no_stamps"]);
+  });
+
+  it("pruneNotebook stamps created+1 when updated is missing", () => {
+    /** @type {any} */
+    const data = NoteStore._load();
+    data["g_legacy"] = { groupId: "g_legacy", notebookIds: ["nb_a"], keys: [], created: 5000 };
+    NoteStore._save();
+    NoteStore.pruneNotebook("nb_a");
+    expect(NoteStore.get("g_legacy").notebookIds).toEqual([]);
+    expect(NoteStore.get("g_legacy").updated).toBe(5001);
+  });
+
+  it("pruneNotebook stamps 1 when both stamps are missing", () => {
+    /** @type {any} */
+    const data = NoteStore._load();
+    data["g_legacy"] = { groupId: "g_legacy", notebookIds: ["nb_a"], keys: [] };
+    NoteStore._save();
+    NoteStore.pruneNotebook("nb_a");
+    expect(NoteStore.get("g_legacy").updated).toBe(1);
+  });
+});
+
+describe("NoteStore — deferred writes while pending (tests-7 item 1)", () => {
+  it("every mutation defers while the store is still loading, and the overlay shows it", () => {
+    NoteStore._resetForTests(); // idb-backed: "pending", writes queue + overlay
+    try {
+      expect(NoteStore.getState()).toBe("pending");
+      expect(() => NoteStore.set("g_p", { body: "pending note", notebookIds: ["nb_a"] })).not.toThrow();
+      expect(() => NoteStore.update("g_p", { body: "edited while pending" })).not.toThrow();
+      expect(() => NoteStore.toggleNotebook("g_p", "nb_b")).not.toThrow();
+      expect(() => NoteStore.pruneNotebook("nb_a")).not.toThrow();
+      expect(() => NoteStore.remove("g_p")).not.toThrow();
+      expect(() => NoteStore.replaceAll(/** @type {any} */ ({}))).not.toThrow();
+      // All six ops queued for rebase, none written through.
+      expect(/** @type {any} */ (NoteStore)._queue.length).toBe(6);
+      expect(NoteStore.getState()).toBe("pending");
+    } finally {
+      NoteStore._resetForTests({ forceLoaded: true });
+    }
+  });
+
+  it("a deferred set is visible through the pending overlay", () => {
+    NoteStore._resetForTests();
+    try {
+      NoteStore.set("g_p", { body: "overlay note" });
+      expect(/** @type {any} */ (NoteStore._load())["g_p"].body).toBe("overlay note");
+    } finally {
+      NoteStore._resetForTests({ forceLoaded: true });
+    }
+  });
+});
