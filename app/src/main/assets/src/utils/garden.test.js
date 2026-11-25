@@ -8,6 +8,7 @@ import {
   gardenPreload,
   gardenImageCache,
   gardenCrawled,
+  gardenIsCached,
   GARDEN_CACHE_MAX,
   gardenTierLimits,
   gardenClearCache,
@@ -148,5 +149,72 @@ describe('gardenClearCache — memory-trim purge (gap-garden-viewer-and-image-ca
     gardenClearCache();
     gardenPreload(9, 'native');
     expect(gardenImageCache[gardenCacheKey(9, 'native')]).toBeTruthy();
+  });
+});
+
+describe('gardenIsCached', () => {
+  // A seeded stand-in: gardenIsCached only reads complete + naturalWidth, so a
+  // plain object stands in for a decoded bitmap. Seeded straight into the cache
+  // (not via gardenPreload, which never completes in jsdom) and deleted after,
+  // because gardenClearCache only evicts LRU-tracked keys.
+  const seed = (n, tierId, img) => {
+    gardenImageCache[gardenCacheKey(n, tierId)] = /** @type {any} */ (img);
+  };
+  const unseed = (n, tierId) => {
+    delete gardenImageCache[gardenCacheKey(n, tierId)];
+  };
+
+  it('false for a page that was never preloaded', () => {
+    expect(gardenIsCached(200, 'standard')).toBe(false);
+  });
+
+  it('false right after preload: jsdom never decodes the image', () => {
+    gardenPreload(5, 'standard');
+    expect(gardenImageCache[gardenCacheKey(5, 'standard')]).toBeTruthy();
+    expect(gardenIsCached(5, 'standard')).toBe(false);
+  });
+
+  it('true once a decoded image sits in the cache', () => {
+    const key = gardenCacheKey(7, 'standard');
+    seed(7, 'standard', { complete: true, naturalWidth: 2880 });
+    try {
+      expect(gardenIsCached(7, 'standard')).toBe(true);
+    } finally {
+      unseed(7, 'standard');
+    }
+    expect(gardenImageCache[key]).toBeUndefined();
+  });
+
+  it('false when the cached image never completed', () => {
+    seed(8, 'standard', { complete: false, naturalWidth: 2880 });
+    try {
+      expect(gardenIsCached(8, 'standard')).toBe(false);
+    } finally {
+      unseed(8, 'standard');
+    }
+  });
+
+  it('false when the cached image decoded to zero width (a broken file)', () => {
+    seed(9, 'standard', { complete: true, naturalWidth: 0 });
+    try {
+      expect(gardenIsCached(9, 'standard')).toBe(false);
+    } finally {
+      unseed(9, 'standard');
+    }
+  });
+});
+
+describe('gardenTierLimits + gardenPreload guards', () => {
+  it('an unknown tier falls back to the standard limits', () => {
+    expect(gardenTierLimits('nope')).toEqual(gardenTierLimits('standard'));
+  });
+
+  it('gardenPreload ignores an out-of-range page (nothing cached, nothing crawled)', () => {
+    gardenPreload(0, 'standard');
+    gardenPreload(GARDEN_TOTAL + 1, 'standard');
+    expect(gardenImageCache[gardenCacheKey(0, 'standard')]).toBeUndefined();
+    expect(gardenImageCache[gardenCacheKey(GARDEN_TOTAL + 1, 'standard')]).toBeUndefined();
+    expect(gardenCrawled.has(gardenCacheKey(0, 'standard'))).toBe(false);
+    expect(gardenCrawled.has(gardenCacheKey(GARDEN_TOTAL + 1, 'standard'))).toBe(false);
   });
 });

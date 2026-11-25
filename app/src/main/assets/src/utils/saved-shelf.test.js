@@ -56,4 +56,77 @@ describe('toggleSavedRecording (s09.3)', () => {
     expect(toggleSavedRecording(null, NEW)).toBe(false);
     expect(shown()).toBeNull();
   });
+
+  // tests-6 item 9: the uncovered branches of the eviction toast.
+  it('a library without wouldEvict saves silently (no eviction to name)', () => {
+    const library = { maxSaved: 100, toggleSaved: vi.fn(() => true), undoEviction: vi.fn() };
+    expect(toggleSavedRecording(library, NEW)).toBe(true);
+    expect(shown()).toBeNull();
+  });
+
+  it('a library without toggleSaved saves nothing', () => {
+    const library = { maxSaved: 100, wouldEvict: vi.fn(() => OLD) };
+    expect(toggleSavedRecording(library, NEW)).toBe(false);
+    expect(shown()).toBeNull();
+  });
+
+  it('a library without maxSaved still says the shelf keeps 100', () => {
+    const library = { wouldEvict: vi.fn(() => OLD), toggleSaved: vi.fn(() => true), undoEviction: vi.fn() };
+    toggleSavedRecording(library, NEW);
+    const el = shown();
+    expect(el).not.toBeNull();
+    expect(el.textContent).toContain('keeps 100');
+  });
+
+  it('a pushed-off recording without a title is named "the oldest"', () => {
+    toggleSavedRecording(lib({ pushed: { url: 'u9' } }), NEW);
+    const el = shown();
+    expect(el).not.toBeNull();
+    expect(el.textContent).toContain('\u201cthe oldest\u201d came off.');
+  });
+
+  it('a toast without an id is left alone by the sweep', () => {
+    const anon = document.createElement('div');
+    anon.className = 'vot-toast show';
+    document.body.appendChild(anon);
+    toggleSavedRecording(lib({ pushed: OLD }), NEW);
+    expect(anon.classList.contains('show')).toBe(true);
+    expect(shown()).not.toBeNull();
+    anon.remove();
+  });
+
+  it('the cap toast itself is never hidden by its own sweep', () => {
+    const cap = document.createElement('div');
+    cap.id = SAVED_CAP_TOAST_ID;
+    cap.className = 'vot-toast show';
+    document.body.appendChild(cap);
+    toggleSavedRecording(lib({ pushed: OLD }), NEW);
+    expect(cap.classList.contains('show')).toBe(true);
+    expect(shown()).not.toBeNull();
+    cap.remove();
+  });
+
+  it('Undo still hides the toast when the library has no undoEviction', () => {
+    const library = { maxSaved: 100, wouldEvict: vi.fn(() => OLD), toggleSaved: vi.fn(() => true) };
+    expect(toggleSavedRecording(library, NEW)).toBe(true);
+    const el = shown();
+    expect(el).not.toBeNull();
+    /** @type {HTMLButtonElement} */ (el.querySelector('button.vot-undo-btn')).click();
+    expect(shown()).toBeNull();
+  });
+
+  it('the toast still shows when its element cannot be looked up for the Undo button', () => {
+    // The getElementById lookup is a defensive seam: the element showToast
+    // just created can vanish (a re-render, another teardown) before the
+    // Undo button is attached. Blind the lookup and the toast must still show.
+    const spy = vi.spyOn(document, 'getElementById').mockReturnValue(null);
+    try {
+      expect(toggleSavedRecording(lib({ pushed: OLD }), NEW)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    const el = shown();
+    expect(el).not.toBeNull();
+    expect(el.querySelector('button.vot-undo-btn')).toBeNull();
+  });
 });
