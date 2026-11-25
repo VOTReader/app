@@ -13,6 +13,7 @@ import {
   ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersPassageCount,
   answersShortTitle, answersSortKey, answersIndexLetter,
   answersTopicEntries, ANSWERS_MAIN_PAGE_ID,
+  answersFiledUnder, isDateHead, isTrumpetSection,
 } from './answers-shelves.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -82,6 +83,8 @@ describe('titles for lists', () => {
     expect(answersShortTitle('God Rebukes New Age Spirituality')).toBe('New Age Spirituality');
     expect(answersShortTitle('THERE IS NO OTHER')).toBe('THERE IS NO OTHER');
     expect(answersShortTitle('The Name of The Lord')).toBe('The Name of The Lord');
+    expect(answersShortTitle(null)).toBe('');
+    expect(answersShortTitle(undefined)).toBe('');
   });
 
   it('every short title is a tail of the site\'s own title', () => {
@@ -101,6 +104,10 @@ describe('passage counts', () => {
   });
   it('the Main Page quotes 12 more', () => {
     expect(answersPassageCount(ALL[ALL.length - 1])).toBe(12);
+  });
+  it('an entry with nothing to count counts nothing', () => {
+    expect(answersPassageCount(null)).toBe(0);
+    expect(answersPassageCount({})).toBe(0);
   });
 });
 
@@ -129,5 +136,36 @@ describe('the highlight namespace', () => {
     const taken = new Set(others);
     expect(others.length).toBeGreaterThan(300);
     expect(ANSWERS.filter((e) => taken.has(e.id)).map((e) => e.id)).toEqual([]);
+  });
+});
+
+describe('answersFiledUnder — where a topic is filed', () => {
+  it('names the commandment by its Roman numeral', () => {
+    expect(answersFiledUnder({ group: 'Commandment 4' })).toBe('Commandment IV');
+    expect(answersFiledUnder({ group: 'Commandment 1' })).toBe('Commandment I');
+  });
+  it('falls back to the group itself when no tablet matches', () => {
+    expect(answersFiledUnder({ group: 'Commandment 99' })).toBe('Commandment 99');
+  });
+  it('names the subject for a subject topic, and nothing for neither', () => {
+    expect(answersFiledUnder({ id: 'the-messiah' })).toBe('The Lord & His Messiah');
+    expect(answersFiledUnder({ id: 'no-such-topic' })).toBe('');
+    expect(answersFiledUnder({})).toBe('');
+    expect(answersFiledUnder(null)).toBe('');
+  });
+});
+
+describe('the small classifiers', () => {
+  it('a dated header needs its closing underscore in range', () => {
+    expect(isDateHead('_1/2/10_ From The Lord')).toBe(true);
+    expect(isDateHead('_1_')).toBe(false);
+    expect(isDateHead('_12345678901_ x')).toBe(false);
+  });
+  it('a trumpet section is only the closing call', () => {
+    expect(isTrumpetSection({ title: 'Be a Part of The Trumpet Call' })).toBe(true);
+    expect(isTrumpetSection({ title: 'Be a Part of The Trumpet Call: Join Us' })).toBe(true);
+    expect(isTrumpetSection({ title: 'Something Else' })).toBe(false);
+    expect(isTrumpetSection({})).toBe(false);
+    expect(isTrumpetSection(null)).toBe(false);
   });
 });
