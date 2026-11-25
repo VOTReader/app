@@ -1160,4 +1160,155 @@ describe('JournalStore - 14a stragglers', () => {
     expect(JournalStore.purgeBlockMarks(j.id, 'b_a')).toBe(0);
   });
 });
+/* ──────────────────────────────────────────────────────────────
+   tests-6 item 14b: _scanAssociated fallbacks, the summary
+   phrasing, the stores-unavailable guards, and the pending-overlay
+   remove. The item-14 target (>=82%) is already met (89.97%);
+   this half lifts the remaining reachable branches.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore - cascade internals (tests-6 item 14b)', () => {
+  const seedEntry = () => JournalStore.add({
+    title: 'E',
+    blocks: [{ id: 'b_a', type: 'p', text: 'one' }, { id: 'b_b', type: 'p', text: 'two' }],
+  });
+
+  it('a null annotation-store answer counts nothing and does not throw', () => {
+    const j = seedEntry();
+    const spy = vi.spyOn(AnnotationStore, 'all').mockReturnValue(/** @type {any} */ (null));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id)).toMatchObject({ highlights: 0, total: 0 });
+      expect(JournalStore.associatedDataSummary(j.id)).toBe(null);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a null annotation value and an annotation with no groupId or id are skipped, not crashed on', () => {
+    const j = seedEntry();
+    const key = (n) => 'journal:' + j.id + ':' + n;
+    const spy = vi.spyOn(AnnotationStore, 'all').mockReturnValue(/** @type {any} */ ({
+      [key(0)]: null,
+      [key(1)]: [{ kind: 'highlight' }],
+    }));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id)).toMatchObject({ highlights: 1, total: 1 });
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a null note-store read counts no notes', () => {
+    const j = seedEntry();
+    const spy = vi.spyOn(NoteStore, '_load').mockReturnValue(/** @type {any} */ (null));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id).notes).toBe(0);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a note group with no keys contributes nothing', () => {
+    const j = seedEntry();
+    const spy = vi.spyOn(NoteStore, '_load').mockReturnValue({ g_empty: {} });
+    try {
+      expect(JournalStore.associatedDataCounts(j.id)).toMatchObject({ notes: 0, total: 0 });
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a null bookmark-store answer counts no bookmarks, by block or by entry', () => {
+    const j = seedEntry();
+    BookmarkStore.add({ id: 'bk_a', hlKey: 'journal:' + j.id + ':b_a:0-3', label: 'x' });
+    const allSpy = vi.spyOn(BookmarkStore, 'all').mockReturnValue(/** @type {any} */ (null));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id, 'b_a').bookmarks).toBe(0);
+    } finally { allSpy.mockRestore(); }
+    const prefixSpy = vi.spyOn(BookmarkStore, 'getForKeyPrefix').mockReturnValue(/** @type {any} */ (null));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id).bookmarks).toBe(0);
+    } finally { prefixSpy.mockRestore(); }
+  });
+
+  it('a null link-store answer counts no links; links without source or target still match by the other end', () => {
+    const j = seedEntry();
+    const nullSpy = vi.spyOn(LinkStore, 'all').mockReturnValue(/** @type {any} */ (null));
+    try {
+      expect(JournalStore.associatedDataCounts(j.id).links).toBe(0);
+    } finally { nullSpy.mockRestore(); }
+    const craftedSpy = vi.spyOn(LinkStore, 'all').mockReturnValue([
+      { id: 'ln_nosrc', target: { type: 'journal', key: 'journal:' + j.id + ':0' } },
+      { id: 'ln_notgt', source: { type: 'journal', key: 'journal:' + j.id + ':0' } },
+    ]);
+    try {
+      expect(JournalStore.associatedDataCounts(j.id).links).toBe(2);
+    } finally { craftedSpy.mockRestore(); }
+  });
+
+  it("a note annotation on one block is that block's note", () => {
+    const j = seedEntry();
+    const A = 'journal:' + j.id + ':b_a';
+    AnnotationStore.add(A, { id: 'nt_a', groupId: 'g_nt', start: 0, end: 3, kind: 'note', color: 'yellow' });
+    expect(JournalStore.associatedDataCounts(j.id, 'b_a')).toMatchObject({ notes: 1, total: 1 });
+    expect(JournalStore.associatedDataCounts(j.id)).toMatchObject({ notes: 1 });
+  });
+
+  it('the summary pluralises and joins two parts', () => {
+    const j = seedEntry();
+    const A = 'journal:' + j.id + ':b_a';
+    AnnotationStore.add(A, { id: 'h1', groupId: 'g1', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    AnnotationStore.add(A, { id: 'h2', groupId: 'g2', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    BookmarkStore.add({ id: 'bk_a', hlKey: A + ':0-3', label: 'x' });
+    expect(JournalStore.associatedDataSummary(j.id)).toBe('2 highlights and 1 bookmark');
+  });
+
+  it('remove() with NoteStore unavailable still deletes the entry and leaves its note groups alone', () => {
+    const j = seedEntry();
+    const A = 'journal:' + j.id + ':b_a';
+    AnnotationStore.add(A, { id: 'nt_a', groupId: 'g_nt', start: 0, end: 3, kind: 'note', color: 'yellow' });
+    NoteStore.set('g_nt', { body: 'on A', keys: [A] });
+    const realNote = NoteStore;
+    try {
+      globalThis.NoteStore = /** @type {any} */ (undefined);
+      JournalStore.remove(j.id);
+      expect(JournalStore.get(j.id)).toBeNull();
+    } finally {
+      globalThis.NoteStore = realNote;
+    }
+    expect(NoteStore.get('g_nt')).not.toBeNull();
+  });
+
+  it('remove() with every associated store unavailable still deletes the entry; add() and clear() skip the missing index', () => {
+    const j = seedEntry();
+    const A = 'journal:' + j.id + ':b_a';
+    AnnotationStore.add(A, { id: 'h1', groupId: 'g1', start: 0, end: 3, kind: 'highlight', color: 'yellow' });
+    BookmarkStore.add({ id: 'bk_a', hlKey: A + ':0-3', label: 'x' });
+    LinkStore.add({ id: 'l_a', source: { type: /** @type {any} */ ('journal'), key: A + ':0-3' }, target: { type: 'letter', key: 'letter:x:0' }, created: 1 });
+    const real = { a: AnnotationStore, n: NoteStore, b: BookmarkStore, l: LinkStore, ix: JournalIndexStore };
+    try {
+      globalThis.AnnotationStore = /** @type {any} */ (undefined);
+      globalThis.NoteStore = /** @type {any} */ (undefined);
+      globalThis.BookmarkStore = /** @type {any} */ (undefined);
+      globalThis.LinkStore = /** @type {any} */ (undefined);
+      globalThis.JournalIndexStore = /** @type {any} */ (undefined);
+      JournalStore.remove(j.id);
+      expect(JournalStore.get(j.id)).toBeNull();
+      const added = JournalStore.add({ title: 'After' });
+      expect(added.id).toBeTruthy();
+      expect(JournalStore.get(added.id)).not.toBeNull();
+      JournalStore.clear();
+      expect(JournalStore.count()).toBe(0);
+    } finally {
+      globalThis.AnnotationStore = real.a;
+      globalThis.NoteStore = real.n;
+      globalThis.BookmarkStore = real.b;
+      globalThis.LinkStore = real.l;
+      globalThis.JournalIndexStore = real.ix;
+    }
+  });
+
+  it('remove() queued while pending applies to the overlay with the purge deferred', () => {
+    JournalStore._resetForTests();
+    expect(JournalStore.getState()).toBe('pending');
+    const j = JournalStore.add({ title: 'P', blocks: [{ id: 'b_a', type: 'p', text: 'x' }] });
+    JournalStore.remove(j.id);
+    expect(JournalStore.get(j.id)).toBeNull();
+    JournalStore._rebaseAndPromote({ list: [] });
+    expect(JournalStore.getState()).toBe('loaded');
+    expect(JournalStore.get(j.id)).toBeNull();
+  });
+});
+
 

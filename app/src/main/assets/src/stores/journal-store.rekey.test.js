@@ -172,6 +172,25 @@ describe('JournalStore.rekeyMarks()', () => {
     JournalStore.rekeyMarks();
     expect(Object.keys(AnnotationStore.all())).toEqual(['journal:' + e.id + ':b_link']);
   });
+  it('a pass with every mark store unavailable moves nothing and writes nothing', () => {
+    const e = JournalStore.add({ title: 'One', blocks: [{ id: 'b_a', type: 'p', text: 'Grace.' }] });
+    AnnotationStore.add('journal:' + e.id + ':0', { id: 'hl', groupId: 'hl', kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'Grace' });
+    const before = AnnotationStore.all();
+    const real = { a: AnnotationStore, n: NoteStore, b: BookmarkStore, l: LinkStore };
+    try {
+      globalThis.AnnotationStore = /** @type {any} */ (undefined);
+      globalThis.NoteStore = /** @type {any} */ (undefined);
+      globalThis.BookmarkStore = /** @type {any} */ (undefined);
+      globalThis.LinkStore = /** @type {any} */ (undefined);
+      expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 0 });
+    } finally {
+      globalThis.AnnotationStore = real.a;
+      globalThis.NoteStore = real.n;
+      globalThis.BookmarkStore = real.b;
+      globalThis.LinkStore = real.l;
+    }
+    expect(AnnotationStore.all()).toBe(before);
+  });
 });
 
 /* The refutation's store-level counterexamples, through the real save path: the stores hydrate from one IDB (an
@@ -242,5 +261,37 @@ describe('JournalStore.rekeyMarks() on hydrated stores (refutation F1, F8)', () 
     expect(BookmarkStore.get('bk1').hlKey).toBe('journal:j_1:b_a:0-5');
     await settle();
     expect(Object.keys(disk('vot-annotations'))).toEqual(['journal:j_1:b_a']);
+  });
+  it('F8b: a second pass while waiting adds no second subscription', async () => {
+    await Promise.all([JournalStore, NoteStore, BookmarkStore, LinkStore].map((s) => s._hydrate()));
+    expect(AnnotationStore.isReady()).toBe(false);
+    const subSpy = vi.spyOn(AnnotationStore, 'subscribe');
+    try {
+      expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 0, waiting: 1 });
+      expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 0, waiting: 1 });
+      expect(subSpy).toHaveBeenCalledTimes(1);
+    } finally { subSpy.mockRestore(); }
+    await AnnotationStore._hydrate();
+    await vi.waitFor(() => expect(Object.keys(AnnotationStore.all())).toEqual(['journal:j_1:b_a']));
+  });
+
+  it('F8c: a wake-up before every store is ready is ignored', async () => {
+    await Promise.all([JournalStore, NoteStore, BookmarkStore, LinkStore].map((s) => s._hydrate()));
+    expect(AnnotationStore.isReady()).toBe(false);
+    const origSub = AnnotationStore.subscribe.bind(AnnotationStore);
+    /** @type {Array<() => void>} */ const seen = [];
+    const subSpy = vi.spyOn(AnnotationStore, 'subscribe').mockImplementation((cb) => {
+      seen.push(/** @type {any} */ (cb));
+      return origSub(/** @type {any} */ (cb));
+    });
+    try {
+      expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 0, waiting: 1 });
+      expect(seen).toHaveLength(1);
+      seen[0]();
+      expect(NoteStore.get('g1').keys).toEqual(['journal:j_1:0']);   // nothing moved on the early wake-up
+      expect(Object.keys(AnnotationStore.all())).toEqual([]);   // still unloaded: the wake-up must not load or move anything early
+    } finally { subSpy.mockRestore(); }
+    await AnnotationStore._hydrate();
+    await vi.waitFor(() => expect(Object.keys(AnnotationStore.all())).toEqual(['journal:j_1:b_a']));
   });
 });
