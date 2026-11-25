@@ -307,3 +307,110 @@ describe('NotebookStore — rename() keeps names unique (ds5 s11.3)', () => {
     expect(/** @type {any} */ (NotebookStore.get(nb.id)).name).toBe('Study');
   });
 });
+
+describe('NotebookStore — list() sort fallbacks (tests-6 item 11)', () => {
+  it('sorts notebooks missing sortIndex/created by their 0 defaults', () => {
+    /** @type {any} */
+    const first = {
+      list: [
+        { id: 'nb_a', name: 'A' },
+        { id: 'nb_b', name: 'B', sortIndex: 0 },
+        { id: 'nb_c', name: 'C', sortIndex: 0, created: 5 },
+        { id: 'nb_d', name: 'D', sortIndex: 1, created: 1 },
+      ],
+    };
+    NotebookStore.replaceAll(first);
+    expect(NotebookStore.list().map((n) => n.id)).toEqual(['nb_a', 'nb_b', 'nb_c', 'nb_d']);
+
+    // The reverse seed order compares the same pairs the other way round,
+    // so both sides of the created comparison are exercised.
+    /** @type {any} */
+    const reversed = {
+      list: [
+        { id: 'nb_d', name: 'D', sortIndex: 1, created: 1 },
+        { id: 'nb_c', name: 'C', sortIndex: 0, created: 5 },
+        { id: 'nb_b', name: 'B', sortIndex: 0 },
+        { id: 'nb_a', name: 'A' },
+      ],
+    };
+    NotebookStore.replaceAll(reversed);
+    // nb_a and nb_b compare equal (both sortIndex 0, created 0), so the
+    // stable sort keeps them in seed order here: b before a.
+    expect(NotebookStore.list().map((n) => n.id)).toEqual(['nb_b', 'nb_a', 'nb_c', 'nb_d']);
+  });
+});
+
+describe('NotebookStore — defensive list-missing fallbacks (tests-6 item 11)', () => {
+  it('get() and list() tolerate a cache with no list', () => {
+    try {
+      /** @type {any} */ (NotebookStore)._cache = {};
+      expect(NotebookStore.get('nb_x')).toBeNull();
+      expect(NotebookStore.list()).toEqual([]);
+    } finally {
+      /** @type {any} */ (NotebookStore)._cache = null;
+      NotebookStore._resetForTests({ forceLoaded: true });
+    }
+  });
+
+  it('setColor(), remove() and rename() tolerate a cache with no list', () => {
+    try {
+      /** @type {any} */ (NotebookStore)._cache = {};
+      const v0 = NotebookStore.getVersion();
+      NotebookStore.setColor('nb_x', 'red');
+      expect(NotebookStore.getVersion()).toBe(v0);
+      expect(() => NotebookStore.remove('nb_x')).not.toThrow();
+      expect(NotebookStore.rename('nb_x', 'New')).toBe(false);
+    } finally {
+      /** @type {any} */ (NotebookStore)._cache = null;
+      NotebookStore._resetForTests({ forceLoaded: true });
+    }
+  });
+});
+
+describe('NotebookStore — dedup and rename against nameless records (tests-6 item 11)', () => {
+  it('add() dedup does not choke on a nameless notebook already in the list', () => {
+    /** @type {any} */
+    const seed = { list: [{ id: 'nb_a' }] };
+    NotebookStore.replaceAll(seed);
+    const nb = NotebookStore.add('New');
+    expect(nb).not.toBeNull();
+    expect(NotebookStore.list().length).toBe(2);
+  });
+
+  it('rename() runs both duplicate checks past a nameless other notebook', () => {
+    /** @type {any} */
+    const seed = {
+      list: [
+        { id: 'nb_a' },
+        { id: 'nb_b', name: 'B', sortIndex: 0, created: 1, updated: 1 },
+      ],
+    };
+    NotebookStore.replaceAll(seed);
+    expect(NotebookStore.rename('nb_b', 'New')).toBe(true);
+    expect(/** @type {any} */ (NotebookStore.get('nb_b')).name).toBe('New');
+  });
+});
+
+describe('NotebookStore — deferred writes while pending (tests-6 item 11)', () => {
+  it('rename() of a fresh name defers while the store is still loading', () => {
+    NotebookStore._resetForTests(); // idb-backed: 'pending', writes queue
+    try {
+      expect(NotebookStore.getState()).toBe('pending');
+      expect(NotebookStore.rename('nb_x', 'Fresh')).toBe(true);
+    } finally {
+      NotebookStore._resetForTests({ forceLoaded: true });
+    }
+  });
+
+  it('setColor(), remove() and replaceAll() defer while the store is still loading', () => {
+    NotebookStore._resetForTests();
+    try {
+      expect(NotebookStore.getState()).toBe('pending');
+      expect(() => NotebookStore.setColor('nb_x', 'red')).not.toThrow();
+      expect(() => NotebookStore.remove('nb_x')).not.toThrow();
+      expect(() => NotebookStore.replaceAll(/** @type {any} */ ({ list: [] }))).not.toThrow();
+    } finally {
+      NotebookStore._resetForTests({ forceLoaded: true });
+    }
+  });
+});
