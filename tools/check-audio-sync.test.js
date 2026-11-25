@@ -74,7 +74,6 @@ const AKEY = 'five:a-bruised-reed-swaying-in-the-wind';
 const BKEY = 'blessed:blessed-are-those-who-believe-in-me';
 const STUDY_KEY = 'study:more-than-a-man-ch0';
 const A_ASSET = '1wDCfnWQ_SOdodxY9Rmtr9rlpiEomGh5b';
-const B_ASSET = '1LHdgPGb0mLYk2HQgjnpwnLUWfATNh4iu';
 const SECTION_ASSET = '1U0xmOIDAo6Q99aZMeKh-3CYVDninq62g';
 const ALT_ASSET = '10YOeEUf9I2MnOb2yuV0oQBBPNvMvZFXW';
 
