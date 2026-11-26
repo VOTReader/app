@@ -115,7 +115,8 @@ describe('a part computed from a skipped part is skipped with it', () => {
     );
     expect(written()).toEqual(['vot-notes', 'vot-bookmarks']);
     expect(res.importFailures).toBe(1);                                         // the unparsed journal, as before
-    expect(res.skippedStores).toEqual(['vot-journal-index', 'vot-journal-stats']);
+    // r6: the unparsed journal is named too, as Verify names it, so the toast reads its index and stats "with them".
+    expect(res.skippedStores).toEqual(['vot-journal', 'vot-journal-index', 'vot-journal-stats']);
   });
 
   it('the other way round does not hold: a refused index or stats never stops a good journal', async () => {

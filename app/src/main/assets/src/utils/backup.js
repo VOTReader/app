@@ -563,6 +563,25 @@ function _dropDraftsOf(name) {
 }
 
 /**
+ * Refuter 11-26 (r6): the journal index is computed only from the journal's entries (JournalStore._reindex). A
+ * journal this restore wrote without also writing its index (the backup's index refused, unparsed, failed or not
+ * carried) would sit beside the phone's old index: the backup's entries get no letter chip and the phone's gone
+ * entries keep theirs. Rebuild it from the entries just written. A skipped journal keeps the phone's journal and
+ * index together, so nothing is done then. Returns the failures to add (0 or 1).
+ * @param {Record<string, { store: any, method: string }>} storesMap
+ * @param {readonly string[]} written  the stores this restore wrote
+ * @returns {number}
+ */
+function _rebuildJournalIndexIfLeft(storesMap, written) {
+  if (written.indexOf('vot-journal') < 0 || written.indexOf('vot-journal-index') >= 0) return 0;
+  if (!Object.prototype.hasOwnProperty.call(storesMap, 'vot-journal-index')) return 0;
+  const journal = storesMap['vot-journal'] && storesMap['vot-journal'].store;
+  if (!journal || typeof journal.rebuildIndex !== 'function') return 0;
+  try { journal.rebuildIndex(); return 0; }
+  catch (e) { backupWarn('journal index rebuild failed', e); return 1; }
+}
+
+/**
  * Apply a v2-shape `stores` object to the IDB-backed stores + flags: SKIP any
  * section that fails shape validation (so a corrupt section can't overwrite good
  * data), and any section computed from a skipped one (backup-related.js: a skipped
@@ -594,13 +613,15 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
   // never landed (only ever fewer writes: each one is a part that passed its own check, now not written).
   const withThem = storesSkippedWith(invalid, (name) => name in storesObj && name in storesMap);
   if (withThem.length) backupWarn('skipping stores computed from a skipped store:', withThem);
+  /** @type {string[]} */ const written = [];
   for (const name of Object.keys(storesMap)) {
     if (!(name in storesObj)) continue;
     if (invalid.indexOf(name) >= 0 || withThem.indexOf(name) >= 0) { skippedStores.push(name); continue; }
     const { store, method } = storesMap[name];
-    try { _restoreStore(store, method, storesObj[name]); _dropDraftsOf(name); }
+    try { _restoreStore(store, method, storesObj[name]); _dropDraftsOf(name); written.push(name); }
     catch (e) { importFailures += 1; backupWarn('store import failed for', name, e); }
   }
+  importFailures += _rebuildJournalIndexIfLeft(storesMap, written);
   for (const name of Object.keys(flagMap)) {
     if (!(name in storesObj)) continue;
     const truthy = !!storesObj[name];
@@ -772,15 +793,20 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
     }
     const withThem = storesSkippedWith(invalid.concat(unparsed), (name) => name in objs);
     if (withThem.length) backupWarn('skipping V1 stores computed from a skipped store:', withThem);
+    /** @type {string[]} */ const written = [];
     for (const name of Object.keys(storesMap)) {
-      if (invalid.indexOf(name) >= 0 || withThem.indexOf(name) >= 0) { skippedStores.push(name); continue; }
+      // An unparsed string is named too (it is already counted as an error): Verify lists it as skipped, and the
+      // result toast needs the journal in the list to say its index and stats went "with them", not "invalid".
+      if (invalid.indexOf(name) >= 0 || unparsed.indexOf(name) >= 0 || withThem.indexOf(name) >= 0) { skippedStores.push(name); continue; }
       if (!(name in objs)) continue;
       try {
         const { store, method } = storesMap[name];
         _restoreStore(store, method, objs[name]);
         _dropDraftsOf(name);
+        written.push(name);
       } catch (e) { importFailures += 1; backupWarn('V1 import failed for', name, e); }
     }
+    importFailures += _rebuildJournalIndexIfLeft(storesMap, written);
     for (const name of Object.keys(flagMap)) {
       if (parsed && parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
         flagMap[name].set();

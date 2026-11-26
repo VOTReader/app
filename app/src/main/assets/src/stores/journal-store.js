@@ -780,6 +780,25 @@ export var JournalStore = extendStore(
     },
 
     /**
+     * Rebuild the whole JournalIndexStore reverse-index from the entries, as _reindex builds it per entry. The
+     * restore calls it when it writes a journal without its index (backup.js _rebuildJournalIndexIfLeft).
+     * @returns {void}
+     */
+    rebuildIndex() {
+      if (typeof JournalIndexStore === 'undefined' || typeof JournalHelpers === 'undefined') return;
+      /** @type {Record<string, string[]>} */
+      var map = {};
+      (this._load().list || []).forEach(function(entry) {
+        if (!entry || !entry.id) return;
+        JournalHelpers.collectRefs(entry).forEach(function(r) {
+          if (!map[r]) map[r] = [];
+          if (map[r].indexOf(entry.id) < 0) map[r].push(entry.id);
+        });
+      });
+      JournalIndexStore.replaceAll(map);
+    },
+
+    /**
      * Wipe everything (entries + reverse-index). Used by "Clear All
      * Personal Data" in Settings.
      * @returns {void}
@@ -794,9 +813,9 @@ export var JournalStore = extendStore(
 
     /**
      * Replace the entire journal-entry list (W2.6 import path). The
-     * imported payload is presumed self-consistent — index rebuild
-     * happens at the import-handler layer after every store is
-     * written, not per-store.
+     * imported payload is presumed self-consistent: the backup's own
+     * index is written beside it, and when the restore writes the
+     * journal without that index it calls rebuildIndex() (backup.js).
      * @param {JournalStoreData | null | undefined} data
      * @returns {void}
      */
