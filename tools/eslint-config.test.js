@@ -37,9 +37,10 @@ const unusedVarsWarn = ['warn', {
 }];
 
 describe('eslint.config.js', () => {
-  it('exports an array of four config objects', () => {
+  it('exports an array of six config objects', () => {
     expect(Array.isArray(config)).toBe(true);
-    expect(config).toHaveLength(4);
+    // ignores, src, service-worker, tools, src tests, tools tests; the two test blocks came with the stubGlobal guard (2026-11-26)
+    expect(config).toHaveLength(6);
   });
 
   it('ignores dist, minified, generated data, vendor and node_modules', () => {
