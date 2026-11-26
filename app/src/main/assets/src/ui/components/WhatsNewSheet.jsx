@@ -16,10 +16,15 @@ import { LinkRow, tourLength, VersionKicker } from './about-parts.jsx';
 export function WhatsNewSheet() {
   const [items, setItems] = React.useState(/** @type {{ t: number, text: string }[] | null} */ (null));
   const isOpen = items != null;
+  // Fix list #21: the notes could not be read (offline, file missing), which is not "nothing new".
+  const [failed, setFailed] = React.useState(false);
   const rail = useRailMode();
   const trapRef = useFocusTrap(isOpen, { modal: !rail });
   React.useEffect(() => {
-    const open = (/** @type {any} */ e) => setItems(Array.isArray(e && e.detail && e.detail.items) ? e.detail.items : []);
+    const open = (/** @type {any} */ e) => {
+      setFailed(!!(e && e.detail && e.detail.failed));
+      setItems(Array.isArray(e && e.detail && e.detail.items) ? e.detail.items : []);
+    };
     window.addEventListener(OPEN_EVENT, open);
     return () => window.removeEventListener(OPEN_EVENT, open);
   }, []);
@@ -38,7 +43,9 @@ export function WhatsNewSheet() {
         {/* WS3 settings (ab-new): an empty list still leads somewhere. */}
         {!days.length && (
           <div className="ws3-new-empty">
-            <EmptyState icon="spark" title="Nothing new to tell yet." text="When an update changes something you will notice, it is listed here, newest first." />
+            {failed
+              ? <EmptyState icon="spark" title="Could not load the notes." text="Check your connection, then open What’s new again." />
+              : <EmptyState icon="spark" title="Nothing new to tell yet." text="When an update changes something you will notice, it is listed here, newest first." />}
             <div className="ui-group is-inset">
               {typeof TourController !== 'undefined' ? (
                 <ListRow icon="help" title="Show me around" meta={tourLength()} onClick={() => { close(); TourController.start('settings'); }} />

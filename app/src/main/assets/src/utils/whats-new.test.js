@@ -77,3 +77,14 @@ describe('byDay', () => {
     expect(g[0].items.map((i) => i.text)).toEqual(['Build your own reading plan.', 'The daily reminder.']);
   });
 });
+
+describe('openWhatsNew when the notes cannot be read (fix list #21)', () => {
+  it('marks the event failed, so the sheet does not say nothing is new', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const seen = [];
+    const on = (e) => seen.push(e.detail);
+    window.addEventListener(OPEN_EVENT, on);
+    try { await openWhatsNew(); } finally { window.removeEventListener(OPEN_EVENT, on); vi.unstubAllGlobals(); }
+    expect(seen[seen.length - 1]).toEqual({ items: [], failed: true });
+  });
+});

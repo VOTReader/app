@@ -25,3 +25,10 @@ it('opens with the changes by day, and an empty list says so', () => {
   act(() => { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { items: [] } })); });
   expect(screen.getByText('Nothing new to tell yet.')).toBeTruthy();
 });
+
+it('a notes file that could not be read says so, not "Nothing new" (fix list #21)', () => {
+  render(<WhatsNewSheet />);
+  act(() => { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { items: [], failed: true } })); });
+  expect(screen.queryByText('Nothing new to tell yet.')).toBeNull();
+  expect(screen.getByText('Could not load the notes.')).toBeTruthy();
+});

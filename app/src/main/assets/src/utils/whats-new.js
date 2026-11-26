@@ -85,11 +85,15 @@ export async function takeNewItems() {
  */
 export async function openWhatsNew(items) {
   let list = items;
+  /** @type {{ items: NoteItem[], failed?: boolean }} */
+  let detail;
   if (!list) {
     const doc = await fetchNotes();
     list = doc ? doc.items.slice(0, RECENT_COUNT) : [];
-  }
-  try { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { items: list } })); } catch (_e) { /* no window */ }
+    // A read that failed (offline, file missing) is not an empty list (fix list #21): the sheet says so.
+    detail = doc ? { items: list } : { items: list, failed: true };
+  } else detail = { items: list };
+  try { window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail })); } catch (_e) { /* no window */ }
 }
 
 /**
