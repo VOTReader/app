@@ -37,7 +37,18 @@
      _resetToasts()
        TEST-ONLY. Tear down every tracked toast element + clear every
        pending timer. Used by vitest beforeEach for isolation.
+
+   SHARED STATE (bundles-n2, audit 2026-11-23): bundles b and d each bundle
+   a copy of this module. The timers, the onHide callbacks and the stacking
+   order live in sharedState, so a b toast (Copy, Share, journal) and a d
+   toast ("Highlighted · Undo") stack, and a re-show from one copy cancels
+   the other copy's pending hide.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { sharedState } from './shared-state.js';
+
+/** @type {{ hideTimers: Map<string, ReturnType<typeof setTimeout>>, onHide: Map<string, () => void>, shownAt: Map<string, number>, seq: number }} */
+const _st = sharedState('toast', () => ({ hideTimers: new Map(), onHide: new Map(), shownAt: new Map(), seq: 0 }));
 
 /**
  * Per-id auto-hide timers so a re-show before the previous duration
@@ -46,7 +57,7 @@
  *
  * @type {Map<string, ReturnType<typeof setTimeout>>}
  */
-const _hideTimers = new Map();
+const _hideTimers = _st.hideTimers;
 
 /**
  * W55: per-id "this showing ended" callbacks (showToast's opts.onHide). A
@@ -56,7 +67,7 @@ const _hideTimers = new Map();
  *
  * @type {Map<string, () => void>}
  */
-const _onHide = new Map();
+const _onHide = _st.onHide;
 
 /** @param {string} id */
 function _endShowing(id) {
@@ -94,8 +105,7 @@ function _endShowing(id) {
  */
 /* FSET (sy-notices): two toasts up at once stack instead of the newer covering the older's words. Each showing
    toast is pushed off its anchor edge by the toasts shown before it (oldest nearest the edge), 8 px apart. */
-const _shownAt = new Map();
-let _showSeq = 0;
+const _shownAt = _st.shownAt;
 function _restack() {
   if (typeof document === 'undefined') return;
   const live = [];
@@ -158,7 +168,7 @@ export function showToast(opts) {
   }
   void el.offsetHeight;
   el.classList.add('show');
-  _shownAt.set(id, ++_showSeq);
+  _shownAt.set(id, ++_st.seq);
   _restack();
 
   // Cancel any pending auto-hide for this id; re-arm if requested.
