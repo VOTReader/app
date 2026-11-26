@@ -273,4 +273,18 @@ class PlanReminderLogicTest {
         assertFalse(PlanReminderLogic.isQuiet(plan(active = LocalDate.of(2028, 2, 23)), LocalDate.of(2028, 3, 1), null))
         assertTrue(PlanReminderLogic.isQuiet(plan(active = LocalDate.of(2028, 2, 22)), LocalDate.of(2028, 3, 1), null))
     }
+
+    @Test
+    fun `a spread-out plan's rest day has no reminder, and the next comes on its next reading day`() {
+        // Ruth over 7 days, Ruth 1 read Thursday: Friday is an empty day (the card says "Nothing to read today").
+        val thu = fri.minusDays(1)
+        val ruth = plan(done = thu, active = thu).copy(rest = setOf(fri))
+        assertFalse(PlanReminderLogic.dueOn(ruth, fri, thu))
+        assertTrue(PlanReminderLogic.dueOn(ruth, fri.plusDays(1), thu))
+        assertEquals(at(fri.plusDays(1), 7, 30), PlanReminderLogic.nextFire(listOf(ruth), at(thu, 20), null, thu, catchUp = false))
+        assertNull(PlanReminderLogic.message(listOf(ruth), at(fri, 7, 31), null, thu))
+        assertFalse(PlanReminderLogic.anyDueToday(listOf(ruth), fri, thu))
+        // A plan with no rest days (every plan read day after day, and a list stored before rest days) is unchanged.
+        assertTrue(PlanReminderLogic.dueOn(plan(done = thu, active = thu), fri, thu))
+    }
 }

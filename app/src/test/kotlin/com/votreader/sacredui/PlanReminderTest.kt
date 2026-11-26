@@ -101,6 +101,18 @@ class PlanReminderTest {
     }
 
     @Test
+    fun `the parse reads a spread-out plan's rest days, and a list stored before them has none`() {
+        val plans = PlanReminder.parse(
+            list(
+                """{"id":"ruth","done":"2026-10-22","rest":["2026-10-23","bad",7]}""",
+                """{"id":"old","done":"2026-10-22"}""",
+            ),
+        )!!
+        assertEquals(setOf(fri), plans[0].rest)
+        assertEquals(emptySet(), plans[1].rest)
+    }
+
+    @Test
     fun `the alarm posts one reminder a day and sets tomorrow's`() {
         PlanReminder.set(app, list(p()), at(fri, 6))
         PlanReminder.onAlarm(app, at(fri, 7, 31))

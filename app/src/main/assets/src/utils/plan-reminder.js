@@ -20,7 +20,7 @@
    as snapshot-sink.js); tests pass `bridge`.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, todayKey, dayNum, dateOf } from '../data/plan-engine.js';
+import { runStatus, dayItems, todayKey, dayNum, dateOf, isReadingDay } from '../data/plan-engine.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun & { remind?: string }} RemindRun */
 /** @typedef {{ ok: boolean, allowed: boolean, next: number, quiet: string[] }} ReminderStatus */
@@ -71,6 +71,21 @@ export function doneToday(run, now) {
 }
 
 /**
+ * The reading days from today on that a spread-out plan gives nothing to read: its empty days before the next reading
+ * (the Today card's "Nothing to read today"), at most 14. The page sends them because the native side decides the days
+ * ahead from the list alone; the next sync (a tick, a boot) sends the ones after. [] for every other plan.
+ * @param {RemindRun} run @param {Date} now @returns {string[]}
+ */
+export function restDates(run, now) {
+  const st = runStatus(run, now);
+  const due = dayNum(st.spreadOn);
+  if (due == null) return [];
+  const out = [];
+  for (let n = /** @type {number} */ (dayNum(todayKey(now))) + (st.doneToday ? 1 : 0); n < due && out.length < 14; n++) if (isReadingDay(run, n)) out.push(dateOf(n));
+  return out;
+}
+
+/**
  * The list PlanReminder.set takes: each running plan with a reminder on.
  * @param {RemindRun[]} runs @param {Date} now @param {(run: RemindRun) => string} [nameOf]
  */
@@ -88,6 +103,8 @@ export function reminderPayload(runs, now, nameOf) {
     if (Array.isArray(run.weekdays) && run.weekdays.length === 7) p.weekdays = run.weekdays.map(Boolean);
     if (typeof run.start === 'string' && dayNum(run.start) != null) p.start = run.start;
     if (doneToday(run, now)) p.done = todayKey(now);
+    const rest = restDates(run, now);
+    if (rest.length) p.rest = rest;   // absent otherwise: the list of a plan read day after day is unchanged
     plans.push(p);
   }
   return { plans };

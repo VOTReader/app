@@ -32,7 +32,8 @@ import java.time.ZonedDateTime
  *
  * The page's contract (JSON in, JSON out; unknown fields ignored):
  *   in  {"plans":[{"id","name","time":"HH:MM","weekdays":[7 x bool, Sunday first],"done":"YYYY-MM-DD",
- *                  "active":"YYYY-MM-DD","end":"YYYY-MM-DD","paused":bool,"start":"YYYY-MM-DD"}]}   (an empty list turns it off)
+ *                  "active":"YYYY-MM-DD","end":"YYYY-MM-DD","paused":bool,"start":"YYYY-MM-DD",
+ *                  "rest":["YYYY-MM-DD", ...]}]}   (an empty list turns it off; "rest", days with nothing to read, may be absent)
  *   out {"ok":bool,"allowed":bool,"next":<epoch ms, 0 = none>,"quiet":[ids gone quiet]}
  * A tap opens the app; the plan's id waits for the page in [takeOpened] (and reaches a running page as
  * JsEvent.PlanReminderOpen).
@@ -52,6 +53,7 @@ object PlanReminder {
     private const val K_NEXT = "next"
     private const val K_OPENED = "opened"
     private const val MAX_PLANS = 50
+    private const val MAX_REST = 31
 
     /** Take the page's list, store it, set the alarm. Returns the status JSON; a list that will not parse changes nothing. */
     fun set(context: Context, json: String?, now: ZonedDateTime = ZonedDateTime.now()): String {
@@ -149,6 +151,9 @@ object PlanReminder {
                 end = PlanReminderLogic.parseDate(o.optString("end", "")),
                 paused = o.optBoolean("paused", false),
                 start = PlanReminderLogic.parseDate(o.optString("start", "")),
+                rest = o.optJSONArray("rest")?.let { a ->
+                    (0 until minOf(a.length(), MAX_REST)).mapNotNull { PlanReminderLogic.parseDate(a.optString(it, "")) }.toSet()
+                } ?: emptySet(),
             )
         }
         return out

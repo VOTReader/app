@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { newRun, tickItem, pauseRun, resumeRun } from '../data/plan-engine.js';
 import {
-  supported, isReminderTime, lastActive, doneToday, reminderPayload, syncPlanReminders, reminderStatus,
+  supported, isReminderTime, lastActive, doneToday, reminderPayload, restDates, syncPlanReminders, reminderStatus,
   askForReminders, openReminderSettings, onReminderOpen, _resetForTests,
 } from './plan-reminder.js';
 
@@ -172,5 +172,24 @@ describe('the bridge', () => {
     expect(b.planReminderOpened()).toBe('');
     off();
     expect(window.__votPlanReminderOpen).toBeUndefined();
+  });
+});
+
+describe('a spread-out plan\'s empty days (the reminder said "ready" while the card said "Nothing to read today")', () => {
+  // Ruth's 4 chapters over 7 days, made Thursday Nov 26 2026: readings on days 1, 3, 5 and 7.
+  const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
+  const ruth = () => ({ ...newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 7 } }, at('2026-11-26')), id: 'ruth', remind: '07:30' });
+  it('Ruth 1 read Thursday: the list sent that evening names Friday a rest day, so Friday morning stays quiet', () => {
+    const run = tickItem(ruth(), 'ruth:1', '2026-11-26', 1);
+    const p = reminderPayload([run], at('2026-11-26', 20)).plans[0];
+    expect(p.done).toBe('2026-11-26');
+    expect(p.rest).toEqual(['2026-11-27']);
+    expect(restDates(run, at('2026-11-27'))).toEqual(['2026-11-27']);
+  });
+  it('a reading due today, or a plan read day after day: no rest days, and the list keeps its old shape', () => {
+    const run = tickItem(ruth(), 'ruth:1', '2026-11-26', 1);
+    expect(restDates(run, at('2026-11-28'))).toEqual([]);
+    expect('rest' in reminderPayload([run], at('2026-11-28')).plans[0]).toBe(false);
+    expect('rest' in reminderPayload([{ ...run3({ id: 'g' }), remind: '07:30' }], at('2026-11-26')).plans[0]).toBe(false);
   });
 });
