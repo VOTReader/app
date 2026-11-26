@@ -221,3 +221,31 @@ describe('a day marked not read, or read on an earlier date, counts the same on 
     expect(live(true)).toEqual(live(false));
   });
 });
+
+describe('refute plans-1126-r2: the plan page\'s "Not read yet" (markDay) is an untick too', () => {
+  it('Ruth over 20 days: day of Dec 13 marked not read on Dec 21 (PlanPage / PlanSchedule); Catch me up on Dec 15 or 17 changes no past day', () => {
+    const cells = (/** @type {any} */ r, /** @type {string} */ now) => monthCells(r, 2026, 11, at(now)).filter((c) => c.date < 27).map((c) => c.state);
+    /** @param {string | null} caught */
+    const live = (caught) => {
+      let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01'));
+      /** @type {Record<string, string[]>} */ const seen = {};
+      for (let n = /** @type {number} */ (dayNum('2026-12-01')); n <= /** @type {number} */ (dayNum('2026-12-26')); n++) {
+        const key = dateOf(n), now = at(key);
+        if (key === caught) run = catchUp(run, now);
+        if (key === '2026-12-21') {
+          const k = /** @type {string} */ (Object.keys(run.ticks).find((x) => run.ticks[x] === '2026-12-13'));
+          let d = 0;
+          while (!dayItems(run, d).some((it) => it.k === k)) d++;
+          run = markDay(run, d, false, now);
+        }
+        const st = runStatus(run, now);
+        if ((key <= '2026-12-13' && !st.doneToday && !st.spreadOn) || key === '2026-12-26') for (const it of st.todayItems) run = tickItem(run, it.k, key, 1);
+        if (key === '2026-12-21' || key === '2026-12-26') seen[key] = cells(run, key);
+      }
+      return seen;
+    };
+    const plain = live(null);
+    expect(plain['2026-12-21'].slice(12, 20)).toEqual(Array(8).fill('missed'));
+    for (const caught of ['2026-12-15', '2026-12-17', '2026-12-23']) expect(live(caught)).toEqual(plain);
+  });
+});
