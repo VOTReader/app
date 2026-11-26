@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays, streak, monthCells } from './plan-engine.js';
-import { planStateLine } from '../ui/screens/ReadingPlansScreen.jsx';
+import { planStateLine, stoppedLine } from '../ui/screens/ReadingPlansScreen.jsx';
 import { doneToday, restDates } from '../utils/plan-reminder.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
@@ -119,5 +119,26 @@ describe('a long spread-out plan\'s past is worked out once', () => {
     expect(first).toBeGreaterThan(60);
     expect(once).toBeGreaterThan(60);
     expect(passes).toBeLessThan(once / 4);
+  });
+});
+
+describe('a plan paused or stopped before its start', () => {
+  // 2 chapters over 7 days by chapter count, made Dec 2 to start Dec 5: day 1 empty, Philemon 1 on day 2, 2 on day 6.
+  const early = () => newRun({ plan: 'custom', startOn: '2026-12-05', tracks: [{ kind: 'bible', by: 'count', items: [1, 2].map((c) => ({ k: 'phm:' + c, w: 600 })) }], pace: { mode: 'days', n: 7 } }, at('2026-12-02'));
+  it('the layout opens with an empty day', () => {
+    const run = early();
+    expect(run.start).toBe('2026-12-05');
+    expect(layout(run)).toEqual(['', 'phm:1', '', '', '', 'phm:2', '']);
+  });
+  it('paused Dec 2: Day 1 before the start and after it, never Day 0 or Day 2', () => {
+    const run = pauseRun(early(), at('2026-12-02'));
+    for (const d of ['2026-12-03', '2026-12-06', '2026-12-12']) {
+      expect(planStateLine(run, at(d))).toMatchObject({ lead: 'Paused', rest: 'Day 1 of 7' });
+    }
+  });
+  it('stopped Dec 2: "day 1 of 7" a week later', () => {
+    const run = { ...early(), status: /** @type {'stopped'} */ ('stopped'), stopped: '2026-12-02' };
+    expect(stoppedLine(run, at('2026-12-10'))).toMatch(/ · day 1 of 7$/);
+    expect(stoppedLine(run, at('2026-12-03'))).toMatch(/ · day 1 of 7$/);
   });
 });

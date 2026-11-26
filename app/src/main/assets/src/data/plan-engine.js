@@ -407,7 +407,9 @@ export function runStatus(run, now) {
     const lastOn = last < 0 ? (startN == null ? null : startN - 1) : doneOn === '' ? startN : dayNum(doneOn || '');
     const due = lastOn == null ? null : nthReadingDay(run, lastOn + 1, gap);
     // A paused or stopped plan's day stays where it was on the pause or stop date.
-    const held = dayNum((paused ? run.paused : run.status === 'stopped' ? run.stopped : '') || '');
+    // (Never before the start: a plan paused or stopped before it began holds its first day, as resumeRun counts.)
+    let held = dayNum((paused ? run.paused : run.status === 'stopped' ? run.stopped : '') || '');
+    if (held != null && startN != null && held < startN) held = startN;
     const t = held != null && held < today ? held : today;
     if (lastOn != null && due != null && due > t + (doneToday ? 1 : 0)) {
       // A paused plan keeps no date ahead (its finish waits) but still counts its day as the card did.
@@ -418,6 +420,9 @@ export function runStatus(run, now) {
       if (!doneToday) todayDay = t <= lastOn ? last : Math.min(day, last + 1 + readingDaysBetween(run, lastOn + 1, t - 1));
     }
   }
+  // A plan not started yet that opens with empty days is on its Day 1 (its first day is empty, so "the portion" is a
+  // later day); a plan read day after day keeps 03d0ea090's portion.
+  if (notStarted && last < 0 && gap > 0) todayDay = 0;
   let projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
   const targetN = dayNum(run.target);
   let behind = 0, ahead = 0, late = 0;
