@@ -42,6 +42,46 @@ import globals from 'globals';
 
 import { projectGlobals } from './tools/eslint-globals.generated.js';
 
+/* hooks-2 selector (the comment at its use in the src block says what and why). A const because the src test-file
+   block below sets no-restricted-syntax again, and a later block replaces the options, so it lists this one too. */
+const SUBSCRIBE_SYNTAX = (() => {
+  const steps = [
+    ['ConditionalExpression', 'consequent'], ['ConditionalExpression', 'alternate'],
+    ['LogicalExpression', 'left'], ['LogicalExpression', 'right'],
+    ['SequenceExpression', 'expressions.1'], ['SequenceExpression', 'expressions.2'],
+    ['AssignmentExpression', 'right'],
+  ];
+  /** @type {Array<Array<[string, string]>>} */
+  const paths = [[]];
+  for (let depth = 0; depth < 3; depth++) {
+    for (const p of paths.filter((q) => q.length === depth)) for (const s of steps) paths.push([...p, /** @type {[string, string]} */ (s)]);
+  }
+  const alts = [];
+  for (const p of paths) {
+    let at = 'arguments.0';
+    let guard = '';
+    for (const [type, key] of p) { guard += `[${at}.type='${type}']`; at += '.' + key; }
+    alts.push(`${guard}[${at}.type='MemberExpression']`, `${guard}[${at}.type='ChainExpression'][${at}.expression.type='MemberExpression']`);
+  }
+  return {
+    selector: "CallExpression:matches([callee.property.name='useSyncExternalStore'], [callee.name='useSyncExternalStore']):matches(" + alts.join(', ') + ')',
+    message: 'Pass the subscribe wrapped, not as X.subscribe (or s?.subscribe, or one behind a ternary, && || ??, a comma or an assignment): a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js; inert for a null store) or React.useCallback((cb) => X.subscribe(cb), []). Not caught: an alias, a destructure or a renamed import of subscribe; getSnapshot is not checked.',
+  };
+})();
+
+/* sleep-test (2026-11-26). The pre-commit hook's fast run (VOT_VITEST_FAST=1, vitest.config.js) runs tests in the
+   vmThreads pool, where the global object is jsdom's window itself. Its document, window, location and top are
+   unforgeable (non-configurable), so vi.stubGlobal on one throws "Cannot redefine property", while the default pool
+   (CI, the hook's fallback) passes: a test red on the first run and green on the second. Measured in both pools
+   2026-11-26: self and navigator stub fine, so they are not refused. Fake one property of the real object instead,
+   as utils/audio-player/sleep.test.js and utils/song-catalog.test.js do. Not caught: a name held in a variable. */
+const STUB_GLOBAL_SYNTAX = {
+  selector: "CallExpression[callee.object.name='vi'][callee.property.name='stubGlobal']" +
+    ':matches([arguments.0.value=/^(document|window|location|top)$/], ' +
+    '[arguments.0.type=TemplateLiteral][arguments.0.quasis.0.value.cooked=/^(document|window|location|top)$/])',
+  message: "vi.stubGlobal can't replace document, window, location or top: in the vmThreads pool (the pre-commit hook's fast run, VOT_VITEST_FAST=1) they are jsdom's unforgeable properties and it throws \"Cannot redefine property\". Fake the one property you need on the real object instead: Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v }), and put the saved descriptor back (or Reflect.deleteProperty) in afterEach. See utils/audio-player/sleep.test.js.",
+};
+
 export default [
   // Global ignores — applies before any other config matches.
   {
@@ -135,30 +175,7 @@ export default [
          (const sub = s.subscribe), a destructure (const { subscribe } = s) and a renamed import reach React as
          a plain identifier and pass. getSnapshot is not checked: 9 sites pass a bare one (X.getVersion and the like)
          that the review of 2026-11-26 found safe, and refusing the shape would trip them. */
-      'no-restricted-syntax': ['error', (() => {
-        const steps = [
-          ['ConditionalExpression', 'consequent'], ['ConditionalExpression', 'alternate'],
-          ['LogicalExpression', 'left'], ['LogicalExpression', 'right'],
-          ['SequenceExpression', 'expressions.1'], ['SequenceExpression', 'expressions.2'],
-          ['AssignmentExpression', 'right'],
-        ];
-        /** @type {Array<Array<[string, string]>>} */
-        const paths = [[]];
-        for (let depth = 0; depth < 3; depth++) {
-          for (const p of paths.filter((q) => q.length === depth)) for (const s of steps) paths.push([...p, /** @type {[string, string]} */ (s)]);
-        }
-        const alts = [];
-        for (const p of paths) {
-          let at = 'arguments.0';
-          let guard = '';
-          for (const [type, key] of p) { guard += `[${at}.type='${type}']`; at += '.' + key; }
-          alts.push(`${guard}[${at}.type='MemberExpression']`, `${guard}[${at}.type='ChainExpression'][${at}.expression.type='MemberExpression']`);
-        }
-        return {
-          selector: "CallExpression:matches([callee.property.name='useSyncExternalStore'], [callee.name='useSyncExternalStore']):matches(" + alts.join(', ') + ')',
-          message: 'Pass the subscribe wrapped, not as X.subscribe (or s?.subscribe, or one behind a ternary, && || ??, a comma or an assignment): a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js; inert for a null store) or React.useCallback((cb) => X.subscribe(cb), []). Not caught: an alias, a destructure or a renamed import of subscribe; getSnapshot is not checked.',
-        };
-      })()],
+      'no-restricted-syntax': ['error', SUBSCRIBE_SYNTAX],
 
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of
@@ -224,5 +241,16 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'no-empty': 'warn',
     },
+  },
+
+  // Test files: no vi.stubGlobal on jsdom's unforgeable globals (STUB_GLOBAL_SYNTAX above). The src block's hooks-2
+  // selector is listed again because this block's no-restricted-syntax replaces that block's options.
+  {
+    files: ['app/src/main/assets/src/**/*.test.{js,jsx}'],
+    rules: { 'no-restricted-syntax': ['error', SUBSCRIBE_SYNTAX, STUB_GLOBAL_SYNTAX] },
+  },
+  {
+    files: ['tools/**/*.test.{js,mjs}'],
+    rules: { 'no-restricted-syntax': ['error', STUB_GLOBAL_SYNTAX] },
   },
 ];
