@@ -66,9 +66,11 @@ function CloseX() {
 
 /* `glyph` (the Answers sheets, AOGCG 2026-10-22): what the close button draws in place of the
    default ×, their own 20px × icon. The button, its name and its place are the same for every sheet. */
-/** @param {{ onClose: () => void, glyph?: any }} props */
-export function SheetHandle({ onClose, glyph }) {
-  const grab = useDragToClose(onClose);
+/* `sheetOf` (fix list 3): what a drag moves when the handle row does not sit straight in the sheet (the Answers
+   sheets wrap it in their sticky head); by default the sheet two levels above the pill. */
+/** @param {{ onClose: () => void, glyph?: any, sheetOf?: (target: HTMLElement) => HTMLElement | null }} props */
+export function SheetHandle({ onClose, glyph, sheetOf }) {
+  const grab = useDragToClose(onClose, sheetOf);
   return (
     <div className="sheet-handle-row">
       <button type="button" className="sheet-handle-back" onClick={onClose} aria-label="Close">

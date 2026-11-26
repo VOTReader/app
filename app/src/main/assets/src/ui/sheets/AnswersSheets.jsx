@@ -25,6 +25,9 @@ import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersD
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from '../components/AnswersParts.jsx';
 import { sheetReference } from '../../utils/passage-copy.js';
 
+/** The handle sits in .ans-sheet-head, so a drag must move the sheet itself, not the head (fix list 3). */
+const ansSheetOf = (/** @type {HTMLElement} */ t) => /** @type {HTMLElement | null} */ (t.closest('.select-sheet'));
+
 /**
  * The kit sheet in the Answers dress: × close at the left of the sticky head, then the head's own
  * words; `tall` fills the screen under the top bar (Text Size 2+, About, the viewer).
@@ -43,7 +46,7 @@ export function AnsSheet({ label, head, tall, viewer, onClose, children }) {
       <div className={'select-sheet ans-sheet' + (tall ? ' is-tall' : '') + (viewer ? ' is-viewer' : '')} ref={trapRef}
         role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}>
         <div className="ans-sheet-head">
-          <SheetHandle onClose={onClose} glyph={<AnsIcon name="close" />} />
+          <SheetHandle onClose={onClose} glyph={<AnsIcon name="close" />} sheetOf={ansSheetOf} />
           {head}
         </div>
         {children}
