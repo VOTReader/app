@@ -12,6 +12,7 @@ import { ReadingPlanStore } from '../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../data/plan-catalog.js';
 import { beginPlanSession, planSession, planSessionHost, sessionKeyOf, _resetPlanSessionForTests } from '../utils/plan-session.js';
 import { openPlanNav, planNavMounted, planNavStack, _resetPlanNavForTests } from '../utils/plan-nav.js';
+import { answersFromSearch, setAnswersFromSearch } from '../utils/answers-from-search.js';
 
 const GLOBALS = ['HistoryScreen', 'ChapterIndex', 'LibraryScreen', 'HomeScreen', 'MyProgressScreen', 'MATTHEW',
   'COL_BY_INDEX_SC', 'COL_BY_KEY', 'COL_BY_LETTER_SC', 'READING_SCREENS', 'ReadingPlanStore'];
@@ -114,5 +115,28 @@ describe('routes built for an off-screen draw', () => {
     buildScreenRoutes(bgRouteDeps(deps, HOME_TAB));
     planNavMounted();
     expect(planNavStack()).toEqual([{ v: 'list' }, { v: 'plan', id: 'x' }]);
+  });
+});
+
+// heart-4 (audit 2026-11-23): the build also reassigned the window bridges the listening desk, the songs card, the
+// Scripture Web door and Android Back call, so for a moment after each drawn card they acted for the drawn tab, and it
+// cleared the web's pending start and the Answers search carry. An off-screen build now leaves all of them alone.
+describe('heart-4: an off-screen draw claims none of the window bridges', () => {
+  const BRIDGES = ['__votOpenPlanItem', '__openAudioText', '__setBibleAudioEdition', '__songsBack', '__journalEditorBack',
+    '__openDownloads', '__openSongs', '__openScriptureWeb'];
+  afterEach(() => { for (const k of BRIDGES) delete window[k]; delete window.navHandoff; setAnswersFromSearch(null); });
+
+  it('the bridges stay the screen on show\'s, and nothing it handed on is cleared', () => {
+    const deps = appDeps(vi.fn());
+    buildScreenRoutes(deps);
+    const before = Object.fromEntries(BRIDGES.map((k) => [k, window[k]]));
+    expect(typeof before.__openAudioText).toBe('function');
+    const cleared = [];
+    window.navHandoff = { clear: (k) => cleared.push(k), set: () => {}, take: () => null, peek: () => null };
+    setAnswersFromSearch('why is the sky blue');
+    buildScreenRoutes(bgRouteDeps(deps, HOME_TAB));
+    for (const k of BRIDGES) expect(window[k], k).toBe(before[k]);
+    expect(cleared).not.toContain('webStart');
+    expect(answersFromSearch()).toBe('why is the sky blue');
   });
 });

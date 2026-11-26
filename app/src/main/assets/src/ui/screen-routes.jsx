@@ -357,7 +357,9 @@ export function buildScreenRoutes({
     _listOpen({ screen: first.screen, letterId: first.id }, { sourceLetterTitle: from, silent: true });
   };
   // mw18 S8: the reader's plan line (PlanRibbon) opens a plan's next item the way the Today card's Read does.
-  /** @type {any} */ (window).__votOpenPlanItem = openPlanItem;
+  // heart-4: a build for an off-screen draw (bgDraw) claims none of the window bridges below; they belong to the
+  // screen on show, and the drawn tab's closures would send the next tap to the wrong place until App renders again.
+  if (!bgDraw) /** @type {any} */ (window).__votOpenPlanItem = openPlanItem;
   // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
   // stops when the portion ends: each Bible chapter in the reader's audio edition, each letter in its
   // collection's recording. Items with no recording are passed over; with none, Read opens the first.
@@ -740,13 +742,13 @@ export function buildScreenRoutes({
   // The listening desk (AudioManagerSheet) renders outside the routed tree,
   // so it reaches the opener through this bridge — reassigned every build so
   // the closure always carries the CURRENT screen for the back pill.
-  window.__openAudioText = (track) => _openAudioText(track, screen);
+  if (!bgDraw) window.__openAudioText = (track) => _openAudioText(track, screen);
   // Same bridge shape for the desk's Voice chips: switching Bible edition
   // there has to move settings.bibleAudio too, or every Listen pill elsewhere
   // would keep offering the edition the listener just left. Guarded on the
   // registry so an unknown id can never be persisted, and on bibleAudioOffered
   // so a hidden one cannot be either (no chip offers it; a tool could).
-  window.__setBibleAudioEdition = (id) => { if (bibleAudioOffered(bibleAudioEdition(id))) updateSetting('bibleAudio', id); };
+  if (!bgDraw) window.__setBibleAudioEdition = (id) => { if (bibleAudioOffered(bibleAudioEdition(id))) updateSetting('bibleAudio', id); };
   // Entering a Listening Library sub-screen chains the origin so backing out
   // lands on the hub, and the hub's own back still returns to Library/Volumes.
   const _enterAudioSub = (destination) => {
@@ -768,7 +770,7 @@ export function buildScreenRoutes({
     goNavOrigin();
     return false;
   };
-  window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
+  if (!bgDraw) window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
   // The journal editor's Back (its Done and the phone's Back alike): a plan day's note returns to its plan, a new
   // entry to the Journal list, any other entry to its read-only view.
   const _journalEditorBack = () => {
@@ -776,18 +778,18 @@ export function buildScreenRoutes({
     if (window.navHandoff.take('journalPlanReturn') === journalEntryId) { window.navHandoff.take('journalNewEntry'); keepPlanNav(); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); return; }
     if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId);
   };
-  window.__journalEditorBack = screen === 'journal-editor' ? _journalEditorBack : null;
+  if (!bgDraw) window.__journalEditorBack = screen === 'journal-editor' ? _journalEditorBack : null;
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
   // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
   // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
   // Downloads (downloads brief D3b): a collection or edition header's "Choose…" opens the tree there, Settings'
   // Downloads & storage opens On this phone; Back returns to the page it came from, the pill naming it.
-  window.__openDownloads = (at, label) => {
+  if (!bgDraw) window.__openDownloads = (at, label) => {
     openDownloadsAt(at);
     setNavOrigin({ screen, letterId, label: label || '', returnOrigin: navOrigin || null });
     setScreen('audio-library-offline');
   };
-  window.__openSongs = (frames, label) => {
+  if (!bgDraw) window.__openSongs = (frames, label) => {
     if (screen === SONGS_SCREEN) {
       // W2-03: the page already on top is not stacked again (its copy made the first Back go nowhere).
       const stack = decodeSongsRoute(audioColKey);
@@ -807,7 +809,7 @@ export function buildScreenRoutes({
   // back (the web's Back is goNavOrigin), and the start rides navHandoff 'webStart' into the route
   // below, which hands it to the screen while the web is up; anywhere else it is spent, so the web
   // opened later from the Library opens where it was. Reassigned every build, like __openSongs.
-  window.__openScriptureWeb = (start, opts) => {
+  if (!bgDraw) window.__openScriptureWeb = (start, opts) => {
     // opts.mine (r-links' "My Web"): the web opens in My Web, the reader's own links, with no start.
     if (opts && opts.mine) {
       if (opts.check) return true;
@@ -832,9 +834,9 @@ export function buildScreenRoutes({
     setScreen('scripture-web');
     return true;
   };
-  if (screen !== 'scripture-web' && window.navHandoff) window.navHandoff.clear('webStart');
+  if (!bgDraw && screen !== 'scripture-web' && window.navHandoff) window.navHandoff.clear('webStart');
   // Home ends a visit to Answers that began in Search: the landing's Back is Home again (PL-SEARCH 2).
-  if (screen === 'home') setAnswersFromSearch(null);
+  if (!bgDraw && screen === 'home') setAnswersFromSearch(null);
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
