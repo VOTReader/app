@@ -29,6 +29,16 @@ function votAudioReady() {
   return typeof AUDIO_MANIFEST !== 'undefined' && !!AUDIO_MANIFEST;
 }
 
+/** A collection row's size line, counted in recordings as its own screen counts them ("29 recordings · 2 h 5 min"),
+ *  not in letters: the count holds the preface, and some letters have no recording (look-1, audit 11-23: Flock read
+ *  62 here and 66 on Read). A study counts chapters, as its screen does. '' while the count or length is unknown.
+ *  @param {any} col @param {number} n @param {number} totalSec */
+export function sizeWords(col, n, totalSec) {
+  if (!(n > 0) || !(totalSec > 0)) return '';
+  const noun = col && col.kind === 'chapter' ? itemNoun(col, n) : (n === 1 ? 'recording' : 'recordings');
+  return n + ' ' + noun + ' · ' + queueTime(totalSec);
+}
+
 /**
  * @param {{
  *   onBack: () => void,
@@ -56,7 +66,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Back to Listen', onOpe
   };
 
   // Warm the lazy VOT corpus so the availability sub-lines can answer.
-  /** U04.1: "30 letters · 6 h 10 min" from the baked lengths, '' until they are known. @param {any} col */
+  /** U04.1: "30 recordings · 6 h 10 min" from the baked lengths, '' until they are known. @param {any} col */
   const sizeLine = (col) => {
     if (typeof colLetterArr !== 'function' || typeof AudioPlayer.renditionsFor !== 'function') return '';
     const pre = typeof colPreface === 'function' ? colPreface(col) : null;
@@ -70,7 +80,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Back to Listen', onOpe
       if (!s) return '';
       total += s;
     }
-    return items.length && total ? items.length + ' ' + itemNoun(col, items.length) + ' · ' + queueTime(total) : '';
+    return sizeWords(col, items.length, total);
   };
 
   React.useEffect(() => {

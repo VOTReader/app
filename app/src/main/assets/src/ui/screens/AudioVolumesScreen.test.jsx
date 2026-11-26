@@ -14,7 +14,7 @@ const { player } = vi.hoisted(() => ({
 
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { AudioVolumesScreen } from './AudioVolumesScreen.jsx';
+import { AudioVolumesScreen, sizeWords } from './AudioVolumesScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import * as AudioCoverage from '../../utils/audio-coverage.js';
@@ -62,6 +62,17 @@ afterEach(() => {
   cleanup();
   delete globalThis.AudioPlayer;
   for (const key of ['ScreenLayout', 'LibraryNav', 'COLLECTIONS', 'AUDIO_MANIFEST']) delete globalThis[key];
+});
+
+// look-1 (audit 11-23): the size line counts recordings (the preface among them), as the collection screen does.
+describe('sizeWords — a collection row counts recordings, not letters', () => {
+  it('says recordings for a letter collection and an entry collection, chapters for a study', () => {
+    expect(sizeWords({ volKey: 'flock', kind: 'letter' }, 62, 7200)).toMatch(/^62 recordings · /);
+    expect(sizeWords({ volKey: 'wtlb-one', kind: 'entry' }, 1, 600)).toMatch(/^1 recording · /);
+    expect(sizeWords({ volKey: 'purity', kind: 'chapter' }, 6, 600)).toMatch(/^6 chapters · /);
+    expect(sizeWords({ volKey: 'one' }, 30, 0)).toBe('');
+    expect(sizeWords({ volKey: 'one' }, 0, 600)).toBe('');
+  });
 });
 
 describe('AudioVolumesScreen', () => {

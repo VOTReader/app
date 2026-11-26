@@ -664,6 +664,26 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
 });
 
 describe('AudioManagerSheet — Up next sheet', () => {
+  /* look-1 (audit 11-23): the kicker counts recordings ("1 of 4", a letter in parts once) while "left" counted
+     queue tracks, so a two-part letter made it read one more than the kicker could. Both count recordings now. */
+  it('"left" counts recordings as the kicker does: a letter in two parts is one recording', () => {
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol1:letter-a': [['idA1', 'B', 'Part 1'], ['idA2', 'B', 'Part 2']] };
+    try {
+      startCollection();
+      openSheet();
+      expect(AudioPlayer.getState().queue.length).toBe(5);   // five tracks, four recordings
+      expect(kicker()).toMatch(/\b1 of 4$/);
+      expect(tool('Up next').getAttribute('aria-label')).toBe('Up next, 3 left');
+      openUpNext();
+      expect(upNextSub()).toBe('3 left');
+      fireEvent.click(nextTrack());                         // The Wide Path, Part 1: 2 of 4
+      expect(upNextSub()).toBe('2 left');
+      expect(tool('Up next').getAttribute('aria-label')).toBe('Up next, 2 left');
+    } finally {
+      globalThis.AUDIO_MANIFEST = MANIFEST;
+    }
+  });
+
   it('pins the playing recording, folds the played ones under Earlier, and re-picks a played recording', () => {
     startCollection();
     openSheet();
