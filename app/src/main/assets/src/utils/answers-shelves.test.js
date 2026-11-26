@@ -13,7 +13,7 @@ import {
   ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersPassageCount,
   answersShortTitle, answersSortKey, answersIndexLetter,
   answersTopicEntries, ANSWERS_MAIN_PAGE_ID,
-  answersFiledUnder, isDateHead, isTrumpetSection,
+  isDateHead, isTrumpetSection,
 } from './answers-shelves.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -136,22 +136,6 @@ describe('the highlight namespace', () => {
     const taken = new Set(others);
     expect(others.length).toBeGreaterThan(300);
     expect(ANSWERS.filter((e) => taken.has(e.id)).map((e) => e.id)).toEqual([]);
-  });
-});
-
-describe('answersFiledUnder — where a topic is filed', () => {
-  it('names the commandment by its Roman numeral', () => {
-    expect(answersFiledUnder({ group: 'Commandment 4' })).toBe('Commandment IV');
-    expect(answersFiledUnder({ group: 'Commandment 1' })).toBe('Commandment I');
-  });
-  it('falls back to the group itself when no tablet matches', () => {
-    expect(answersFiledUnder({ group: 'Commandment 99' })).toBe('Commandment 99');
-  });
-  it('names the subject for a subject topic, and nothing for neither', () => {
-    expect(answersFiledUnder({ id: 'the-messiah' })).toBe('The Lord & His Messiah');
-    expect(answersFiledUnder({ id: 'no-such-topic' })).toBe('');
-    expect(answersFiledUnder({})).toBe('');
-    expect(answersFiledUnder(null)).toBe('');
   });
 });
 

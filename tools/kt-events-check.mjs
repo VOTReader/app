@@ -13,9 +13,7 @@ import { kotlinEntryPoints, pageSources, stripComments, REPO_ROOT } from './brid
 
 /** Dispatches known to have no receiver, with the reason. */
 export const KNOWN_UNWIRED = {
-  // The legacy base64 import picker, dead since 2026-06-02 (the v3 streaming import replaced it). Audit
-  // dead-code-docs-n1 removes it from AppInterface, BridgeHost, MainActivity and JsEvent.
-  __onImportFile: 'dead legacy import picker; removal is dead-code-docs-n1',
+  // (empty: the legacy base64 import picker's __onImportFile left with dead-code-docs-n1)
 };
 
 /** @returns {{ issues: string[], notes: string[] }} */
