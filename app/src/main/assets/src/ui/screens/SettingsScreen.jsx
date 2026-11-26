@@ -454,11 +454,11 @@ export function BackupCounts({ s, here = null }) {
   const n = (/** @type {any} */ v) => Number(v || 0).toLocaleString('en-US');
   // A kind the file does not carry reads as a dash, not 0: the restore leaves it untouched, and 0 reads as a wipe.
   // A kind it carries but cannot count (a counts-only file's highlights or read marks) is a dash too. 0 means empty.
-  // A kind the restore will skip (its part of the file fails the restore's shape check) is a dash as well.
-  // The dash is hidden from screen readers, which read the words instead.
+  // A kind the restore will skip (its part of the file fails the restore's shape check) reads "skipped", in sight
+  // and to screen readers. A dash is hidden from screen readers, which read the words instead.
   const dash = (/** @type {string} */ words) => <span className="ws3-count-n"><span aria-hidden="true">–</span><span className="sr-only">{words}</span></span>;
   const fileCell = (/** @type {string} */ k) => (skipped.indexOf(k) >= 0
-    ? dash('Will be skipped: this part of the backup is damaged')
+    ? <span className="ws3-count-n is-skipped"><span aria-hidden="true">skipped</span><span className="sr-only">{"Will be skipped: this app can't read this part of the backup"}</span></span>
     : absent.indexOf(k) >= 0
       ? dash('Not in this backup')
       : unknown.indexOf(k) >= 0
@@ -487,8 +487,11 @@ function _backupDay(iso) {
 function _verifyWords(r) {
   const s = r.summary || null;
   const damaged = ['mismatch', 'malformed', 'trailing', 'truncated'].indexOf(r.integrity) >= 0;
+  const skips = !!(s && Array.isArray(s.skippedStores) && s.skippedStores.length);
   const title = !s ? 'This file could not be checked' : r.level === 'ok' ? 'This backup is intact'
-    : damaged ? 'This backup may be damaged' : 'This backup could not be fully checked';
+    : damaged ? 'This backup may be damaged'
+      : skips && (r.kind === 'legacy' || r.integrity === 'ok' || r.integrity === 'absent') ? 'Part of this backup can\'t be restored'
+        : 'This backup could not be fully checked';
   let sub = null;
   if (s) {
     const how = r.kind === 'legacy' ? 'older format, no checksum' : r.integrity === 'ok' ? 'integrity check passed'

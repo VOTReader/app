@@ -4,7 +4,7 @@
    summary math and the user-facing report copy. */
 
 import { describe, it, expect } from 'vitest';
-import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
+import { summarizeBackupManifest, formatVerifyReport, describeBackupKinds, describeSkipped } from './backup-verify.js';
 import { buildV3Manifest, buildExportPayload, readsStoresBlock } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 import { formatBytes } from './format-bytes.js';
@@ -28,6 +28,15 @@ const v3Manifest = {
     { id: 'b', size: 2500 },
   ],
 };
+// The stores its counts describe: the restore writes `stores`, never `counts`, so a v3 summary counts these.
+{
+  const objOf = (n, f) => Object.fromEntries(Array.from({ length: n }, (_, i) => ['k' + i, f(i)]));
+  const listOf = (n) => Array.from({ length: n }, (_, i) => ({ id: 'x' + i }));
+  v3Manifest.stores = {
+    'vot-notes': objOf(12, () => ({})), 'vot-annotations': objOf(40, () => [{ id: 'm' }]),
+    'vot-journal': { list: listOf(5) }, 'vot-bookmarks': listOf(3), 'vot-links': listOf(7),
+  };
+}
 
 describe('summarizeBackupManifest', () => {
   it('totals records across stores (excluding _media) and sums media bytes (v3 array)', () => {
@@ -37,9 +46,9 @@ describe('summarizeBackupManifest', () => {
     expect(s.mediaCount).toBe(2);
     expect(s.mediaBytes).toBe(3500);
     expect(s.notes).toBe(12);
-    // Declared counts hold passages, not marks: no stores block, no highlight count.
-    expect(s.annotatedPassages).toBe(40);
-    expect(s.highlights).toBe(0);
+    // Counted from the stores the restore writes: one mark per passage here, so 40 highlights.
+    expect(s.annotatedPassages).toBe(0);
+    expect(s.highlights).toBe(40);
     expect(s.journal).toBe(5);
     expect(s.bookmarks).toBe(3);
     expect(s.date).toBe('2026-07-01T12:00:00.000Z');
@@ -72,7 +81,7 @@ describe('formatVerifyReport', () => {
     const r = formatVerifyReport(s, 'ok', 'v3');
     expect(r.level).toBe('ok');
     expect(r.message).toContain('12 notes');
-    expect(r.message).toContain('40 annotated passages');
+    expect(r.message).toContain('40 highlights');
     expect(r.message).toContain('5 journal entries');
     expect(r.message).toContain('67 records across 5 data stores');
     expect(r.message).toContain('2 media files');
@@ -108,7 +117,7 @@ describe('formatVerifyReport', () => {
   });
 
   it('singulars + unknown date stay grammatical', () => {
-    const one = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 1 }, media: [{ id: 'x', size: 5 }] });
+    const one = summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-notes': { n1: {} } }, media: [{ id: 'x', size: 5 }] });
     const r = formatVerifyReport(one, 'ok', 'v3');
     expect(r.message).toContain('1 note — ');
     expect(r.message).toContain('1 record across 1 data store');
@@ -396,13 +405,6 @@ describe('Verify counts the highlights a real export carries', () => {
     expect(s.absent).not.toContain('highlights');
   });
 
-  it('a file that only declares counts says passages, the unit those counts are in', () => {
-    const many = formatVerifyReport(summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-annotations': 12 } }), 'absent', 'v3');
-    expect(many.message).toContain(': 12 annotated passages — ');
-    expect(many.message).not.toContain('highlight');
-    const one = formatVerifyReport(summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-annotations': 1 } }), 'absent', 'v3');
-    expect(one.message).toContain(': 1 annotated passage — ');
-  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -435,10 +437,6 @@ describe('summarizeBackupManifest: the kinds past the first four (data-7)', () =
     expect(one.message).toContain(': 1 link, 1 place marked read — ');
   });
 
-  it('a counts-only file still names links, plans and notebooks; read marks need the stores', () => {
-    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-links': 4, 'vot-reading-plans': 2, 'vot-notebooks': 1, 'vot-state': 1 } });
-    expect([s.links, s.plans, s.notebooks, s.readMarks]).toEqual([4, 2, 1, 0]);
-  });
 
   it('an old backup without those sections reads 0 for each, and odd shapes do not throw', () => {
     const old = summarizeBackupManifest({ exportVersion: 2, data: {}, stores: { 'vot-notes': { g1: { groupId: 'g1' } } } });
@@ -583,19 +581,52 @@ describe('summarizeBackupManifest: kinds the file does not carry, or cannot coun
     expect(summarizeBackupManifest({ exportVersion: 3, stores: {} }).absent).toContain('mediaCount');
   });
 
-  it('a counts-only file cannot say its read marks or highlights: unknown, not absent and not 0', () => {
-    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-state': 1, 'vot-annotations': 4, 'vot-notes': 2 } });
-    expect(s.unknown).toEqual(['highlights', 'readMarks']);
-    expect(s.absent).not.toContain('readMarks');
-    expect(s.absent).toContain('links');
-    const none = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 2 } });
-    expect(none.unknown).toEqual([]);
-    expect(none.absent).toContain('readMarks');
+  /* Second review of 213e39ce1: a v3 manifest without a stores block showed its `counts`, but applyV3 restores
+     `manifest.stores || {}` and writes no store from it. Every row is absent; only its media still restores. */
+  it('REVIEW: a v3 file with only counts shows every row absent and names no kinds, however much it declares', () => {
+    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 2, 'vot-annotations': 12, 'vot-links': 4, 'vot-state': 1, _media: 1 }, media: [{ id: 'm', size: 3 }] });
+    expect(s.absent).toEqual(expect.arrayContaining(['notes', 'highlights', 'journal', 'bookmarks', 'links', 'plans', 'notebooks', 'journalNotebooks', 'readMarks']));
+    expect(s.absent).not.toContain('mediaCount');
+    expect([s.notes, s.annotatedPassages, s.links, s.readMarks, s.records, s.storeCount]).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(s.unknown).toEqual([]);
+    expect(describeBackupKinds(s)).toEqual([]);
   });
 
   it('null or garbage never throws and says nothing is carried', () => {
     const s = summarizeBackupManifest(null);
     expect(s.absent).toContain('notes');
     expect(s.absent).toContain('mediaCount');
+  });
+});
+
+/* Second review of 213e39ce1: a store the restore will skip was told only to screen readers. A v2 file whose
+   vot-journal is { list: 'oops' } verified as "contents read back correctly" with a plain dash on the sheet. */
+describe('a store the restore will skip is a visible warning, not a quiet dash', () => {
+  const doc = { exportVersion: 2, exportDate: '2026-11-01T12:00:00.000Z', data: {},
+    stores: { 'vot-notes': { n1: {}, n2: {} }, 'vot-journal': { list: 'oops' }, 'vot-history': 'junk' }, media: {} };
+
+  it('REPRO: Verify warns and names the kinds that will not restore', () => {
+    const s = summarizeBackupManifest(doc);
+    const r = formatVerifyReport(s, 'absent', 'legacy');
+    expect(r.level).toBe('warn');
+    expect(r.message).toContain("WARNING: this app can't read some of this backup, so a restore will skip its journal entries, 1 other part and leave those as they are on this phone.");
+    expect(r.message).not.toContain('damaged');
+  });
+
+  it('skipped stores add no records and no store', () => {
+    const s = summarizeBackupManifest(doc);
+    expect([s.records, s.storeCount, s.notes, s.journal]).toEqual([2, 1, 2, 0]);
+    expect(s.skippedStores.sort()).toEqual(['vot-history', 'vot-journal']);
+  });
+
+  it('a file with nothing skipped keeps its ok verdict and no warning line', () => {
+    const s = summarizeBackupManifest({ ...doc, stores: { 'vot-notes': { n1: {} } } });
+    expect(describeSkipped(s)).toBe('');
+    expect(formatVerifyReport(s, 'absent', 'legacy').level).toBe('ok');
+  });
+
+  it('a v1 string the restore cannot parse is skipped only for a store it knows; an unknown name is ignored', () => {
+    const s = summarizeBackupManifest({ data: { 'vot-bookmarks': '{oops', 'vot-someday': '{oops' } });
+    expect(s.skippedStores).toEqual(['vot-bookmarks']);
   });
 });

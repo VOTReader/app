@@ -60,7 +60,7 @@ import { validateStorePayload } from './import-validators.js';
  *   notes: number, highlights: number, annotatedPassages: number,
  *   journal: number, bookmarks: number,
  *   links: number, plans: number, notebooks: number, journalNotebooks: number, readMarks: number,
- *   absent: string[], skipped: string[], unknown: string[]
+ *   absent: string[], skipped: string[], skippedStores: string[], unknown: string[]
  * }}
  */
 export function summarizeBackupManifest(manifest) {
@@ -87,27 +87,25 @@ export function summarizeBackupManifest(manifest) {
         const raw = manifest.data[k];
         if (k.indexOf('vot-') !== 0 || typeof raw !== 'string') continue;
         let v;
-        try { v = JSON.parse(raw); } catch (_e) { skippedStores.add(k); continue; }
+        // A store the restore knows (validateStorePayload has a shape for it: it refuses undefined) and cannot parse
+        // is one it fails to write; a name it does not know it ignores.
+        try { v = JSON.parse(raw); } catch (_e) { if (validateStorePayload(k, undefined).length) skippedStores.add(k); continue; }
         if (validateStorePayload(k, v).length) skippedStores.add(k);
         else if (v && typeof v === 'object') fromData[k] = v;
       }
     }
     stores = fromData;
   }
-  // Otherwise a v3 manifest without its stores block: only its declared `counts` can speak for it.
+  // Otherwise a v3 manifest without its stores block: applyV3 restores `manifest.stores || {}`, which writes no
+  // store, so every row is absent whatever `counts` it declares (its media is still restored).
   let records = 0;
   let storeCount = 0;
   /** @type {Map<string, number>} */
   const byStore = new Map();
   const add = (k, n) => { byStore.set(k, n); records += n; storeCount += 1; };
+  // A store the restore will skip writes nothing, so it adds no records and no store.
   if (stores) {
-    for (const k of Object.keys(stores)) add(k, countStoreRecords(stores[k]));
-  } else {
-    for (const k of Object.keys(counts)) {
-      if (k === '_media') continue;
-      const n = counts[k];
-      if (typeof n === 'number' && Number.isFinite(n)) add(k, n);
-    }
+    for (const k of Object.keys(stores)) if (!skippedStores.has(k)) add(k, countStoreRecords(stores[k]));
   }
   // Media: a v3 array or a v2 id map is restored (and what it omits pruned); a v1 file's media is never read.
   const media = manifest && exportVersion !== 1 ? manifest.media : null;
@@ -185,6 +183,7 @@ export function summarizeBackupManifest(manifest) {
     readMarks,
     absent,
     skipped,
+    skippedStores: [...skippedStores],
     unknown,
   };
 }
@@ -280,8 +279,11 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
     + ' record' + (s.records === 1 ? '' : 's') + ' across ' + s.storeCount
     + ' data store' + (s.storeCount === 1 ? '' : 's') + mediaBit + '. ';
 
+  // A store the restore will skip is a warning whatever the checksum says: the file reads back, but that part of it
+  // will not restore. Named in plain words, here and on the sheet, not only to screen readers.
+  const skippedLine = describeSkipped(s);
   let tail;
-  let level = /** @type {'ok'|'warn'} */ ('ok');
+  let level = /** @type {'ok'|'warn'} */ (skippedLine ? 'warn' : 'ok');
   if (kind === 'legacy') {
     tail = 'Older text-format backup — contents read back correctly (this format carries no checksum).';
   } else if (integrity === 'ok') {
@@ -330,5 +332,29 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
     tail = 'WARNING: this backup could not be checked — the integrity check did not complete, so nothing here says whether the file is damaged. What is listed above was read from it. Try Verify again, and make a fresh Export if it keeps failing.';
     level = 'warn';
   }
-  return { message: body + tail, level };
+  return { message: body + (skippedLine ? skippedLine + ' ' : '') + tail, level };
+}
+
+/** Words for the kinds the counts sheet names, as a sentence lists them. */
+const SKIPPED_WORDS = /** @type {Record<string, string>} */ ({
+  notes: 'notes', highlights: 'highlights', journal: 'journal entries', bookmarks: 'bookmarks', links: 'links',
+  plans: 'reading plans', notebooks: 'notebooks', journalNotebooks: 'journal notebooks', readMarks: 'read marks',
+});
+/** Stores behind the sheet's rows; any other store the restore skips is counted as "other parts". */
+const ROW_STORES = ['vot-notes', 'vot-annotations', 'vot-journal', 'vot-bookmarks', 'vot-links', 'vot-reading-plans',
+  'vot-notebooks', 'vot-journal-notebooks', 'vot-state'];
+
+/**
+ * The visible warning for the parts of a backup the restore will skip (they fail its shape check), or '' when
+ * there are none. "This app can't read", not "damaged": a newer app's shape is skipped the same way.
+ * @param {ReturnType<typeof summarizeBackupManifest>} s
+ * @returns {string}
+ */
+export function describeSkipped(s) {
+  const kinds = (Array.isArray(s.skipped) ? s.skipped : []).filter((k) => SKIPPED_WORDS[k]).map((k) => SKIPPED_WORDS[k]);
+  const others = (Array.isArray(s.skippedStores) ? s.skippedStores : []).filter((k) => ROW_STORES.indexOf(k) < 0).length;
+  if (others) kinds.push(others === 1 ? '1 other part' : others + ' other parts');
+  if (!kinds.length) return '';
+  return 'WARNING: this app can\'t read some of this backup, so a restore will skip its ' + kinds.join(', ')
+    + ' and leave those as they are on this phone.';
 }

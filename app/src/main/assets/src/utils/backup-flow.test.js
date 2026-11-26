@@ -31,7 +31,7 @@ const STORE_NAMES = [
 const MANIFEST = {
   app: 'VOTReader', exportVersion: 3, exportDate: '2026-07-01T12:00:00.000Z',
   counts: { _media: 0, 'vot-notes': 1 },
-  data: {}, stores: { 'vot-notes': [1], 'vot-bookmarks': [1, 2] }, media: [],
+  data: {}, stores: { 'vot-notes': { n1: {} }, 'vot-bookmarks': [1, 2] }, media: [],
 };
 const LEGACY = {
   app: 'VOTReader', exportVersion: 2, exportDate: '2026-07-01T12:00:00.000Z',
@@ -1104,5 +1104,16 @@ describe('data-2: before an import writes, the library is kept; the sheet shows 
     expect(ctx.confirmImport.mock.calls[0][0]).toContain(
       ' This backup contains 2 notes, 3 highlights, 1 link, 2 reading plans, 2 places marked read, 1 photo or recording.');
     expect(ctx.confirmImport.mock.calls[0][0]).not.toContain('annotated keys');
+  });
+
+  it('when the summary cannot be built, the confirm text falls back to its own count rather than naming nothing', async () => {
+    globalThis.summarizeBackupManifest = () => { throw new Error('summary broke'); };
+    try {
+      bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+      await createBackupFlow(ctx).importPersonalData();
+      await settle();
+      expect(ctx.confirmImport.mock.calls[0][0]).toContain(' This backup contains 2 annotated keys.');
+      expect(ctx.confirmImport.mock.calls[0][1]).toBeNull();   // no counts sheet: the text is what the reader sees
+    } finally { globalThis.summarizeBackupManifest = summarizeBackupManifest; }
   });
 });

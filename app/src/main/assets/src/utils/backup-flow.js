@@ -589,11 +589,29 @@ export function createBackupFlow(ctx) {
       /** @type {string[]} */
       let summaryParts = [];
       try {
-        if (fileSummary) {
-          summaryParts = typeof describeBackupKinds === 'function' ? describeBackupKinds(fileSummary) : [];
-          if (fileSummary.mediaCount) summaryParts.push(fileSummary.mediaCount + (fileSummary.mediaCount === 1 ? ' photo or recording' : ' photos and recordings'));
-        }
-      } catch (_e) { summaryParts = []; }
+        if (!fileSummary) throw new Error('no summary');
+        summaryParts = describeBackupKinds(fileSummary);
+        if (fileSummary.mediaCount) summaryParts.push(fileSummary.mediaCount + (fileSummary.mediaCount === 1 ? ' photo or recording' : ' photos and recordings'));
+      } catch (_e) {
+        // The summary could not be built (or its words are missing): fall back to the sentence this text carried
+        // before it shared the summary, read straight off the stores block, rather than naming nothing.
+        summaryParts = [];
+        try {
+          if (parsed.stores && typeof parsed.stores === 'object') {
+            const annData = parsed.stores['vot-annotations'];
+            const annKeys = annData && typeof annData === 'object' ? Object.keys(annData).length : 0;
+            const bkms = Array.isArray(parsed.stores['vot-bookmarks']) ? parsed.stores['vot-bookmarks'].length : 0;
+            const jrn = parsed.stores['vot-journal'] && Array.isArray(parsed.stores['vot-journal'].list)
+              ? parsed.stores['vot-journal'].list.length : 0;
+            if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
+            if (bkms) summaryParts.push(`${bkms} bookmarks`);
+            if (jrn) summaryParts.push(`${jrn} journal entries`);
+          }
+          const mediaCount = Array.isArray(parsed.media) ? parsed.media.length
+            : (parsed.media && typeof parsed.media === 'object' ? Object.keys(parsed.media).length : 0);
+          if (mediaCount) summaryParts.push(`${mediaCount} media items`);
+        } catch (_e2) { summaryParts = []; }
+      }
       const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
 
       // Soft, advisory free-space heads-up (P4). v3 streaming is uncapped, so a huge

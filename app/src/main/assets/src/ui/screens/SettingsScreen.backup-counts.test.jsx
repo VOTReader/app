@@ -85,20 +85,27 @@ describe('BackupCounts: a dash for a kind the file does not carry', () => {
     ]);
   });
 
-  it('a counts-only file that cannot say its read marks gets a dash and its row, labelled as not counted', () => {
-    const { container } = render(<BackupCounts s={sum({ counts: { 'vot-notes': 2, 'vot-state': 1, _media: 0 } })} />);
+  it('a v3 file with only counts (no stores block, which the restore would not write) is a dash on every row', () => {
+    const { container } = render(<BackupCounts s={sum({ counts: { 'vot-notes': 2, 'vot-state': 1, _media: 0 }, media: [] })} />);
     const r = rows(container);
-    expect(r).toContainEqual(['Marked read', '–']);
-    expect(r).toContainEqual(['Notes', '2']);
-    const marked = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Marked read');
-    expect(spoken(marked.querySelector('.ws3-count-n'))).toBe('Not counted in this file');
+    expect(r).toContainEqual(['Notes', '–']);
+    expect(r).not.toContainEqual(['Notes', '2']);
+    const notes = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Notes');
+    expect(spoken(notes.querySelector('.ws3-count-n'))).toBe('Not in this backup');
   });
 
-  it('a store the restore will skip (it fails the shape check) is a dash with its row, said to be skipped', () => {
+  it('a store the restore will skip (it fails the shape check) reads "skipped" in sight and to screen readers', () => {
     const { container } = render(<BackupCounts s={sum({ stores: { 'vot-notes': {}, 'vot-links': 'junk' }, media: [] })} here={{ notes: 1, links: 4 }} />);
-    expect(rows(container)).toContainEqual(['Links', '–', '4']);
-    const links = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Links');
-    expect(spoken(links.querySelector('.ws3-count-n'))).toBe('Will be skipped: this part of the backup is damaged');
+    expect(rows(container)).toContainEqual(['Links', 'skipped', '4']);
+    const cell = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Links').querySelector('.ws3-count-n');
+    expect(cell.className).toContain('is-skipped');
+    expect(cell.querySelector('[aria-hidden="true"]').textContent).toBe('skipped');
+    expect(cell.querySelector('.sr-only').textContent).toBe("Will be skipped: this app can't read this part of the backup");
+  });
+
+  it('a damaged vot-links on a phone with no links still gets its row (the row rule counts skipped kinds)', () => {
+    const { container } = render(<BackupCounts s={sum({ stores: { 'vot-notes': {}, 'vot-links': 'junk' }, media: [] })} here={{ notes: 1, links: 0 }} />);
+    expect(rows(container)).toContainEqual(['Links', 'skipped', '0']);
   });
 
   it('the two notebook stores are two rows: a file with only journal notebooks does not claim the others', () => {
