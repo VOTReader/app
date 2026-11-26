@@ -80,3 +80,16 @@ describe('the search box at large Text Size', () => {
     expect(decls('.search-input')['font-size']).toBe('var(--ts-control)');
   });
 });
+
+/* large-text-n3 (audit 2026-11-23): from 240% the three corpus pills (All, Scriptures, Volumes) are wider than a
+   phone and "Volumes" ran 66 px off screen at 300% (headless, 412 px). At large text the row wraps, each pill
+   still flex:1 so a lone last pill takes the whole second line. */
+describe('the corpus pills at large Text Size', () => {
+  it('wrap instead of running off screen', () => {
+    expect(decls('.vot-large-text .srch-corpus-row')['flex-wrap']).toBe('wrap');
+    expect(decls('.vot-large-text .srch-corpus-btn').flex).toBe('1 1 auto');
+  });
+  it('stay on one track below large text', () => {
+    expect(decls('.srch-corpus-row')['flex-wrap']).toBeUndefined();
+  });
+});

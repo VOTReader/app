@@ -4096,6 +4096,9 @@
     .srch-corpus-row { display:flex; margin:2px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-field); }
     .srch-corpus-btn { flex:1; min-height:var(--tap); border:4px solid transparent; background:none; background-clip:padding-box; border-radius:var(--r-field); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-control); cursor:pointer; }
     .srch-corpus-btn.active { background-color:var(--surface-3); color:var(--text-1); }
+    /* large-text-n3: from 240% the three pills outgrow a phone ("Volumes" 66 px off screen at 300%); they wrap. */
+    .vot-large-text .srch-corpus-row { flex-wrap:wrap; }
+    .vot-large-text .srch-corpus-btn { flex:1 1 auto; }
     .srch-scope-chip { display:inline-flex; align-items:center; gap:6px; min-height:var(--tap); margin:10px var(--gutter) 0; padding:0 14px; background:var(--surface-1); border:0; border-radius:var(--r-pill); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); text-align:left; cursor:pointer; }
     .srch-scope-chip.active { background:var(--accent-soft); color:var(--text-1); }
     .srch-scope-chip-icon, .srch-scope-chip-x { display:inline-flex; color:var(--accent); }
