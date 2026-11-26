@@ -91,8 +91,10 @@ function _stamp(r) {
 
 /**
  * Newer of two records by `_stamp`. Ties resolve to `theirs` (the already-
- * committed sibling value) so the result is deterministic regardless of which
- * tab flushes second.
+ * committed sibling value). With equal stamps the result therefore depends on
+ * which copy is `theirs`: the copy of the tab that flushed first stays, and
+ * swapping the arguments swaps the answer. Only distinct stamps make the
+ * choice independent of the order.
  * @param {any} ours
  * @param {any} theirs
  * @returns {any}

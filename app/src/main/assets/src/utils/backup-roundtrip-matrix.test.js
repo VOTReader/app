@@ -796,6 +796,9 @@ describe('a plan\'s pinned days off (rested.off) through Export, Import and Rest
     const after = await restoreOver(plan, live);
     // A Restore has no base, so it never takes a read away: Jude 1 comes back from the snapshot. The pins are the newer
     // (live) copy's, already cut from Dec 2 by the untick, and the days off ride whole.
+    // KNOWN OPEN ITEM (review 11-26, left for the owner: it changes what a Restore does to the reader's data): with the
+    // read back and the pins cut from Dec 2, Dec 4, 5 and 8 read as rest days (none), where both the live copy and the
+    // snapshot showed them missed: a calendar neither copy had. This test pins rested only, not that calendar.
     expect(after).toEqual({ ...live, ticks: { 'jude:1': '2026-12-02' } });
     expect(after.rested).toEqual(live.rested);
     expect(after.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
