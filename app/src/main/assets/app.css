@@ -5974,6 +5974,11 @@
     .rd-menu-sheet .more-menu-item-sub { max-width: 100%; overflow-wrap: anywhere; }
     .rd-menu-sheet .more-menu-hint .more-menu-item-sub { flex: none; white-space: nowrap; }
     .rd-menu-sheet .more-menu-item > svg:first-child { box-sizing: content-box; flex: none; width: 20px; height: 20px; padding: 9px; border-radius: 10px; background: var(--surface-3); }
+    /* At large text a "Got it" kept beside the tip squeezed the tip to a sliver (896 px tall at 300%): the tip takes the
+       row and "Got it" drops under it, at the row's end, still whole. */
+    .vot-large-text .rd-menu-sheet .more-menu-hint .more-menu-item-text { flex-wrap: wrap; row-gap: var(--sp-1); }
+    .vot-large-text .rd-menu-sheet .more-menu-hint .more-menu-item-text > :first-child { flex: 1 1 100%; }
+    .vot-large-text .rd-menu-sheet .more-menu-hint .more-menu-item-sub { margin-left: auto; }
     .rd-menu-sheet .more-menu-item > svg:last-child:not(:first-child) { width: 18px; height: 18px; margin-left: auto; color: var(--text-3); }
     .rd-menu-sheet .more-menu-seg { padding: 2px; border-radius: var(--r-field); background: var(--surface-1); }
     .rd-menu-sheet .more-menu-seg button, .rd-menu-sheet .more-menu-step button { border-radius: var(--r-chip); background: var(--surface-1); }

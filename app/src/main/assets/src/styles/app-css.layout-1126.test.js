@@ -90,3 +90,15 @@ describe('look-7: a collection list never cuts a recording\'s name', () => {
     expect(decls('.listen-rec .ui-row-title')['-webkit-line-clamp']).toBe('2');
   });
 });
+
+/* visual2-7 follow-up: at large text the hint's "Got it" beside the tip squeezed the tip to 896 px tall at 300%. */
+describe('visual2-7: at large text the hint\'s Got it drops under the tip, still whole', () => {
+  it('the tip takes the row and Got it wraps under it, never breaking', () => {
+    expect(decls('.vot-large-text .rd-menu-sheet .more-menu-hint .more-menu-item-text')['flex-wrap']).toBe('wrap');
+    expect(decls('.vot-large-text .rd-menu-sheet .more-menu-hint .more-menu-item-text > :first-child').flex).toBe('1 1 100%');
+    expect(decls('.rd-menu-sheet .more-menu-hint .more-menu-item-sub')['white-space']).toBe('nowrap');
+  });
+  it('at normal size the hint row does not wrap', () => {
+    expect((decls('.rd-menu-sheet .more-menu-hint .more-menu-item-text') || {})['flex-wrap']).toBeUndefined();
+  });
+});
