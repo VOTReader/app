@@ -7,8 +7,9 @@
    key; AOGCG final design f04, f04b):
 
      '1'..'12'  a numbered "Thus Says The Lord..." group: the site's label
-                word for word as its eyebrow (C13), our short name as the
-                title, and the line that says the short names are ours
+                word for word as its eyebrow (C13) and our short name as the
+                title (that the short names are ours is said once, in About:
+                0125 C)
      'other'    Other Topics, its page outside the site's menu last
 
    The topics run in the site's order, never by size (U2). "Read all N in

@@ -15,7 +15,7 @@
          outside the menu (`notInMenu`);
      12  "N. Thus Says The Lord...", 85 topics in groups of 7/6/4/7/9/7/5/6/8/12/6/8.
          The site leaves them unnamed; each has a short name that is OURS
-         (ANSWERS_GROUP_NOTE says so wherever they show);
+         (said once, in About: 0125 C; fix list 39);
       1  "Index of False Doctrines Within the Churches of Men", its one entry
          listed as "False Doctrines Within the Churches (Index)".
 
@@ -46,7 +46,8 @@ export const ANSWERS_FD_INDEX_ID = 'false-doctrines-within-the-churches-of-men-r
 export const ANSWERS_FD_INDEX_TEXT = 'False Doctrines Within the Churches (Index)';
 /** Flat Earth's "Next topic:" on the site, the end of the topics. */
 export const ANSWERS_END_CARD = 'This ends Answers Only God Can Give - Topics';
-/** The one line every screen showing the twelve short names carries. */
+/** The short-names line. 0125 C moved it off the screens into About's own words (AnswersSheets AboutSheet), so no
+ *  screen draws this constant; kept for the site test that pins the wording (fix list 39). */
 export const ANSWERS_GROUP_NOTE = 'The site numbers these groups; the short names are ours.';
 /** 0125 C: the app's name for the site's "Other Topics" (a name like the twelve groups' short names; the site's own
     label stays in the About sheet). */
