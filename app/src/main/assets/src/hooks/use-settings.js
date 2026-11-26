@@ -377,8 +377,15 @@ export function useSettings({ savedSettings, theme }) {
     // status bar + navigator.wakeLock fire-and-forget for the screen-on
     // flag (the browser drops it on tab hide; the bridge takes it again on show).
     PlatformBridge.setLightStatusBar(theme === "light");
-    PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
   }, [theme, settings]);
+
+  // audio2-1: the screen-on mirror runs only when the pref itself changes. Inside the [theme, settings] effect
+  // a speed tap (autoScrollLpm) or a theme change wrote the pref again, and with the pref off that dropped the
+  // hold autoscroll takes for its run (use-autoscroll re-asserts it only at its own state edges).
+  const keepScreenOn = settings.keepScreenOn !== false;
+  React.useLayoutEffect(() => {
+    PlatformBridge.setKeepScreenOn(keepScreenOn);
+  }, [keepScreenOn]);
 
   // ── Return ─────────────────────────────────────────────────────────────
   return { settings, toggleSetting, updateSetting };

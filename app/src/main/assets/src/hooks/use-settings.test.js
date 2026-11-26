@@ -319,6 +319,32 @@ describe('useSettings — PlatformBridge mirror', () => {
     mount({ savedSettings: { keepScreenOn: false } });
     expect(PlatformBridge.setKeepScreenOn).toHaveBeenLastCalledWith(false);
   });
+
+  // audio2-1 (audit 2026-11-23): with the pref off, autoscroll holds the screen on itself; a speed tap
+  // (autoScrollLpm) used to re-run the whole settings mirror, which wrote false and dropped that hold.
+  it('a speed write with the pref off makes no setKeepScreenOn call (autoscroll keeps its hold)', () => {
+    const { result } = mount({ savedSettings: { keepScreenOn: false } });
+    vi.mocked(PlatformBridge.setKeepScreenOn).mockClear();
+    act(() => { result.current.updateSetting('autoScrollLpm', '18'); });
+    expect(PlatformBridge.setKeepScreenOn).not.toHaveBeenCalled();
+  });
+
+  it('a theme change makes no setKeepScreenOn call', () => {
+    const { rerender } = mount({ savedSettings: { keepScreenOn: false } });
+    vi.mocked(PlatformBridge.setKeepScreenOn).mockClear();
+    rerender({ savedSettings: { keepScreenOn: false }, theme: 'light' });
+    expect(PlatformBridge.setKeepScreenOn).not.toHaveBeenCalled();
+  });
+
+  it('turning the pref off and on still reaches the bridge', () => {
+    const { result } = mount();
+    vi.mocked(PlatformBridge.setKeepScreenOn).mockClear();
+    act(() => { result.current.updateSetting('keepScreenOn', false); });
+    expect(PlatformBridge.setKeepScreenOn).toHaveBeenLastCalledWith(false);
+    act(() => { result.current.updateSetting('keepScreenOn', true); });
+    expect(PlatformBridge.setKeepScreenOn).toHaveBeenLastCalledWith(true);
+    expect(PlatformBridge.setKeepScreenOn).toHaveBeenCalledTimes(2);
+  });
 });
 
 /* THE 2026-09-10 DEFAULT FLIPS ARE A MIGRATION, NOT A NEW LITERAL (Corbin: "make surprise me
