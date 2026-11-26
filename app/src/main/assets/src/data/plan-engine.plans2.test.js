@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   dayNum, dateOf, dayItems, newRun, runStatus, tickItem, markDay, pauseRun, resumeRun, changePace, changeWeekdays,
   isDayDone, dayDoneOn, schedule, sections, streak, lateDays, creditRead, readCount, startToday, untickItem, itemsCount,
-  itemKinds, catchUp, spreadOut, totalDays,
+  itemKinds, catchUp, spreadOut, totalDays, monthCells,
 } from './plan-engine.js';
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { runRow } from '../utils/plan-runs-view.js';
@@ -178,6 +178,14 @@ describe('days in a row and this week', () => {
     expect(runRow(read, at('2026-11-28')).rest).toBe(false);
     expect(remindDoneToday(read, at('2026-11-27'))).toBe(true);   // no reminder on the empty Friday
     expect(remindDoneToday(read, at('2026-11-28'))).toBe(false);  // Saturday: Ruth 2 is due
+  });
+  it('a spread-out plan in the month calendar: after Ruth 1 on Thursday, Ruth 2 is ahead on Saturday, not Friday', () => {
+    const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
+    const read = readDay(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-26')), 0, '2026-11-26');
+    const ahead = (y, m) => monthCells(read, y, m, at('2026-11-26')).filter((c) => c.state === 'ahead').map((c) => [c.date, c.day]);
+    // Ruth 2 (day index 2) on the 28th, Ruth 3 (4) on the 30th, Ruth 4 (6) on Dec 2; the empty days hold nothing.
+    expect(ahead(2026, 10)).toEqual([[28, 2], [30, 4]]);
+    expect(ahead(2026, 11)).toEqual([[2, 6]]);
   });
 });
 

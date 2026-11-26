@@ -503,10 +503,11 @@ export function monthCells(run, year, month, now) {
   const readOn = new Set(Object.values(run.ticks || {}).filter(Boolean));
   const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const out = [];
-  let planned = st.day;
-  // Planned days before this month's first future date: count the reading days from today up to it.
+  // The days still to read on the dates the schedule plans them (the one place a spread-out plan's empty days and a
+  // next reading's spread day are laid out): a date is ahead only when its planned day holds a reading.
+  /** @type {Map<string, number>} */ const plannedOn = new Map();
+  for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date && d.day >= st.day) plannedOn.set(d.date, d.day);
   const first = /** @type {number} */ (dayNum(year + '-' + String(month + 1).padStart(2, '0') + '-01'));
-  if (first > today) planned += readingDaysBetween(run, today + (st.doneToday ? 1 : 0), first - 1);
   for (let date = 1; date <= last; date++) {
     const n = first + date - 1;
     const key = dateOf(n);
@@ -515,11 +516,10 @@ export function monthCells(run, year, month, now) {
     if (start == null || n < start) state = 'none';
     else if (n === today) state = 'today';
     else if (n < today) state = readOn.has(key) ? 'read' : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) ? 'missed' : 'none');
-    else if (!st.finished && end != null && n <= end && isReadingDay({ ...run, paused: undefined }, n)) {
+    else if (!st.finished && end != null && n <= end && plannedOn.has(key)) {
       state = 'ahead';
-      day = planned++;
+      day = /** @type {number} */ (plannedOn.get(key));
     }
-    if (n === today && !st.doneToday && !st.finished) planned++;
     out.push({ date, weekday: weekdayOf(n), state, read: readOn.has(key), day });
   }
   return out;
