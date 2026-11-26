@@ -1093,7 +1093,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // terminal: degraded once, StorageHealth told (its own banner), no retry.
           const newerDb = typeof IDBAdapter.isVersionError === 'function' && IDBAdapter.isVersionError(err);
           if (newerDb) _reportNewerDatabase(storageKey);
-          if (_isBrokenRecord(err)) { self._unreadable = true; _reportUnreadable(); }
+          if (_isBrokenRecord(err)) _markUnreadable(self);
           if (self._state !== 'degraded') {
             self._state = 'degraded';
             // E5: trace the degraded transition (see the timeout path above).
@@ -1259,7 +1259,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             _reportNewerDatabase(storageKey);
             return;
           }
-          if (_isBrokenRecord(err) && !self._unreadable) { self._unreadable = true; _reportUnreadable(); }
+          if (_isBrokenRecord(err)) _markUnreadable(self);
           attempt += 1;
           var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);
           if (idx < 0) return;
@@ -1378,6 +1378,19 @@ export function storesUnreadable() {
 /** data-3: a read error that waiting will not fix: the record is broken. @param {any} err */
 function _isBrokenRecord(err) {
   return !!err && err.name === 'DataError';
+}
+
+/**
+ * data-3: this store's record is broken. Said once. A store the hydration timeout already
+ * degraded has told its subscribers nothing new since, and HydrationGate stops waiting on a
+ * store (so the safety pass runs) only when it hears from it: tell them (refute b2, 11-26).
+ * @param {any} self
+ */
+function _markUnreadable(self) {
+  if (self._unreadable) return;
+  self._unreadable = true;
+  _reportUnreadable();
+  if (self._state === 'degraded') { self._version += 1; self._notifySubscribers(); }
 }
 
 /** data-3: tell StorageHealth (its banner names them) which stores cannot be read. */

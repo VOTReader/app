@@ -44,6 +44,26 @@ describe('data-3: an unreadable store says so', () => {
     expect(storesUnreadable()).toEqual([]);
   });
 
+  it('REFUTE: a store that timed out first and then reads as broken tells its subscribers (HydrationGate waits on them)', async () => {
+    // A slow cold open: the 3 s hydration timeout fires first (degraded, subscribers told), and the
+    // read rejects with a DataError only after it. HydrationGate stops waiting on a store only when it
+    // hears from it, so without a second notify the safety pass (and the media sweep's verdict) never run.
+    let reject;
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(() => new Promise((_res, rej) => { reject = rej; }));
+    const s = CachedStore('vot-history', [], { idb: true, hydrationTimeoutMs: 5 });
+    s._backgroundRetryDelays = [];
+    const heard = vi.fn();
+    s.subscribe(heard);
+    const p = s._hydrate();
+    await vi.waitFor(() => expect(s.getState()).toBe('degraded'));
+    const before = heard.mock.calls.length;
+    reject(Object.assign(new Error('pieces gone'), { name: 'DataError' }));
+    await p;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.isUnreadable()).toBe(true);
+    expect(heard.mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('a retry that finally reads clears it', async () => {
     await IDBAdapter.put('vot-history', 'v', BROKEN);
     const s = CachedStore('vot-history', [], { idb: true });
