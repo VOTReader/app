@@ -1371,6 +1371,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     // 2026-10-11: a wiped database re-runs the cleanup; these must outlive it.
     expect(LS_SKIP_LIST).toContain('vot-weekly-copy-off');      // utils/data-safety.js WEEKLY_OFF_KEY
     expect(LS_SKIP_LIST).toContain('vot-auto-restore');         // utils/data-safety.js AUTO_RESTORE_KEY
+    expect(LS_SKIP_LIST).toContain('vot-media-orphans-seen');   // hooks/use-journal-media-sweep.js ORPHANS_SEEN_KEY (data-1)
     expect(LS_SKIP_LIST).toContain('vot-restored-note');        // utils/data-safety.js RESTORED_NOTE_KEY
     expect(LS_SKIP_LIST).toContain('vot-ls-cleanup-done');      // this cleanup's own done-flag
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
@@ -1381,7 +1382,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
     expect(LS_SKIP_LIST).toContain('vot-plan-session');         // utils/plan-session.js: today's paused plan sitting
-    expect(LS_SKIP_LIST.length).toBe(33);   // plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session
+    expect(LS_SKIP_LIST.length).toBe(34);   // data-1 added vot-media-orphans-seen; plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

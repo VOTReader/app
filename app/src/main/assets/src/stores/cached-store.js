@@ -1441,6 +1441,7 @@ export const LS_SKIP_LIST = Object.freeze([
   // empty would restore and reload forever) and the note that says what was restored.
   'vot-weekly-copy-off',          // utils/data-safety.js WEEKLY_OFF_KEY
   'vot-auto-restore',             // utils/data-safety.js AUTO_RESTORE_KEY
+  'vot-media-orphans-seen',       // hooks/use-journal-media-sweep.js ORPHANS_SEEN_KEY (data-1)
   'vot-restored-note',            // utils/data-safety.js RESTORED_NOTE_KEY
   'vot-ls-cleanup-done',          // LS_CLEANUP_DONE_KEY below
   // AOGCG (2026-10-22): the Answers landing's reading path (the topic finished last) and its

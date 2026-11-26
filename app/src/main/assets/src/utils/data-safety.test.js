@@ -1132,3 +1132,48 @@ describe('mergeForRestore: the stores no restore test reached yet (votreader-tes
   });
 });
 
+
+describe('data-1: whenJudged, the verdict the journal media prune waits for', () => {
+  const JOURNAL = { list: [1, 2, 3, 4].map((i) => ({ id: 'j' + i, blocks: [{ type: 'image', mediaId: 'm' + i }] })) };
+
+  it('REPRO: the journal record gone under a 4-entry snapshot judges damaged, so nothing may prune', async () => {
+    const journal = CachedStore('vot-journal', { list: [] }, { idb: true });
+    journal._resetForTests({ forceLoaded: true });
+    await seed({ 'vot-state': STATE, 'vot-journal': JOURNAL });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    vi.useRealTimers();
+    DataSafety._resetForTests();                  // the next boot
+    await IDBAdapter.delete('vot-journal', 'v');  // the record loads as defaults, still "ready"
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    const verdict = await DataSafety.whenJudged();
+    expect(verdict).toBe('damaged');
+    expect(DataSafety.judgedHealthy(verdict)).toBe(false);
+  });
+
+  it('a healthy pass resolves healthy; a loss banner up at prune time still says no', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    expect(await DataSafety.run({ sink: memorySink() })).toBe('snapshotted');
+    const verdict = await DataSafety.whenJudged();
+    expect(DataSafety.judgedHealthy(verdict)).toBe(true);
+    StorageHealth.setDataMissing({ name: 'x', at: 1, then: {}, now: {} });
+    expect(DataSafety.judgedHealthy(verdict)).toBe(false);
+    expect(DataSafety.judgedHealthy('no-sink')).toBe(false);   // still the banner
+    StorageHealth.setDataMissing(null);
+    expect(DataSafety.judgedHealthy('no-sink')).toBe(true);
+    for (const v of ['not-loaded', 'failed', 'damaged', 'restored']) expect(DataSafety.judgedHealthy(v)).toBe(false);
+  });
+
+  it('only the boot pass gives the verdict: a forced pass (Keep as is) does not', async () => {
+    await seed({ 'vot-state': STATE });
+    let got = null;
+    void DataSafety.whenJudged().then((v) => { got = v; });
+    await DataSafety.run({ sink: memorySink(), force: true });
+    await Promise.resolve();
+    expect(got).toBe(null);
+    await DataSafety.run({ sink: memorySink() });
+    await Promise.resolve();
+    expect(got).not.toBe(null);
+  });
+});

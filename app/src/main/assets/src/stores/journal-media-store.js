@@ -779,9 +779,10 @@ export var JournalMediaStore = (function() {
      * @param {string[]} referencedIds
      * @param {number} [cutoffMs]  sweep-start timestamp; records `created` >= this survive
      * @param {() => Promise<string[]>} [moreReferenced]
+     * @param {(ids: string[]) => string[]} [mayDelete]  data-1: of the unreferenced ids, the ones that may go now
      * @returns {Promise<number>}
      */
-    pruneOrphans: function(referencedIds, cutoffMs, moreReferenced) {
+    pruneOrphans: function(referencedIds, cutoffMs, moreReferenced, mayDelete) {
       /** @type {Record<string, boolean>} */
       var set = {};
       (referencedIds || []).forEach(function(id) { set[id] = true; });
@@ -819,6 +820,8 @@ export var JournalMediaStore = (function() {
           return toRemove.filter(function(id) { return !keep[id]; });
         });
       }).then(function(toRemove) {
+        // data-1: the caller may hold back ids not yet unreferenced long enough (mark-then-sweep).
+        if (typeof mayDelete === 'function') toRemove = mayDelete(toRemove) || [];
         return Promise.all(toRemove.map(function(id) { return self.delete(id); })).then(function() { return toRemove.length; });
       });
     },

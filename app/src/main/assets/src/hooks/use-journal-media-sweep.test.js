@@ -19,10 +19,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useJournalMediaSweep } from './use-journal-media-sweep.js';
 import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
+import { heldLongEnough, ORPHANS_SEEN_KEY, ORPHAN_HOLD_MS } from './use-journal-media-sweep.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
 vi.mock('../stores/journal-media-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalMediaStore() { return /** @type {any} */ (globalThis).JournalMediaStore; } }; });
 vi.mock('../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return /** @type {any} */ (globalThis).JournalStore; } }; });
+// data-1: the prune waits for this boot's health verdict; healthy unless a case says otherwise.
+vi.mock('../utils/data-safety.js', () => ({
+  whenJudged: () => /** @type {any} */ (globalThis).__verdict || Promise.resolve('snapshotted'),
+  judgedHealthy: (/** @type {string} */ v) => v === 'snapshotted' || v === 'fresh',
+}));
 
 beforeEach(() => {
   localStorage.clear();
@@ -33,6 +39,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete /** @type {any} */ (globalThis).JournalMediaStore;
   delete /** @type {any} */ (globalThis).JournalStore;
+  delete /** @type {any} */ (globalThis).__verdict;
 });
 
 describe('useJournalMediaSweep — storage-backup-5: stale import-staging cleanup', () => {
@@ -111,7 +118,7 @@ describe('useJournalMediaSweep — pre-existing orphan sweep (regression guard)'
     renderHook(() => useJournalMediaSweep());
     await vi.advanceTimersByTimeAsync(4000);
 
-    expect(pruneOrphans).toHaveBeenCalledWith(['a', 'b'], expect.any(Number));
+    expect(pruneOrphans).toHaveBeenCalledWith(['a', 'b'], expect.any(Number), undefined, expect.any(Function));
   });
 
   it('also keeps what the stored journal names, read under the journal save lock (a sibling tab, review 11-26)', async () => {
@@ -130,7 +137,7 @@ describe('useJournalMediaSweep — pre-existing orphan sweep (regression guard)'
     await vi.advanceTimersByTimeAsync(4000);
 
     expect(held).toHaveBeenCalledTimes(1);
-    expect(pruneOrphans).toHaveBeenCalledWith(['a'], expect.any(Number), expect.any(Function));
+    expect(pruneOrphans).toHaveBeenCalledWith(['a'], expect.any(Number), expect.any(Function), expect.any(Function));
     await expect(pruneOrphans.mock.calls[0][2]()).resolves.toEqual(['b']);
   });
 
@@ -229,7 +236,7 @@ describe('useJournalMediaSweep — W7: a restore live in another tab', () => {
     await settle();
 
     expect(abortImportReplace).toHaveBeenCalledTimes(1);
-    expect(pruneOrphans).toHaveBeenCalledWith(['old'], expect.any(Number));
+    expect(pruneOrphans).toHaveBeenCalledWith(['old'], expect.any(Number), undefined, expect.any(Function));
   });
 });
 
@@ -278,5 +285,97 @@ describe('useJournalMediaSweep — W7 round 3: the staging clear runs under the 
     for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0);
 
     expect(abortImportReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('useJournalMediaSweep — data-1: the prune waits for a healthy verdict', () => {
+  const readyJournal = () => ({ isReady: () => true, getState: () => 'loaded', collectAllMediaIds: () => [] });
+
+  it('REPRO: a journal that loaded short (verdict damaged) prunes nothing; the staging sweep still runs', async () => {
+    /** @type {any} */ (globalThis).__verdict = Promise.resolve('damaged');
+    const abortImportReplace = vi.fn().mockResolvedValue(undefined);
+    const pruneOrphans = vi.fn().mockResolvedValue(3);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace, pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = readyJournal();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(abortImportReplace).toHaveBeenCalledTimes(1);
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+
+  it('does not prune before the verdict comes (HydrationGate judges after this timer)', async () => {
+    /** @type {(v: string) => void} */ let judge = () => {};
+    /** @type {any} */ (globalThis).__verdict = new Promise((r) => { judge = r; });
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace: vi.fn().mockResolvedValue(undefined), pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = readyJournal();
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4500);
+    expect(pruneOrphans).not.toHaveBeenCalled();
+    judge('fresh');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(pruneOrphans).toHaveBeenCalledTimes(1);
+  });
+
+  it('a restore that began while the verdict was pending stops the prune', async () => {
+    /** @type {(v: string) => void} */ let judge = () => {};
+    /** @type {any} */ (globalThis).__verdict = new Promise((r) => { judge = r; });
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace: vi.fn().mockResolvedValue(undefined), pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = readyJournal();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4500);
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, String(Date.now()) + ':x');
+    judge('snapshotted');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+
+  it('unmounted before the verdict: no prune', async () => {
+    /** @type {(v: string) => void} */ let judge = () => {};
+    /** @type {any} */ (globalThis).__verdict = new Promise((r) => { judge = r; });
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace: vi.fn().mockResolvedValue(undefined), pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = readyJournal();
+    const { unmount } = renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4500);
+    unmount();
+    judge('snapshotted');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+});
+
+describe('heldLongEnough — data-1 mark-then-sweep', () => {
+  beforeEach(() => { localStorage.clear(); });
+  const D = 86400000;
+
+  it('a blob first seen unreferenced goes only once it stayed so for a week of healthy boots', () => {
+    expect(heldLongEnough(['x', 'y'], 1000)).toEqual([]);
+    expect(heldLongEnough(['x', 'y'], 1000 + 3 * D)).toEqual([]);
+    expect(heldLongEnough(['x', 'y'], 1000 + ORPHAN_HOLD_MS)).toEqual(['x', 'y']);
+    expect(JSON.parse(localStorage.getItem(ORPHANS_SEEN_KEY) || '{}')).toEqual({});
+  });
+
+  it('a blob referenced again (Restore brought its entry back) starts over', () => {
+    heldLongEnough(['x'], 0);
+    heldLongEnough([], 2 * D);                    // referenced on this boot: forgotten
+    expect(heldLongEnough(['x'], ORPHAN_HOLD_MS)).toEqual([]);
+    expect(heldLongEnough(['x'], 2 * ORPHAN_HOLD_MS)).toEqual(['x']);  // a week from the new mark
+  });
+
+  it('a mark from the future (clock moved back) or a broken record deletes nothing yet', () => {
+    localStorage.setItem(ORPHANS_SEEN_KEY, JSON.stringify({ x: 99 * D }));
+    expect(heldLongEnough(['x'], D)).toEqual([]);
+    localStorage.setItem(ORPHANS_SEEN_KEY, '{broken');
+    expect(heldLongEnough(['x'], 50 * D)).toEqual([]);
+  });
+
+  it('with no storage it keeps everything', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    expect(heldLongEnough(['x'], 0)).toEqual([]);
+    expect(heldLongEnough(['x'], 30 * D)).toEqual([]);
   });
 });

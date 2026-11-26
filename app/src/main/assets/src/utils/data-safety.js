@@ -296,6 +296,34 @@ function _showRestoredNote() {
  * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'restored' | 'snapshotted' | 'fresh' | 'empty' | 'too-big' | 'failed'>}
  */
 export async function run(opts) {
+  const verdict = await _run(opts);
+  if (!(opts && opts.force)) _judged(verdict);
+  return verdict;
+}
+
+// ─── data-1: this page's health verdict, for work that must not run on a damaged library ───
+
+/** The verdicts that found the library whole (the ones that arm the leave snapshots), plus
+ *  no-sink: a browser with nowhere to keep a copy never gets a verdict, and never had one. */
+const HEALTHY_VERDICTS = new Set(['fresh', 'snapshotted', 'empty', 'too-big', 'no-sink']);
+/** @type {(v: string) => void} */ let _judged = () => {};
+/** @type {Promise<string>} */ let _verdict = _newVerdict();
+function _newVerdict() { return new Promise((resolve) => { _judged = resolve; }); }
+
+/**
+ * The first boot verdict of this page (run() without force). Never resolves when no pass runs:
+ * whatever waits on it then waits for good, which is the safe side for a deletion.
+ * @returns {Promise<string>}
+ */
+export function whenJudged() { return _verdict; }
+
+/** True when `verdict` found the library whole and no loss is flagged now (data-1). @param {string} verdict */
+export function judgedHealthy(verdict) {
+  return HEALTHY_VERDICTS.has(verdict) && !StorageHealth.getReport().dataMissing;
+}
+
+/** @param {{ now?: () => number, sink?: any, force?: boolean, weeklyBridge?: any, reload?: () => void }} [opts] */
+async function _run(opts) {
   const now = (opts && opts.now) || Date.now;
   const force = !!(opts && opts.force);
   _showRestoredNote();
@@ -541,6 +569,7 @@ export function _resetForTests(opts) {
   _again = false;
   _dbClosed = false;
   _cleared = false;
+  _verdict = _newVerdict();
 }
 
 /**
@@ -954,4 +983,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, beginClear, abortClear, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };
+export const DataSafety = { whenJudged, judgedHealthy, weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, beginClear, abortClear, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };

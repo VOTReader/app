@@ -49,6 +49,33 @@ import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
 import { JournalMediaStore } from '../stores/journal-media-store.js';
 import { JournalStore } from '../stores/journal-store.js';
 import { backupLockBusy, canQueryBackupLock, whenBackupLockFree, withBackupLockIfFree } from '../utils/backup-lock.js';
+import { judgedHealthy, whenJudged } from '../utils/data-safety.js';
+
+/** data-1: unreferenced blobs first seen when (localStorage, `{ id: ms }`); one is deleted only
+ *  once it has stayed unreferenced on healthy boots for ORPHAN_HOLD_MS. */
+export const ORPHANS_SEEN_KEY = 'vot-media-orphans-seen';
+export const ORPHAN_HOLD_MS = 7 * 86400000;
+
+/**
+ * data-1 mark-then-sweep: of this sweep's unreferenced ids, the ones unreferenced for a week.
+ * Records the new ones and forgets the ones referenced again. No storage: none (keep them all).
+ * @param {string[]} ids @param {number} nowMs @returns {string[]}
+ */
+export function heldLongEnough(ids, nowMs) {
+  try {
+    /** @type {Record<string, number>} */ let seen = {};
+    try { seen = JSON.parse(localStorage.getItem(ORPHANS_SEEN_KEY) || '{}') || {}; } catch (_e) { seen = {}; }
+    /** @type {Record<string, number>} */ const next = {};
+    /** @type {string[]} */ const ripe = [];
+    for (const id of ids) {
+      const at = typeof seen[id] === 'number' && seen[id] <= nowMs ? seen[id] : nowMs;
+      if (nowMs - at >= ORPHAN_HOLD_MS) ripe.push(id);
+      else next[id] = at;
+    }
+    localStorage.setItem(ORPHANS_SEEN_KEY, JSON.stringify(next));
+    return ripe;
+  } catch (_e) { return []; }
+}
 
 /** Whether a restore marker is set now (any tab). */
 function _markerSet() {
@@ -65,10 +92,11 @@ export function useJournalMediaSweep() {
     let live = true;
     /** @type {(() => void) | null} */
     let stopWaiting = null;
+    const isLive = () => live;
     const t = setTimeout(() => {
-      if (!queryable) { _sweep(markerAtBoot, false, false); return; }
+      if (!queryable) { _sweep(markerAtBoot, false, false, isLive); return; }
       void Promise.all([lockAtBoot, backupLockBusy()]).then(([atBoot, now]) => {
-        if (live) stopWaiting = _sweep(markerAtBoot || atBoot, now, true);
+        if (live) stopWaiting = _sweep(markerAtBoot || atBoot, now, true, isLive);
       });
     }, 4000);
     return () => { live = false; clearTimeout(t); if (stopWaiting) stopWaiting(); };
@@ -79,9 +107,10 @@ export function useJournalMediaSweep() {
  * @param {boolean} restoreAtBoot - a restore was live when this tab booted
  * @param {boolean} restoreNow - another tab holds the backup lock right now
  * @param {boolean} queryable - this browser can say who holds the lock
+ * @param {() => boolean} isLive - the hook is still mounted
  * @returns {(() => void) | null} stops a staging sweep still waiting on the lock
  */
-function _sweep(restoreAtBoot, restoreNow, queryable) {
+function _sweep(restoreAtBoot, restoreNow, queryable, isLive) {
   const inflight = _markerSet();
   /** @type {(() => void) | null} */
   let stopWaiting = null;
@@ -118,20 +147,41 @@ function _sweep(restoreAtBoot, restoreNow, queryable) {
       console.info('Journal media orphan sweep skipped — store not ready (' + JournalStore.getState() + ')');
       return stopWaiting;
     }
-    // STORE-2: stamp the snapshot moment and pass it as the prune cutoff so a
-    // blob captured AFTER this snapshot (but read by prune's async IDB pass)
-    // is never reclaimed — it's too new to be a real orphan.
-    const sweepStart = Date.now();
-    const referenced = JournalStore.collectAllMediaIds();
-    // Another PWA tab may have linked media since this tab loaded the journal: what the stored journal names is
-    // kept too, read after the scan with the journal's save lock held, so a save already under way lands first and
-    // none lands between that read and the deletes (review 11-26).
-    const prune = typeof JournalStore.mediaIdsOnDisk === 'function'
-      ? () => JournalStore.withSavesHeld(() => JournalMediaStore.pruneOrphans(referenced, sweepStart, () => JournalStore.mediaIdsOnDisk()))
-      : () => JournalMediaStore.pruneOrphans(referenced, sweepStart);
-    prune().then((n) => {
-      if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
-    }).catch((e) => console.warn('Journal media orphan sweep failed', e));
+    // data-1: a journal record that loaded short still counts as ready, so "unreferenced" is
+    // only believed once this boot's health pass has judged the library whole (HydrationGate
+    // runs it ~5 s after the gate opens, after this timer) and no loss banner is up. A damaged,
+    // unread or failed verdict leaves every blob for Restore to find.
+    whenJudged().then((verdict) => {
+      if (!isLive()) return;
+      if (!judgedHealthy(verdict)) {
+        console.info('Journal media orphan sweep skipped — library not judged healthy (' + verdict + ')');
+        return;
+      }
+      if (_markerSet()) { console.info('Journal media orphan sweep skipped — a restore was in progress'); return; }
+      _prune();
+    }).catch((e) => console.warn('Journal media orphan sweep threw', e));
   } catch (e) { console.warn('Journal media orphan sweep threw', e); }
   return stopWaiting;
+}
+
+/** The orphan prune itself, once the library is judged healthy (data-1). */
+function _prune() {
+  if (!JournalStore.isReady()) return;
+  // STORE-2: stamp the snapshot moment and pass it as the prune cutoff so a
+  // blob captured AFTER this snapshot (but read by prune's async IDB pass)
+  // is never reclaimed — it's too new to be a real orphan.
+  const sweepStart = Date.now();
+  const referenced = JournalStore.collectAllMediaIds();
+  // data-1 mark-then-sweep: an unreferenced blob goes only after a week of healthy boots
+  // that all found it unreferenced (a short journal that no check caught gets that week).
+  const ripe = (/** @type {string[]} */ ids) => heldLongEnough(ids, sweepStart);
+  // Another PWA tab may have linked media since this tab loaded the journal: what the stored journal names is
+  // kept too, read after the scan with the journal's save lock held, so a save already under way lands first and
+  // none lands between that read and the deletes (review 11-26).
+  const prune = typeof JournalStore.mediaIdsOnDisk === 'function'
+    ? () => JournalStore.withSavesHeld(() => JournalMediaStore.pruneOrphans(referenced, sweepStart, () => JournalStore.mediaIdsOnDisk(), ripe))
+    : () => JournalMediaStore.pruneOrphans(referenced, sweepStart, undefined, ripe);
+  prune().then((/** @type {number} */ n) => {
+    if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
+  }).catch((/** @type {any} */ e) => console.warn('Journal media orphan sweep failed', e));
 }
