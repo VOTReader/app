@@ -11,7 +11,11 @@ const { loaders, web } = vi.hoisted(() => ({
   },
   web: { supported: () => true, offlineAudioState: () => JSON.stringify({ items: [], totalBytes: 0, freeBytes: 1e9, active: null, queued: [] }), offlineAudioSave: vi.fn() },
 }));
-vi.mock('./sync-loaders.js', () => ({ ...loaders, audioLengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } }));
+vi.mock('./sync-loaders.js', () => ({
+  ...loaders, audioLengthsStore: { subscribe: () => () => {}, getVersion: () => 0 },
+  // A compilation's name in the mirror reads the compilation timings (offline-audio.section-titles.test.js).
+  audioSyncSectionsStore: { subscribe: () => () => {}, getVersion: () => 0 }, audioSyncSectionsSettled: () => false,
+}));
 vi.mock('./offline-audio-web.js', () => ({ WebOfflineAudio: web }));
 vi.mock('./audio-track.js', async (importOriginal) => {
   const real = /** @type {any} */ (await importOriginal());

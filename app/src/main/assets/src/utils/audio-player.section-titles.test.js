@@ -92,6 +92,14 @@ describe('syncedSections: a compilation list labelled from its synced rows', () 
     expect(again).not.toBe(first);
     expect(again).toEqual(first);
   });
+
+  it('asked before the entries land, is the hand list, and is worked out once they have (not kept as the hand list)', () => {
+    globalThis.AUDIO_SYNC_SECTIONS = { ...TABLE };
+    globalThis.colLetterArr = () => null;
+    expect(syncedSections(HAND)).toBe(HAND);
+    globalThis.colLetterArr = () => ENTRIES;
+    expect(syncedSections(HAND).map((s) => s[0])).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
+  });
 });
 
 describe('the player names a compilation by what it reads', () => {

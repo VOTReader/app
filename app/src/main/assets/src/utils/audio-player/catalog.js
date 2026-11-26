@@ -5,7 +5,7 @@
 
 import { audioReaderLabel, isSongKey } from '../audio-track.js';
 import { songTrack } from '../song-catalog.js';
-import { neutralSections, relabelSections } from '../section-labels.js';
+import { neutralSections, relabelOrNull } from '../section-labels.js';
 import { audioSyncSectionsSettled } from '../sync-loaders.js';
 import {
   _alternates,
@@ -149,17 +149,28 @@ const _relabelled = new WeakMap();
  * @returns {Array<any[]>}
  */
 export function syncedSections(raw) {
+  return /** @type {any} */ (_syncedOrNull(raw) || raw);
+}
+
+/**
+ * syncedSections, but null while the labels cannot be worked out (no timings, or the entries they name not loaded).
+ * Only a worked-out list is kept: one asked for before the corpus landed is worked out again once it has, rather
+ * than keeping the hand label for as long as the timings stay the same.
+ * @param {ReadonlyArray<any[]>} raw
+ * @returns {Array<any[]> | null}
+ */
+function _syncedOrNull(raw) {
   const g = _g();
   const table = g.AUDIO_SYNC_SECTIONS || null;
-  if (!table) return /** @type {any} */ (raw);
+  if (!table) return null;
   const hit = _relabelled.get(raw);
   if (hit && hit.table === table) return hit.out;
   const entriesOf = (/** @type {string} */ vk) => {
     const col = g.COL_BY_KEY && typeof g.COL_BY_KEY.get === 'function' ? g.COL_BY_KEY.get(vk) : null;
     return col && typeof g.colLetterArr === 'function' ? g.colLetterArr(col) : null;
   };
-  const out = /** @type {any} */ (relabelSections(raw, table, entriesOf));
-  _relabelled.set(raw, { table, out });
+  const out = /** @type {any} */ (relabelOrNull(raw, table, entriesOf));
+  if (out) _relabelled.set(raw, { table, out });
   return out;
 }
 
@@ -185,6 +196,54 @@ export function sectionTracks(volKey, collectionLabel) {
     readerCode: s[2] || '',
     partLabel: null,
   }));
+}
+
+/** Where each compilation file sits, by its URL, per AUDIO_SECTIONS object (it is replaced whole, never edited). */
+const _sectionAt = new WeakMap();
+/** @param {Record<string, any[][]>} all @returns {Map<string, { volKey: string, at: number }>} */
+function _sectionIndex(all) {
+  let byUrl = _sectionAt.get(all);
+  if (byUrl) return byUrl;
+  byUrl = new Map();
+  for (const vk of Object.keys(all)) {
+    const raw = all[vk];
+    if (!Array.isArray(raw)) continue;
+    raw.forEach((s, at) => { const u = s ? trackUrl(s[1]) : ''; if (u) byUrl.set(u, { volKey: vk, at }); });
+  }
+  _sectionAt.set(all, byUrl);
+  return byUrl;
+}
+
+/** @param {string} url @returns {boolean} the URL is a range-compilation file (AUDIO_SECTIONS) */
+export function isSectionUrl(url) {
+  const all = _sections();
+  return !!all && typeof url === 'string' && _sectionIndex(all).has(url);
+}
+
+/**
+ * The name a compilation file goes by now, by its URL, for a download asked under an older one (labels-r3
+ * follow-up): the synced range once the timings and the entries they name are in, the hand label once the timings
+ * failed to load (or the entries cannot name it), as sectionTracks has them. Null while either is on its way, so a
+ * caller keeps the name it has rather than trading a right one for the bare "Section 2"; null too for any URL that
+ * is no compilation file.
+ * @param {string} url
+ * @returns {string | null}
+ */
+export function sectionTitleOf(url) {
+  const all = _sections();
+  const hit = all && typeof url === 'string' ? _sectionIndex(all).get(url) : null;
+  if (!all || !hit) return null;
+  const raw = all[hit.volKey];
+  const g = _g();
+  let secs = null;
+  if (g.AUDIO_SYNC_SECTIONS) {
+    const vc = g.__votCorpus;
+    secs = _syncedOrNull(raw) || (vc && !vc.loaded && !vc.error ? null : raw);
+  } else if (audioSyncSectionsSettled()) {
+    secs = raw;
+  }
+  const name = secs && secs[hit.at] ? String(secs[hit.at][0] || '') : '';
+  return name || null;
 }
 
 /**

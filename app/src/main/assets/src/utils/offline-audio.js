@@ -33,8 +33,9 @@
 
 import { isSongUrl, resolveBibleAudio } from './audio-track.js';
 import { WebOfflineAudio } from './offline-audio-web.js';
-import { loadAudioSync, loadBibleSync, loadAudioSyncSections } from './sync-loaders.js';
+import { loadAudioSync, loadBibleSync, loadAudioSyncSections, audioSyncSectionsStore } from './sync-loaders.js';
 import { bytesOf, lengthsReady, lengthsSettled } from './audio-lengths.js';
+import { isSectionUrl, sectionTitleOf } from './audio-player/catalog.js';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale: boolean }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
@@ -164,6 +165,42 @@ function _warmTimings(items) {
   if (letters) loadAudioSync();
   if (sections) loadAudioSyncSections();
   for (const v of editions) loadBibleSync(v);
+}
+
+/* A compilation's name (labels-r3 follow-up). A WTLB compilation file is named "Section 2" while the read-along
+   timings are on their way, and "Section 2 · 31–58" once they land (catalog sectionTracks; sections.js renames the
+   queue then). A Download asked in between handed the store the bare name; the store keeps a download's title as it
+   was asked (OfflineAudioStore has no rename) and nothing read it again, so Downloads said "Section 2" for good.
+   So the mirror names a compilation file by what the player calls it now, at the hand-over (the store then keeps
+   the right name whenever it is known) and wherever a download is listed (items, queue, pending, later): one asked
+   too early, or saved under an older hand range, reads right as soon as the timings are in. Nothing is downloaded
+   again and nothing stored is rewritten. */
+/** @type {null | (() => void)} */
+let _unwatchNames = null;
+
+/**
+ * A download as it should be named: a compilation file by the name it goes by now (sectionTitleOf); anything
+ * else, or a compilation whose name is not known yet, as it is.
+ * @template {{ url: string, key: string, title: string }} T
+ * @param {T} t
+ * @returns {T}
+ */
+function _named(t) {
+  if (!t || t.key || typeof t.url !== 'string' || !isSectionUrl(t.url)) return t;
+  const now = sectionTitleOf(t.url);
+  if (now === null) { _watchNames(); return t; }
+  return now === t.title ? t : { ...t, title: now };
+}
+
+/** The timings (and the entries they name) name the compilations: ask for them once, and draw again when they land. */
+function _watchNames() {
+  if (_unwatchNames) return;
+  void loadAudioSyncSections();
+  const offTimings = audioSyncSectionsStore.subscribe(_notify);
+  // Called as a method: the corpus keeps its listeners on `this`.
+  const vc = typeof window !== 'undefined' ? /** @type {any} */ (window).__votCorpus : null;
+  const offCorpus = vc && typeof vc.subscribe === 'function' ? vc.subscribe(_notify) : null;
+  _unwatchNames = () => { offTimings(); if (typeof offCorpus === 'function') offCorpus(); };
 }
 
 /** @returns {any} the store downloads go to: the phone app's, else this browser's (cf1), else null */
@@ -483,7 +520,7 @@ export const OfflineAudio = {
     queueMicrotask(_flushSizes);
   },
   /** The recordings on the phone (songs kept on it are songItems'). @returns {SavedItem[]} newest first */
-  items: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => !isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
+  items: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => !isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt).map(_named); },
   /** The songs of the letters kept on the phone (K1). @returns {SavedItem[]} newest first */
   songItems: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
   /**
@@ -525,6 +562,7 @@ export const OfflineAudio = {
     const items = asked.map((t) => {
       /** @type {{ url: string, key: string, title: string, bytes?: number, wifi?: boolean, pri: string }} */
       const it = { url: t.url, key: String(t.key || ''), title: String(t.title || ''), pri: 'bulk' };
+      it.title = _named(it).title;   // a compilation under the name it goes by now, when that is known
       // The build's size when the caller gave none (brief section 7 item 17): the phone totals the queue with no lookups.
       const bytes = typeof t.bytes === 'number' && t.bytes > 0 ? t.bytes : bytesOf(t.url);
       if (bytes && bytes > 0) it.bytes = bytes;
@@ -560,10 +598,10 @@ export const OfflineAudio = {
     if (!_loaded) refresh();
     const busy = [...new Set([..._queued, ..._actives.keys()])].filter((u) => !isSongUrl(u)).length;
     const failed = [];
-    for (const t of _later.values()) if (!isSongUrl(t.url) && !_saved.has(t.url)) failed.push(_asked.get(t.url) || t);
+    for (const t of _later.values()) if (!isSongUrl(t.url) && !_saved.has(t.url)) failed.push(_named(_asked.get(t.url) || t));
     for (const u of _failed.keys()) {
       const t = _asked.get(u);
-      if (t && !isSongUrl(u) && !_saved.has(u) && !_later.has(u) && !_queued.has(u) && !_actives.has(u)) failed.push(t);
+      if (t && !isSongUrl(u) && !_saved.has(u) && !_later.has(u) && !_queued.has(u) && !_actives.has(u)) failed.push(_named(t));
     }
     return { busy, failed };
   },
@@ -571,7 +609,7 @@ export const OfflineAudio = {
    * The "will try again" list as the store keeps it: why each did not download, and when it is tried next.
    * @returns {LaterItem[]}
    */
-  later: () => { if (!_loaded) refresh(); return [..._later.values()].filter((t) => !isSongUrl(t.url) && !_saved.has(t.url)); },
+  later: () => { if (!_loaded) refresh(); return [..._later.values()].filter((t) => !isSongUrl(t.url) && !_saved.has(t.url)).map(_named); },
   /** Try every one on the "will try again" list now. */
   retryAll: () => {
     const b = _bridge();
@@ -624,7 +662,7 @@ export const OfflineAudio = {
   update(list) {
     const b = _bridge();
     const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && _saved.has(t.url))
-      .map((t) => ({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), update: true }));
+      .map((t) => ({ url: t.url, key: String(t.key || ''), title: _named({ url: t.url, key: String(t.key || ''), title: String(t.title || '') }).title, update: true }));
     if (!b || typeof b.offlineAudioSave !== 'function' || !items.length) return false;
     return _save(b, items) > 0;
   },
@@ -693,7 +731,7 @@ export const OfflineAudio = {
     for (const u of _actives.keys()) add(u);
     for (const t of _order) if (_queued.has(t.url) || _actives.has(t.url)) add(t.url);
     for (const u of _queued) add(u);
-    return urls.filter((u) => !isSongUrl(u)).map((u) => _asked.get(u) || { url: u, key: '', title: '' });
+    return urls.filter((u) => !isSongUrl(u)).map((u) => _named(_asked.get(u) || { url: u, key: '', title: '' }));
   },
   /** @returns {string[]} the urls downloading now (up to the store's DOWNLOADS_AT_ONCE) */
   actives: () => { if (!_loaded) refresh(); return [..._actives.keys()].filter((u) => !isSongUrl(u)); },
@@ -705,6 +743,8 @@ export const OfflineAudio = {
   _reset() {
     _cancels.clear();
     _listeners.clear();
+    if (_unwatchNames) _unwatchNames();
+    _unwatchNames = null;
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
     _sizesToSend = new Set(); _sizesFlushQueued = false;
     if (_sizeRetryTimer) clearTimeout(_sizeRetryTimer);
