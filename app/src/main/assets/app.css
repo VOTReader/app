@@ -4107,6 +4107,8 @@
     .srch-scope-chip-icon, .srch-scope-chip-x { display:inline-flex; color:var(--accent); }
     .srch-section-label, .srch-count, .srch-direct-k, .srch-suggest-head { font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); font-weight:700; letter-spacing:var(--track-label); text-transform:uppercase; color:var(--accent); }
     .srch-section-label { margin:var(--label-above) var(--gutter) var(--label-below); padding:0; }
+      /* look-5 (11-26): "Where it appears" sits inside .srch-groups, which already has the gutter: one inset, not two. */
+      .srch-groups > .srch-section-label { margin-left:0; margin-right:0; }
     .srch-section-head { display:flex; align-items:center; justify-content:space-between; margin:var(--label-above) var(--gutter) var(--label-below); }
     .srch-section-head .srch-section-label { margin:0; }
     .srch-clear-all { min-height:var(--tap); min-width:var(--tap); margin:-14px -8px; padding:0 8px; background:none; border:0; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); cursor:pointer; }

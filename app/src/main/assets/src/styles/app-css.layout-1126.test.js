@@ -73,3 +73,12 @@ describe('look-6: Up next titles take three lines', () => {
     expect(d['text-overflow']).toBeUndefined();
   });
 });
+
+/* look-5: "Where it appears" carried the label's own gutter inside .srch-groups' gutter (40 px in on a phone, every
+   other label 20). */
+describe('look-5: the Where it appears label has one gutter', () => {
+  it('a label directly in the groups drops its own side margins', () => {
+    expect(decls('.srch-groups > .srch-section-label')).toMatchObject({ 'margin-left': '0', 'margin-right': '0' });
+    expect(decls('.srch-groups').margin).toBe('0 var(--gutter) 10px');
+  });
+});
