@@ -187,6 +187,21 @@ describe('days in a row and this week', () => {
     expect(ahead(2026, 10)).toEqual([[28, 2], [30, 4]]);
     expect(ahead(2026, 11)).toEqual([[2, 6]]);
   });
+  it('a spread-out plan in the month calendar: a past empty day is never missed, as in the week strip', () => {
+    const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
+    const read = readDay(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-26')), 0, '2026-11-26');
+    // Sunday 29th, Ruth 2 not read on Saturday: Saturday is missed, the empty Friday is not.
+    const now = at('2026-11-29');
+    const missed = monthCells(read, 2026, 10, now).filter((c) => c.state === 'missed').map((c) => c.date);
+    expect(missed).toEqual([28]);
+    // Made on Sunday 22nd and not read: readings fell on Sun 22, Tue 24 and Thu 26; on Friday the month view and the
+    // week strip miss the same three dates, and neither misses the empty Mon 23 or Wed 25.
+    const sun = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-22'));
+    const fri = at('2026-11-27');
+    const monthMissed = monthCells(sun, 2026, 10, fri).filter((c) => c.state === 'missed').map((c) => c.date);
+    expect(monthMissed).toEqual([22, 24, 26]);
+    expect(streak(sun, fri).week.filter((w) => w.missed).map((w) => w.n)).toEqual(monthMissed);
+  });
 });
 
 describe('late, in days, and never while paused', () => {

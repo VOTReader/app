@@ -113,6 +113,18 @@ function nthReadingDay(run, from, k) {
   return n;
 }
 
+/**
+ * Whether a past date held a reading as the plan was laid out, one reading day each from the start: a spread-out
+ * plan's empty days (and an old short cut's empty last days) held none, so they are never missed. The week strip
+ * (streak) and the month calendar (monthCells) both ask this.
+ * @param {PlanRun} run @param {number} n @param {number} startN @param {number} total
+ */
+function heldReading(run, n, startN, total) {
+  if (n < startN || !isReadingDay({ ...run, paused: undefined }, n)) return false;
+  const k = readingDaysBetween(run, startN, n - 1);
+  return k < total && dayItems(run, k).length > 0;
+}
+
 /** Reading days in [a, b] (dates as day numbers). */
 function readingDaysBetween(run, a, b) {
   const r = { ...run, paused: undefined };
@@ -452,12 +464,7 @@ export function streak(run, now) {
   // schedule plans for the date; before today, one reading day each from the start, as the plan was laid out.
   const planned = new Set();
   for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
-  const holds = (/** @type {number} */ n) => {
-    if (n >= today) return planned.has(dateOf(n));
-    if (n < startN || !isReadingDay({ ...run, paused: undefined }, n)) return false;
-    const k = readingDaysBetween(run, startN, n - 1);
-    return k < total && dayItems(run, k).length > 0;
-  };
+  const holds = (/** @type {number} */ n) => (n >= today ? planned.has(dateOf(n)) : heldReading(run, n, startN, total));
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
@@ -515,7 +522,10 @@ export function monthCells(run, year, month, now) {
     /** @type {number | null} */ let day = null;
     if (start == null || n < start) state = 'none';
     else if (n === today) state = 'today';
-    else if (n < today) state = readOn.has(key) ? 'read' : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) ? 'missed' : 'none');
+    else if (n < today) {
+      state = readOn.has(key) ? 'read'
+        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && heldReading(run, n, start, st.total) ? 'missed' : 'none');
+    }
     else if (!st.finished && end != null && n <= end && plannedOn.has(key)) {
       state = 'ahead';
       day = /** @type {number} */ (plannedOn.get(key));
