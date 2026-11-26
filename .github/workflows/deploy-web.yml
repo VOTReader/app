@@ -358,3 +358,27 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+  verify:
+    # pipeline-7 (audit 2026-11-23): is the live site the build just deployed, byte for byte? build-sha.txt must
+    # name the gate's commit, then every file in the live service worker's ASSET_INTEGRITY must hash to its entry
+    # (tools/verify-live-deploy.mjs, the service worker's own install check). Red here rolls nothing back:
+    # CONTRIBUTING.md §5 "Rolling back" says how. Read-only, after the publish, outside the deploy job.
+    needs: [gate, deploy]
+    if: needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # n7-05: up to 10 min for Pages to serve the new build-sha.txt, then 12 small fetches
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the checker (the deployed commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+          sparse-checkout: tools/verify-live-deploy.mjs
+          sparse-checkout-cone-mode: false
+      - name: Live build-sha.txt and core files match the deploy
+        env:
+          EXPECT_SHA: ${{ needs.gate.outputs.sha }}
+        run: node tools/verify-live-deploy.mjs

@@ -169,6 +169,17 @@ the Robolectric suite reads. It tests the working tree, so it refuses a push who
   (`tools/deploy-target.mjs`, `tools/release-window.mjs`). For a live break (a crash, data loss, the app won't
   open), run it by hand: `gh workflow run deploy-web.yml` ships `main`'s tip now. Its `build` job runs npm with
   read-only rights; only the `deploy` job holds the Pages token, and it runs no repository code.
+  After a publish, its `verify` job (`tools/verify-live-deploy.mjs`) waits for the live `build-sha.txt` to name the
+  deployed commit and hashes every core file against the live service worker's `ASSET_INTEGRITY`.
+
+### Rolling back
+
+A bad build is live (the app will not open, data is at risk, or `verify` went red): `git revert` the commits that
+broke it, push to `main`, wait for its CI to go green (about 7 minutes), then `gh workflow run deploy-web.yml` to
+ship `main`'s tip now rather than at the next window: about 7-11 minutes in all. The deploy never publishes an
+older commit than what is live (the `build-sha.txt` floor), so a rollback is always a new commit, never a redeploy
+of an old one. A build whose bytes do not match its own `ASSET_INTEGRITY` never installs: open readers keep the
+previous build, and only first visits get the broken one.
 
 ### Landing a change
 

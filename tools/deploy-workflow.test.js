@@ -141,6 +141,15 @@ describe('deploy-web.yml - no repository code runs beside the Pages token (v10-0
     }
   });
 
+  it('pipeline-7: after a publish, a read-only job checks the live site is the deployed commit, byte for byte', () => {
+    const verify = code(jobs().verify || '');
+    expect(verify).toMatch(/needs: \[gate, deploy\]/);
+    expect(verify).toMatch(/if: needs\.deploy\.result == 'success'/);
+    expect(verify).toMatch(/EXPECT_SHA: \$\{\{ needs\.gate\.outputs\.sha \}\}/);
+    expect(verify).toMatch(/run: node tools\/verify-live-deploy\.mjs/);
+    expect(verify).toMatch(/timeout-minutes: \d+/);
+  });
+
   it('the job holding pages / id-token runs only the Pages actions, on the artifact the build uploaded', () => {
     const all = jobs();
     const publishers = Object.entries(all).filter(([, t]) => /pages: write|id-token: write/.test(permissionsOf(t) || ''));
