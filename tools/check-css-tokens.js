@@ -44,9 +44,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
-const ASSETS = path.join(ROOT, 'app', 'src', 'main', 'assets');
+const SELF = fileURLToPath(import.meta.url);
+const REPO_ROOT = path.join(path.dirname(SELF), '..');
 // dist/ is generated from these very files; data/ is the corpus; fonts/icons
 // are binaries. Scanning dist would let a stale build mask a source defect.
 const SKIP_DIRS = new Set(['dist', 'node_modules', 'data', 'fonts', 'icons']);
@@ -79,45 +78,76 @@ function stripBlockComments(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
 }
 
-const files = collect(ASSETS, []);
-/** file → comment-blanked source, read once. */
-const source = new Map(files.map((f) => [f, stripBlockComments(fs.readFileSync(f, 'utf8'))]));
+/**
+ * Scan `<root>/app/src/main/assets` and return what the CLI prints and its
+ * exit status. Exported so the test runs it in-process: a child process per
+ * case was 85 ms alone but 45-77 s whenever another vmThreads worker had a
+ * child running (on Windows a concurrent spawn inherits the gate's stdout
+ * pipe, and spawnSync waits for that pipe to close).
+ * @param {string} [root] repo root (default: the one this file sits in)
+ * @returns {{ status: 0|1, stdout: string, stderr: string }}
+ */
+export function checkCssTokens(root = REPO_ROOT) {
+  const files = collect(path.join(root, 'app', 'src', 'main', 'assets'), []);
+  /** file → comment-blanked source, read once. */
+  const source = new Map(files.map((f) => [f, stripBlockComments(fs.readFileSync(f, 'utf8'))]));
 
-const declared = new Set();
-for (const text of source.values()) {
-  for (const m of text.matchAll(DECL)) declared.add(m[1]);
-  for (const m of text.matchAll(SET_PROPERTY)) declared.add(m[1]);
-}
-
-/** name → ["relative/path.css:120", …] */
-const phantoms = new Map();
-for (const file of files) {
-  const rel = path.relative(ROOT, file).replace(/\\/g, '/');
-  const lines = source.get(file).split(/\r?\n/);
-  lines.forEach((line, i) => {
-    for (const m of line.matchAll(REF_NO_FALLBACK)) {
-      const name = m[1];
-      if (declared.has(name) || TYPE_SCALE.test(name)) continue;
-      if (!phantoms.has(name)) phantoms.set(name, []);
-      phantoms.get(name).push(`${rel}:${i + 1}`);
-    }
-  });
-}
-
-if (phantoms.size) {
-  console.error('[css-tokens] references to UNDECLARED custom properties.');
-  console.error('             An undeclared var() with no fallback is invalid at');
-  console.error('             computed-value time: the WHOLE declaration is dropped');
-  console.error('             (a border becomes `none`, not a default colour).');
-  for (const [name, sites] of phantoms) {
-    console.error(`\n  var(${name})  — ${sites.length} reference${sites.length === 1 ? '' : 's'}, 0 declarations:`);
-    for (const site of sites) console.error('      ' + site);
+  const declared = new Set();
+  for (const text of source.values()) {
+    for (const m of text.matchAll(DECL)) declared.add(m[1]);
+    for (const m of text.matchAll(SET_PROPERTY)) declared.add(m[1]);
   }
-  console.error('');
-  console.error('  Fix by DECLARING it (app.css :root + its body.light twin, beside the');
-  console.error('  token it belongs with) — or, if absence is genuinely fine, give every');
-  console.error('  reference a fallback: var(--name, <value>).');
-  process.exit(1);
+
+  /** name → ["relative/path.css:120", …] */
+  const phantoms = new Map();
+  for (const file of files) {
+    const rel = path.relative(root, file).replace(/\\/g, '/');
+    const lines = source.get(file).split(/\r?\n/);
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(REF_NO_FALLBACK)) {
+        const name = m[1];
+        if (declared.has(name) || TYPE_SCALE.test(name)) continue;
+        if (!phantoms.has(name)) phantoms.set(name, []);
+        phantoms.get(name).push(`${rel}:${i + 1}`);
+      }
+    });
+  }
+
+  if (phantoms.size) {
+    const err = [
+      '[css-tokens] references to UNDECLARED custom properties.',
+      '             An undeclared var() with no fallback is invalid at',
+      '             computed-value time: the WHOLE declaration is dropped',
+      '             (a border becomes `none`, not a default colour).',
+    ];
+    for (const [name, sites] of phantoms) {
+      err.push(`\n  var(${name})  — ${sites.length} reference${sites.length === 1 ? '' : 's'}, 0 declarations:`);
+      for (const site of sites) err.push('      ' + site);
+    }
+    err.push('');
+    err.push('  Fix by DECLARING it (app.css :root + its body.light twin, beside the');
+    err.push('  token it belongs with) — or, if absence is genuinely fine, give every');
+    err.push('  reference a fallback: var(--name, <value>).');
+    return { status: 1, stdout: '', stderr: err.join('\n') + '\n' };
+  }
+
+  return {
+    status: 0,
+    stdout: `[css-tokens] OK — every var() with no fallback resolves (${declared.size} properties declared).\n`,
+    stderr: '',
+  };
 }
 
-console.log(`[css-tokens] OK — every var() with no fallback resolves (${declared.size} properties declared).`);
+/** Run as `node tools/check-css-tokens.js` (pre-commit, CI, npm script). */
+function isMain() {
+  if (!process.argv[1]) return false;
+  const a = path.resolve(process.argv[1]);
+  return process.platform === 'win32' ? a.toLowerCase() === SELF.toLowerCase() : a === SELF;
+}
+
+if (isMain()) {
+  const r = checkCssTokens();
+  process.stdout.write(r.stdout);
+  process.stderr.write(r.stderr);
+  process.exitCode = r.status;
+}
