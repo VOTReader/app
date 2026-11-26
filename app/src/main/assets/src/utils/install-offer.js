@@ -2,8 +2,8 @@
    install-offer — when and how to offer "install as an app" (ip1)
    ═══════════════════════════════════════════════════════════════════════
    Design: D:/AgentBackbone/reports/phone-audio-and-growth-2026-09-24/
-   05-install-as-app-prompt.md (sections 4 and 6). The card itself is UI and
-   waits for its mockups; this module is the part that decides.
+   05-install-as-app-prompt.md (sections 4 and 6). The card itself is
+   ui/components/InstallCard.jsx; this module is the part that decides.
 
    installFlow   which way this browser installs: 'prompt' (Chromium handed us
                  its beforeinstallprompt, so a real Install button works),

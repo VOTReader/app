@@ -53,6 +53,11 @@
        https://audio.votreader.workers.dev (cf1, 2026-09-26) is in connect-src:
        the relay the PWA saves recordings for offline through; media-src
        'self' is the service worker's saved copy (offline-audio/...).
+       https://votes.votreader.workers.dev (sy4, 2026-10-23) is in connect-src:
+       the song-votes Worker (votes/README.md). utils/song-votes.js posts a
+       song like or unlike to it from the page, and the service worker's
+       Background Sync drains the same outbox; in the APK, native code sends
+       them (SongVotes.kt) and the page does not.
        Cloudflare Web Analytics (cfa1, Corbin 2026-09-26 21:3x): its beacon
        (static.cloudflareinsights.com in script-src) posts one page view per
        app open to cloudflareinsights.com (connect-src); spa off, no cookies,
@@ -816,7 +821,7 @@ else (function () {
 </script>
   <!-- Cloudflare Web Analytics (cfa1): one page view per open of the WEBSITE, spa off; nothing about it is shown.
        bc1 (Corbin via hub 2026-10-05): the website only. The phone app (appassets.androidplatform.net), the
-       review preview and a local server load no beacon, so the app sends nothing. tools/beacon-web-only.test.js.
+       review preview and a local server load no beacon, so the app sends no page view. tools/beacon-web-only.test.js.
        cf-noagent (hub 2026-10-24): our own opens are not visits either. An automated browser (navigator.webdriver:
        the headless walks, check:live) loads none, nor a device marked vot-no-stats in localStorage; opening the
        site once with ?nostats=1 marks that browser (the S22 keeper's Chrome does). -->

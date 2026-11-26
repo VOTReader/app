@@ -279,7 +279,7 @@ describe('the outbox', () => {
     }
   });
 
-  it('in the APK hands the votes to native WorkManager instead of posting them', async () => {
+  it('in the APK hands the votes to the native job instead of posting them', async () => {
     const queued = [];
     window.AndroidBridge = { queueSongVote: (json) => { queued.push(JSON.parse(json)); return true; } };
     await loadSongVotes();

@@ -14,12 +14,12 @@
  *     only read here; no deploy ever deletes it.
  *
  * Update lifecycle (fully automatic):
- *   A new SW installs and WAITS (up1, Corbin 2026-10-23: no update mid-session).
- *   It takes over when the browser closes the app's last page, or when a page
- *   asks with SKIP_WAITING (sw-register.js: at app open, or on a return after
- *   10+ min away, never while a recording plays), and only if no OTHER window
- *   of the app is on screen. 'controllerchange' then fires in sw-register.js
- *   and the page reloads onto the new build.
+ *   A new SW installs and takes over at once (Corbin 2026-11-20: nothing makes
+ *   an update wait; takeOver below). activate claims every open page,
+ *   'controllerchange' fires in sw-register.js, and each page reloads onto the
+ *   new build; only that reload waits, while a note, voice memo or backup is
+ *   open (update-hold.js). If skipWaiting fails, the build waits and a page
+ *   asks with SKIP_WAITING. From 2026-10-23 to 11-20 (up1) a new build waited.
  *
  * STALE-CACHE RESILIENCE — two layers, because a fresh cache KEY does not prove
  * fresh BYTES:
@@ -914,7 +914,7 @@ async function isThisBuilds(response, want) {
 
 /** The network holds another build: look for it now, not at the page's next check (at most once a minute). With
     `failed` (a 503: another build's code or timings, so what the page asked for did not load), also tell the pages
-    (up1): a new build no longer takes over on its own, and sw-register takes or offers it. Another build's TEXT is
+    (ANOTHER_BUILD); the build reg.update() finds takes over on its own once installed (takeOver). Another build's TEXT is
     served (marked) and told nobody: the reader is reading it. @param {boolean} [failed] */
 let _updateAskedAt = 0;
 function askForUpdate(failed) {

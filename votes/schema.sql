@@ -1,6 +1,6 @@
 -- VOTReader song votes (votes/README.md). Apply: npx wrangler@4 d1 execute votes --remote --file votes/schema.sql
 CREATE TABLE IF NOT EXISTS votes (
-  install TEXT NOT NULL,          -- the app's random per-install id
+  install TEXT NOT NULL,          -- per-install id: random on the web, hashed ANDROID_ID in the APK (song-votes.js)
   song    TEXT NOT NULL,          -- catalog id, 12 hex
   v       INTEGER NOT NULL,       -- 1 liked, 0 cleared (a thumbs-down is never sent)
   at      INTEGER NOT NULL,       -- the device's own time of the vote, ms

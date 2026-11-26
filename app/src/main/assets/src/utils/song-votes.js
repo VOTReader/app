@@ -16,7 +16,7 @@
    latest state per song and resends freely: from the page (a vote, the link
    coming back, the app shown again), from the service worker's Background
    Sync ('song-votes', service-worker.js drainSongVotes) even with the app
-   closed, and in the APK from native WorkManager (AndroidBridge.queueSongVote).
+   closed, and in the APK from a native JobScheduler job (AndroidBridge.queueSongVote, SongVotes.kt).
 
    Kept in IDB's `meta` store (no DB_VERSION bump; the service worker opens
    the same database to drain the outbox): `song-votes` {id: {v, at}},
@@ -64,7 +64,7 @@ const MAX_AGE_MS = 89 * 24 * 3600 * 1000;
 
 /** IDBAdapter is bundle-b, reached at call time (song-catalog's rule). */
 const _idb = () => /** @type {any} */ (globalThis).IDBAdapter || null;
-/** The APK's bridge when it can take votes (slice 4: native WorkManager sends them). */
+/** The APK's bridge when it can take votes (slice 4: a native JobScheduler job sends them). */
 const _bridge = () => {
   const b = typeof window !== 'undefined' ? /** @type {any} */ (window).AndroidBridge : null;
   return b && typeof b.queueSongVote === 'function' ? b : null;
@@ -340,7 +340,7 @@ function _settleSent(body) {
 /**
  * Send what waits in the outbox, oldest first; stop at the first one the
  * Worker or the network turns away (it waits for the next try). In the APK
- * the votes go to native WorkManager instead, which sends them with the app
+ * the votes go to a native JobScheduler job instead, which sends them with the app
  * closed. One run at a time.
  * @returns {Promise<void>}
  */
