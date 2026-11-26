@@ -208,7 +208,7 @@ android {
             "audio-manifest.js",
             // src/data ES modules (bundled into dist/bundle-b / -d).
             "scripture-resolution.js", "translations.js",
-            "journal-helpers.js", "letter-linking.js",
+            "journal-helpers.js", "letter-linking.js", "notebook-label.js",
             // ...and the reading plans' modules (platform-6).
             "plan-bible-words.js", "plan-builder.js", "plan-catalog.js", "plan-engine.js",
             "reading-plans.js", "vot-note-label.js",
