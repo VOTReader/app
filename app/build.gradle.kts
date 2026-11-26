@@ -190,6 +190,10 @@ android {
             // Bundle-only source trees + entry.
             "<dir>components", "<dir>hooks", "<dir>renderer", "<dir>search",
             "<dir>stores", "<dir>styles", "<dir>ui",
+            // platform-6 (audit 2026-11-23): src/utils too (175 files, its .test.jsx files and a fixture among
+            // them): bundled into dist/, never loaded loose. tools/check-apk-assets.js now fails on any src
+            // file that no runtime loader names and no pattern here excludes.
+            "<dir>utils",
             "app.jsx",
             // src/data files concatenated into dist/ bundles by build.py.
             "books.js", "books-restored.js",
@@ -205,6 +209,12 @@ android {
             // src/data ES modules (bundled into dist/bundle-b / -d).
             "scripture-resolution.js", "translations.js",
             "journal-helpers.js", "letter-linking.js",
+            // ...and the reading plans' modules (platform-6).
+            "plan-bible-words.js", "plan-builder.js", "plan-catalog.js", "plan-engine.js",
+            "reading-plans.js", "vot-note-label.js",
+            // bible-audio-manifest.js rides bundle-a too, but the gate reads it as one of the "src/data/bible-" +
+            // code translations (a family match) and refuses to see it excluded: it stays, the one dead file left.
+            "*.test.jsx",
             // Junk + tests + root duplicates.
             "*.lnk",
             "*.test.js",

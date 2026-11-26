@@ -44,7 +44,7 @@ android {
     androidResources {
         ignoreAssetsPatterns += listOf(
             "!.svn", ".*", "<dir>_*",
-            "<dir>components", "<dir>hooks", "<dir>ui",
+            "<dir>components", "<dir>hooks", "<dir>ui", "<dir>utils",
             "app.jsx"
         )
     }
@@ -223,5 +223,24 @@ describe('check-apk-assets — the KJV wording file a loader names (search200 fi
     const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_WITH_TWIN }));
     expect(r.status, r.all).toBe(1);
     expect(r.stderr).toContain('search-kjv-twin.json');
+  });
+});
+
+/* platform-6 (audit 2026-11-23): the APK packaged 182 src files nothing loads at runtime (all of src/utils, its
+   .test.jsx files and a fixture, and 7 reading-plan and manifest modules bundle-d already holds). The gate now derives
+   the other side too: a file under src/ that no loader names and no pattern excludes is dead weight, and fails. */
+describe('check-apk-assets — no dead src file is packaged (platform-6)', { timeout: SPAWN_TIMEOUT_MS }, () => {
+  it('FAILS, naming the file, when a src file nothing loads would ship', () => {
+    const gradle = GRADLE_WITH_BLOCK.replace(' "<dir>utils",', '');
+    const r = runGate(mirror({ gradle, loader: LOADER_LITERAL }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toMatch(/\[apk-assets\] FAIL/);
+    expect(r.stderr).toContain('src/utils/translations.js');
+  });
+
+  it('FAILS on a bundled data module left out of the list', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_LITERAL, dataFiles: ['bible-studies.js', 'plan-engine.js'] }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toContain('src/data/plan-engine.js');
   });
 });

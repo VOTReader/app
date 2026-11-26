@@ -176,4 +176,28 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`[apk-assets] OK — ${needed.length} runtime-injected assets all survive the ignore list (${patterns.length} patterns).`);
+/* THE OTHER SIDE: DEAD WEIGHT (platform-6, audit 2026-11-23). The APK packaged 182 src files nothing loads at
+   runtime: all of src/utils (its .test.jsx files and a fixture too), and 7 data modules bundle-d already holds. A file
+   under src/ that no loader above names and no pattern excludes ships for nothing, so it fails here: add its name (or
+   its directory) to ignoreAssetsPatterns, or, if the app loads it at runtime, teach collectInjectedPaths() the shape. */
+const dead = [];
+const walkSrc = (dir, rel) => {
+  if (!existsSync(dir)) return;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const r = rel + '/' + e.name;
+    if (isExcluded(r, patterns)) continue;
+    if (e.isDirectory()) walkSrc(join(dir, e.name), r);
+    else if (!needed.includes(r)) dead.push(r);
+  }
+};
+walkSrc(join(ASSETS, 'src'), 'src');
+if (dead.length) {
+  console.error('\n[apk-assets] FAIL — these src files would be packaged in the APK, but nothing loads them at runtime:\n');
+  for (const d of dead.slice(0, 40)) console.error('   ' + d);
+  if (dead.length > 40) console.error(`   ... and ${dead.length - 40} more`);
+  console.error("\nThey are bundled into dist/ (or dead). Exclude them in app/build.gradle.kts's");
+  console.error('ignoreAssetsPatterns; if one IS loaded at runtime, teach this gate the loader.\n');
+  process.exit(1);
+}
+
+console.log(`[apk-assets] OK — ${needed.length} runtime-injected assets all survive the ignore list (${patterns.length} patterns), and no dead src file is packaged.`);
