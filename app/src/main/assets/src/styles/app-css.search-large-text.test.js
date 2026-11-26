@@ -104,3 +104,14 @@ describe("the passage card's Open button at large Text Size", () => {
     expect(d['border-radius']).toBe('var(--r-card)');
   });
 });
+
+/* Seen live while fixing large-text-n3: the songs row's "13 songs match “mercy”" ended in "…" from 170% and read
+   "13 songs …" at 300%, which no longer says what it opens. It wraps at every size instead. */
+describe('the songs row on Search', () => {
+  it('wraps its line instead of ending it with an ellipsis', () => {
+    const d = decls('.srch-songs-row .srch-songs-row-text');
+    expect(d['white-space']).toBe('normal');
+    expect(d['text-overflow']).toBe('clip');
+    expect(d['overflow-wrap']).toBe('anywhere');
+  });
+});

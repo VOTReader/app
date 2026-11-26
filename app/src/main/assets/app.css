@@ -4152,6 +4152,8 @@
     .srch-suggest-item:not(:has(.srch-kbd)) .srch-suggest-label { font-family:var(--font-serif); font-size:var(--ts-body); font-weight:600; }
     .srch-suggest { background:var(--surface-1); border-radius:var(--r-card); overflow:hidden; }
     .srch-songs-row { width:calc(100% - 2 * var(--gutter)); margin:8px var(--gutter) 0; background:var(--surface-1); border-radius:var(--r-card); }
+    /* The songs line wraps (it read "13 songs …" at 300% and lost its last word from 170%); a long query breaks. */
+    .srch-songs-row .srch-songs-row-text { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
     .srch-results-summary { margin:var(--label-above) var(--gutter) var(--label-below); }
     .srch-summary-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; min-height:var(--tap); margin:-10px 0 -8px; }
     .srch-sort { display:inline-flex; flex:none; }
