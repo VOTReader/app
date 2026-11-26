@@ -233,3 +233,22 @@ describe('WtlbEntryView — the body names its marks for the corpus remap (n4-02
     expect(document.querySelector('[data-mark-entry]').getAttribute('data-mark-entry')).toBe('wtlb:matters-of-the-heart:');
   });
 });
+
+// reading2-4 (audit 2026-11-23): a landing that names its paragraph (Saved answers, Scripture Web) handed the
+// read-along the paragraph with no offset, so a seek in an entry already playing started at the paragraph's head.
+// As in LetterView, the excerpt still places the words within the named paragraph.
+describe('WtlbEntryView — a named paragraph still places the words within it', () => {
+  it('hands the read-along the landed words\' offset, not null', () => {
+    renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'All who are weary, And I will give you rest', para: 1 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(seekToSeen.at(-1)).toBe('wtlb:matters-of-the-heart:1');
+    expect(seekOffsetSeen.at(-1)).toBe('_**Come to Me,**_ All who are weary, And I will give you rest...'.indexOf('All who'));
+  });
+
+  it('words the named paragraph does not hold land on its head (offset null), as before', () => {
+    renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'bread alone but by every word', para: 1 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(seekToSeen.at(-1)).toBe('wtlb:matters-of-the-heart:1');
+    expect(seekOffsetSeen.at(-1)).toBeNull();
+  });
+});

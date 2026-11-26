@@ -165,8 +165,13 @@ export function WtlbEntryView(props) {
     const paras = entry.paragraphs || [];
     // A saved mark names its paragraph (Saved answers, O5): that one, not the first with the same words.
     const para = surpriseAnchor.para;
-    const { index: found, off } = Number.isInteger(para) && para >= 0 && para < paras.length ? { index: para, off: null }
-      : excerptLanding(excerpt, paras.map((p) => squash(p && p.text)), surpriseAnchor.find && surpriseAnchor.find.terms);
+    const terms = surpriseAnchor.find && surpriseAnchor.find.terms;
+    // The paragraph named, the excerpt still placing the words within it (reading2-4: as LetterView does), so the
+    // read-along's seek starts at the landed words and not at the paragraph's head.
+    const inPara = Number.isInteger(para) && para >= 0 && para < paras.length
+      ? (excerpt ? excerptLanding(excerpt, [squash(paras[para] && paras[para].text)], terms) : { index: -1, off: null }) : null;
+    const { index: found, off } = inPara ? { index: para, off: inPara.index === 0 ? inPara.off : null }
+      : excerptLanding(excerpt, paras.map((p) => squash(p && p.text)), terms);
     if (found < 0) return;
     setLandedPara(found);
     setLandedOff(off);
