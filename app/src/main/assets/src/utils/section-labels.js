@@ -16,7 +16,20 @@
  * @returns {ReadonlyArray<any[]>} the same array when nothing changes, else a relabelled copy
  */
 export function relabelSections(secs, table, entriesOf) {
-  if (!Array.isArray(secs) || !secs.length || !table) return secs;
+  return relabelOrNull(secs, table, entriesOf) || secs;
+}
+
+/**
+ * relabelSections, but null when the labels cannot be worked out yet (no timings, or a collection's entries not
+ * loaded), so a caller can tell "nothing to change" (the same array) from "not known yet" (null).
+ * @param {ReadonlyArray<any[]>} secs
+ * @param {Record<string, Record<string, any>> | null | undefined} table
+ * @param {(volKey: string) => any[] | null | undefined} entriesOf
+ * @returns {ReadonlyArray<any[]> | null}
+ */
+export function relabelOrNull(secs, table, entriesOf) {
+  if (!Array.isArray(secs) || !secs.length) return secs;
+  if (!table) return null;
   /** @type {Array<{ first: number, last: number, intro: boolean } | null>} */
   const spans = secs.map((s) => {
     const rows = s && table[s[1]];
@@ -32,7 +45,7 @@ export function relabelSections(secs, table, entriesOf) {
     if (!a || !b || !(a.num > 0) || !(b.num > 0)) return null;
     return { first: a.num, last: b.num, intro: a.id === 'introduction' };
   });
-  if (spans.some((s) => !s)) return secs;
+  if (spans.some((s) => !s)) return null;
   const s = /** @type {Array<{ first: number, last: number, intro: boolean }>} */ (spans);
   let changed = false;
   // A gap of unproved entries between two files goes to the later file, as the hand labels place it.

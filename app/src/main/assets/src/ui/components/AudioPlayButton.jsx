@@ -26,9 +26,9 @@ import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC } from '../../utils/aud
 import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
-import { useStoreVersion } from '../../hooks/use-store-version.js';
+import { useStoreVersion, useStoreVersionByName } from '../../hooks/use-store-version.js';
 import { audioSyncSectionsStore, audioSyncSectionsSettled, loadAudioSyncSections } from '../../utils/sync-loaders.js';
-import { neutralSections, relabelSections } from '../../utils/section-labels.js';
+import { neutralSections, relabelOrNull } from '../../utils/section-labels.js';
 
 /** A collection's entries by volKey, from the registry globals (null before the corpus lands). @param {string} vk */
 const entriesOfVol = (vk) => {
@@ -36,6 +36,9 @@ const entriesOfVol = (vk) => {
   const col = g.COL_BY_KEY && typeof g.COL_BY_KEY.get === 'function' ? g.COL_BY_KEY.get(vk) : null;
   return col && typeof g.colLetterArr === 'function' ? g.colLetterArr(col) : null;
 };
+
+/* The VOT corpus (index.html's __votCorpus) holds the WTLB entries a range is read from. */
+const votCorpus = () => /** @type {any} */ (globalThis).__votCorpus || null;
 
 /**
  * Compilation rows labelled from their synced rows (reader-behaviour-n4): asks for the read-along timings once and
@@ -45,16 +48,31 @@ const entriesOfVol = (vk) => {
 export function useSyncedSections(sections) {
   const has = !!(sections && sections.length);
   useStoreVersion(audioSyncSectionsStore);
+  const vv = useStoreVersionByName('__votCorpus');
   React.useEffect(() => { if (has) void loadAudioSyncSections(); }, [has]);
   const table = /** @type {any} */ (globalThis).AUDIO_SYNC_SECTIONS || null;
-  // Until the timings land, the chips carry their names only, so a wrong hand range never shows and then changes.
-  // A failed load (or a page with no loader) settles too, and then the hand labels are what there is.
+  // Until both the timings and the entries they name are in, the chips carry their names only, so a wrong hand
+  // range never shows and then changes. A failed load (or a page with no loader) settles, and then the hand
+  // labels are what there is.
+  const vc = votCorpus();
+  const corpusWaiting = !!(vc && !vc.loaded && !vc.error);
   const waiting = !table && !audioSyncSectionsSettled();
-  return React.useMemo(() => {
-    if (!sections) return sections;
-    if (table) return relabelSections(sections, table, entriesOfVol);
-    return waiting ? neutralSections(sections) : sections;
-  }, [sections, table, waiting]);
+  const out = React.useMemo(() => {
+    if (!sections) return { secs: sections, needCorpus: false };
+    if (table) {
+      const r = relabelOrNull(sections, table, entriesOfVol);
+      if (r) return { secs: r, needCorpus: false };
+      return corpusWaiting ? { secs: neutralSections(sections), needCorpus: true } : { secs: sections, needCorpus: false };
+    }
+    return { secs: waiting ? neutralSections(sections) : sections, needCorpus: false };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vv is the corpus's version: new entries may now resolve
+  }, [sections, table, waiting, corpusWaiting, vv]);
+  // The entries are what is missing: ask for them (a no-op once asked).
+  React.useEffect(() => {
+    const load = /** @type {any} */ (globalThis).__loadVotCorpus;
+    if (out.needCorpus && typeof load === 'function') void Promise.resolve(load()).catch(() => undefined);
+  }, [out.needCorpus]);
+  return out.secs;
 }
 
 /**

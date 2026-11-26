@@ -65,6 +65,36 @@ describe('useSyncedSections: no chip flash while the timings load', () => {
     } finally { delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; }
   });
 
+  // Timings in, WTLB corpus not yet: the entries a range is read from are missing, so names only, never the hand range.
+  it('timings in but the corpus not yet: names only, then the synced ranges once the corpus lands', () => {
+    const entries = [{ id: 'introduction', num: 1 }, ...Array.from({ length: 60 }, (_, i) => ({ id: 'e' + (i + 2), num: i + 2 }))];
+    const listeners = new Set();
+    let version = 0;
+    const vot = { loaded: false, error: false, subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }, getVersion() { return version; } };
+    let have = false;
+    globalThis.__votCorpus = vot;
+    globalThis.__loadVotCorpus = vi.fn(() => Promise.resolve());
+    globalThis.COL_BY_KEY = new Map([['wtlb2', { key: 'wtlb2' }]]);
+    globalThis.colLetterArr = () => (have ? entries : null);
+    globalThis.AUDIO_SYNC_SECTIONS = { a1: { 'wtlb2:introduction': 1, 'wtlb2:e30': 1 }, a2: { 'wtlb2:e31': 1, 'wtlb2:e58': 1 } };
+    try {
+      render(<Chips />);
+      expect(chips()).toEqual(['Section 1', 'Section 2']);
+      expect(globalThis.__loadVotCorpus).toHaveBeenCalled();
+      act(() => { have = true; vot.loaded = true; version += 1; listeners.forEach((cb) => cb()); });
+      expect(chips()).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
+    } finally { delete globalThis.__votCorpus; delete globalThis.__loadVotCorpus; delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; }
+  });
+
+  it('timings in and the corpus failed: the hand labels show', () => {
+    globalThis.__votCorpus = { loaded: false, error: true, subscribe: () => () => {}, getVersion: () => 1 };
+    globalThis.AUDIO_SYNC_SECTIONS = { a1: { 'wtlb2:introduction': 1 }, a2: { 'wtlb2:e31': 1 } };
+    try {
+      render(<Chips />);
+      expect(chips()).toEqual(['Section 1 · Intro–28', 'Section 2 · 29–56']);
+    } finally { delete globalThis.__votCorpus; }
+  });
+
   it('neutralSections keeps the name and the rest of each row', () => {
     expect(neutralSections(SECS)).toEqual([['Section 1', 'a1', 'r'], ['Section 2', 'a2', 'r']]);
   });
