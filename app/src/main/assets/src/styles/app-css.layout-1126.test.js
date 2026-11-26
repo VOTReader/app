@@ -62,3 +62,14 @@ describe('visual2-7: the More sheet values stay on the card', () => {
     expect(decls('.rd-menu-sheet .more-menu-hint .more-menu-item-sub')).toMatchObject({ flex: 'none', 'white-space': 'nowrap' });
   });
 });
+
+/* look-6: an Up next title had one line (26 of Volume Seven's 67 cut; two lines still cut 15). */
+describe('look-6: Up next titles take three lines', () => {
+  it('the queue title clamps at three lines and no longer ellipsises one', () => {
+    const d = decls('.audio-manager-queue-main strong');
+    expect(d['-webkit-line-clamp']).toBe('3');
+    expect(d.display).toBe('-webkit-box');
+    expect(d['white-space']).toBeUndefined();
+    expect(d['text-overflow']).toBeUndefined();
+  });
+});

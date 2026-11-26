@@ -1597,7 +1597,9 @@
       }
       .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 56px; padding: 8px 0; display: flex; align-items: center; border: 0; background: transparent; color: var(--text-1); cursor: pointer; text-align: left; }
       .audio-manager-queue-main > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      .audio-manager-queue-main strong { overflow: hidden; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); white-space: nowrap; text-overflow: ellipsis; }
+      .audio-manager-queue-main strong { overflow: hidden; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+      /* look-6 (11-26): one line cut 26 of Volume Seven's 67 queue titles and two still cut 15; three lines is the
+         real minimum. Rows now differ in height, so a grip drag counts the rows it passes by their own heights. */
       .audio-manager-queue-main small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
       @media (hover: hover) { .audio-manager-queue-main:hover strong { color: var(--accent); } }
       .audio-manager-queue li.is-played .audio-manager-queue-main strong { color: var(--text-2); }

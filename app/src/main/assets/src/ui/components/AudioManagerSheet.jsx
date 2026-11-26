@@ -269,6 +269,16 @@ function Scrubber({ state, marks }) {
  */
 /** Why the recording did not start, as the bar under it says it (h1104-19: a lost signal is not "not on this phone").
     @param {string} failed  the engine's state.failed: load | signal | offline */
+/**
+ * The Voice tile's value: the reader's name alone. The tile is a fixed width and "Read by Benjamin" was cut to
+ * "Read by Benj…" (look-6, 11-26); the tile's word already says Voice, and its label keeps the whole name.
+ * @param {string | null | undefined} label  a reader label ("Read by Benjamin", "Text-to-speech")
+ * @returns {string}
+ */
+export function voiceTileWord(label) {
+  return String(label || '').replace(/^Read by /, '');
+}
+
 export function sheetFailLine(failed) {
   if (failed === 'load') return 'Couldn’t load this recording.';
   if (failed === 'signal') return 'No signal. Your place is kept.';
@@ -495,7 +505,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
             <Tool label={sleepOn ? 'Sleep timer: ' + sleepWord : 'Sleep timer, off'} word="Sleep" value={sleepOn ? sleepWord : 'Off'} on={sleepOn} onClick={() => setSheet('sleep')}><MoonIcon /></Tool>
             {songId ? null : (
               <Tool label={voices ? (voices.kind === 'edition' ? 'Edition, ' : 'Voice, ') + voices.activeLabel :'Voice: ' + (reader || 'this recording has one')} word={voices && voices.kind === 'edition' ? 'Edition' : 'Voice'}
-                value={voices ? voices.activeLabel : reader || ''} disabled={!voices} onClick={() => setSheet('voice')}><UiIcon name="mic" /></Tool>
+                value={voiceTileWord(voices ? voices.activeLabel : reader)} disabled={!voices} onClick={() => setSheet('voice')}><UiIcon name="mic" /></Tool>
             )}
             <Tool label={'Up next' + (upcoming ? ', ' + upNextWord(queue, state.qi) : '')} word="Up next" value={upWord} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
             {songId ? (

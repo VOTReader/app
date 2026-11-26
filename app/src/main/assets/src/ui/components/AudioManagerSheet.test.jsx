@@ -1005,7 +1005,7 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     fireEvent.click(nextTrack());                         // The Wide Path — two readings
 
     expect(voiceChip().getAttribute('aria-label')).toBe('Voice, Read by Benjamin');
-    expect(toolValue(voiceChip())).toBe('Read by Benjamin');
+    expect(toolValue(voiceChip())).toBe('Benjamin');   // look-6: the tile shows the name; the label keeps it whole
     openVoice();
     expect(subSheet('np-voice-sheet')).toBeTruthy();
     // The registry label is the whole name ("Read by Benjamin", "Text-to-speech"), never prefixed twice.

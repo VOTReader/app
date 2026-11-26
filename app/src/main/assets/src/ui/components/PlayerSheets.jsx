@@ -266,6 +266,37 @@ export function queueRowWords(track) {
 }
 
 /**
+ * How many rows a grip drag of dy px passes (negative: upward). A title takes one to three lines (look-6), so the rows
+ * differ in height: a row is passed once the drag is past its middle, counted by each passed row's own height (the
+ * old count divided by the dragged row's height, which is wrong next to a taller or shorter row).
+ * @param {number} dy
+ * @param {number[]} above  the heights of the rows above, nearest first
+ * @param {number[]} below  the heights of the rows below, nearest first
+ * @returns {number}
+ */
+export function rowsPassed(dy, above, below) {
+  const rows = dy > 0 ? below : above;
+  const far = Math.abs(dy);
+  let n = 0;
+  let passed = 0;
+  for (const h of rows) {
+    if (far <= passed + h / 2) break;
+    n++;
+    passed += h;
+  }
+  return dy < 0 ? -n : n;
+}
+
+/** The heights of a row's sibling rows in one direction, nearest first. @param {Element | null} li @param {-1|1} dir */
+function rowHeights(li, dir) {
+  const out = [];
+  for (let s = li && (dir > 0 ? li.nextElementSibling : li.previousElementSibling); s; s = dir > 0 ? s.nextElementSibling : s.previousElementSibling) {
+    if (s.tagName === 'LI') out.push(s.getBoundingClientRect().height || 64);   // 64: a row before layout (and in jsdom)
+  }
+  return out;
+}
+
+/**
  * One upcoming (or played) row.
  * @param {{ track: any, index: number, qi: number, count: number, played: boolean, nowSub?: string, onRemove: (index: number) => void }} props
  */
@@ -277,7 +308,6 @@ function QueueRow({ track, index, qi, count, played, nowSub, onRemove }) {
   const [shift, setShift] = React.useState({ x: 0, y: 0 });
   const canMoveUp = index > qi + 1;
   const canMoveDown = index < count - 1;
-  const rowHeight = () => (ref.current && ref.current.getBoundingClientRect().height) || 64;
   const start = (/** @type {'grip'|'swipe'} */ mode) => (/** @type {any} */ e) => {
     if (played) return;
     if (mode === 'grip') e.stopPropagation();
@@ -296,7 +326,7 @@ function QueueRow({ track, index, qi, count, played, nowSub, onRemove }) {
     setShift({ x: 0, y: 0 });
     if (!d || e.pointerId !== d.id) return;
     if (d.mode === 'grip') {
-      const to = Math.max(qi + 1, Math.min(count - 1, index + Math.round((e.clientY - d.y) / rowHeight())));
+      const to = Math.max(qi + 1, Math.min(count - 1, index + rowsPassed(e.clientY - d.y, rowHeights(ref.current, -1), rowHeights(ref.current, 1))));
       if (to !== index) AudioPlayer.moveUpcoming(index, to);
     } else if (Math.abs(e.clientX - d.x) >= SWIPE_REMOVE_PX) {
       onRemove(index);
