@@ -4,7 +4,7 @@
    histories with such changes, then checks that the month calendar and the week strip still say the same. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, newRun, tickItem, untickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, replaceContents, startToday, pauseRun, resumeRun } from './plan-engine.js';
+import { dayNum, dateOf, newRun, tickItem, untickItem, markDay, markOn, totalDays, dayItems, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, replaceContents, startToday, pauseRun, resumeRun } from './plan-engine.js';
 
 const at = (s, h = 12) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 /** mulberry32. @param {number} seed */
@@ -193,5 +193,31 @@ describe('point 3: a day off stays off when the reading days change', () => {
     // The week strip of Dec 6 to 9 says the same: Sunday and Monday are not missed.
     const week = streak(run, at('2026-12-10')).week.filter((d) => d.date >= '2026-12-06' && d.date <= '2026-12-07');
     expect(week.map((d) => d.missed)).toEqual([false, false]);
+  });
+});
+
+describe('a day marked not read, or read on an earlier date, counts the same on both sides of a pin', () => {
+  const ruth = () => newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01'));
+  const dayOf = (/** @type {any} */ r, /** @type {string} */ k) => { for (let d = 0; d < totalDays(r); d++) if (dayItems(r, d).some((it) => it.k === k)) return d; return -1; };
+  const cells = (/** @type {any} */ r) => monthCells(r, 2026, 11, at('2026-12-21')).filter((c) => c.date < 21).map((c) => c.state);
+  it('Not read yet on the day read Dec 13, pressed Dec 21: the same calendar with Catch me up on Dec 17 or without', () => {
+    const live = (/** @type {boolean} */ caught) => {
+      let run = ruth();
+      run = tickItem(run, 'ruth:1', '2026-12-03', 1); run = tickItem(run, 'ruth:2', '2026-12-08', 1); run = tickItem(run, 'ruth:3', '2026-12-13', 1);
+      if (caught) run = catchUp(run, at('2026-12-17'));
+      return cells(markDay(run, dayOf(run, 'ruth:3'), false, at('2026-12-21')));
+    };
+    expect(live(false).slice(12)).toEqual(Array(8).fill('missed'));
+    expect(live(true)).toEqual(live(false));
+  });
+  it('"I read it on Dec 13", told on Dec 21: the same calendar with Catch me up on Dec 17 or without', () => {
+    const live = (/** @type {boolean} */ caught) => {
+      let run = ruth();
+      run = tickItem(run, 'ruth:1', '2026-12-03', 1); run = tickItem(run, 'ruth:2', '2026-12-08', 1);
+      if (caught) run = catchUp(run, at('2026-12-17'));
+      return cells(markOn(run, '2026-12-13', at('2026-12-21')));
+    };
+    expect(live(false).slice(12, 17)).toEqual(['read', 'none', 'none', 'none', 'none']);
+    expect(live(true)).toEqual(live(false));
   });
 });

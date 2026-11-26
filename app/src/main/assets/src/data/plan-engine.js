@@ -967,10 +967,20 @@ export function untickItem(run, k, now) {
   const was = ticks[k];
   delete ticks[k];
   const next = { ...run, ticks, updated: now.getTime() };
-  const r = run.rested;
-  if (was && r && was < r.until) next.rested = { until: was, ranges: toRanges([...pinnedDates(r)].filter((d) => d < was).sort()) };
   if (next.status === 'finished') { next.status = 'running'; delete next.finished; }
-  return next;
+  return unpinFrom(next, [was]);
+}
+
+/**
+ * A read taken back (untickItem, a day marked not read) or one dated in the past (markOn, "I read it on…") changes
+ * what the card said from that date on: the pinned days from the earliest such date are dropped and judged again
+ * live, as the days after the pin are, so both sides of the pin agree. @param {PlanRun} run @param {string[]} dates
+ * @returns {PlanRun}
+ */
+function unpinFrom(run, dates) {
+  const r = run.rested, from = dates.filter(Boolean).sort()[0];
+  if (!r || !from || from >= r.until) return run;
+  return { ...run, rested: { until: from, ranges: toRanges([...pinnedDates(r)].filter((d) => d < from).sort()) } };
 }
 
 /** Pause from today. */
@@ -1009,12 +1019,13 @@ export function tickItem(run, k, dateKey, at) {
 export function markDay(run, d, done, now) {
   const key = todayKey(now);
   const ticks = { ...(run.ticks || {}) };
+  /** @type {string[]} */ const taken = [];
   for (const it of dayItems(run, d)) {
-    if (done) { if (!(it.k in ticks)) ticks[it.k] = key; } else delete ticks[it.k];
+    if (done) { if (!(it.k in ticks)) ticks[it.k] = key; } else { if (ticks[it.k]) taken.push(ticks[it.k]); delete ticks[it.k]; }
   }
   const next = { ...run, ticks, updated: now.getTime() };
   if (!done && next.status === 'finished') { next.status = 'running'; delete next.finished; }
-  return done ? finishIfDone(next, key) : next;
+  return done ? finishIfDone(next, key) : unpinFrom(next, taken);
 }
 
 /**
@@ -1053,7 +1064,7 @@ export function markOn(run, dateKey, now) {
   if (st.finished) return run;
   const ticks = { ...(run.ticks || {}) };
   for (const it of dayItems(run, st.day)) if (!(it.k in ticks)) ticks[it.k] = dateKey;
-  return finishIfDone({ ...run, ticks, updated: now.getTime() }, todayKey(now));
+  return finishIfDone(unpinFrom({ ...run, ticks, updated: now.getTime() }, [dateKey]), todayKey(now));
 }
 
 /** A run whose every day is read is finished on `dateKey`; `seen: false` until its finish page is opened (FIXB). */
