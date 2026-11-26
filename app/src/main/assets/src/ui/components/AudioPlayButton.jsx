@@ -57,22 +57,18 @@ export function useSyncedSections(sections) {
   const vc = votCorpus();
   const corpusWaiting = !!(vc && !vc.loaded && !vc.error);
   const waiting = !table && !audioSyncSectionsSettled();
-  const out = React.useMemo(() => {
-    if (!sections) return { secs: sections, needCorpus: false };
+  // The chips never ask for the corpus themselves: both screens that show them (AudioCollectionScreen and the
+  // WTLB index) load it already, and pulling all 14 collections for a chip's label is not worth it. They wait.
+  return React.useMemo(() => {
+    if (!sections) return sections;
     if (table) {
       const r = relabelOrNull(sections, table, entriesOfVol);
-      if (r) return { secs: r, needCorpus: false };
-      return corpusWaiting ? { secs: neutralSections(sections), needCorpus: true } : { secs: sections, needCorpus: false };
+      if (r) return r;
+      return corpusWaiting ? neutralSections(sections) : sections;
     }
-    return { secs: waiting ? neutralSections(sections) : sections, needCorpus: false };
+    return waiting ? neutralSections(sections) : sections;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- vv is the corpus's version: new entries may now resolve
   }, [sections, table, waiting, corpusWaiting, vv]);
-  // The entries are what is missing: ask for them (a no-op once asked).
-  React.useEffect(() => {
-    const load = /** @type {any} */ (globalThis).__loadVotCorpus;
-    if (out.needCorpus && typeof load === 'function') void Promise.resolve(load()).catch(() => undefined);
-  }, [out.needCorpus]);
-  return out.secs;
 }
 
 /**

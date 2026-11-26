@@ -80,7 +80,7 @@ describe('useSyncedSections: no chip flash while the timings load', () => {
     try {
       render(<Chips />);
       expect(chips()).toEqual(['Section 1', 'Section 2']);
-      expect(globalThis.__loadVotCorpus).toHaveBeenCalled();
+      expect(globalThis.__loadVotCorpus).not.toHaveBeenCalled();   // the screen loads the corpus; the chips only wait
       act(() => { have = true; vot.loaded = true; version += 1; listeners.forEach((cb) => cb()); });
       expect(chips()).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
     } finally { delete globalThis.__votCorpus; delete globalThis.__loadVotCorpus; delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; }
