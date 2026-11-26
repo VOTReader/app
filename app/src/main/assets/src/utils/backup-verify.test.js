@@ -509,3 +509,46 @@ describe('summarizeBackupManifest: a v1 backup counted from its data block', () 
     expect(summarizeBackupManifest({ data: { 'vot-notes': 'null' } }).records).toBe(0);
   });
 });
+
+/* A kind the file does not carry is left untouched by a restore, so the counts sheet must not print 0 for it
+   (0 reads as a wipe). The summary names those kinds (absent), and the ones it carries but cannot count (unknown). */
+describe('summarizeBackupManifest: kinds the file does not carry, or cannot count', () => {
+  it('REPRO: a missing section is absent; a carried empty one is 0 and not absent', () => {
+    const s = summarizeBackupManifest({ exportVersion: 2, data: {}, stores: { 'vot-notes': {}, 'vot-links': [] }, media: {} });
+    expect([s.notes, s.links, s.mediaCount]).toEqual([0, 0, 0]);
+    expect(s.absent).not.toContain('notes');
+    expect(s.absent).not.toContain('links');
+    expect(s.absent).not.toContain('mediaCount');
+    expect(s.absent).toEqual(expect.arrayContaining(['highlights', 'journal', 'bookmarks', 'plans', 'notebooks', 'readMarks']));
+    expect(s.unknown).toEqual([]);
+  });
+
+  it('either notebook store carries notebooks; vot-state carries read marks even with none marked', () => {
+    const s = summarizeBackupManifest({ stores: { 'vot-journal-notebooks': { list: [] }, 'vot-state': { settings: {} } } });
+    expect(s.absent).not.toContain('notebooks');
+    expect(s.absent).not.toContain('readMarks');
+    expect(s.readMarks).toBe(0);
+  });
+
+  it('media: a v3 array or v1/v2 map carries it (empty too); no table and no _media count does not', () => {
+    expect(summarizeBackupManifest({ stores: {}, media: [] }).absent).not.toContain('mediaCount');
+    expect(summarizeBackupManifest({ counts: { _media: 0 } }).absent).not.toContain('mediaCount');
+    expect(summarizeBackupManifest({ stores: {} }).absent).toContain('mediaCount');
+  });
+
+  it('a counts-only file cannot say its read marks or highlights: unknown, not absent and not 0', () => {
+    const s = summarizeBackupManifest({ counts: { 'vot-state': 1, 'vot-annotations': 4, 'vot-notes': 2 } });
+    expect(s.unknown).toEqual(['highlights', 'readMarks']);
+    expect(s.absent).not.toContain('readMarks');
+    expect(s.absent).toContain('links');
+    const none = summarizeBackupManifest({ counts: { 'vot-notes': 2 } });
+    expect(none.unknown).toEqual([]);
+    expect(none.absent).toContain('readMarks');
+  });
+
+  it('null or garbage never throws and says nothing is carried', () => {
+    const s = summarizeBackupManifest(null);
+    expect(s.absent).toContain('notes');
+    expect(s.absent).toContain('mediaCount');
+  });
+});

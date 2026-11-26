@@ -4,6 +4,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { BackupCounts } from './SettingsScreen.jsx';
+import { summarizeBackupManifest } from '../../utils/backup-verify.js';
 
 afterEach(cleanup);
 const rows = (c) => [...c.querySelectorAll('.ws3-count')].map((r) => [r.children[0].textContent, ...[...r.querySelectorAll('.ws3-count-n')].map((x) => x.textContent)]);
@@ -52,5 +53,40 @@ describe('BackupCounts: the kinds past the first four (data-7)', () => {
   it('an old summary without those fields (or a phone count that failed) shows the first rows only, and no crash', () => {
     const { container } = render(<BackupCounts s={four} here={{}} />);
     expect(rows(container).map((r) => r[0])).toEqual(['', 'Notes', 'Highlights', 'Journal entries', 'Bookmarks', 'Photos and recordings']);
+  });
+});
+
+/* A kind the backup does not carry is left untouched by a restore: "0" there read as a wipe. A dash says the file
+   has none of it; 0 stays for a kind the file carries empty. Counted through the real summary, as the sheet is. */
+describe('BackupCounts: a dash for a kind the file does not carry', () => {
+  const sum = (doc) => summarizeBackupManifest(doc);
+
+  it('REPRO: missing kinds read "–" beside this phone; a carried empty kind reads 0', () => {
+    const s = sum({ exportVersion: 2, data: {}, stores: { 'vot-notes': {}, 'vot-links': [{ id: 'l1' }] } });
+    const { container } = render(<BackupCounts s={s} here={{ notes: 6, highlights: 55, journal: 4, bookmarks: 2, links: 0, readMarks: 627, mediaCount: 3 }} />);
+    expect(rows(container)).toEqual([
+      ['', 'Backup', 'This phone'],
+      ['Notes', '0', '6'], ['Highlights', '–', '55'], ['Journal entries', '–', '4'], ['Bookmarks', '–', '2'],
+      ['Links', '1', '0'], ['Marked read', '–', '627'],
+      ['Photos and recordings', '–', '3'],
+    ]);
+    const dash = [...container.querySelectorAll('.ws3-count-n')].find((x) => x.textContent === '–');
+    expect(dash.getAttribute('aria-label')).toBe('Not in this backup');
+  });
+
+  it('the check sheet (one column) shows the same dashes', () => {
+    const { container } = render(<BackupCounts s={sum({ stores: { 'vot-bookmarks': [] }, media: [] })} />);
+    expect(rows(container)).toEqual([
+      ['Notes', '–'], ['Highlights', '–'], ['Journal entries', '–'], ['Bookmarks', '0'], ['Photos and recordings', '0'],
+    ]);
+  });
+
+  it('a counts-only file that cannot say its read marks gets a dash and its row, labelled as not counted', () => {
+    const { container } = render(<BackupCounts s={sum({ counts: { 'vot-notes': 2, 'vot-state': 1, _media: 0 } })} />);
+    const r = rows(container);
+    expect(r).toContainEqual(['Marked read', '–']);
+    expect(r).toContainEqual(['Notes', '2']);
+    const marked = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Marked read');
+    expect(marked.querySelector('.ws3-count-n').getAttribute('aria-label')).toBe('Not counted in this file');
   });
 });

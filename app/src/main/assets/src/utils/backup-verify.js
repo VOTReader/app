@@ -43,6 +43,13 @@ import { countStoreRecords } from './backup.js';
  * (`annotatedPassages`) and the report names it that way. Exactly one of the
  * two is ever non-zero.
  *
+ * `absent` names the fields whose kind the file does not carry at all (no
+ * store, no count): a restore leaves those kinds on the phone untouched, so a
+ * "0" there would read as a wipe. `unknown` names the fields whose kind it
+ * carries but cannot count: a counts-only file's highlights and read marks.
+ * The counts sheet shows a dash for both, and 0 only for a kind the file
+ * carries empty.
+ *
  * @param {any} manifest
  * @returns {{
  *   date: string | null,
@@ -50,7 +57,8 @@ import { countStoreRecords } from './backup.js';
  *   mediaCount: number, mediaBytes: number,
  *   notes: number, highlights: number, annotatedPassages: number,
  *   journal: number, bookmarks: number,
- *   links: number, plans: number, notebooks: number, readMarks: number
+ *   links: number, plans: number, notebooks: number, readMarks: number,
+ *   absent: string[], unknown: string[]
  * }}
  */
 export function summarizeBackupManifest(manifest) {
@@ -115,6 +123,22 @@ export function summarizeBackupManifest(manifest) {
     const items = st && typeof st === 'object' && !Array.isArray(st) ? st.readItems : null;
     if (items && typeof items === 'object' && !Array.isArray(items)) readMarks = Object.keys(items).length;
   }
+  // What the file says nothing about. Media is carried by a v3 array, a v1/v2 id map or a declared _media count;
+  // a restore without one leaves this phone's media alone (applyImportPayload only prunes when the file lists media).
+  const has = (/** @type {string} */ k) => byStore.has(k);
+  /** @type {string[]} */ const absent = [];
+  /** @type {string[]} */ const unknown = [];
+  if (!has('vot-notes')) absent.push('notes');
+  if (!has('vot-annotations')) absent.push('highlights', 'annotatedPassages');
+  else if (!stores) unknown.push('highlights');
+  if (!has('vot-journal')) absent.push('journal');
+  if (!has('vot-bookmarks')) absent.push('bookmarks');
+  if (!has('vot-links')) absent.push('links');
+  if (!has('vot-reading-plans')) absent.push('plans');
+  if (!has('vot-notebooks') && !has('vot-journal-notebooks')) absent.push('notebooks');
+  if (!has('vot-state')) absent.push('readMarks');
+  else if (!stores) unknown.push('readMarks');
+  if (!(Array.isArray(media) || (media && typeof media === 'object') || typeof counts._media === 'number')) absent.push('mediaCount');
   return {
     date: (manifest && typeof manifest.exportDate === 'string') ? manifest.exportDate : null,
     records,
@@ -131,6 +155,8 @@ export function summarizeBackupManifest(manifest) {
     plans: pick('vot-reading-plans'),
     notebooks: pick('vot-notebooks') + pick('vot-journal-notebooks'),
     readMarks,
+    absent,
+    unknown,
   };
 }
 
