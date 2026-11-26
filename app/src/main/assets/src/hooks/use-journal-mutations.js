@@ -61,7 +61,7 @@ import { StorageHealth } from '../utils/storage-health.js';
 export function useJournalMutations({ setJournalEntryId, setScreen }) {
   const createAndEditJournal = () => {
     if (typeof JournalStore === 'undefined') return;
-    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation(createAndEditJournal).shouldBlock) return;
     const e = JournalStore.add();
     // Hand the new entry's id to the editor for first-save stats recording
     // (see header). The same key literal lives in JournalEditorScreen.jsx.

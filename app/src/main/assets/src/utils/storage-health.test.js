@@ -1329,3 +1329,31 @@ describe('W8: the library was changed in another tab', () => {
     expect(StorageHealth.getReport().libraryElsewhere).toBeNull();
   });
 });
+
+describe('safari 7-day gate: the first save is not lost (fix list #1)', () => {
+  it('shows the warning even when no storage report exists yet', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB, storageApi: mockStorage(), standalone: false });
+    expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(true);
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(true);
+  });
+
+  it('runs the blocked gesture once the warning is answered', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB, storageApi: mockStorage(), standalone: false });
+    const resume = vi.fn();
+    expect(StorageHealth.checkFirstDataCreation(resume).shouldBlock).toBe(true);
+    expect(resume).not.toHaveBeenCalled();
+    StorageHealth.dismissScenario('safari-7day');
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(false);
+    StorageHealth.dismissScenario('safari-7day');
+    expect(resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('a resume that throws still clears the gate', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB, storageApi: mockStorage(), standalone: false });
+    StorageHealth.checkFirstDataCreation(() => { throw new Error('boom'); });
+    expect(() => StorageHealth.dismissScenario('safari-7day')).not.toThrow();
+    expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
+  });
+});
+

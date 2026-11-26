@@ -182,6 +182,8 @@ let _refreshIntervalId = null;
 let _lastAssessedAt = 0;
 let _safariWarningShownThisSession = false;
 let _safariGateBlocked = false;
+/** The gesture the Safari gate held back; run when the warning is answered. @type {(() => void) | null} */
+let _safariResume = null;
 // E5: true while any cached store is stuck in the degraded hydration tier
 // (serving empty copyDefault() snapshots). Plumbed into the report so the
 // StorageHealthBanner — which only subscribes to StorageHealth — can surface
@@ -752,10 +754,13 @@ async function _ensurePersistence() {
  * Returns `shouldBlock: true` exactly once per session when the
  * platform is safari-tab. The UI shows the modal and awaits the
  * user's choice before proceeding with the data-creating gesture.
+ * Pass `resume` (the gesture itself) and it runs once the warning is
+ * answered, so the reader's first save is not dropped (fix list #1).
  *
+ * @param {() => void} [resume]
  * @returns {{ shouldBlock: boolean, reason?: string }}
  */
-function _checkFirstDataCreation() {
+function _checkFirstDataCreation(resume) {
   var platform = _getPlatform();
   if (platform !== PLATFORM.SAFARI_TAB) return { shouldBlock: false };
   // Installed (Home Screen / Add to Dock) Safari apps are exempt from the 7-day
@@ -765,7 +770,9 @@ function _checkFirstDataCreation() {
   if (_sessionDismissals.has('safari-7day')) return { shouldBlock: false };
   _safariWarningShownThisSession = true;
   _safariGateBlocked = true;
-  if (_report) _report = Object.assign({}, _report, { safariGateBlocked: true });
+  _safariResume = typeof resume === 'function' ? resume : null;
+  // No report yet (a save right after a cold open): start from the default one, or the warning never shows.
+  _report = Object.assign({}, _report || _DEFAULT_REPORT, { safariGateBlocked: true });
   _bump();
   return { shouldBlock: true, reason: 'safari-7day' };
 }
@@ -783,6 +790,11 @@ function _dismissScenario(scenarioId) {
     if (_report) _report = Object.assign({}, _report, { safariGateBlocked: false });
   }
   _bump();
+  if (scenarioId === 'safari-7day' && _safariResume) {
+    var resume = _safariResume;
+    _safariResume = null;
+    try { resume(); } catch (e) { console.warn('[StorageHealth] resumed save failed', e); }
+  }
 }
 
 /**
@@ -932,6 +944,7 @@ function _resetForTests(opts) {
   _lastAssessedAt = 0;
   _safariWarningShownThisSession = false;
   _safariGateBlocked = false;
+  _safariResume = null;
   _storesDegraded = false;
   _storesUnreadable = [];
   _versionTooNew = false;

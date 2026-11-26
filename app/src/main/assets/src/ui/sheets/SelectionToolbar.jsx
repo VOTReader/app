@@ -827,7 +827,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const applyHighlight = React.useCallback((color) => {
     if (!selInfo) return;
-    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation(() => applyHighlight(color)).shouldBlock) return;
     suppressRef.current = true;
     const kind = activeStyle === 'underline' ? 'underline'
       : activeStyle === 'squiggle' ? 'squiggle' : 'highlight';
@@ -981,7 +981,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const handleNote = React.useCallback(() => {
     if (!selInfo) return;
-    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation(() => handleNote()).shouldBlock) return;
     // New notes use the last-used note default (style + color); the cold-start
     // default is a BLANK highlight (invisible mark + just the icon — a note
     // with no visual overhead). Note-ness is a NoteStore entry, NOT the kind,
@@ -1221,7 +1221,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
-    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation(() => handleBookmark()).shouldBlock) return;
     // Determine the hlKey: single-container uses selInfo.hlKey;
     // multi-container uses the first container's key.
     var hlKey = selInfo.hlKey;

@@ -29,7 +29,12 @@ export function ChapterBookmarkBtn({ chapterBookmark }) {
       }
       return;
     }
-    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation(create).shouldBlock) return;
+    create();
+  };
+
+  // The gesture itself; the Safari 7-day gate runs it again once its warning is answered (fix list #1).
+  const create = () => {
     // Open the pre-commit create sheet so the user can refine label +
     // attach a thought before persisting. Same flow as the
     // SelectionToolbar bookmark action — consistent experience whether
