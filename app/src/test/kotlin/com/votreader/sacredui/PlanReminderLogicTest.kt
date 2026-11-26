@@ -26,7 +26,8 @@ class PlanReminderLogicTest {
     private fun plan(
         id: String = "a", time: String = "07:30", weekdays: List<Boolean>? = null, done: LocalDate? = null,
         active: LocalDate? = fri, end: LocalDate? = null, paused: Boolean = false, name: String = "Bible in a Year",
-    ) = Plan(id, name, PlanReminderLogic.parseTime(time)!!, weekdays, done, active, end, paused)
+        start: LocalDate? = null,
+    ) = Plan(id, name, PlanReminderLogic.parseTime(time)!!, weekdays, done, active, end, paused, start)
 
     @Test
     fun `times and dates parse strictly`() {
@@ -81,6 +82,17 @@ class PlanReminderLogicTest {
         assertFalse(PlanReminderLogic.readsOn(plan(weekdays = sun), fri))
         assertTrue(PlanReminderLogic.readsOn(plan(weekdays = List(7) { false }), sat))
         assertTrue(PlanReminderLogic.readsOn(plan(weekdays = listOf(true, false)), sat))   // not 7 long: ignored
+    }
+
+    @Test
+    fun `a plan that starts later stays quiet until its start`() {
+        val start = fri.plusDays(3)
+        assertFalse(PlanReminderLogic.readsOn(plan(start = start), fri))
+        assertFalse(PlanReminderLogic.readsOn(plan(start = start), start.minusDays(1)))
+        assertTrue(PlanReminderLogic.readsOn(plan(start = start), start))
+        assertEquals(at(start, 7, 30), PlanReminderLogic.nextFire(listOf(plan(start = start, active = start)), at(fri, 6), null, fri, false))
+        val farStart = fri.plusDays(40)   // past the usual week ahead: the alarm is still set for it
+        assertEquals(at(farStart, 7, 30), PlanReminderLogic.nextFire(listOf(plan(start = farStart, active = farStart)), at(fri, 6), null, fri, false))
     }
 
     @Test

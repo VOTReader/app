@@ -84,6 +84,7 @@ export function reminderPayload(runs, now, nameOf) {
       active: lastActive(run),
     };
     if (Array.isArray(run.weekdays) && run.weekdays.length === 7) p.weekdays = run.weekdays.map(Boolean);
+    if (typeof run.start === 'string' && dayNum(run.start) != null) p.start = run.start;
     if (doneToday(run, now)) p.done = todayKey(now);
     plans.push(p);
   }

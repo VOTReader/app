@@ -32,7 +32,7 @@ import java.time.ZonedDateTime
  *
  * The page's contract (JSON in, JSON out; unknown fields ignored):
  *   in  {"plans":[{"id","name","time":"HH:MM","weekdays":[7 x bool, Sunday first],"done":"YYYY-MM-DD",
- *                  "active":"YYYY-MM-DD","end":"YYYY-MM-DD","paused":bool}]}   (an empty list turns it off)
+ *                  "active":"YYYY-MM-DD","end":"YYYY-MM-DD","paused":bool,"start":"YYYY-MM-DD"}]}   (an empty list turns it off)
  *   out {"ok":bool,"allowed":bool,"next":<epoch ms, 0 = none>,"quiet":[ids gone quiet]}
  * A tap opens the app; the plan's id waits for the page in [takeOpened] (and reaches a running page as
  * JsEvent.PlanReminderOpen).
@@ -148,6 +148,7 @@ object PlanReminder {
                 active = PlanReminderLogic.parseDate(o.optString("active", "")),
                 end = PlanReminderLogic.parseDate(o.optString("end", "")),
                 paused = o.optBoolean("paused", false),
+                start = PlanReminderLogic.parseDate(o.optString("start", "")),
             )
         }
         return out

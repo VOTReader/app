@@ -48,6 +48,7 @@ object PlanReminderLogic {
         val active: LocalDate? = null,
         val end: LocalDate? = null,
         val paused: Boolean = false,
+        val start: LocalDate? = null,
     )
 
     /**
@@ -85,6 +86,7 @@ object PlanReminderLogic {
     /** Whether [plan] reads on [day]: not paused, not past its end, and [day] is one of its weekdays. */
     fun readsOn(plan: Plan, day: LocalDate): Boolean {
         if (plan.paused) return false
+        if (plan.start != null && day.isBefore(plan.start)) return false
         if (plan.end != null && day.isAfter(plan.end)) return false
         val wd = plan.weekdays
         if (wd != null && wd.size == 7 && wd.any { it } && !wd[day.dayOfWeek.value % 7]) return false
@@ -126,7 +128,10 @@ object PlanReminderLogic {
         // A late-evening time (23:45) that a reboot or a clock change lost just before midnight is still within the
         // grace after it: catch up on yesterday's reminder now, as one at 7:30 lost at 9:00 is caught up on.
         if (catchUp && dueSlots(plans, today.minusDays(1), now, lastNotified, setOn).isNotEmpty()) return now
-        for (offset in 0L..8L) {
+        // Look a week ahead, or as far as a plan's later start (at most a year), so the alarm is set for it.
+        val horizon = plans.mapNotNull { it.start }.maxOfOrNull { java.time.temporal.ChronoUnit.DAYS.between(today, it) }
+            ?.coerceIn(8L, 366L) ?: 8L
+        for (offset in 0L..horizon) {
             val day = today.plusDays(offset)
             if (day == lastNotified) continue
             var best: ZonedDateTime? = null

@@ -85,10 +85,20 @@ describe('reminderPayload', () => {
     ];
     const out = reminderPayload(/** @type {any} */ (runs), now, (r) => (r.id === 'r1' ? 'Genesis in three days' : ''));
     expect(out.plans.map((p) => p.id)).toEqual(['r1', 'done']);
-    expect(out.plans[0]).toEqual({ id: 'r1', name: 'Genesis in three days', time: '07:30', active: '2026-10-23', weekdays: [true, true, true, true, true, true, true] });
+    expect(out.plans[0]).toEqual({ id: 'r1', name: 'Genesis in three days', time: '07:30', active: '2026-10-23', weekdays: [true, true, true, true, true, true, true], start: '2026-10-23' });
     expect(out.plans[1].done).toBe('2026-10-23');
     expect(out.plans[1].name).toBe('Genesis');
     expect(reminderPayload(/** @type {any} */ (null), now).plans).toEqual([]);
+  });
+});
+
+describe('reminderPayload and a later start', () => {
+  it('sends the start date so the phone stays quiet until then', () => {
+    const now = at('2026-10-23');
+    const later = run3({ id: 'later', start: '2026-11-01' });
+    const out = reminderPayload(/** @type {any} */ ([later, run3({ id: 'bad', start: 'soon' })]), now);
+    expect(out.plans.find((p) => p.id === 'later')?.start).toBe('2026-11-01');
+    expect(out.plans.find((p) => p.id === 'bad')?.start).toBeUndefined();
   });
 });
 
