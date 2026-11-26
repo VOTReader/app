@@ -486,7 +486,7 @@ jobs:
   browser:
     name: browser (smoke render walk + end-to-end)
     runs-on: ubuntu-latest
-    timeout-minutes: 45   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h; 45 since e2e:contrast (LIGHT2)
+    timeout-minutes: 30   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h; the long walks run in browser-walks
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name != github.repository
@@ -609,6 +609,52 @@ jobs:
         # came from; a run that checks nothing FAILS (NOTHING-CHECKED).
         run: npm run e2e:search
 
+  browser-walks:
+    # pipeline-1 (audit 2026-11-23): the contrast walk (836 s) and the never-official walk (208 s) ran last in
+    # `browser`, after every other walk, and made it CI's critical path (about 21 min). Their own job runs them
+    # beside the rest: the same setup and build, the same commit; the aggregator needs both jobs.
+    name: browser walks (contrast + never-official)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35   # n7-05: contrast ~14 min + official ~3.5 min + setup; they ran inside browser's 45 before
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node (pinned via .nvmrc — matches local)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json (skips re-fetch each push)
+
+      # B2 — cache puppeteer's downloaded Chromium (~150 MB) keyed on the lockfile,
+      # so `npm ci` reuses it across pushes instead of re-downloading the browser
+      # the smoke:ci render walk drives. The path is puppeteer's default cache dir.
+      - name: Cache puppeteer Chromium
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # `npm run build` invokes `python tools/build.py` (which generates
+      # bundle-a.js) — setup-python guarantees a `python` on PATH. 3.13, not
+      # '3.x' (which floated to 3.14): requirements-dev.txt's pins are measured
+      # on 3.13, like the pre-commit hook's `py -3.13` (v12-06). The pip cache
+      # saves re-downloading requirements-dev.txt on every run.
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies (npm ci — exact lockfile)
+        run: npm ci
+
+      - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
+        run: npm run build
+
       - name: Both themes readable (contrast walk)
         # tools/e2e-contrast.mjs (LIGHT1-LIGHT2, 2026-11-11): the built app walked at 412x915 in the dark and the
         # light theme through ~110 stops (a seeded profile: notes, every highlight colour and mark style, a journal
@@ -665,7 +711,7 @@ jobs:
     name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) && 'build + syntax-check' || 'build + syntax-check (skipped PR copy)' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [gates, vitest, browser, search-bench]
+    needs: [gates, vitest, browser, browser-walks, search-bench]
     # Every PR opened here ran this whole chain TWICE. Measured, not inferred:
     # `gh pr checks 13` listed each check under two distinct run ids
     # (33872042913 and 33872045621). The `push` and `pull_request` events both
@@ -697,17 +743,17 @@ jobs:
     #
     # always(): a job whose needs failed is SKIPPED by default, and a skipped
     # required check counts as passing. This one runs anyway and fails unless
-    # all four jobs succeeded.
+    # all five jobs succeeded.
     if: >-
       always() &&
       (github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name != github.repository)
     steps:
-      - name: All four CI jobs passed
+      - name: All five CI jobs passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "gates/vitest/browser/search-bench: $RESULTS"
+          echo "gates/vitest/browser/browser-walks/search-bench: $RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
 

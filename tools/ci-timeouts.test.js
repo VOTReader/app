@@ -23,7 +23,7 @@ function jobs(text) {
 }
 
 describe('workflow job timeouts', () => {
-  for (const [file, expected] of [['ci.yml', { gates: 20, vitest: 20, browser: 45, 'search-bench': 8, build: 5, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10, verify: 15 }]]) {
+  for (const [file, expected] of [['ci.yml', { gates: 20, vitest: 20, browser: 30, 'browser-walks': 35, 'search-bench': 8, build: 5, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10, verify: 15 }]]) {
     it(`${file}: every job has one`, () => {
       const js = jobs(wf(file));
       expect(Object.keys(js).sort()).toEqual(Object.keys(expected).sort());
@@ -63,8 +63,8 @@ describe('the required check covers every CI job (ln1)', () => {
     expect(other).not.toBe('build + syntax-check');
   });
   // search-bench (2026-10-05) joined them: the benchmark's floor gates main like the rest.
-  it('needs gates, vitest, browser and search-bench, and runs when one of them fails', () => {
-    expect(build).toMatch(/\n {4}needs: \[gates, vitest, browser, search-bench\]\n/);
+  it('needs gates, vitest, browser, browser-walks and search-bench, and runs when one of them fails', () => {
+    expect(build).toMatch(/\n {4}needs: \[gates, vitest, browser, browser-walks, search-bench\]\n/);
     expect(build).toMatch(/\n {4}if: >-\n {6}always\(\) &&/);
     expect(build).toMatch(/\[ "\$r" = success \] \|\| exit 1/);
   });
