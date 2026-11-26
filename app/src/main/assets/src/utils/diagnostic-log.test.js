@@ -9,8 +9,8 @@
    and in FIFO order with no corruption.
    ─────────────────────────────────────────────────────────────── */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { DiagnosticLog } from './diagnostic-log.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { DiagnosticLog, PERSIST_KEY } from './diagnostic-log.js';
 
 beforeEach(() => {
   DiagnosticLog.clear();
@@ -216,6 +216,33 @@ describe('DiagnosticLog — burst integrity (single-threaded concurrency analog)
       expect(['W', 'E', 'I']).toContain(e[i].lvl);
       expect(e[i].tag).toBe('burst');
       if (i > 0) expect(e[i].t).toBeGreaterThanOrEqual(e[i - 1].t);
+    }
+  });
+});
+
+/* Bundle d carries its own copy of this module (idb-chunks for thumb-store) beside bundle-b's. An entry d's copy
+   logged went into a buffer Export JSON never reads. The ?copy= import is a second instance, as d's is. */
+describe('DiagnosticLog — one buffer for every bundle copy', () => {
+  it('an entry logged through the other copy is in this copy\'s export, and a clear empties both', async () => {
+    // @ts-ignore — the query makes a second module instance
+    const d = await import('./diagnostic-log.js?copy=d');
+    expect(d.DiagnosticLog).not.toBe(DiagnosticLog);
+    d.DiagnosticLog.warn('thumb', 'thumbnail chunk write failed');
+    expect(DiagnosticLog.entries().map((e) => e.msg)).toEqual(['thumbnail chunk write failed']);
+    expect(JSON.parse(DiagnosticLog.toJSON())).toHaveLength(1);
+    DiagnosticLog.clear();
+    expect(d.DiagnosticLog.entries()).toEqual([]);
+  });
+
+  it('a module reset still starts a fresh buffer, seeded from the ring (vitest.setup.js drops the shared state)', async () => {
+    DiagnosticLog.warn('render', 'this page only');
+    localStorage.setItem(PERSIST_KEY, JSON.stringify([{ t: 1, lvl: 'W', tag: 'store', msg: 'an earlier session' }]));
+    try {
+      vi.resetModules();
+      const fresh = await import('./diagnostic-log.js');
+      expect(fresh.DiagnosticLog.entries().map((e) => e.msg)).toEqual(['an earlier session']);
+    } finally {
+      localStorage.removeItem(PERSIST_KEY);
     }
   });
 });

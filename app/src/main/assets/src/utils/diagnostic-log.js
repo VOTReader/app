@@ -2,7 +2,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    DiagnosticLog — JS-side diagnostic ring buffer (web telemetry)
    ═══════════════════════════════════════════════════════════════════════
-   ES module. Bundled into bundle-b via _entry-b.js. No dependencies.
+   ES module. Bundled into bundle-b via _entry-b.js, and into bundle-d through
+   idb-chunks (thumb-store); both copies keep one buffer (utils/shared-state.js).
 
    W7.4 of the W7 code-quality-hardening phase. The JS-side twin of the
    Kotlin BoundedLogTree (app/src/main/java/.../BoundedLogTree.kt):
@@ -50,6 +51,8 @@
      DiagnosticLog.toJSON()                      → string (JSON array; '[]' when empty)
      DiagnosticLog.clear()                       → void
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { sharedState } from './shared-state.js';
 
 /**
  * One captured diagnostic line.
@@ -143,9 +146,11 @@ function _appendRing(entry) {
 
 /* ─── Module state ──────────────────────────────────────────────────── */
 
-/** Seeded with the ring, so earlier sessions' storage warnings show in an export.
- *  @type {DiagEntry[]} */
-let _buffer = _readRing();
+/** The buffer, seeded with the ring so earlier sessions' storage warnings show in an export.
+ *  Shared: bundle d carries its own copy of this module (via idb-chunks for thumb-store), and an
+ *  entry that copy logged would otherwise miss Export JSON, which reads b's (BRIDGES.md §14).
+ *  @type {{ buffer: DiagEntry[] }} */
+const _st = sharedState('diagnostic-log', () => ({ buffer: _readRing() }));
 
 /**
  * Append one entry, evicting the oldest when over capacity. Both tag and
@@ -156,8 +161,8 @@ let _buffer = _readRing();
  */
 function _push(lvl, tag, msg) {
   const entry = { t: Date.now(), lvl, tag: sanitize(String(tag)), msg: sanitize(String(msg)) };
-  _buffer.push(entry);
-  if (_buffer.length > CAPACITY) _buffer.shift();
+  _st.buffer.push(entry);
+  if (_st.buffer.length > CAPACITY) _st.buffer.shift();
   if (lvl !== 'I' && PERSIST_TAGS.has(entry.tag)) _appendRing(entry);
 }
 
@@ -200,7 +205,7 @@ function _timing(tag, label, durationMs) {
  * @returns {DiagEntry[]}
  */
 function _entries() {
-  return _buffer.map((e) => ({ t: e.t, lvl: e.lvl, tag: e.tag, msg: e.msg }));
+  return _st.buffer.map((e) => ({ t: e.t, lvl: e.lvl, tag: e.tag, msg: e.msg }));
 }
 
 /**
@@ -210,12 +215,12 @@ function _entries() {
  * @returns {string}
  */
 function _toJSON() {
-  return JSON.stringify(_buffer);
+  return JSON.stringify(_st.buffer);
 }
 
 /** Drop all stored entries, the persisted ring too. Also the test-reset hook. */
 function _clear() {
-  _buffer = [];
+  _st.buffer = [];
   try { localStorage.removeItem(PERSIST_KEY); } catch (_e) { /* no storage: nothing persisted */ }
 }
 

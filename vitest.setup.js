@@ -24,7 +24,7 @@
 */
 
 import * as React from 'react';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
 // A git hook exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE to everything it runs, this suite included, and any
 // child `git` inherits them: a test's `git init` / `git config` in a temp dir then writes to the REAL repository
@@ -208,3 +208,14 @@ if (typeof navigator !== 'undefined' && navigator && !navigator.locks) {
 // (--sequence.shuffle --sequence.seed=11 / 2 / 3333). cleanup() is idempotent,
 // so the files that already call it are unaffected.
 afterEach(() => { cleanup(); });
+
+// (8) Shared module state (utils/shared-state.js) lives on window.__votShared, one object for every copy of a
+// module, as bundles b and d each carry one (BRIDGES.md §14). A test that re-imports after vi.resetModules() wants
+// the module as a fresh page loads it, but the re-import would find the old copy's state there: diagnostic-log's
+// buffer, the toast stack, Search's carried words. So a module reset drops the shared state too.
+const _resetModules = vi.resetModules;
+vi.resetModules = function resetModulesAndSharedState(...args) {
+  if (typeof window !== 'undefined') delete (/** @type {any} */ (window)).__votShared;
+  delete (/** @type {any} */ (globalThis)).__votShared;
+  return _resetModules.apply(this, args);
+};

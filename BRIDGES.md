@@ -363,8 +363,8 @@ Next docs pass: give each the full Setter/Cleanup/Consumers treatment used above
 
 ### `__votShared`
 - **Setter:** `src/utils/shared-state.js` — `sharedState(name, make)` creates `window.__votShared` (a null-prototype object) on first call and `window.__votShared[name] = make()` once per name.
-- **Cleanup:** none (page lifetime; a reload starts fresh, as module state did)
-- **Consumers:** every copy of a module that holds state and is bundled into two bundles (b and d build separate esbuild entries, so each carries its own copy): `utils/toast.js` (`toast`: timers, onHide, stacking order), `utils/answers-from-search.js` (`answers-from-search`: the words Search carried to Answers). `tools/check-bundle-state.js` refuses any other module-scope state in a module shared across b/c/d.
+- **Cleanup:** none (page lifetime; a reload starts fresh, as module state did). In tests, `vitest.setup.js` drops it on every `vi.resetModules()`, so a re-imported module starts fresh as before.
+- **Consumers:** every copy of a module that holds state and is bundled into two bundles (b and d build separate esbuild entries, so each carries its own copy): `utils/toast.js` (`toast`: timers, onHide, stacking order), `utils/answers-from-search.js` (`answers-from-search`: the words Search carried to Answers), `utils/diagnostic-log.js` (`diagnostic-log`: the buffer Export JSON reads; d's copy comes in through idb-chunks for thumb-store). `tools/check-bundle-state.js` refuses any other module-scope state in a module shared across b/c/d.
 
 ---
 
