@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createBackupFlow, _savedBackupToast } from './backup-flow.js';
 import { writeContainer, readContainer, isContainerMagic } from './backup-container.js';
 import { validateImportEnvelope, isNewerBackup } from './import-validators.js';
-import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
+import { summarizeBackupManifest, formatVerifyReport, describeBackupKinds } from './backup-verify.js';
 
 const STORE_NAMES = [
   'AnnotationStore', 'NoteStore', 'BookmarkStore', 'LinkStore', 'ReadingPlanStore', 'NotebookStore', 'JournalStore',
@@ -92,6 +92,7 @@ beforeEach(() => {
   put('validateStorePayload', () => []);
   put('validateMediaRecord', () => []);
   put('summarizeBackupManifest', summarizeBackupManifest);
+  put('describeBackupKinds', describeBackupKinds);
   put('formatVerifyReport', formatVerifyReport);
   put('formatImportSpaceWarning', () => '');
   put('applyV3', vi.fn(() => Promise.resolve({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] })));
@@ -311,7 +312,7 @@ describe('Import (web)', () => {
     await createBackupFlow(ctx).importPersonalData();
     await settle();
     expect(ctx.confirmImport).toHaveBeenCalledTimes(1);
-    expect(ctx.confirmImport.mock.calls[0][0]).toContain('2 annotated keys');
+    expect(ctx.confirmImport.mock.calls[0][0]).toContain('Importing the backup from ');
     expect(globalThis.applyImportPayload).toHaveBeenCalled();
     expect(globalThis.__freezePersistState).toHaveBeenCalledWith(true);
     expect(localStorage.getItem('vot-restore-inflight')).toBeNull();
@@ -1082,5 +1083,25 @@ describe('data-2: before an import writes, the library is kept; the sheet shows 
     await settle();
     const details = ctx.confirmImport.mock.calls[0][1];
     expect(details.here).toMatchObject({ links: 2, plans: 1, notebooks: 1, readMarks: 3 });
+  });
+
+  it('data-7: the confirm text (the sheet\'s fallback) names the kinds the counts sheet names', async () => {
+    const file = {
+      app: 'VOTReader', exportVersion: 2, exportDate: '2026-07-01T12:00:00.000Z', data: {},
+      stores: {
+        'vot-notes': { g1: {}, g2: {} },
+        'vot-annotations': { k1: [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }] },
+        'vot-links': [{ id: 'l1' }],
+        'vot-reading-plans': [{ id: 'p1' }, { id: 'p2' }],
+        'vot-state': { readItems: { 'v1:genesis:1': 1, 'v1:john:3': 1 } },
+      },
+      media: { m1: { size: 1 } },
+    };
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(file)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(ctx.confirmImport.mock.calls[0][0]).toContain(
+      ' This backup contains 2 notes, 3 highlights, 1 link, 2 reading plans, 2 places marked read, 1 photo or recording.');
+    expect(ctx.confirmImport.mock.calls[0][0]).not.toContain('annotated keys');
   });
 });

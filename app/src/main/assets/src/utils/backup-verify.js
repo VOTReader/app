@@ -161,6 +161,31 @@ export function summarizeBackupManifest(manifest) {
 }
 
 /**
+ * The reader's kinds a summary holds, each named for a sentence ("2 notes", "1 link"); a kind it holds none of
+ * is left out. Shared by the Verify line and the restore confirm's fallback text, so both name the same kinds
+ * as the counts sheet.
+ * @param {ReturnType<typeof summarizeBackupManifest>} s
+ * @returns {string[]}
+ */
+export function describeBackupKinds(s) {
+  /** @type {string[]} */
+  const parts = [];
+  /** @param {number} n @param {string} one @param {string} many */
+  const add = (n, one, many) => { if (n) parts.push(n + ' ' + (n === 1 ? one : many)); };
+  add(s.notes, 'note', 'notes');
+  add(s.highlights, 'highlight', 'highlights');
+  add(s.annotatedPassages, 'annotated passage', 'annotated passages');
+  add(s.journal, 'journal entry', 'journal entries');
+  add(s.bookmarks, 'bookmark', 'bookmarks');
+  // data-7: the line named only the kinds above, so a plans-and-progress backup's warning line named nothing.
+  add(s.links, 'link', 'links');
+  add(s.notebooks, 'notebook', 'notebooks');
+  add(s.plans, 'reading plan', 'reading plans');
+  add(s.readMarks, 'place marked read', 'places marked read');
+  return parts;
+}
+
+/**
  * Compose the user-facing verify report.
  *
  * @param {ReturnType<typeof summarizeBackupManifest>} s
@@ -196,19 +221,7 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
     const d = new Date(s.date);
     if (!Number.isNaN(d.getTime())) when = d.toLocaleString();
   }
-  const parts = [];
-  if (s.notes) parts.push(s.notes + (s.notes === 1 ? ' note' : ' notes'));
-  if (s.highlights) parts.push(s.highlights + (s.highlights === 1 ? ' highlight' : ' highlights'));
-  if (s.annotatedPassages) {
-    parts.push(s.annotatedPassages + (s.annotatedPassages === 1 ? ' annotated passage' : ' annotated passages'));
-  }
-  if (s.journal) parts.push(s.journal + (s.journal === 1 ? ' journal entry' : ' journal entries'));
-  if (s.bookmarks) parts.push(s.bookmarks + (s.bookmarks === 1 ? ' bookmark' : ' bookmarks'));
-  // data-7: the line named only the four kinds above, so a plans-and-progress backup's warning line named nothing.
-  if (s.links) parts.push(s.links + (s.links === 1 ? ' link' : ' links'));
-  if (s.notebooks) parts.push(s.notebooks + (s.notebooks === 1 ? ' notebook' : ' notebooks'));
-  if (s.plans) parts.push(s.plans + (s.plans === 1 ? ' reading plan' : ' reading plans'));
-  if (s.readMarks) parts.push(s.readMarks + (s.readMarks === 1 ? ' place marked read' : ' places marked read'));
+  const parts = describeBackupKinds(s);
   const detail = parts.length ? parts.join(', ') + ' — ' : '';
   const plural = s.mediaCount === 1 ? '' : 's';
   let mediaBit = '';

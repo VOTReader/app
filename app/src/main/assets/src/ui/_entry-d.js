@@ -91,7 +91,7 @@ import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, forma
 import { countTextWords, countItemWords, readingMinutes } from '../utils/word-count.js';
 import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
-import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
+import { summarizeBackupManifest, formatVerifyReport, describeBackupKinds } from '../utils/backup-verify.js';
 import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js';
 // Downloads to the phone (listening item 8): ONE store, here beside the player that consults it offline; the
 // Listening Library's rows and "On this phone" read it as the OfflineAudio global.
@@ -345,7 +345,7 @@ Object.assign(window, {
   countTextWords, countItemWords, readingMinutes,
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
-  summarizeBackupManifest, formatVerifyReport,
+  summarizeBackupManifest, formatVerifyReport, describeBackupKinds,
   AudioPlayer, audioTrackUrl, OfflineAudio, AudioLengths, SongCatalog, SongVotes,
   SongVotePair, SongVoteAsk, ThumbUpIcon, ThumbDownIcon, useSongVote,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,

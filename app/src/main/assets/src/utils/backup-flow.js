@@ -579,22 +579,16 @@ export function createBackupFlow(ctx) {
 
     const _confirmDegradeApplyReload = async (parsed, applyFn, getIntegrity) => {
       const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
-      // Summarize what's about to land for the confirm dialog.
-      const summaryParts = [];
-      if (parsed.stores && typeof parsed.stores === 'object') {
-        const annData = parsed.stores['vot-annotations'];
-        const annKeys = annData && typeof annData === 'object' ? Object.keys(annData).length : 0;
-        const bkms = Array.isArray(parsed.stores['vot-bookmarks']) ? parsed.stores['vot-bookmarks'].length : 0;
-        const jrn = parsed.stores['vot-journal'] && Array.isArray(parsed.stores['vot-journal'].list)
-          ? parsed.stores['vot-journal'].list.length : 0;
-        if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
-        if (bkms) summaryParts.push(`${bkms} bookmarks`);
-        if (jrn) summaryParts.push(`${jrn} journal entries`);
-      }
-      // media is an object (v2) or an array of metadata (v3) — count either.
-      const mediaCount = Array.isArray(parsed.media) ? parsed.media.length
-        : (parsed.media && typeof parsed.media === 'object' ? Object.keys(parsed.media).length : 0);
-      if (mediaCount) summaryParts.push(`${mediaCount} media items`);
+      // Summarize what's about to land for the confirm dialog: the text the sheet shows when its counts could not
+      // be built. data-7: it names the kinds the counts sheet and Verify name (it named annotated keys, bookmarks
+      // and journal entries only), counted by the same summary.
+      /** @type {string[]} */
+      let summaryParts = [];
+      try {
+        const sum = summarizeBackupManifest(parsed);
+        summaryParts = typeof describeBackupKinds === 'function' ? describeBackupKinds(sum) : [];
+        if (sum.mediaCount) summaryParts.push(sum.mediaCount + (sum.mediaCount === 1 ? ' photo or recording' : ' photos and recordings'));
+      } catch (_e) { summaryParts = []; }
       const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
 
       // Soft, advisory free-space heads-up (P4). v3 streaming is uncapped, so a huge
