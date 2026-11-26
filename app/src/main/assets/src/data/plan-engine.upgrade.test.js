@@ -160,4 +160,25 @@ describe('a run with `rested` on 03d0ea090 (a backup from this build restored on
     const past = (/** @type {any} */ x) => mine.monthCells(x, 2026, 11, now).filter((c) => c.date < 12).map((c) => c.state);
     expect(past(back)).toEqual(past(run));
   });
+
+  it('the same for the days off a change of days pins (rested.off, b529d9fe9): 03d0ea090 ignores and keeps them', () => {
+    // b529d9fe9's Jude: Tue-Sat from Dec 1, Jude 1 read Dec 2, Finish by Dec 20 set Dec 4, every day from Dec 10.
+    let run = mine.newRun({ plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    run = mine.changePace(mine.tickItem(run, 'jude:1', '2026-12-02', 1), { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    run = JSON.parse(JSON.stringify(mine.changeWeekdays(run, [true, true, true, true, true, true, true], at('2026-12-10'))));
+    expect(run.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+    const bare = /** @type {any} */ ({ ...run });
+    delete bare.rested;
+    const now = at('2026-12-11');
+    expect(base.runStatus(run, now)).toEqual(base.runStatus(bare, now));
+    expect(base.streak(run, now)).toEqual(base.streak(bare, now));
+    expect(base.monthCells(run, 2026, 11, now)).toEqual(base.monthCells(bare, 2026, 11, now));
+    const offDays = (/** @type {any} */ x) => mine.monthCells(x, 2026, 11, now).filter((c) => c.date === 6 || c.date === 7).map((c) => c.state);
+    for (const next of [base.tickItem(run, 'jude:2', '2026-12-11', 1), base.catchUp(run, now), base.spreadOut(run, now), base.changePace(run, { mode: 'by', date: '2026-12-30' }, now),
+      base.changeWeekdays(run, [false, false, true, true, true, true, true], now), base.pauseRun(run, now), base.resumeRun(base.pauseRun(run, at('2026-12-10')), now),
+      base.untickItem(run, 'jude:1', now), base.markDay(run, 0, false, now), base.markOn(run, '2026-12-03', now)]) {
+      expect(next.rested).toEqual(run.rested);
+      expect(offDays(JSON.parse(JSON.stringify(next)))).toEqual(['none', 'none']);   // back here: still days off
+    }
+  });
 });

@@ -179,7 +179,7 @@ function rests(run) {
 function pinnedDates(r) {
   /** @type {Set<string>} */ const set = new Set();
   for (const g of Array.isArray(r.ranges) ? r.ranges : []) {
-    const a = dayNum(g[0] || ''), b = dayNum(g[1] || '');
+    const a = dayNum((g && g[0]) || ''), b = dayNum((g && g[1]) || '');   // a broken range never throws (the merge runs this)
     if (a != null && b != null) for (let n = a; n <= b && n - a < 100000; n++) set.add(dateOf(n));
   }
   for (const d of Array.isArray(r.dates) ? r.dates : []) set.add(d);
@@ -984,10 +984,12 @@ export function untickItem(run, k, now) {
 /**
  * A read taken back (untickItem, a day marked not read) or one dated in the past (markOn, "I read it on…") changes
  * what the card said from that date on: the pinned days from the earliest such date are dropped and judged again
- * live, as the days after the pin are, so both sides of the pin agree. @param {PlanRun} run @param {string[]} dates
- * @returns {PlanRun}
+ * live, as the days after the pin are, so both sides of the pin agree. The field is never deleted (cut to nothing it is
+ * { until, ranges: [] }), so a copy without it never had it (mergePlanStore relies on that). Also the merge's: a read
+ * the other copy took back, dated back or made before it had the pins (mergePlanStore). @param {PlanRun} run
+ * @param {(string | undefined)[]} dates @returns {PlanRun}
  */
-function unpinFrom(run, dates) {
+export function unpinFrom(run, dates) {
   const r = run.rested, from = dates.filter(Boolean).sort()[0];
   if (!r || !from || from >= r.until) return run;
   // The days off and paused days a change of days pinned (`off`) do not depend on any read: kept whole.

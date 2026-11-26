@@ -4,7 +4,8 @@ import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'Indexed
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
-import { newRun, runStatus, tickItem, catchUp, untickItem, monthCells } from '../data/plan-engine.js';
+import { newRun, runStatus, tickItem, catchUp, untickItem, monthCells, markDay, markOn, changePace, changeWeekdays } from '../data/plan-engine.js';
+import { startOverRun } from '../utils/plan-runs-view.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
 const run = (items, plan = 'x') => newRun({ plan, tracks: [{ kind: 'bible', by: 'count', items: items.map((k) => ({ k, w: 600 })) }], pace: { mode: 'days', n: items.length } }, at('2026-10-22'));
@@ -148,6 +149,112 @@ describe('a run\'s pinned rest days (rested) survive the store, backups and merg
     // Both have it: the newer copy's stays.
     const later = { ...newer(r), rested: { until: '2026-12-11', ranges: [['2026-12-01', '2026-12-02']] } };
     expect(mergePlanStore(null, [r], [later])[0].rested).toEqual(later.rested);
+  });
+
+  /* Hub Lock 11-26 (resurrection): a copy without `rested` that is newer than one with it must never get the older
+     copy's pins back over a change the reader made on purpose. The app never deletes the field (an untick that cuts
+     every pin leaves { until, ranges: [] }), so a copy without it never had it; what such a copy can still do on
+     purpose is take a read back or date one in the past, which cuts the pins from that date. */
+  const ruth = (/** @type {string} */ readOn) => tickItem(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01')), 'ruth:1', readOn, at(readOn).getTime());
+  const one = (/** @type {any[]} */ out, /** @type {string} */ id) => out.find((x) => x.id === id);
+
+  it('(e) an untick that cuts every pin keeps the field, and the merge keeps the cut (with a base and without)', () => {
+    const r = catchUp(ruth('2026-12-01'), at('2026-12-10'));
+    expect(r.rested).toEqual({ until: '2026-12-10', ranges: [['2026-12-01', '2026-12-05']] });
+    const cut = untickItem(r, 'ruth:1', at('2026-12-11'));
+    expect(cut.rested).toEqual({ until: '2026-12-01', ranges: [] });
+    expect(one(mergePlanStore([r], [cut], [r]), r.id).rested).toEqual(cut.rested);
+    expect(one(mergePlanStore([r], [r], [cut]), r.id).rested).toEqual(cut.rested);
+    expect(mergePlanStore(null, [cut], [r])[0].rested).toEqual(cut.rested);
+    expect(mergePlanStore(null, [r], [cut])[0].rested).toEqual(cut.rested);
+    // "Not read yet" on the day, and "I read it on…", the same.
+    const r3 = catchUp(ruth('2026-12-03'), at('2026-12-10'));
+    for (const changed of [markDay(r3, 2, false, at('2026-12-11')), markOn(r3, '2026-12-05', at('2026-12-11'))]) {
+      expect(changed.rested.until < r3.rested.until).toBe(true);
+      expect(one(mergePlanStore([r3], [changed], [r3]), r3.id).rested).toEqual(changed.rested);
+      expect(one(mergePlanStore([r3], [r3], [changed]), r3.id).rested).toEqual(changed.rested);
+    }
+  });
+
+  it('(f) a Stop or a Start over keeps the stopped run\'s pins, and the new run never gets them', () => {
+    const r = catchUp(ruth('2026-12-03'), at('2026-12-10'));
+    const [old, fresh] = startOverRun(r, at('2026-12-11'));
+    expect(old.status).toBe('stopped');
+    expect(old.rested).toEqual(r.rested);
+    for (const out of [mergePlanStore([r], [old, fresh], [r]), mergePlanStore([r], [r], [old, fresh]), mergePlanStore(null, [old, fresh], [r])]) {
+      expect(one(out, r.id).status).toBe('stopped');
+      expect(one(out, r.id).rested).toEqual(r.rested);
+      expect('rested' in one(out, fresh.id)).toBe(false);
+    }
+  });
+
+  it('(g) a read taken back or dated back on a copy that never had the pins cuts them in the merge, as on the copy that had them', () => {
+    const before = ruth('2026-12-03');                       // the copy a second tab (or 03d0ea090) still holds
+    const r = catchUp(before, at('2026-12-10'));             // this tab caught up: pins up to Dec 10
+    const ops = [
+      (/** @type {any} */ x) => untickItem(x, 'ruth:1', at('2026-12-11')),
+      (/** @type {any} */ x) => markDay(x, 2, false, at('2026-12-11')),
+      (/** @type {any} */ x) => markOn(x, '2026-12-05', at('2026-12-11')),
+    ];
+    for (const op of ops) {
+      const stale = op(before);
+      expect('rested' in stale).toBe(false);
+      const want = op(r).rested;                             // what the change does on the copy with the pins
+      expect(want.until < r.rested.until).toBe(true);
+      const a = one(mergePlanStore([before], [stale], [r]), r.id);   // the second tab saves over the caught-up copy
+      expect(a.ticks).toEqual(stale.ticks);
+      expect(a.rested).toEqual(want);
+      const b = one(mergePlanStore([before], [r], [stale]), r.id);   // this tab saves after the second tab's change
+      expect(b.ticks).toEqual(stale.ticks);
+      expect(b.rested).toEqual(want);
+    }
+    // A plain read today on the copy without the pins (on or after the day they end) leaves them as they were (c).
+    const read = tickItem(before, 'ruth:2', '2026-12-11', at('2026-12-11').getTime());
+    expect(one(mergePlanStore([before], [read], [r]), r.id).rested).toEqual(r.rested);
+    // A broken stored range never throws in the save path.
+    const broken = { ...r, rested: { until: '2026-12-10', ranges: [null, ['2026-12-01']] } };
+    expect(() => mergePlanStore([before], [ops[0](before)], [broken])).not.toThrow();
+  });
+
+  it('(h) a read this copy took back BEFORE it pinned leaves its pins whole when the merge drops the read the other copy kept', () => {
+    // Ruth over 10 days from Dec 1, read Dec 3 and Dec 4; this copy takes the Dec 4 read back on Dec 5 and catches up on
+    // Dec 8, so its pins never counted that read and Dec 4 shows missed. The other copy still holds it; the merge drops
+    // it (C4). Cutting the pins from Dec 4 (its date) re-judged Dec 4 against the caught-up target: a rest day.
+    let base = tickItem(newRun({ id: 'p-h', plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 10 } }, at('2026-12-01')), 'ruth:1', '2026-12-03', at('2026-12-03').getTime());
+    base = tickItem(base, 'ruth:2', '2026-12-04', at('2026-12-04').getTime());
+    const mine = catchUp(untickItem(base, 'ruth:2', at('2026-12-05')), at('2026-12-08'));
+    const cells = (/** @type {any} */ r) => monthCells(r, 2026, 11, at('2026-12-08')).filter((c) => c.date < 8).map((c) => c.state);
+    expect(cells(mine)).toEqual(['none', 'missed', 'read', 'missed', 'missed', 'missed', 'missed']);
+    for (const later of [3600000, -3600000]) {   // the other copy, still holding ruth:2, saved an hour after this one, or before
+      const other = { ...base, notes: { 1: 'a note' }, updated: mine.updated + later };
+      for (const [ours, theirs] of [[mine, other], [other, mine]]) {
+        const m = one(mergePlanStore([base], [ours], [theirs]), base.id);
+        expect('ruth:2' in m.ticks).toBe(false);
+        expect(m.rested).toEqual(mine.rested);
+        if (later < 0) expect(cells(m)).toEqual(cells(mine));   // this copy the newer: the merge reads as it does
+      }
+    }
+  });
+
+  it('(i) the days off a change of days pinned (rested.off) stay through the merge\'s cut, and a broken rested is left as it was', () => {
+    // b529d9fe9's Jude: Tue-Sat from Dec 1, Jude 1 read Dec 2, Finish by Dec 20 set Dec 4, every day from Dec 10.
+    let base = newRun({ id: 'p-i', plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    base = changePace(tickItem(base, 'jude:1', '2026-12-02', 1), { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    const pinned = changeWeekdays(base, [true, true, true, true, true, true, true], at('2026-12-10'));
+    expect(pinned.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+    const stale = untickItem(base, 'jude:1', at('2026-12-11'));               // the other tab, before the change of days
+    const offDays = (/** @type {any} */ r) => monthCells(r, 2026, 11, at('2026-12-11')).filter((c) => c.date === 6 || c.date === 7).map((c) => c.state);
+    for (const later of [3600000, -3600000]) {
+      const p = { ...pinned, updated: stale.updated + later };
+      for (const [ours, theirs] of [[p, stale], [stale, p]]) {
+        const m = one(mergePlanStore([base], [ours], [theirs]), base.id);
+        expect('jude:1' in m.ticks).toBe(false);
+        expect(offDays(m)).toEqual(['none', 'none']);
+        if (later > 0) expect(m.rested).toEqual(untickItem(pinned, 'jude:1', at('2026-12-11')).rested);   // as the untick on the pinned copy
+      }
+    }
+    const broken = { ...pinned, rested: { ranges: [['2026-12-01', '2026-12-05']] }, updated: stale.updated + 3600000 };
+    expect(one(mergePlanStore([base], [broken], [stale]), base.id).rested).toEqual(broken.rested);
   });
 });
 

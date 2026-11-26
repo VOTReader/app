@@ -57,6 +57,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { unpinFrom } from '../data/plan-engine.js';
 
 /** @param {any} x @returns {any[]} */
 function _arr(x) { return Array.isArray(x) ? x : []; }
@@ -271,7 +272,10 @@ export function unionStrings(ours, theirs) {
  * and one un-marked in one tab (C4) stays un-marked unless the other tab
  * changed it too. A spread-out plan's pinned rest days (`rested`, kept by a
  * change of target or days) stay when only one copy has them: the other copy
- * was written before the change, or by a build that never wrote the field.
+ * was written before the change, or by a build that never wrote the field (the
+ * app never deletes it, so a copy without it never had it). A read the merge
+ * takes from or adds to the copy whose pins it keeps, dated before they end,
+ * cuts them from that date, as that change does on the copy itself (unpinFrom).
  * @param {any} base @param {any} ours @param {any} theirs
  * @returns {any[]}
  */
@@ -290,30 +294,20 @@ export function mergePlanStore(base, ours, theirs) {
       if (k in b && (!(k in ot) || !(k in tt))) continue;
       ticks[k] = k in ot ? ot[k] : tt[k];
     }
-    // A read one copy took back (in the base, gone from that copy) is gone from the merge, so the rest days pinned on
-    // and after its date go too, as the untick cut them (plan-engine unpinFrom): the other copy may be the newer and
-    // still hold them.
-    let from = '';
-    for (const src of [ot, tt]) for (const k of Object.keys(src)) if (!(k in ticks) && src[k] && (!from || src[k] < from)) from = src[k];
-    const rested = unpinRested(r.rested || o.rested || t.rested, from);
-    return rested ? { ...r, ticks, rested } : { ...r, ticks };
+    const src = r.rested ? r : o.rested ? o : t.rested ? t : null;
+    if (!src) return { ...r, ticks };
+    if (typeof src.rested.until !== 'string') return { ...r, ticks, rested: src.rested };   // a broken field: a cut would make it live
+    // The pins were judged against the reads of the copy that holds them. A read the merge took away from it (the other
+    // copy's untick or "Not read yet"), one it gained, or one dated anew (the other copy's "I read it on…" or a read it
+    // made before it had the pins), dated before the pins end, cuts them from that date, as the change itself does on a
+    // copy that has them (unpinFrom, which keeps the days off): the older pins never come back over it. A read dated on
+    // or after the day they end changes nothing, and a read this copy took back itself is already cut (or was taken
+    // back before it pinned, so its pins never counted it).
+    const st = src.ticks || {};
+    /** @type {(string | undefined)[]} */ const moved = [];
+    for (const k of new Set([...Object.keys(st), ...Object.keys(ticks)])) if (st[k] !== ticks[k]) moved.push(st[k], ticks[k]);
+    return unpinFrom({ ...r, ticks, rested: src.rested }, moved);
   });
-}
-
-/**
- * plan-engine's unpinFrom on a bare `rested`: the rest days pinned from `from` on are dropped (a read dated `from` was
- * taken back); the days off and paused days (`off`) depend on no read and stay. Kept here, not imported: this module
- * rides a bundle the plan engine does not. @param {any} rested @param {string} from @returns {any}
- */
-function unpinRested(rested, from) {
-  if (!rested || typeof rested.until !== 'string' || !from || from >= rested.until) return rested;
-  const prev = new Date(Date.parse(from + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
-  /** @type {string[][]} */ const ranges = [];
-  for (const g of Array.isArray(rested.ranges) ? rested.ranges : []) {
-    if (Array.isArray(g) && typeof g[0] === 'string' && g[0] < from) ranges.push([g[0], typeof g[1] === 'string' && g[1] < from ? g[1] : prev]);
-  }
-  for (const d of Array.isArray(rested.dates) ? rested.dates : []) if (typeof d === 'string' && d < from) ranges.push([d, d]);
-  return { until: from, ranges, ...(rested.off ? { off: rested.off } : {}) };
 }
 
 /** Bare id-bearing arrays: bookmarks, links. */
