@@ -11,10 +11,11 @@
    Still IMMEDIATE (deliberately): creating a notebook (explicit "Create"
    button — the container is real and reusable even if this note's
    membership is discarded) and deleting a notebook (its own ConfirmStrip;
-   store-side cleanup moves notes to Uncategorized).
+   store-side cleanup leaves its notes in Not in a notebook).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { UiIcon } from '../components/UiIcon.jsx';
+import { NOT_IN_A_NOTEBOOK } from '../../data/notebook-label.js';
 
 export function NotebookPickerSheet({ groupId, onClose }) {
   // Subscribe to both stores. The note's notebookIds list is in NoteStore;
@@ -115,7 +116,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
         <div className="ui-group is-inset nb-picker-list">
           <button type="button" className={'ui-row is-one no-lead ui-row-press nb-picker-none' + (selected.size === 0 ? ' checked' : '')}
             role="checkbox" aria-checked={selected.size === 0} onClick={() => setSelected(new Set())}>
-            <span className="ui-row-title">Not in a notebook</span>
+            <span className="ui-row-title">{NOT_IN_A_NOTEBOOK}</span>
             {selected.size === 0 && <span className="ui-row-mark is-tick"><UiIcon name="check" size="sm" /></span>}
           </button>
           {notebooks.map(nb => {
@@ -123,7 +124,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
               return (
                 <ConfirmStrip
                   key={nb.id}
-                  question={`Delete “${nb.name}”? Notes will move to Uncategorized.`}
+                  question={`Delete “${nb.name}”? Its notes stay, in ${NOT_IN_A_NOTEBOOK}.`}
                   onCancel={() => setConfirmDeleteNb(null)}
                   onConfirm={() => deleteNb(nb.id)}
                 />

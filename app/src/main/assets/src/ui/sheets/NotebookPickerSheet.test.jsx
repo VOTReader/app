@@ -152,3 +152,15 @@ describe('NotebookPickerSheet — buffered toggles', () => {
     expect(container.querySelector('.nb-picker-discard-confirm')).toBeTruthy();
   });
 });
+
+// product-8 (audit 11-23): the unfiled bucket has one name, "Not in a notebook", here as on the Notes screen.
+describe('NotebookPickerSheet — the unfiled bucket says Not in a notebook', () => {
+  it('the delete question names where the notes stay, and never says Uncategorized', () => {
+    setupStores();
+    render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);
+    expect(screen.getByText('Not in a notebook')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Delete notebook Prayers'));
+    expect(screen.getByText(/Delete “Prayers”\? Its notes stay, in Not in a notebook\./)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Uncategorized/);
+  });
+});

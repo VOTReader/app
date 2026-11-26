@@ -7,6 +7,7 @@ import { foldLower } from '../../utils/fold-accents.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { SheetHandle } from '../components/SheetHandle.jsx';
 import { openJournalLinkPicker } from '../../utils/journal-link-picker.js';
+import { NOT_IN_A_NOTEBOOK } from '../../data/notebook-label.js';
 
 /** The note picker lists the newest this many (a long list is slow to draw). */
 var NOTE_PICKER_CAP = 200;
@@ -342,7 +343,7 @@ export function JournalInsertSheet(props) {
     );
   }
 
-  // ── Notebook picker — Uncategorized + every user notebook ──
+  // ── Notebook picker: Not in a notebook + every user notebook ──
   function renderNotebookPicker() {
     var nbs = (typeof NotebookStore !== 'undefined') ? NotebookStore.list() : [];
     // One note list per render, counted into every notebook at once: each row used to re-list (and
@@ -360,7 +361,7 @@ export function JournalInsertSheet(props) {
       });
     } catch (_e) { counts = new Map(); uncategorized = 0; }
     var noteCount = function(nbId) { return nbId === 'uncategorized' ? uncategorized : (counts.get(nbId) || 0); };
-    var rows = [{ id: 'uncategorized', name: 'Uncategorized' }].concat(nbs);
+    var rows = [{ id: 'uncategorized', name: NOT_IN_A_NOTEBOOK }].concat(nbs);
     var q = foldLower(query.trim());
     if (q) rows = rows.filter(function(nb) { return foldLower(nb.name || '').indexOf(q) >= 0; });
     return (
@@ -368,7 +369,7 @@ export function JournalInsertSheet(props) {
         {searchPill()}
         <div className="jrn-picker-results">
           {rows.length === 0
-            ? <div className="jrn-picker-empty">{nbs.length === 0 ? 'No notebooks yet — Uncategorized is always available.' : 'No matches.'}</div>
+            ? <div className="jrn-picker-empty">{nbs.length === 0 ? 'No notebooks yet.' : 'No matches.'}</div>
             : rows.map(function(nb) {
                 var cnt = noteCount(nb.id);
                 return (

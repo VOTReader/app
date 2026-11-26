@@ -35,6 +35,7 @@ import { BookmarkStore } from '../stores/bookmark-store.js';
 import { COL_BY_KEY, findEntryContext } from './scripture-resolution.js';
 import { NoteStore } from '../stores/note-store.js';
 import { NotebookStore } from '../stores/notebook-store.js';
+import { NOT_IN_A_NOTEBOOK } from './notebook-label.js';
 
 export var JournalHelpers = (function() {
 
@@ -357,7 +358,7 @@ export var JournalHelpers = (function() {
      'uncategorized' (the system bucket) or a NotebookStore id. */
   function resolveNotebookCard(notebookId) {
     if (notebookId === 'uncategorized') {
-      return { title: 'Uncategorized', eyebrow: 'Notebook', deleted: false };
+      return { title: NOT_IN_A_NOTEBOOK, eyebrow: 'Notebook', deleted: false };
     }
     if (typeof NotebookStore === 'undefined') return null;
     var nb = NotebookStore.get(notebookId);

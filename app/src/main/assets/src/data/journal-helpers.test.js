@@ -139,3 +139,11 @@ describe('search ignores accents (i18n-text-n4)', () => {
     expect(JournalHelpers.searchSnippet(entry, 'unigénito', 120).hit).toBe('unigénito');
   });
 });
+
+// product-8 (audit 11-23): a saved notebook card for the unfiled bucket said "Uncategorized" while the
+// Notes screen calls it "Not in a notebook". One name now; the stored id stays 'uncategorized'.
+describe('resolveNotebookCard — the unfiled bucket', () => {
+  it('titles the uncategorized card "Not in a notebook"', () => {
+    expect(JournalHelpers.resolveNotebookCard('uncategorized')).toEqual({ title: 'Not in a notebook', eyebrow: 'Notebook', deleted: false });
+  });
+});

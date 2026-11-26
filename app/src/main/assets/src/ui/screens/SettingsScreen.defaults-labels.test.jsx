@@ -20,6 +20,14 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
     expect(rowLabels()).not.toContain('Random Letter Button');
   });
 
+  // product-8 (audit 11-23): the line names the button by its own words, not by a shape ("A dice").
+  it('the Surprise me line says Surprise me, not "A dice"', () => {
+    renderSettings();
+    const desc = row('Surprise me button').querySelector('.settings-row-desc').textContent;
+    expect(desc).toBe('Surprise me on the Read tab opens a random chapter or letter');
+    expect(desc).not.toMatch(/dice/i);
+  });
+
   it('the marker row is "Reading position marker" and says what it does, not what shape it is', () => {
     renderSettings();
     const r = row('Reading position marker');

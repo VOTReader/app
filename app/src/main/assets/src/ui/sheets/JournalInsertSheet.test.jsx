@@ -255,13 +255,15 @@ describe('journal drill — entry → block picker', () => {
 });
 
 describe('notebook drill', () => {
-  it('Uncategorized is always offered and emits a notebook-card', () => {
+  // product-8: the unfiled bucket says "Not in a notebook" here too, as the Notes screen does (id stays 'uncategorized').
+  it('Not in a notebook is always offered and emits a notebook-card', () => {
     window.NotebookStore = { list: () => [{ id: 'nb1', name: 'Prayers' }] };
     window.NoteStore = { list: () => [] };
     const { onInsertBlock } = mountSheet();
     fireEvent.click(screen.getByText('Notebook'));
     expect(screen.getByText('Prayers')).toBeTruthy();
-    fireEvent.click(screen.getByText('Uncategorized'));
+    expect(screen.queryByText('Uncategorized')).toBeNull();
+    fireEvent.click(screen.getByText('Not in a notebook'));
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('notebook-card');
     expect(block.notebookId).toBe('uncategorized');
@@ -287,7 +289,7 @@ describe('notebook drill', () => {
     mountSheet();
     fireEvent.click(screen.getByText('Notebook'));
     const count = (name) => screen.getByText(name).parentElement.querySelector('.jrn-picker-cat').textContent;
-    expect(count('Uncategorized')).toBe('2 notes');
+    expect(count('Not in a notebook')).toBe('2 notes');
     expect(count('Prayers')).toBe('2 notes');
     expect(count('Psalms')).toBe('2 notes');
     expect(count('Empty')).toBe('0 notes');

@@ -15,9 +15,10 @@ import { BarMenu } from '../components/RootNav.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
 import { ListGroup, ListRow, Segmented, UiButton, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+import { NOT_IN_A_NOTEBOOK } from '../../data/notebook-label.js';
 
-/** The notebook every unfiled note is in (X-hidden-decisions: "Uncategorized" becomes this). */
-export const NOT_IN_A_NOTEBOOK = 'Not in a notebook';
+/** The notebook every unfiled note is in, said one way everywhere (data/notebook-label.js). */
+export { NOT_IN_A_NOTEBOOK };
 
 /** A highlight colour id as a word: 'yellow' -> 'Yellow'. @param {string} c */
 export const colourName = (c) => (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Gold');

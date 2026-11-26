@@ -1318,7 +1318,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             <SettingsRow
               label="Surprise me button"
-              desc="A dice on the Read tab that opens a random chapter or letter"
+              desc="Surprise me on the Read tab opens a random chapter or letter"
               find="random dice"
               checked={settings.showSurpriseButton}
               onToggle={() => onToggle("showSurpriseButton")}
