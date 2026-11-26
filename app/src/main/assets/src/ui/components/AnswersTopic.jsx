@@ -41,7 +41,7 @@ import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { endsOnClosing } from '../../utils/closing-breaks.js';
 import { usePageMenu } from '../../utils/page-menu.js';
 import { answersIndexOf } from '../../utils/answers-search.js';
-import { answersCardFor, answersShownText, answersCardWords, ANSWERS_CARD_MAX_WORDS } from '../../utils/answers-extras.js';
+import { answersCardFor, answersShownText, answersCardWords, answersLinkOnly, ANSWERS_CARD_MAX_WORDS } from '../../utils/answers-extras.js';
 import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
@@ -397,7 +397,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     const fits = (/** @type {string} */ w) => { const n = answersCardWords(w); return n > 0 && n <= ANSWERS_CARD_MAX_WORDS; };
     // FA: the card starts at the passage's first real sentence, past its header lines ("Words To Live By / The Word
     // of Truth", a dated head, an ornament): a line with no sentence end in it is a header
-    const real = (/** @type {any} */ q) => { const raw = entry.paragraphs[q.index].text; const t = answersShownText(raw).trim(); return !!t && t !== '✦' && !isDateHead(raw) && /[.!?…]/.test(t); };
+    const real = (/** @type {any} */ q) => { const raw = entry.paragraphs[q.index].text; const t = answersShownText(raw).trim(); return !!t && t !== '✦' && !isDateHead(raw) && !answersLinkOnly(t) && /[.!?…]/.test(t); };
     const body = (/** @type {any[]} */ qs) => { const i = qs.findIndex(real); return i > 0 ? qs.slice(i) : qs; };
     let pick = null;
     for (const p of ps) { const b = body(p.paras); if (fits(text(b))) { pick = b; break; } }

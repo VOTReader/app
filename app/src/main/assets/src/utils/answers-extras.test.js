@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import {
   answersKeyParts, answersIsTopicKey, answersSaved, answersSavedSum, answersParaSource, answersCardFor, answersCardWords,
-  answersShownText, answersWrap, answersCardLayout, ANSWERS_CARD_THEMES, ANSWERS_CARD_SITE,
+  answersShownText, answersWrap, answersCardLayout, ANSWERS_CARD_THEMES, ANSWERS_CARD_SITE, answersLinkOnly,
 } from './answers-extras.js';
 import { answersIndexOf, answersSearch } from './answers-search.js';
 import { answersSiteOrder } from './answers-site.js';
@@ -106,11 +106,20 @@ describe('Share as a card (O6)', () => {
     expect(answersCardWords(Array(81).fill('w').join(' '))).toBe(81);
   });
 
-  it('wraps at word boundaries, keeps hard breaks, never splits a word', () => {
+  it('wraps at word boundaries, keeps hard breaks, splits only a word longer than the line', () => {
     const m = (s) => s.length * 10;
     expect(answersWrap('aa bb cc dd', 50, m)).toEqual(['aa bb', 'cc dd']);
     expect(answersWrap('a\n\nb', 100, m)).toEqual(['a', '', 'b']);
-    expect(answersWrap('supercalifragilistic x', 50, m)).toEqual(['supercalifragilistic', 'x']);
+    // Fix list 34: a word wider than the line ran off the card's right edge; it breaks to fit (was: stood alone, uncut).
+    expect(answersWrap('supercalifragilistic x', 50, m)).toEqual(['super', 'calif', 'ragil', 'istic', 'x']);
+    expect(answersWrap('go to www.youtube.com/thevolumesoftruth now', 100, m).every((l) => m(l) <= 100)).toBe(true);
+  });
+
+  it('a line that is only a link does not count as a sentence to open a card on (fix list 34)', () => {
+    expect(answersLinkOnly('www.youtube.com')).toBe(true);
+    expect(answersLinkOnly(' https://thevolumesoftruth.com/x. ')).toBe(true);
+    expect(answersLinkOnly('See www.youtube.com for more.')).toBe(false);
+    expect(answersLinkOnly('Thus says The Lord.')).toBe(false);
   });
 
   it('never opens a line with the cite\'s "·" (idea sweep 10-22, s30.3)', () => {

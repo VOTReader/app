@@ -187,6 +187,29 @@ export function answersCardFor(entry, item, index, passage, sections) {
 }
 
 /**
+ * A word wider than the line, cut into pieces that fit (fix list 34: a bare link ran off the card's right edge).
+ * @param {string} w @param {number} width @param {(s: string) => number} measure @returns {string[]}
+ */
+function _fitWord(w, width, measure) {
+  if (measure(w) <= width) return [w];
+  const parts = [];
+  let piece = '';
+  for (const ch of w) {
+    if (piece && measure(piece + ch) > width) { parts.push(piece); piece = ch; } else piece += ch;
+  }
+  if (piece) parts.push(piece);
+  return parts;
+}
+
+/**
+ * A line that is only a link ('www.youtube.com'): its dots are no sentence end, so a card never opens on it (fix list 34).
+ * @param {string} text @returns {boolean}
+ */
+export function answersLinkOnly(text) {
+  return /^(?:https?:\/\/|www\.)\S+$/i.test(String(text || '').trim());
+}
+
+/**
  * Lines that fit `width`: hard breaks kept, words never split (one longer than the line stands alone).
  * @param {string} text
  * @param {number} width
@@ -196,7 +219,7 @@ export function answersCardFor(entry, item, index, passage, sections) {
 export function answersWrap(text, width, measure) {
   const out = [];
   for (const para of String(text || '').split('\n')) {
-    const words = para.split(' ').filter(Boolean);
+    const words = para.split(' ').filter(Boolean).flatMap((w) => _fitWord(w, width, measure));
     let line = '';
     for (const w of words) {
       const next = line ? line + ' ' + w : w;
