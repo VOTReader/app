@@ -176,3 +176,22 @@ describe('the fourth review: only a change with past days to keep pins them', ()
     expect(run.rested).toBeUndefined();
   });
 });
+
+describe('point 3: a day off stays off when the reading days change', () => {
+  it('Jude over Tue–Sat from Tue Dec 1: Sun and Mon Dec 6 and 7 (days off) are not missed after the days change to Sun/Mon/Wed/Thu and then every day', () => {
+    let run = newRun({ plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    run = changePace(run, { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    const cells = (/** @type {any} */ r) => Object.fromEntries(monthCells(r, 2026, 11, at('2026-12-10')).filter((c) => c.date <= 9).map((c) => [c.date, c.state]));
+    const before = cells(run);
+    expect(before).toMatchObject({ 6: 'none', 7: 'none' });
+    expect(isReadingDay(run, /** @type {number} */ (dayNum('2026-12-06')))).toBe(false);
+    run = changeWeekdays(run, [true, true, false, true, true, false, false], at('2026-12-10'));   // Sun, Mon, Wed, Thu
+    expect(cells(run)).toMatchObject({ 6: 'none', 7: 'none' });
+    run = changeWeekdays(run, [true, true, true, true, true, true, true], at('2026-12-10'));
+    expect(isReadingDay(run, /** @type {number} */ (dayNum('2026-12-06')))).toBe(true);
+    expect(cells(run)).toEqual(before);
+    // The week strip of Dec 6 to 9 says the same: Sunday and Monday are not missed.
+    const week = streak(run, at('2026-12-10')).week.filter((d) => d.date >= '2026-12-06' && d.date <= '2026-12-07');
+    expect(week.map((d) => d.missed)).toEqual([false, false]);
+  });
+});

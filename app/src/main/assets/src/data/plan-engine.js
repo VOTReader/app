@@ -209,10 +209,11 @@ function pinRests(before, after, now) {
   const memo = rests(before), spread = hasEmptyDays(before), was = memo.pinned;
   const nopause = { ...before, paused: undefined };
   // The days an earlier change pinned are kept as they were, whatever the reading days are now (a rest day under the
-  // old weekdays stays one after a second change of days); only the days since are judged, against `before`.
+  // old weekdays stays one after a second change of days); only the days since are judged, against `before`. A day
+  // the plan did not read on then (a day off, a pause) is kept with them: a later change of days never makes it missed.
   const dates = was ? [...was.dates].filter((k) => k < was.until).sort() : [];
   const from = was ? Math.max(startN, /** @type {number} */ (dayNum(was.until))) : startN;
-  for (let n = from; n < today; n++) if ((spread || was) && isReadingDay(nopause, n) && restedOn(before, n, memo)) dates.push(dateOf(n));
+  for (let n = from; n < today; n++) if ((spread || was) && (!isReadingDay(nopause, n) || restedOn(before, n, memo))) dates.push(dateOf(n));
   return { ...after, rested: { until: dateOf(Math.max(today, was ? /** @type {number} */ (dayNum(was.until)) : today)), ranges: toRanges(dates) } };
 }
 
