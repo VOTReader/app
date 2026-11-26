@@ -224,7 +224,7 @@ describe('AudioManagerSheet — modal contract', () => {
     openSheet(onClose);
 
     expect(modalRegistry.peek().id).toBe('audio-manager-sheet');
-    expect(window.__closeSheet).toBe(onClose);                             // the Android Back / tour bridge
+    expect(window.__closeSheet, 'hooks-1: Back and the tour reach it through the registry').not.toBe(onClose);
 
     act(() => { modalRegistry.peek().dismiss(); });                        // the app's Escape/back path
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -250,14 +250,12 @@ describe('AudioManagerSheet — modal contract', () => {
     openSpeed();
     expect(subSheet('np-speed-sheet')).toBeTruthy();
     expect(modalRegistry.peek().id).toBe('np-speed');
-    expect(window.__closeSheet).not.toBe(onClose);                         // the sheet holds the bridge
 
     act(() => { modalRegistry.peek().dismiss(); });                        // Escape #1: the sheet only
     expect(subSheet('np-speed-sheet')).toBeNull();
     expect(onClose).not.toHaveBeenCalled();
     expect(sheetEl()).toBeTruthy();
     expect(modalRegistry.peek().id).toBe('audio-manager-sheet');
-    expect(window.__closeSheet).toBe(onClose);                             // handed back
 
     act(() => { modalRegistry.peek().dismiss(); });                        // Escape #2: the player
     expect(onClose).toHaveBeenCalledTimes(1);

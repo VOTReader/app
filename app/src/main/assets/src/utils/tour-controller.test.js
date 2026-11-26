@@ -19,6 +19,7 @@
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TourController, TOUR_LATER_MS } from './tour-controller.js';
+import { modalRegistry } from '../hooks/use-modal-registry.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 const nav = () => ({ goHome: vi.fn(), goLibrary: vi.fn(), goListen: vi.fn(), openLetter: vi.fn(), openBible: vi.fn(), goJournalHub: vi.fn(), openSettingsData: vi.fn() });
@@ -390,10 +391,11 @@ describe('TourController — the listening span keeps the Bible playback, and th
     el.getBoundingClientRect = () => /** @type {any} */ ({ x: 133, y: 271, width: 94, height: 25, left: 133, right: 227, top: 271, bottom: 296 });
     return el;
   };
+  /** The listening sheet as AudioManagerSheet puts it on the modal registry while it renders (hooks-1). */
   const sheetOpen = () => {
     document.body.insertAdjacentHTML('beforeend', '<div class="audio-manager-sheet"><button class="sheet-handle-back">‹</button></div>');
-    const close = vi.fn(() => { const s = document.querySelector('.audio-manager-sheet'); if (s) s.remove(); });
-    /** @type {any} */ (window).__closeSheet = close;
+    const close = vi.fn(() => { const s = document.querySelector('.audio-manager-sheet'); if (s) s.remove(); modalRegistry.unregister('audio-manager-sheet'); });
+    modalRegistry.register({ id: 'audio-manager-sheet', dismiss: close });
     return close;
   };
   /** Walk to the Bible stop from the start (every earlier stop pressed by the reader, so nothing plays yet). */
@@ -409,7 +411,7 @@ describe('TourController — the listening span keeps the Bible playback, and th
     audio = { stop: vi.fn(), syncKeepAlive: vi.fn(), getState: vi.fn(() => ({ status: 'playing', queue: [{ key: 'bible-brm-kjv:john' }], qi: 0 })) };
     /** @type {any} */ (globalThis).AudioPlayer = audio;
   });
-  afterEach(() => { delete /** @type {any} */ (window).__closeSheet; });
+  afterEach(() => { delete /** @type {any} */ (window).__closeSheet; modalRegistry.unregister('audio-manager-sheet'); });
 
   it('leaving the pressed Bible stop for the player stop keeps the playback; so does moving on to back-to-words and to the closing card', () => {
     bibleScreen(); toBible();
@@ -481,6 +483,15 @@ describe('TourController — the listening span keeps the Bible playback, and th
     TourController.skip();
     expect(close).toHaveBeenCalledTimes(1);
     expect(audio.stop).not.toHaveBeenCalled();               // the tour pressed nothing: not its playback
+  });
+
+  it('a sheet open over the player holds the legacy slot; the tour still closes the player itself (hooks-1)', () => {
+    TourController.attachNav(nav()); TourController.start('settings'); TourController.next();
+    const close = sheetOpen();
+    const speedSheet = vi.fn(); /** @type {any} */ (window).__closeSheet = speedSheet;
+    TourController.skip();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(speedSheet).not.toHaveBeenCalled();
   });
 
   it('a Settings select sheet is not the listening sheet: with no .audio-manager-sheet on the page, __closeSheet is left alone', () => {

@@ -298,14 +298,6 @@ export function AudioManagerSheet({ open, state, onClose }) {
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
 
-  // The close bridge is the player's while no sheet of its own is up (a sheet holds it then, and hands it back).
-  React.useEffect(() => {
-    if (!renders || sheet || typeof window === 'undefined') return undefined;
-    const previous = window.__closeSheet;
-    window.__closeSheet = onClose;
-    return () => { window.__closeSheet = previous || null; };
-  }, [renders, sheet, onClose]);
-
   // The whole screen follows a drag down on its head, and closes past the line (U06.8).
   const grab = useDragToClose(onClose, (target) => /** @type {HTMLElement | null} */ (target.closest('.audio-manager-sheet')));
 

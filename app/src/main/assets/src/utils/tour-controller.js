@@ -37,6 +37,7 @@
 
 import { TOUR_STEPS, TOUR_STOPS_WORD, TOUR_MINUTES_WORD, HIGHLIGHT_GESTURE_WORDS, FIRST_LETTER, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
+import { modalRegistry } from '../hooks/use-modal-registry.js';
 
 /** How long "Maybe later" keeps the Home offer away, across launches. */
 export const TOUR_LATER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -83,14 +84,12 @@ function stopTourAudio() {
   const ap = typeof AudioPlayer !== 'undefined' ? /** @type {any} */ (AudioPlayer) : null;
   try { if (ap && typeof ap.stop === 'function') ap.stop(); } catch (_e) { /* the player's problem */ }
 }
-/* The listening sheet, if it is open: window.__closeSheet is the sheet's own close, published
-   while it renders (AudioManagerSheet) — asked only when the sheet is on the page, so a Settings
-   select sheet's close is never taken for it. */
+/* The listening sheet, if it is open: AudioManagerSheet registers as 'audio-manager-sheet' in the modal
+   registry while it renders, and the tour closes that entry by name (hooks-1). It used to call
+   window.__closeSheet, which holds whichever sheet claimed it last: a speed or sleep sheet open over the
+   player, or a Settings select sheet. */
 function closeTourSheet() {
-  if (typeof document === 'undefined' || typeof window === 'undefined') return;
-  if (!document.querySelector('.audio-manager-sheet')) return;
-  const close = /** @type {any} */ (window).__closeSheet;
-  if (typeof close === 'function') { try { close(); } catch (_e) { /* the sheet's problem */ } }
+  try { modalRegistry.dismiss('audio-manager-sheet'); } catch (_e) { /* the sheet's problem */ }
 }
 /** Leaving the current stop for `dest` (a stop index; null when the tour ends). Read before the
     state moves: goTo and end both call this while `index` is still the stop being left. */

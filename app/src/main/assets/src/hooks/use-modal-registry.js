@@ -119,6 +119,22 @@ export const modalRegistry = {
   },
 
   /**
+   * Dismiss one open modal by its id, wherever it sits in the stack (hooks-1: the tour closes the
+   * listening screen this way, not through the legacy window.__closeSheet slot, which holds whatever
+   * sheet claimed it last).
+   *
+   * @param {string} id
+   * @param {string} [how]  passed to the modal's dismiss, as the dispatcher passes 'back' / 'escape'
+   * @returns {boolean} true when that modal was open and was asked to close
+   */
+  dismiss(id, how) {
+    const fn = id ? _registry.get(id) : undefined;
+    if (typeof fn !== 'function') return false;
+    fn(how);
+    return true;
+  },
+
+  /**
    * @returns {boolean} true iff at least one modal is currently registered.
    */
   isAnyOpen() {
