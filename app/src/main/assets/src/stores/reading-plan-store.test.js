@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'Indexed
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
-import { newRun, runStatus, tickItem, catchUp, untickItem, monthCells, markDay, markOn, changePace, changeWeekdays } from '../data/plan-engine.js';
+import { newRun, runStatus, tickItem, catchUp, spreadOut, untickItem, monthCells, markDay, markOn, changePace, changeWeekdays } from '../data/plan-engine.js';
 import { startOverRun } from '../utils/plan-runs-view.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
@@ -255,6 +255,41 @@ describe('a run\'s pinned rest days (rested) survive the store, backups and merg
     }
     const broken = { ...pinned, rested: { ranges: [['2026-12-01', '2026-12-05']] }, updated: stale.updated + 3600000 };
     expect(one(mergePlanStore([base], [broken], [stale]), base.id).rested).toEqual(broken.rested);
+  });
+
+  /* refute aeb5ec7dd: a read the other copy made before this copy pinned (offline on the phone, then Catch me up on the
+     tablet) is the same data as (g)'s "I read it on Dec 5" made after the pin, but cutting for it re-judged the days after
+     it against the caught-up target: a past neither copy showed, a missed day among them. Only a copy changed on or after
+     the day the pins end can have dated a read back over them; one saved before that day made its reads before the pins. */
+  const ruthN = (/** @type {number} */ c, /** @type {number} */ n) => newRun({ id: 'p-j', plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: Array.from({ length: c }, (_, i) => ({ k: 'ruth:' + (i + 1), w: 600 })) }], pace: { mode: 'days', n } }, at('2026-12-01'));
+  const before = (/** @type {any} */ r, /** @type {number} */ d, /** @type {string} */ today) => monthCells(r, 2026, 11, at(today)).filter((c) => c.date < d).map((c) => c.state);
+  it('(j) a read the other copy made before the pins, offline, leaves them whole: no day shows what neither copy showed', () => {
+    // Ruth 3 chapters over 8 days; the phone reads Dec 3 offline; the tablet, without it, catches up Dec 6.
+    const base = ruthN(3, 8);
+    const phone = tickItem(base, 'ruth:1', '2026-12-03', at('2026-12-03').getTime());
+    const tablet = catchUp(base, at('2026-12-06'));
+    expect(before(phone, 6, '2026-12-08')).toEqual(['none', 'missed', 'read', 'missed', 'missed']);
+    expect(before(tablet, 6, '2026-12-08')).toEqual(['none', 'missed', 'missed', 'missed', 'missed']);
+    for (const [ours, theirs] of [[phone, tablet], [tablet, phone]]) {
+      const m = one(mergePlanStore([base], [ours], [theirs]), base.id);
+      expect(m.rested).toEqual(tablet.rested);
+      expect(before(m, 6, '2026-12-08')).toEqual(['none', 'missed', 'read', 'missed', 'missed']);   // aeb5ec7dd: Dec 4 'none'
+    }
+    // Ruth 4 over 15 days, read Dec 2; the phone reads Dec 3 offline; the tablet spreads it out Dec 8. Both copies show
+    // Dec 5 as a rest day; aeb5ec7dd's merge showed it missed.
+    const b2 = tickItem(ruthN(4, 15), 'ruth:1', '2026-12-02', at('2026-12-02').getTime());
+    const p2 = tickItem(b2, 'ruth:2', '2026-12-03', at('2026-12-03').getTime());
+    const t2 = spreadOut(b2, at('2026-12-08'));
+    expect(before(p2, 8, '2026-12-10')[4]).toBe('none');
+    expect(before(t2, 8, '2026-12-10')[4]).toBe('none');
+    for (const [ours, theirs] of [[p2, t2], [t2, p2]]) {
+      const m = one(mergePlanStore([b2], [ours], [theirs]), b2.id);
+      expect(m.rested).toEqual(t2.rested);
+      expect(before(m, 8, '2026-12-10')).toEqual(['none', 'read', 'read', 'none', 'none', 'missed', 'missed']);   // the tablet's past, with the phone's read
+    }
+    // The same read dated back AFTER the pins ((g)'s markOn on the phone, Dec 7) still cuts them, as on the tablet.
+    const late = markOn(base, '2026-12-03', at('2026-12-07'));
+    expect(one(mergePlanStore([base], [late], [tablet]), base.id).rested).toEqual(markOn(tablet, '2026-12-03', at('2026-12-07')).rested);
   });
 });
 

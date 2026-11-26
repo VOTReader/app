@@ -302,10 +302,18 @@ export function mergePlanStore(base, ours, theirs) {
     // made before it had the pins), dated before the pins end, cuts them from that date, as the change itself does on a
     // copy that has them (unpinFrom, which keeps the days off): the older pins never come back over it. A read dated on
     // or after the day they end changes nothing, and a read this copy took back itself is already cut (or was taken
-    // back before it pinned, so its pins never counted it).
-    const st = src.ticks || {};
+    // back before it pinned, so its pins never counted it). A read the other copy ADDS can only have been dated back
+    // over the pins if that copy changed on or after the day they end; one last saved before that day made its reads
+    // before the pins (offline, say), and cutting for them would judge those days against the new target, a past
+    // neither copy showed: the pins, this copy's own past, stay.
+    const st = src.ticks || {}, other = src === o ? t : o;
+    const [y, mo, d] = src.rested.until.split('-').map(Number);
+    const after = typeof other.updated === 'number' && other.updated >= new Date(y, mo - 1, d).getTime();
     /** @type {(string | undefined)[]} */ const moved = [];
-    for (const k of new Set([...Object.keys(st), ...Object.keys(ticks)])) if (st[k] !== ticks[k]) moved.push(st[k], ticks[k]);
+    for (const k of new Set([...Object.keys(st), ...Object.keys(ticks)])) {
+      if (st[k] === ticks[k]) continue;
+      if (k in st) moved.push(st[k], ticks[k]); else if (after) moved.push(ticks[k]);
+    }
     return unpinFrom({ ...r, ticks, rested: src.rested }, moved);
   });
 }
