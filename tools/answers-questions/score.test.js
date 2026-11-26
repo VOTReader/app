@@ -5,7 +5,7 @@
    change that moves a case re-pins them here with its reason, the way cases.test.js re-pins
    cases.json. Counts (set cases, hunt rows) are read from the inputs, not pinned. */
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from '../test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, dirname, join } from 'node:path';

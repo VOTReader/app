@@ -10,7 +10,7 @@
    Fully offline. */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { mkdtempSync, readFileSync, existsSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';

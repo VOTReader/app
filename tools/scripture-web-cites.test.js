@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildVerseTable } from './scripture-web-lib.mjs';

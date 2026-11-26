@@ -2,7 +2,7 @@
    heading shows up here, and `node tools/answers-questions/build.mjs` writes it anew. The scores themselves are a
    bench (npm run bench:answers, floor.json): the engine and its meaning model are too heavy for a unit run. */
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from '../test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

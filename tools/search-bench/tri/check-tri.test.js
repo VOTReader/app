@@ -8,7 +8,7 @@
    against); a probe measured one such run at ~2 s. Fully offline, deterministic. */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../../test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'node:path';

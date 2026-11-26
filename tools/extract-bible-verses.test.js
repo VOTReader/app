@@ -7,7 +7,7 @@
  * --all, 0 differ. This pins a few chapters of each branch.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, dirname, join } from 'node:path';

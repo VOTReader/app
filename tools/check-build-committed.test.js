@@ -9,7 +9,7 @@
  * (4 lanes on gates.lock) one case took 23 s and timed out (datasafe, 10-14 01:27).
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { execFileSync, spawnSync } from 'child_process';
+import { execFileSync, spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'path';

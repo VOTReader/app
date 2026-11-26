@@ -3,7 +3,7 @@
    driver through a real rebase in a temp repo, configured the way tools/install-merge-drivers.sh does it. */
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, copyFileSync, mkdirSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';

@@ -5,7 +5,7 @@
  * laptop only (its inventory lives on D:), so this test runs only where that inventory is.
  */
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

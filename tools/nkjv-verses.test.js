@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawnSync } from 'child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import {
   mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync,
 } from 'node:fs';

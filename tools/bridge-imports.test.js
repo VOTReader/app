@@ -9,7 +9,7 @@
    reason). A skip-list entry nothing reads any more also fails, so the list
    only shrinks. */
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'child_process';
+import { execFileSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';

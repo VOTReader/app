@@ -6,7 +6,7 @@
    never the real corpus. Fully offline, deterministic. */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { spawnSync } from 'child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'path';

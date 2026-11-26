@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { planStates, STATES } from './plan-states.mjs';
 import { runStatus } from '../app/src/main/assets/src/data/plan-engine.js';
 import { resolve, dirname } from 'node:path';

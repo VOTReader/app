@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'fs';
-import { execFileSync, spawnSync } from 'child_process';
+import { execFileSync, spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { resolve, dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';

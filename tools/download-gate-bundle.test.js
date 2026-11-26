@@ -4,7 +4,7 @@
    (sw-register's launch-time meaning download), which lives in metered-link.js, so b never bundles download-gate.
    esbuild runs in a child node: vitest's jsdom breaks it in-process. */
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { execPath } from 'node:process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

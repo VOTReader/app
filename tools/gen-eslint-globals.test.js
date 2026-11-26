@@ -8,7 +8,7 @@
    were read as exports, and src/data/*.test.js constants (HERE, DIST, BUNDLES,
    DATA, DOORWAYS) were read as corpus globals. */
 import { describe, it, expect, vi } from 'vitest';
-import { spawnSync } from 'child_process';
+import { spawnSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';

@@ -2,7 +2,7 @@
    arch-2, arch-1, bundles-n1, bundles-n2). The detector's own cases, then the real b/c/d built from package.json. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from './test-spawn.js'; // file stdio: no pipe another worker's child can hold
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripComments, moduleState, optionsFromScript, ALLOWED } from './check-bundle-state.js';
