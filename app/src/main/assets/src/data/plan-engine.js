@@ -53,7 +53,7 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
- *   rested?: { until: string, dates: string[] },
+ *   rested?: { until: string, ranges?: string[][], dates?: string[] },
  *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean, credited?: number,
  *   seen?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
@@ -163,10 +163,34 @@ function rests(run) {
   const hit = run.ticks ? _restMemo.get(run.ticks) : null;
   if (hit && hit.of.every((v, i) => v === of[i])) return hit;
   const r = run.rested;
-  const pinned = r && typeof r.until === 'string' && Array.isArray(r.dates) ? { until: r.until, dates: new Set(r.dates) } : null;
+  const pinned = r && typeof r.until === 'string' && (Array.isArray(r.ranges) || Array.isArray(r.dates)) ? { until: r.until, dates: pinnedDates(r) } : null;
   const memo = { dates: [...new Set(Object.values(ticks).filter(Boolean))].sort(), next: new Map(), of, pinned };
   if (run.ticks) _restMemo.set(run.ticks, memo);
   return memo;
+}
+
+/**
+ * A run's pinned rest days as a set of dates: from its ranges ([first, last] of days in a row), or from the list of
+ * single dates an earlier build of this branch stored (never shipped, still read). @param {{ ranges?: string[][], dates?: string[] }} r
+ */
+function pinnedDates(r) {
+  /** @type {Set<string>} */ const set = new Set();
+  for (const g of Array.isArray(r.ranges) ? r.ranges : []) {
+    const a = dayNum(g[0] || ''), b = dayNum(g[1] || '');
+    if (a != null && b != null) for (let n = a; n <= b && n - a < 100000; n++) set.add(dateOf(n));
+  }
+  for (const d of Array.isArray(r.dates) ? r.dates : []) set.add(d);
+  return set;
+}
+
+/** Sorted dates as ranges of days in a row: ['2026-12-01', '2026-12-02', '2026-12-04'] gives [[12-01, 12-02], [12-04, 12-04]]. @param {string[]} dates */
+function toRanges(dates) {
+  /** @type {string[][]} */ const out = [];
+  for (const d of dates) {
+    const last = out[out.length - 1];
+    if (last && dayNum(last[1]) === /** @type {number} */ (dayNum(d)) - 1) last[1] = d; else out.push([d, d]);
+  }
+  return out;
 }
 
 /**
@@ -189,7 +213,7 @@ function pinRests(before, after, now) {
   const dates = was ? [...was.dates].filter((k) => k < was.until).sort() : [];
   const from = was ? Math.max(startN, /** @type {number} */ (dayNum(was.until))) : startN;
   for (let n = from; n < today; n++) if ((spread || was) && isReadingDay(nopause, n) && restedOn(before, n, memo)) dates.push(dateOf(n));
-  return { ...after, rested: { until: dateOf(Math.max(today, was ? /** @type {number} */ (dayNum(was.until)) : today)), dates } };
+  return { ...after, rested: { until: dateOf(Math.max(today, was ? /** @type {number} */ (dayNum(was.until)) : today)), ranges: toRanges(dates) } };
 }
 
 /**
@@ -941,7 +965,7 @@ export function untickItem(run, k, now) {
   delete ticks[k];
   const next = { ...run, ticks, updated: now.getTime() };
   const r = run.rested;
-  if (was && r && was < r.until) next.rested = { until: was, dates: r.dates.filter((d) => d < was) };
+  if (was && r && was < r.until) next.rested = { until: was, ranges: toRanges([...pinnedDates(r)].filter((d) => d < was).sort()) };
   if (next.status === 'finished') { next.status = 'running'; delete next.finished; }
   return next;
 }

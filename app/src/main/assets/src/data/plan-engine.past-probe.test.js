@@ -133,3 +133,25 @@ describe('the fourth review: an untick is the same on both sides of a pin', () =
     for (const caught of ['2026-12-15', '2026-12-17', '2026-12-23']) expect(live(caught)).toEqual(plain);
   });
 });
+
+describe('the fourth review: pinned rest days are kept as ranges', () => {
+  it('12 readings over 365 days, 10 read by October, Catch me up on Dec 5: 10 ranges in about 310 bytes (280 single dates were 3.6 KB); the older list of dates reads the same', () => {
+    let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: Array.from({ length: 12 }, (_, i) => ({ k: 'mark:' + (i + 1), w: 600 })) }], pace: { mode: 'days', n: 365 } }, at('2026-01-01'));
+    for (let n = /** @type {number} */ (dayNum('2026-01-01')); n < /** @type {number} */ (dayNum('2026-12-05')); n++) {
+      const key = dateOf(n), st = runStatus(run, at(key));
+      if (!st.doneToday && !st.spreadOn && n % 3 === 0 && key < '2026-10-01') for (const it of st.todayItems) run = tickItem(run, it.k, key, 1);
+    }
+    const now = at('2026-12-05'), caught = catchUp(run, now);
+    const r = /** @type {{ until: string, ranges: string[][] }} */ (caught.rested);
+    expect(r.ranges).toHaveLength(10);
+    expect(JSON.stringify(r).length).toBeLessThan(350);
+    // The same rest days as single dates (the form an earlier build of this branch stored): the same calendar.
+    const dates = r.ranges.flatMap(([a, b]) => Array.from({ length: /** @type {number} */ (dayNum(b)) - /** @type {number} */ (dayNum(a)) + 1 }, (_, i) => dateOf(/** @type {number} */ (dayNum(a)) + i)));
+    expect(dates).toHaveLength(280);   // 3.6 KB as single dates
+    const old = { ...caught, rested: { until: r.until, dates } };
+    const year = (/** @type {any} */ x) => Array.from({ length: 12 }, (_, m) => monthCells(x, 2026, m, now).map((c) => c.state)).flat();
+    expect(year(old)).toEqual(year(caught));
+    expect(year(caught).filter((s) => s === 'missed').length).toBeGreaterThan(0);
+    expect(streak(old, now)).toEqual(streak(caught, now));
+  });
+});
