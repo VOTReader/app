@@ -187,8 +187,20 @@ export function JournalHubScreen(props) {
   function renderCard(entry) {
     var title = JournalHelpers.entryDisplayTitle(entry);
     var preview = JournalHelpers.previewText(entry, 160);
-    // An untitled entry takes its title from this same preview: say it once ("[Voice recording]", a short note).
-    if (preview && preview === title) preview = '';
+    // An untitled entry takes its title from this same preview: say it once ("[Voice recording]", a short note). A
+    // longer note's title is its first words cut short ("Grace for today and…"): the preview goes on from there.
+    if (preview && title && !(entry.title && entry.title.trim())) {
+      var head = title.slice(-1) === '…' ? title.slice(0, -1) : title;
+      var full = JournalHelpers.previewText(entry, head.length + 160);
+      if (full.indexOf(head) === 0) {
+        // A title cut inside a word: the preview starts at that word ("…of us"), never halfway through it.
+        var cut = head.length;
+        var sp = full.lastIndexOf(' ', cut);
+        if (/\S/.test(full.charAt(cut)) && /\S/.test(full.charAt(cut - 1)) && sp > 0) cut = sp + 1;
+        var rest = full.slice(cut).trim();
+        preview = rest ? '…' + rest : '';
+      }
+    }
     // id-datasafe 121: in a search the card shows the words around the hit, marked.
     var snip = searchQ && typeof JournalHelpers.searchSnippet === 'function' ? JournalHelpers.searchSnippet(entry, searchQ, 120) : null;
     var attachments = JournalHelpers.attachmentSummary(entry);

@@ -9,6 +9,7 @@ import * as ReactDOM from 'react-dom';
 /** @type {any} */ (globalThis).ReactDOM = ReactDOM;
 /** @type {any} */ (globalThis).JournalCardMenu = JournalCardMenu;
 
+const LONG = 'Grace for today, and strength for the road ahead of us, and rest in the evening once the work is done.';
 const ENTRIES = [
   { id: 'rec', title: '', created: 1720000000000, updated: 1720000000000, tags: [],
     blocks: [{ id: 'a1', type: 'audio', mediaId: 'm1', duration: 42, samples: null }] },
@@ -16,6 +17,8 @@ const ENTRIES = [
     blocks: [{ id: 'p1', type: 'p', text: 'Grace for today.' }] },
   { id: 'named', title: 'Morning prayer', created: 1720000200000, updated: 1720000200000, tags: [],
     blocks: [{ id: 'p2', type: 'p', text: 'A short first paragraph.' }] },
+  { id: 'long', title: '', created: 1720000300000, updated: 1720000300000, tags: [],
+    blocks: [{ id: 'p3', type: 'p', text: LONG }] },
 ];
 
 beforeEach(() => {
@@ -51,5 +54,15 @@ describe('a journal card says its words once', () => {
     const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
     expect(card(container, 'Grace for today.').querySelector('.jrn-card-preview')).toBeNull();
     expect(card(container, 'Morning prayer').querySelector('.jrn-card-preview').textContent).toBe('A short first paragraph.');
+  });
+  it('a long untitled note (over 50 characters): the title is its first words, the preview goes on from there', () => {
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    const title = 'Grace for today, and strength for the road ahead o…';
+    expect(JournalHelpers.entryDisplayTitle(ENTRIES[3])).toBe(title);
+    const c = card(container, title);
+    expect(c).toBeTruthy();
+    const preview = c.querySelector('.jrn-card-preview').textContent;
+    expect(preview).toBe('…of us, and rest in the evening once the work is done.');
+    expect(preview).not.toContain('Grace for today');
   });
 });
