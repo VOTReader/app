@@ -120,6 +120,10 @@ on them through the same corpus objects. The contract and its one race class are
 - Tests sit next to their source as `*.test.js(x)`. Tests of gate scripts and of the built bundles live in `tools/`.
   React-as-global and the `window.__*` stubs are in `vitest.setup.js`.
 - **RED first.** A fix lands with a test that fails on the pre-fix code and passes after it. Say so in the commit.
+- **Which pool the hook ran.** `.githooks/pre-push` uses the fast vmThreads pool (`npm run test:hook`) unless the
+  push touches a coverage-floored file (`src/hooks`, `src/stores`, `src/utils`, a file with its own floor in
+  `vitest.config.js`, or that file itself), when it runs `npm run test:coverage` in the default pool; a test that only
+  passes in the default pool can hide behind that.
 - **Never quote a number you did not just produce.** Test counts, bundle sizes and report totals drift with every
   landing, and a report directory another session also writes to holds whoever finished last. Run it yourself,
   then quote it.
