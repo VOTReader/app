@@ -13,6 +13,7 @@ const METHODS = [
   'setShuffle', 'switchSongVersion', 'setRepeat', 'setLoop', 'clearLoop', 'canLoop', 'isNative',
   'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter', 'sectionMarks',
   'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'skipSeconds', 'setSkipSeconds', 'clampSkipSeconds', 'setPlaybackRate',
+  'readingRate',   // fix list 14: the Speed sheet shows the reading speed while a song plays
   'getSleepRemainingSeconds', 'setSleepTimer', 'setSleepAtTrackEnd', 'setSleepAtQueueEnd', 'clearSleepTimer',
   'playAt', 'removeUpcoming', 'insertUpcoming', 'moveUpcoming', 'clearUpcoming', 'clearUpcomingWithUndo', 'undoClearUpcoming', 'playNext', 'addToQueue', 'switchVoiceInPlace', 'stop', 'stopWithUndo', 'undoStop', 'finished', 'replayFinished', 'dismissFinished', 'pauseIfPlaying', 'syncKeepAlive',
 ];

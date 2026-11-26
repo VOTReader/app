@@ -69,6 +69,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock('./core.js', () => ({
   get _el() { return h.el; },
+  get _readingRate() { return h.readingRate; },
   get _native() { return h.native; },
   get _pendingRestore() { return h.pendingRestore; },
   get _source() { return h.source; },
@@ -524,7 +525,9 @@ describe('audio-player transport', () => {
     expect(h.state.rate).toBe(1);
     expect(h.el.playbackRate).toBe(1);
     expect(setPlaybackRate).toHaveBeenCalledWith(2);
-    expect(h.notify).not.toHaveBeenCalled();
+    // Fix list 14: the Speed sheet shows the reading speed while a song plays, so a tap must redraw it.
+    expect(T.readingRate()).toBe(2);
+    expect(h.notify).toHaveBeenCalled();
   });
 
   it('setPlaybackRate falls back to 1× for a bad value and clamps the top', () => {

@@ -81,12 +81,12 @@ export function PlayerSheet({ id, title, sub, aside, onClose, className = '', ch
   );
 }
 
-/** @param {{ rate: number, onClose: () => void }} props */
-export function SpeedSheet({ rate, onClose }) {
+/** `song`: a song is playing (it stays at 1×); `rate` is then the reading speed, so a tap shows (fix list 14). @param {{ rate: number, song?: boolean, onClose: () => void }} props */
+export function SpeedSheet({ rate, song, onClose }) {
   return (
     <PlayerSheet id="np-speed" title="Speed" aside={<AudioSpeedReadout rate={rate} />} onClose={onClose} className="np-speed-sheet">
       <AudioSpeedControl rate={rate} />
-      <p className="np-sheet-note">Applies to letters and chapters. Songs always play at 1×.</p>
+      <p className="np-sheet-note">{song ? 'This song plays at 1×. The speed here is for letters and chapters.' : 'Applies to letters and chapters. Songs always play at 1×.'}</p>
     </PlayerSheet>
   );
 }

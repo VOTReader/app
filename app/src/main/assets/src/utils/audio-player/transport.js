@@ -16,6 +16,7 @@ import {
   _pendingRestore,
   PREV_OFFLINE_MSG,
   _setPendingRestore,
+  _readingRate,
   _setReadingRate,
   _setSkipSec,
   _setSource,
@@ -358,6 +359,7 @@ export function setSkipSeconds(v) {
  */
 export function setPlaybackRate(rate) {
   const next = normalizeAudioRate(rate);
+  const readingMoved = _readingRate !== next;
   _setReadingRate(next);
   // The READING speed moves; a song playing now stays at 1× and the new speed
   // takes effect at the next reading.
@@ -375,9 +377,13 @@ export function setPlaybackRate(rate) {
     const library = _library();
     if (library && typeof library.setPlaybackRate === 'function') library.setPlaybackRate(next);
   } catch (_e) { /* metadata persistence is best-effort */ }
-  if (changed) _notify();
+  // A song's own rate stays 1, but the Speed sheet shows the reading speed then (fix list 14): redraw it.
+  if (changed || readingMoved) _notify();
   return next;
 }
+
+/** The saved reading speed, which a song playing at 1× does not show in state.rate (fix list 14). @returns {number} */
+export function readingRate() { return _readingRate; }
 
 /**
  * Jump directly to a queued track. Queue order remains intact, so a normal
