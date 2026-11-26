@@ -93,7 +93,7 @@ export function useNow() {
 
 /**
  * @typedef {{ id: string, name: string, loading: boolean, label: string, done: boolean, day: number,
- *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string,
+ *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string, nextWhen?: string, rest?: boolean,
  *   todayTicked?: number, todayCount?: number, minutes?: number, minutesLeft?: number, paused?: boolean, notStarted?: boolean, start?: string,
  *   status?: { key: string, text: string, behind: number } }} TodayRow
  */
@@ -182,11 +182,14 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
   const eyebrow = behind || st.key === 'starts' ? [many ? r.name : '', st.text].filter(Boolean).join(' · ')
     : [many ? r.name : (st.key === 'ontrack' ? 'On track' : 'Today'), many && st.key === 'ontrack' ? 'On track' : dayText].filter(Boolean).join(' · ');
   const doneToday = !r.loading && r.done;
-  const ready = !r.loading && !r.done && !r.notStarted && !!r.next;
+  // A spread-out plan's empty day: nothing is due today; the next reading and its day.
+  const rest = !r.loading && !r.done && !!r.rest;
+  const ready = !r.loading && !r.done && !r.notStarted && !rest && !!r.next;
   const title = r.loading ? 'Loading the Volumes…' : r.notStarted ? (r.label || startsText(r.start || '', now))
-    : doneToday ? 'Done today' : r.label;
+    : doneToday ? 'Done today' : rest ? 'Nothing to read today' : r.label;
   // A day read through: tomorrow's reading on the line "N min left" holds on a day not read, so it shows whole (hub 01:15).
-  const sub = ready && (r.minutesLeft || r.minutes) ? (r.minutesLeft || r.minutes) + ' min left' : doneToday && r.tomorrow ? 'Tomorrow: ' + r.tomorrow : '';
+  const sub = ready && (r.minutesLeft || r.minutes) ? (r.minutesLeft || r.minutes) + ' min left'
+    : doneToday && r.tomorrow ? (r.nextWhen || 'Tomorrow') + ': ' + r.tomorrow : rest ? r.nextWhen + ': ' + r.label : '';
   return (
     <div className="upnext-row upnext-plan" data-plan={r.id}>
       <div className="upnext-head">
@@ -203,7 +206,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
       {r.loading ? (
         <div className="upnext-text"><span className="upnext-title">{title}</span></div>
       ) : (
-        <button type="button" className="upnext-text upnext-open" onClick={open} aria-label={'Open ' + r.name + ': ' + title + (doneToday && sub ? ', ' + sub : '')}>
+        <button type="button" className="upnext-text upnext-open" onClick={open} aria-label={'Open ' + r.name + ': ' + title + ((doneToday || rest) && sub ? ', ' + sub : '')}>
           <span className="upnext-title">{title}</span>
           {sub ? <span className="upnext-sub">{sub}</span> : null}
         </button>
@@ -214,7 +217,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
           <PlanListen pill refs={listenOf(r)} tracksOf={tracksOf} label={'Listen to ' + r.label} onListen={() => onListen(listenOf(r), r.id)} />
         </div>
       ) : null}
-      {doneToday && r.next ? (
+      {(doneToday || rest) && r.next ? (
         <button type="button" className="upnext-textlink" onClick={() => onRead(r.next, r.id)}>Read ahead</button>
       ) : null}
     </div>

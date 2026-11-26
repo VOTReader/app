@@ -82,6 +82,14 @@ export function finishDate(key, now) {
   return full.endsWith(', ' + now.getFullYear()) ? full.slice(0, -6) : full;
 }
 
+/** 'YYYY-MM-DD' as "Sat Nov 28" (with the year when it is not `now`'s). @param {string} key @param {Date} now */
+export function weekdayDate(key, now) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || '');
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return WEEKDAYS[d.getUTCDay()] + ' ' + finishDate(key, now);
+}
+
 /** "Starts tomorrow" or "Starts Fri Nov 20". @param {string} start @param {Date} now */
 export function startsText(start, now) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start || '');
@@ -122,7 +130,8 @@ export function runRow(run, now) {
   const st = runStatus(run, now);
   const ticks = run.ticks || {};
   const today = st.todayItems;
-  const prev = st.day > 0 ? dayItems(run, st.day - 1) : [];
+  // The day just read: the last day with readings (a spread-out plan's empty days are never "read").
+  const prev = st.lastDay >= 0 ? dayItems(run, st.lastDay) : [];
   const shown = st.doneToday ? prev : today;
   const nextItem = today.find((it) => !(it.k in ticks)) || today[0] || null;
   const from = nextItem ? today.indexOf(nextItem) : 0;
@@ -135,7 +144,11 @@ export function runRow(run, now) {
     id: run.id, plan: run.plan, name: runName(run, null), loading: false,
     label: st.finished ? '' : itemsLabel(shown, bookTitle),
     tomorrow: st.doneToday ? itemsLabel(today, bookTitle) : '',
-    done: st.doneToday, day: st.doneToday ? st.day - 1 : st.day, totalDays: st.total,
+    // When the next reading is not tomorrow (a spread-out plan's empty days lie between): its day, "Sat Nov 28".
+    nextWhen: st.spreadOn ? weekdayDate(st.spreadOn, now) : '',
+    // An empty day of a spread-out plan, nothing read today: no reading is due until nextWhen.
+    rest: !st.doneToday && !!st.spreadOn,
+    done: st.doneToday, day: st.doneToday ? Math.max(0, st.lastDay) : st.day, totalDays: st.total,
     percent: st.percent,
     behind: st.behind, ahead: st.ahead, late: st.late, finished: st.finished, paused: st.paused, notStarted: st.notStarted, start: run.start,
     next: nextItem ? itemRef(nextItem.k) : null,

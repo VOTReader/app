@@ -11,6 +11,7 @@ import {
 } from './plan-engine.js';
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { runRow } from '../utils/plan-runs-view.js';
+import { doneToday as remindDoneToday } from '../utils/plan-reminder.js';
 import { ReadingPlanStore } from '../stores/reading-plan-store.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
@@ -152,6 +153,31 @@ describe('days in a row and this week', () => {
     expect(sat.weekDays).toBe(2);
     // Saturday read too: the empty Friday between does not end the days in a row.
     expect(streak(readDay(read, 2, '2026-11-28'), at('2026-11-28')).inRow).toBe(2);
+  });
+  it('a spread-out plan: reading day 1 is done for today, and the next reading keeps its spread day and the finish', () => {
+    const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
+    const run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-26'));
+    expect(runStatus(run, at('2026-11-26')).projected).toBe('2026-12-02');
+    const read = readDay(run, 0, '2026-11-26');   // Ruth 1 on Thursday
+    const st = runStatus(read, at('2026-11-26'));
+    expect(st.doneToday).toBe(true);   // not "Ruth 2 offered today"
+    expect(st.projected).toBe('2026-12-02');
+    expect(st.ahead).toBe(0);
+    const days = schedule(read, at('2026-11-26'), title).filter((d) => d.items.length);
+    expect(days.map((d) => d.date)).toEqual(['2026-11-26', '2026-11-28', '2026-11-30', '2026-12-02']);
+    expect(days.some((d) => d.today)).toBe(false);
+    // The Today card: Ruth 1 done today, Ruth 2 next on Saturday (not "Tomorrow").
+    const row = runRow(read, at('2026-11-26'));
+    expect(row).toMatchObject({ done: true, day: 0, label: 'Ruth 1', tomorrow: 'Ruth 2', nextWhen: 'Sat Nov 28' });
+    // Friday, the empty day: nothing is offered for today; Ruth 2 still waits for Saturday and the finish holds.
+    const fri = runStatus(read, at('2026-11-27'));
+    expect(fri.spreadOn).toBe('2026-11-28');
+    expect(fri.projected).toBe('2026-12-02');
+    expect(fri.late).toBe(0);
+    expect(runRow(read, at('2026-11-27'))).toMatchObject({ done: false, rest: true, label: 'Ruth 2', nextWhen: 'Sat Nov 28' });
+    expect(runRow(read, at('2026-11-28')).rest).toBe(false);
+    expect(remindDoneToday(read, at('2026-11-27'))).toBe(true);   // no reminder on the empty Friday
+    expect(remindDoneToday(read, at('2026-11-28'))).toBe(false);  // Saturday: Ruth 2 is due
   });
 });
 

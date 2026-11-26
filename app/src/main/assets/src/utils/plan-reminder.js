@@ -61,9 +61,11 @@ export function lastActive(run) {
 export function doneToday(run, now) {
   const st = runStatus(run, now);
   if (st.doneToday) return true;
-  if (st.day <= 0) return false;
+  // An empty day of a spread-out plan: the next reading falls on a later day, so today has nothing to remind of.
+  if (st.spreadOn && st.spreadOn > todayKey(now)) return true;
+  if (st.lastDay < 0) return false;
   const today = todayKey(now);
-  const prev = dayItems(run, st.day - 1);
+  const prev = dayItems(run, st.lastDay);
   const ticks = run.ticks || {};
   return prev.length > 0 && prev.some((it) => ticks[it.k] === today);
 }

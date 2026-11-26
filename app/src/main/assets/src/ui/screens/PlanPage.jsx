@@ -269,7 +269,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
   // The day the Today card shows (today's portion, tomorrow's once done, the first day not yet counted before the start) is not repeated here.
   const coming = days.filter((d) => !d.done && d.day > st.day).slice(0, 3);
   const listenRefs = left.map((it) => itemRef(it.k));
-  const prevDay = st.doneToday ? st.day - 1 : -1;
+  const prevDay = st.doneToday ? st.lastDay : -1;   // the day just read (empty days of a spread-out plan are never read)
   const roadNoun = road.length && road.every((s) => s.key.startsWith('b:')) ? 'books' : 'parts';
 
   let todayCard;
@@ -295,11 +295,22 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
     todayCard = (
       <div className="ui-card plan-today plan-today-done">
         <p className="plan-today-head"><PlanTick on /><span className="plan-today-title">Done today</span></p>
-        {today.length ? <p className="plan-today-sub">{'Tomorrow · ' + itemsLabel(today, bookTitle) + ' · ' + minText(minutesFor(itemsWords(today)))}</p> : null}
+        {today.length ? <p className="plan-today-sub">{(st.spreadOn ? dayDate(st.spreadOn) : 'Tomorrow') + ' · ' + itemsLabel(today, bookTitle) + ' · ' + minText(minutesFor(itemsWords(today)))}</p> : null}
         <div className="plan-links">
           {today.length ? <button type="button" className="plan-text-btn plan-link" onClick={() => onDaySheet(st.day)}>Read ahead</button> : null}
           {onNote ? <button type="button" className="plan-text-btn plan-link" onClick={() => onNote(prevDay)}>{noteOf && noteOf(prevDay) ? 'Your note' : 'Write a note'}</button> : null}
           {prevDay >= 0 ? <button type="button" className="plan-text-btn plan-link" onClick={() => saveRun(markDay(run, prevDay, false, new Date()))}>Not read yet</button> : null}
+        </div>
+      </div>
+    );
+  } else if (st.spreadOn && !st.finished) {
+    // A spread-out plan's empty day: nothing is due today; the next reading keeps its day.
+    todayCard = (
+      <div className="ui-card plan-today plan-today-done">
+        <p className="plan-today-head"><span className="plan-today-title">Nothing to read today</span></p>
+        <p className="plan-today-sub">{dayDate(st.spreadOn) + ' · ' + itemsLabel(today, bookTitle) + ' · ' + minText(minutesFor(itemsWords(today)))}</p>
+        <div className="plan-links">
+          <button type="button" className="plan-text-btn plan-link" onClick={() => onDaySheet(st.day)}>Read ahead</button>
         </div>
       </div>
     );
@@ -338,7 +349,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       <div className="ui-card plan-progress">
         <PlanRing percent={st.percent} size="big" />
         <div className="plan-progress-text">
-          <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, (st.doneToday ? st.day : st.day + 1)) + ' of ' + st.total.toLocaleString('en-US')}</p>
+          <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, (st.doneToday ? st.lastDay + 1 : st.day + 1)) + ' of ' + st.total.toLocaleString('en-US')}</p>
           <p className="plan-progress-line">{st.itemsDone.toLocaleString('en-US') + ' of ' + st.itemsTotal.toLocaleString('en-US') + ' ' + unit + ' read'}</p>
           {/* 2235: the plan's one status, the same words as Home and the Plans list; behind leads to Catch up. */}
           <p className="plan-progress-line plan-status" data-status={status.key}>

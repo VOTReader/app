@@ -291,7 +291,9 @@ export function totalDays(run) {
  * @returns {{ total: number, day: number, finished: boolean, todayItems: PlanItem[], todayTicked: number,
  *   doneToday: boolean, doneDays: number, itemsDone: number, itemsTotal: number, projected: string, target: string,
  *   behind: number, ahead: number, late: number, paused: boolean, notStarted: boolean, percent: number,
- *   perDay: { items: number, words: number } }}
+ *   perDay: { items: number, words: number }, spreadOn: string, lastDay: number }}
+ *   spreadOn: the date the portion falls on when a spread-out plan's empty days put it after today ('' otherwise).
+ *   lastDay: the last day with readings before the portion (-1 when none); day - 1 unless empty days lie between.
  *   day: the portion's day (the first day not fully read); todayItems its items. notStarted: the start date is
  *   still ahead (no portion yet). late: calendar days the projected finish lies past the planned one (0 when
  *   paused, not started or finished). behind / ahead: the same in reading days (older callers).
@@ -309,18 +311,28 @@ export function runStatus(run, now) {
   const finished = day >= total;
   const todayItems = finished ? [] : dayItems(run, day);
   const todayTicked = todayItems.filter((it) => it.k in ticks).length;
-  // A day finished today: the last tick of the day before `day` is dated today.
+  // A day finished today: the last tick of the last day with readings before `day` is dated today. A spread-out plan
+  // (d682e8ed7) has empty days between its readings; an empty day is never "read", so the check looks past them.
+  let last = day - 1;
+  while (last >= 0 && !dayItems(run, last).length) last--;
+  const gap = day - 1 - last;   // empty days between the last day with readings and the portion
   let doneToday = false;
-  if (day > 0) {
-    const prev = dayItems(run, day - 1);
-    doneToday = prev.length > 0 && prev.some((it) => ticks[it.k] === dateOf(today))
-      && todayTicked === 0;
+  if (last >= 0) {
+    const prev = dayItems(run, last);
+    doneToday = prev.some((it) => ticks[it.k] === dateOf(today)) && todayTicked === 0;
   }
   const paused = run.status === 'paused' || !!run.paused;
   const startN = dayNum(run.start);
   const notStarted = !finished && startN != null && today < startN;
   const remaining = total - day;
-  const from = notStarted ? /** @type {number} */ (startN) : today + (doneToday || paused ? 1 : 0);
+  let from = notStarted ? /** @type {number} */ (startN) : today + (doneToday || paused ? 1 : 0);
+  // The empty days still take their reading days: the portion after them falls on its spread day, counted from the
+  // date the last reading was finished, never sooner (reading Ruth 1 on Thursday keeps Ruth 2 on Saturday).
+  let spreadOn = '';
+  if (!finished && !notStarted && !paused && gap > 0) {
+    const lastOn = dayNum(dayDoneOn(run, last) || '');
+    if (lastOn != null) { const due = nthReadingDay(run, lastOn + 1, gap); if (due > from) { from = due; spreadOn = dateOf(due); } }
+  }
   const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
   const targetN = dayNum(run.target);
   let behind = 0, ahead = 0, late = 0;
@@ -335,7 +347,7 @@ export function runStatus(run, now) {
     total, day, finished, todayItems, todayTicked, doneToday, doneDays, itemsDone, itemsTotal,
     projected: paused && !finished ? run.target : dateOf(projectedN), target: run.target, behind, ahead, late, paused, notStarted,
     percent: finished ? 100 : itemsTotal ? Math.min(99, Math.round(itemsDone * 100 / itemsTotal)) : 0,
-    perDay: { items: leftItems / nextDays, words: leftWords / nextDays },
+    perDay: { items: leftItems / nextDays, words: leftWords / nextDays }, spreadOn, lastDay: last,
   };
 }
 
@@ -346,7 +358,7 @@ export const lateDays = (/** @type {PlanRun} */ run, /** @type {Date} */ now) =>
 function firstOpenDate(run, st, today) {
   const startN = dayNum(run.start);
   const base = st.notStarted && startN != null ? startN : today + (st.doneToday ? 1 : 0);
-  return nthReadingDay(run, base, 0);
+  return Math.max(nthReadingDay(run, base, 0), dayNum(st.spreadOn || '') ?? 0);
 }
 
 /**
@@ -383,7 +395,7 @@ export function schedule(run, now, bookTitle) {
     }
     out.push({
       day: d, items, minutes: items.length ? minutesFor(itemsWords(items)) : 0, done, doneOn, credited: doneOn === '',
-      date, today: !st.finished && !st.notStarted && !st.paused && d === st.day && !st.doneToday, ends: ends.get(d) || [],
+      date, today: !st.finished && !st.notStarted && !st.paused && d === st.day && !st.doneToday && !st.spreadOn, ends: ends.get(d) || [],
     });
   }
   return out;
