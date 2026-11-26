@@ -1166,7 +1166,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               />
             </div>
           </Findable>
-          <p className="ws1-note">Changes reading text everywhere in the app. Icons and menus stay the same size, and your phone’s own font size does not affect it.</p>
+          {/* look-8 (audit 11-23): the slider scales all text, not only reading text. The phone's own font size is
+              an Android setting, so only the APK names it. */}
+          <p className="ws1-note">Changes the size of all text in the app. Icons and buttons stay the same size.{typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid ? ' Your phone’s own font size does not affect it.' : ''}</p>
           {/* Reading Font (2026-07-31) — replaces the two-state "Modern
               Fonts" toggle. settings.fontStyle now holds any READING_FONTS
               id; "classic"/"modern" keep their historical meanings so

@@ -51,3 +51,17 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
     expect(r.querySelector('.ws2-place').textContent).toBe('Reading · Your place');
   });
 });
+
+// look-8 (audit 11-23): the text size note says all text, and names the phone's font size only on Android.
+describe('SettingsScreen — the text size note', () => {
+  const note = () => [...document.querySelectorAll('.ws1-note')].find((p) => /size of all text/.test(p.textContent));
+  it('on the web it says all text and icons and buttons, with no phone font clause', () => {
+    renderSettings();
+    expect(note().textContent).toBe('Changes the size of all text in the app. Icons and buttons stay the same size.');
+  });
+  it('in the APK it adds that the phone font size does not affect it', () => {
+    /** @type {any} */ (globalThis).PlatformBridge.isAndroid = true;
+    renderSettings();
+    expect(note().textContent).toBe('Changes the size of all text in the app. Icons and buttons stay the same size. Your phone’s own font size does not affect it.');
+  });
+});
