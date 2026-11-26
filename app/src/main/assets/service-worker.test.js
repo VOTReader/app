@@ -118,7 +118,7 @@ async function otherCorpusAfter(res, len) {
   return win.__votOtherCorpus;
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined, windows = null } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined, windows = null, connection = undefined } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
@@ -160,6 +160,8 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
     skipWaiting: () => { if (skipped.fail) return Promise.reject(new Error('no')); skipped.count += 1; return Promise.resolve(); },
     clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
     registration,
+    // connection: the worker's navigator.connection (Chrome exposes it in workers); unset, the worker cannot tell
+    navigator: { connection },
   };
   // `crypto` is passed EXPLICITLY rather than left to resolve off globalThis:
   // the SW's integrity check needs crypto.subtle.digest, and under jsdom the
@@ -1039,10 +1041,10 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
     const A = 'aaaaaaaaaaa1', B = 'bbbbbbbbbbb2', C = 'ccccccccccc3', HID = 'ddddddddddd4';
     const catalogBody = { songs: [{ id: A }, { id: B }, { id: C }, { id: HID, hid: true }, { id: '../x' }] };
     const catalogResp = () => ({ ok: true, redirected: false, clone: () => ({ json: async () => catalogBody }) });
-    async function run(fetchImpl, seed) {
+    async function run(fetchImpl, seed, connection) {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       try {
-        const sw = bootSW({ fetchImpl });
+        const sw = bootSW({ fetchImpl, connection });
         const cache = await songsCache(sw);
         if (seed) await seed(cache);
         const waited = [];
@@ -1070,6 +1072,20 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
       expect(await cache.match(thumb(A))).toEqual({ ok: true, redirected: false, body: thumb(A) });
       expect(await cache.match(thumb(B))).toEqual({ body: 'kept' });
       expect(await cache.match(thumb(HID))).toBeFalsy();
+    });
+
+    /* web-platform-n2 (audit 2026-11-23): the warm-up pulled 1,613 covers, 13.85 MB, on Data Saver and mobile data
+       too. On such a link the covers come as the reader sees them. */
+    it('Data Saver or mobile data: no cover is fetched; Wi-Fi warms them', async () => {
+      for (const [connection, want] of [[{ type: 'wifi', saveData: true }, 0], [{ type: 'cellular' }, 0], [{ type: 'wifi' }, 3]]) {
+        const calls = [];
+        await run(async (r) => {
+          const url = typeof r === 'string' ? r : r.url;
+          calls.push(url);
+          return url === CAT ? catalogResp() : { ok: true, redirected: false, body: url };
+        }, null, connection);
+        expect(calls.filter((u) => u !== CAT)).toHaveLength(want);
+      }
     });
 
     it('a catalog that lands during a run is warmed after it (refuter)', async () => {
