@@ -31,6 +31,7 @@ import { CachedStore, extendStore } from './cached-store.js';
 import { mergeArrayStore } from './store-merge.js';
 import { HOLY_DAYS_LETTER_IDS, verseKeyParts, keyTouchesVerse } from '../utils/hl-keys.js';
 import { recordsAlongKey, recordsAtOrBelow } from './key-prefix-index.js';
+import { keepListMembers } from './list-members.js';
 
 /**
  * A link endpoint (either source or target). The `key` is the hlKey
@@ -267,7 +268,9 @@ export const LinkStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      this._cache = Array.isArray(data) ? data.slice() : [];
+      // data-6: a link with no id is kept under a new one; a member that is no record is dropped and reported
+      // (_normalize below still drops a record whose endpoints are incomplete, as it always has)
+      this._cache = keepListMembers(data, lnkId, 'vot-links').list;
       this._normalize();
       this._save();
       this._bump();

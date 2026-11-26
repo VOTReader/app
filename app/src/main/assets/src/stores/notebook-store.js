@@ -9,6 +9,7 @@
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeListStore } from './store-merge.js';
 import { NoteStore } from './note-store.js';
+import { keepListMembers } from './list-members.js';
 
 /**
  * A notebook record. Notebooks have no color (the color belongs to the
@@ -155,7 +156,9 @@ export const NotebookStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      const list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      // data-6: a notebook with no id is kept under a new one; a member that is no record is dropped and reported
+      const list = keepListMembers((data && typeof data === 'object') ? data.list : null,
+        () => 'nb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), 'vot-notebooks').list;
       this._cache = /** @type {any} */ ({ list: list });
       this._save();
       this._bump();

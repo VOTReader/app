@@ -46,6 +46,7 @@ import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js'
 import { AnnotationStore } from './annotation-store.js';
 import { BookmarkStore } from './bookmark-store.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { keepListMembers } from './list-members.js';
 import { JournalHelpers } from '../data/journal-helpers.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
@@ -801,7 +802,8 @@ export var JournalStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      var list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      // data-6: an entry with no id is kept under a new one; a member that is no record is dropped and reported
+      var list = keepListMembers((data && typeof data === 'object') ? data.list : null, jrnId, 'vot-journal').list;
       this._cache = /** @type {any} */ ({ list: list });
       this._save();
       this._bump();
@@ -891,7 +893,9 @@ export var JournalNotebookStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      var list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      // data-6: as JournalStore.replaceAll
+      var list = keepListMembers((data && typeof data === 'object') ? data.list : null,
+        function () { return 'jnb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }, 'vot-journal-notebooks').list;
       this._cache = /** @type {any} */ ({ list: list });
       this._save();
       this._bump();
