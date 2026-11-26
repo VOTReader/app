@@ -383,9 +383,15 @@ export function runStatus(run, now) {
       if (!doneToday) todayDay = t <= lastOn ? last : Math.min(day, last + 1 + readingDaysBetween(run, lastOn + 1, t - 1));
     }
   }
-  const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
+  let projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
   const targetN = dayNum(run.target);
   let behind = 0, ahead = 0, late = 0;
+  // A reader behind the target gets no rest days: the next portion is offered today (and the reminder stays), so each
+  // read day gains the empty days back; the rest days come back once the plan is on schedule again.
+  if (spreadOn && !finished && !paused && !notStarted && targetN != null && projectedN > targetN) {
+    spreadOn = ''; from = today + (doneToday ? 1 : 0); todayDay = doneToday ? last : day;
+    projectedN = nthReadingDay(run, from, remaining - 1);
+  }
   if (!finished && !paused && !notStarted && targetN != null) {
     if (projectedN > targetN) { behind = readingDaysBetween(run, targetN + 1, projectedN); late = projectedN - targetN; }
     else if (projectedN < targetN) ahead = readingDaysBetween(run, projectedN + 1, targetN);

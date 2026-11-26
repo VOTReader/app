@@ -29,20 +29,23 @@ describe('a spread-out plan\'s past follows what the reader was told', () => {
     expect([0, 1, 2, 3, 4, 5, 6].map((d) => dayItems(run, d).map((it) => it.k).join())).toEqual(['ruth:1', '', 'ruth:2', '', 'ruth:3', '', 'ruth:4']);
   });
 
-  it('A: Ruth 1 read Friday, rest Saturday as told, Ruth 2 Sunday: Saturday is never missed, 2 days in a row', () => {
+  // A reader behind the plan gets no rest day (second review): Ruth 1 read a day late is followed by Ruth 2 the next day.
+  it('A: Ruth 1 read a day late Friday, Ruth 2 Saturday as offered, rest Sunday, Ruth 3 Monday: 3 days in a row', () => {
     let run = read(ruth(), 1, '2026-11-27');
-    expect(runStatus(run, at('2026-11-28')).spreadOn).toBe('2026-11-29');   // Saturday: "Nothing to read today · Sun Nov 29: Ruth 2"
-    run = read(run, 2, '2026-11-29');
-    const now = at('2026-11-30');
-    expect(cardSaid(run, now)['2026-11-28']).toBe('2026-11-29');
-    expect(novState(run, now)).toEqual({ 26: 'missed', 27: 'read', 28: 'none', 29: 'read', 30: 'today' });
-    expect(streak(run, now).inRow).toBe(2);
+    expect(runStatus(run, at('2026-11-28')).spreadOn).toBe('');   // Saturday: Ruth 2 today, not "Nothing to read today"
+    run = read(run, 2, '2026-11-28');
+    expect(runStatus(run, at('2026-11-29')).spreadOn).toBe('2026-11-30');   // back on schedule: Sunday rests
+    run = read(run, 3, '2026-11-30');
+    const now = at('2026-12-01');
+    expect(cardSaid(run, now)).toMatchObject({ '2026-11-28': '', '2026-11-29': '2026-11-30' });
+    expect(novState(run, now)).toEqual({ 26: 'missed', 27: 'read', 28: 'read', 29: 'none', 30: 'read' });
+    expect(streak(run, now).inRow).toBe(3);
   });
 
-  it('A, Sunday skipped: Sunday (when Ruth 2 was due) is missed and ends the days in a row', () => {
+  it('A, nothing after Friday: Saturday and Sunday (Ruth 2 offered each day) are missed', () => {
     const run = read(ruth(), 1, '2026-11-27');
     const now = at('2026-11-30');
-    expect(novState(run, now)).toEqual({ 26: 'missed', 27: 'read', 28: 'none', 29: 'missed', 30: 'today' });
+    expect(novState(run, now)).toEqual({ 26: 'missed', 27: 'read', 28: 'missed', 29: 'missed', 30: 'today' });
     expect(streak(run, now).inRow).toBe(0);
     expect(streak(run, now).week.find((w) => w.date === '2026-11-29').missed).toBe(true);
   });

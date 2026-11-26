@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays } from './plan-engine.js';
 import { planStateLine } from '../ui/screens/ReadingPlansScreen.jsx';
+import { doneToday, restDates } from '../utils/plan-reminder.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 const book = (b, n, days) => newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: Array.from({ length: n }, (_, i) => ({ k: b + ':' + (i + 1), w: 600 })) }], pace: { mode: 'days', n: days } }, at('2026-11-26'));
@@ -56,5 +57,41 @@ describe('a paused or stopped spread-out plan keeps its day', () => {
     const run = { ...tickItem(book('ruth', 4, 7), 'ruth:1', '2026-11-26', 1), status: /** @type {'stopped'} */ ('stopped'), stopped: '2026-11-27' };
     expect(runStatus(run, at('2026-11-27')).todayDay + 1).toBe(2);
     expect(runStatus(run, at('2026-12-04')).todayDay + 1).toBe(2);
+  });
+});
+
+describe('a late reader on a spread-out plan gets the next reading today', () => {
+  it('Ruth 1 read a day late on Friday: on Saturday the card and the list both offer Ruth 2, nothing behind', () => {
+    const run = tickItem(book('ruth', 4, 7), 'ruth:1', '2026-11-27', 1);
+    const sat = at('2026-11-28');
+    const st = runStatus(run, sat);
+    expect(st.spreadOn).toBe('');
+    expect(st.todayItems.map((it) => it.k)).toEqual(['ruth:2']);
+    expect(st.late).toBe(0);
+    const line = planStateLine(run, sat);
+    expect(line.lead + ' ' + line.rest).not.toMatch(/Nothing to read today|behind/);
+    // The reminder stays on: Saturday is not a rest day and not done.
+    expect(restDates(run, sat)).toEqual([]);
+    expect(doneToday(run, sat)).toBe(false);
+  });
+
+  it('a reader who starts late catches up: reading on each day offered, the plan finishes on its target', () => {
+    let run = book('ruth', 4, 7);
+    const target = run.target;
+    // Ruth 1 two days late (Saturday), then whatever the card offers, read on the day it is offered.
+    let n = /** @type {number} */ (dayNum('2026-11-28'));
+    run = tickItem(run, 'ruth:1', dateOf(n), 1);
+    const finishes = [];
+    for (n++; n < (dayNum('2026-12-20') ?? 0); n++) {
+      const st = runStatus(run, at(dateOf(n)));
+      if (st.finished) break;
+      finishes.push(st.projected);
+      if (st.spreadOn) continue;
+      for (const it of st.todayItems) run = tickItem(run, it.k, dateOf(n), 1);
+    }
+    expect(Object.entries(run.ticks).sort((a, b) => a[0].localeCompare(b[0]))).toEqual([['ruth:1', '2026-11-28'], ['ruth:2', '2026-11-29'], ['ruth:3', '2026-11-30'], ['ruth:4', '2026-12-02']]);
+    expect(target).toBe('2026-12-02');
+    // Each read day brings the finish closer (the old rule kept it two days late on every read): Thu Dec 3, then on time.
+    expect(finishes).toEqual(['2026-12-03', '2026-12-02', '2026-12-02', '2026-12-02']);
   });
 });
