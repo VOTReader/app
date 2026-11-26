@@ -1177,3 +1177,39 @@ describe('data-1: whenJudged, the verdict the journal media prune waits for', ()
     expect(got).not.toBe(null);
   });
 });
+
+describe('data-rest-n1: Liked Songs ride in the snapshots and come back on Restore', () => {
+  const VOTES = { 'song-a': { v: 1, at: 100 } };
+
+  it('REPRO: the snapshot carries meta.song-votes; a restore after a wipe merges it back', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    await IDBAdapter.put('meta', 'song-votes', VOTES);
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    vi.useRealTimers();
+    expect(JSON.parse([...sink.files.values()][0]).meta).toEqual({ 'song-votes': VOTES });
+    for (const n of ['vot-annotations', 'vot-notes']) await IDBAdapter.put(n, 'v', {});
+    await IDBAdapter.put('vot-links', 'v', []);
+    await IDBAdapter.put('meta', 'song-votes', { 'song-z': { v: -1, at: 5 } });
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(true);
+    expect(await IDBAdapter.get('meta', 'song-votes')).toEqual({ 'song-z': { v: -1, at: 5 }, 'song-a': { v: 1, at: 100 } });
+  });
+
+  it('the weekly copy carries them too', () => {
+    expect(JSON.parse(weeklyCopyJson({}, 0, { 'song-votes': VOTES })).meta).toEqual({ 'song-votes': VOTES });
+    expect(JSON.parse(weeklyCopyJson({}, 0)).meta).toBeUndefined();
+  });
+
+  it('a vote alone changing is a change for the leave snapshot', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink('web');
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    await DataSafety.saveLatest({ sink });        // settles this fixture's memory-vs-disk difference
+    expect(await DataSafety.saveLatest({ sink })).toBe('unchanged');
+    await IDBAdapter.put('meta', 'song-votes', VOTES);
+    expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
+    expect(await DataSafety.saveLatest({ sink })).toBe('unchanged');
+  });
+});

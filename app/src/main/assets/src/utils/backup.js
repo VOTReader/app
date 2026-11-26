@@ -23,6 +23,7 @@
 */
 
 import { validateV3MediaMetadata } from './import-validators.js';
+import { applyBackupMeta, readBackupMeta } from './song-votes-backup.js';
 import { backupWarn } from './backup-warn.js';
 import { BACKUP_LOCK } from './backup-lock.js';
 
@@ -213,7 +214,7 @@ function _unloadedStores(storesMap, flagMap) {
  * @param {Record<string, any>} flagMap
  * @param {any} idbAdapter
  * @param {string[]} dataLsKeys  the localStorage keys carried as `data` (the boot shim)
- * @returns {Promise<{ staleProblems: string[], exportProblems: string[], data: Record<string, string>, stores: Record<string, any> }>}
+ * @returns {Promise<{ staleProblems: string[], exportProblems: string[], data: Record<string, string>, stores: Record<string, any>, meta: Record<string, any> | null }>}
  */
 async function _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys) {
   const staleProblems = _unloadedStores(storesMap, flagMap);
@@ -252,7 +253,12 @@ async function _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKey
       if (v !== undefined) stores[name] = !!v;
     } catch (e) { backupWarn('export: flag read failed', name, e); exportProblems.push(name); }
   }
-  return { staleProblems, exportProblems, data, stores };
+  // data-rest-n1: Liked Songs (IDB meta's votes map) ride beside the stores.
+  /** @type {Record<string, any> | null} */
+  let meta = null;
+  // Best effort: an unreadable votes map never costs the reader the rest of the backup.
+  try { meta = await readBackupMeta(idbAdapter); } catch (e) { backupWarn('export: meta read failed', 'song-votes', e); }
+  return { staleProblems, exportProblems, data, stores, meta };
 }
 
 /**
@@ -296,7 +302,7 @@ export async function buildExportPayload(ctx) {
   // (a) data (the LS boot-shim; V1 clients reading this file see just theme +
   // fontStyle restored, an intentional limitation) and (b) every store, read
   // straight from IDB after the durability barrier: _collectStoresForExport.
-  const { staleProblems, exportProblems, data, stores } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
+  const { staleProblems, exportProblems, data, stores, meta } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
 
   // (c) media: encode JournalMediaStore blobs as base64.
   /** @type {Record<string, any>} */
@@ -352,6 +358,7 @@ export async function buildExportPayload(ctx) {
     stores: stores,
     media: media,
   };
+  if (meta) /** @type {any} */ (payload).meta = meta;
   return { ok: true, payload, problems: staleProblems };
 }
 
@@ -389,7 +396,7 @@ export async function buildV3Manifest(ctx) {
   } = ctx;
 
   // The same durability barrier, data and store read as v2 (_collectStoresForExport).
-  const { staleProblems, exportProblems, data, stores } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
+  const { staleProblems, exportProblems, data, stores, meta } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
 
   // Media: per-blob METADATA for the manifest + the blob refs (SAME order) for
   // the container to stream. No base64, no size cap (streaming is bounded). The
@@ -438,6 +445,7 @@ export async function buildV3Manifest(ctx) {
     stores: stores,
     media: mediaMeta,
   };
+  if (meta) /** @type {any} */ (manifest).meta = meta;
   // UTF-8 size of the manifest frame as it will be written. Android's native
   // import refuses a manifest over StorageManager.MAX_V3_MANIFEST_SIZE (16 MiB);
   // exposing the size lets the export UI warn while the data still lives on
@@ -572,6 +580,17 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
 }
 
 /**
+ * data-rest-n1: merge a backup's `meta` (Liked Songs) into this device. 1 on a failed write, else 0.
+ * @param {unknown} meta @param {any} idbAdapter
+ * @returns {Promise<number>}
+ */
+async function _applyMeta(meta, idbAdapter) {
+  if (!meta || !idbAdapter) return 0;
+  try { await applyBackupMeta(idbAdapter, meta); return 0; }
+  catch (e) { backupWarn('meta import failed', 'song-votes', e); return 1; }
+}
+
+/**
  * The U1 durability barrier: wait for every store + flag write to durably land in
  * IDB before returning (the caller reloads right after, and `_save` is
  * fire-and-forget — returning early would drop the just-imported data). Media is
@@ -646,6 +665,7 @@ export function verifyImportCounts(manifest, mediaApplied) {
  * @property {(id: string, record: any) => string[]} validateMediaRecord
  * @property {string[]} [dataLsKeys]
  * @property {number} [mediaTotalLimitBytes] - aggregate decoded-media ceiling (S5)
+ * @property {any} [idbAdapter] - data-rest-n1: where a backup's Liked Songs (`meta`) merge in
  */
 
 /**
@@ -797,6 +817,9 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
       } catch (e) { backupWarn('prune stale media failed', e); }
     }
   }
+
+  // data-rest-n1: Liked Songs merge in (newest vote per song wins); awaited, so durable here.
+  if (exportVersion >= 2) importFailures += await _applyMeta(parsed && parsed.meta, ctx.idbAdapter);
 
   // (4) U1 DURABILITY BARRIER — wait for every imported store's IDB write to land
   // before returning (the caller reloads right after; media is already durable).
@@ -1008,6 +1031,7 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
   const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
   importFailures += applied.importFailures;
   const skippedStores = applied.skippedStores;
+  importFailures += await _applyMeta(manifest && manifest.meta, ctx.idbAdapter);   // data-rest-n1
 
   // (4) U1 DURABILITY BARRIER — media already durable (JournalMediaStore.put is
   // awaited above), stores' _save fired synchronously in (3). whenSaved never rejects.

@@ -59,11 +59,13 @@
 */
 
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, dirname, relative, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { USER_DATA_STORES } from './user-data-size.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
+import { SONG_VOTE_KEYS } from './song-votes.js';
+import { SONG_VOTES_META } from './song-votes-backup.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
 vi.mock('../stores/idb-adapter.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get IDBAdapter() { return 'IDBAdapter' in globalThis ? /** @type {any} */ (globalThis).IDBAdapter : real.IDBAdapter; } }; });
@@ -72,6 +74,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // The export + flag maps moved out of SettingsScreen with the backup flows
 // (v15-code-health-05); the constant keeps its name so the legs read as before.
 const SETTINGS_PATH = join(HERE, 'backup-flow.js');
+/** The app's source tree (data-rest-n1's meta-writer census). */
+const SRC_ROOT = join(HERE, '..');
+/** @param {string} dir @returns {string[]} every .js/.jsx file under dir */
+function walk(dir) {
+  /** @type {string[]} */ const out = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...walk(p));
+    else if (/\.jsx?$/.test(name)) out.push(p);
+  }
+  return out;
+}
 const VALIDATORS_PATH = join(HERE, 'import-validators.js');
 
 const SETTINGS_SRC = readFileSync(SETTINGS_PATH, 'utf8');
@@ -297,9 +311,11 @@ describe('user-data parity — STORE_NAMES (the IDB schema)', () => {
   });
 
   it('exempts `meta` and `offline-songs` and nothing else', () => {
-    // `meta` holds migration bookkeeping + the storage-growth series, and is
-    // deliberately outside USER_DATA_STORES so the series cannot inflate the
-    // number it trends (see user-data-size.js).
+    // `meta` holds migration bookkeeping, the storage-growth series and, since
+    // 10-23 (869489717), the song votes. It stays outside USER_DATA_STORES so the
+    // series cannot inflate the number it trends (see user-data-size.js); the one
+    // reader-made key in it, the votes map, rides every backup beside `stores`
+    // (data-rest-n1; the next case classifies every key).
     // `offline-songs` (IDB v12, Songs of the Letters K1) holds the BYTES of the
     // songs kept on this phone: up to gigabytes the reader can fetch again from
     // the song sites, so they never ride the Settings export and never count in
@@ -313,6 +329,26 @@ describe('user-data parity — STORE_NAMES (the IDB schema)', () => {
     expect(USER_DATA_STORES).not.toContain('offline-songs');
     expect(BACKED_UP).not.toContain('offline-songs');
     expect(SETTINGS_SRC.indexOf("'offline-songs'")).toBe(-1);
+  });
+
+  it('every key written into `meta` is classified: the votes map is backed up, the rest is device-only (data-rest-n1)', () => {
+    const META_WRITERS = {
+      'stores/cached-store.js': 'migration bookkeeping (schema versions, the LS migration flag)',
+      'utils/user-data-size.js': 'the storage-growth series (a measurement, not reader data)',
+      'utils/song-votes.js': 'song votes (classified key by key below)',
+      'utils/song-votes-backup.js': 'the backup writing the votes map back',
+    };
+    const writers = [];
+    for (const f of walk(SRC_ROOT)) {
+      if (/\.test\.jsx?$/.test(f)) continue;
+      const src = readFileSync(f, 'utf8');
+      if (/\.put\((?:META|'meta')\s*,/.test(src)) writers.push(relative(SRC_ROOT, f).split(sep).join('/'));
+    }
+    expect(writers.sort()).toEqual(Object.keys(META_WRITERS).sort());
+    // song-votes.js: only the votes map is the reader's; the outbox, the install id, the
+    // first-thumbs-down note and the downloaded tallies are this device's own.
+    expect(Object.values(SONG_VOTE_KEYS).sort()).toEqual(['song-votes', 'song-votes-down-note', 'song-votes-install', 'song-votes-outbox', 'songs-votes']);
+    expect(SONG_VOTES_META).toBe(SONG_VOTE_KEYS.votes);
   });
 
   it('the kept songs travel as a LIST: songKept is part of the vot-audio-library record', () => {

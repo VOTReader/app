@@ -94,7 +94,7 @@ const flagMap = () => ({
 const STORE_NAMES = Object.keys(storesMap());
 const FLAG_NAMES = Object.keys(flagMap());
 const ALL = [...Object.values(storesMap()).map((e) => e.store), ...Object.values(flagMap())];
-const importCtx = () => ({ storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord });
+const importCtx = () => ({ storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord, idbAdapter: IDBAdapter });
 const exportCtx = () => ({
   storesMap: storesMap(), flagMap: flagMap(), idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
   diagnosticLog: [], nowIso: () => '2026-11-04T08:00:00.000Z', storageEstimate: async () => ({ quota: null, usage: null }),
@@ -599,4 +599,40 @@ describe('a damaged or foreign file leaves the device untouched', () => {
     expect(after.media.m_aud).toEqual(before.media.m_aud);    // the device's copy of the cut memo stays
     expect(after.stores['vot-journal']).toEqual(before.stores['vot-journal']);
   }, 30000);
+});
+
+describe('data-rest-n1: Liked Songs survive export, a wipe and import', () => {
+  const VOTES = { 'song-a': { v: 1, at: 100 }, 'song-b': { v: -1, at: 200 } };
+
+  it('REPRO: v3 carries the votes map and the wiped device gets it back', async () => {
+    await wipeDevice();
+    await IDBAdapter.put('meta', 'song-votes', VOTES);
+    await IDBAdapter.put('meta', 'song-votes-outbox', { 'song-a': { song: 'song-a', v: 1, at: 100 } });
+    const { built, file } = await exportV3();
+    expect(built.manifest.meta).toEqual({ 'song-votes': VOTES });          // the votes only, never the outbox
+    await wipeDevice();
+    expect(await IDBAdapter.get('meta', 'song-votes')).toBeUndefined();
+    const { res } = await importV3(file);
+    expect(res).toEqual(CLEAN);
+    expect(await IDBAdapter.get('meta', 'song-votes')).toEqual(VOTES);
+  });
+
+  it('v2 JSON too, and the import merges: a newer vote on this phone stands, the rest come in', async () => {
+    await wipeDevice();
+    await IDBAdapter.put('meta', 'song-votes', VOTES);
+    const text = await exportV2();
+    await wipeDevice();
+    await IDBAdapter.put('meta', 'song-votes', { 'song-b': { v: 1, at: 900 }, 'song-c': { v: 1, at: 5 } });
+    expect(await importV2(text)).toEqual(CLEAN);
+    expect(await IDBAdapter.get('meta', 'song-votes')).toEqual({ 'song-a': { v: 1, at: 100 }, 'song-b': { v: 1, at: 900 }, 'song-c': { v: 1, at: 5 } });
+  });
+
+  it('no votes: no meta in the file, and an older file without one leaves the votes alone', async () => {
+    await wipeDevice();
+    const text = await exportV2();
+    expect(JSON.parse(text).meta).toBeUndefined();
+    await IDBAdapter.put('meta', 'song-votes', VOTES);
+    expect(await importV2(text)).toEqual(CLEAN);
+    expect(await IDBAdapter.get('meta', 'song-votes')).toEqual(VOTES);
+  });
 });

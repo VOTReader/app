@@ -80,6 +80,7 @@ import { snapshotSink, snapshotTime } from './snapshot-sink.js';
 import { showToast } from './toast.js';
 import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
 import { withBackupLockIfFree } from './backup-lock.js';
+import { applyBackupMeta, readBackupMeta } from './song-votes-backup.js';
 
 /** Set (localStorage) by an import or Clear All just before its reload: the next boot's
  *  smaller library is the reader's own doing, so it is not compared. In LS_SKIP_LIST.
@@ -233,12 +234,20 @@ async function _newestReadable(sink, list) {
   return { entry: null, snap: null, failed };
 }
 
+/** data-rest-n1: Liked Songs (IDB meta's votes map) for a snapshot; null when none or unreadable. */
+async function _collectMeta() {
+  try { return await readBackupMeta(IDBAdapter); } catch (_e) { return null; }
+}
+
+/** A stores JSON with the meta that rides beside it, for the "same as last time" check. @param {string} json @param {any} meta */
+const _withMeta = (json, meta) => (json && meta ? json + JSON.stringify(meta) : json);
+
 /** A local calendar day key. @param {number} ms */
 const dayOf = (ms) => new Date(ms).toDateString();
 
-/** The snapshot manifest. @param {Record<string, any>} stores @param {ReturnType<typeof summarize>} summary @param {number} ms */
-function snapshotJson(stores, summary, ms) {
-  return JSON.stringify({ app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(ms).toISOString(), summary, data: {}, media: [], stores });
+/** The snapshot manifest. @param {Record<string, any>} stores @param {ReturnType<typeof summarize>} summary @param {number} ms @param {any} [meta] Liked Songs (data-rest-n1) */
+function snapshotJson(stores, summary, ms, meta) {
+  return JSON.stringify(Object.assign({ app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(ms).toISOString(), summary, data: {}, media: [], stores }, meta ? { meta } : {}));
 }
 
 /** What the database told this boot, for the data-health line. */
@@ -343,6 +352,7 @@ async function _run(opts) {
   if (storesNotLoaded().length) return 'not-loaded';
   try {
     const stores = await collectStores();
+    const meta = await _collectMeta();
     const summary = summarize(stores);
     const list = await sink.list();
     /** The snapshot this boot is measured against: the newest that reads (W9). */
@@ -381,14 +391,14 @@ async function _run(opts) {
       // Emptied on purpose (a reset, Clear All, Keep as is): record it, or the boot after
       // next would compare it with an older full snapshot and restore over the choice (5).
       // Every snapshot broken (W9): the empty library is the good copy there is.
-      if ((((chosen || force) && newest) || allBroken) && !_cleared && await sink.save(snapshotJson(stores, summary, now()))) {
-        _arm(sink, summary, _memoryJson());
+      if ((((chosen || force) && newest) || allBroken) && !_cleared && await sink.save(snapshotJson(stores, summary, now(), meta))) {
+        _arm(sink, summary, _withMeta(_memoryJson(), meta));
         return 'snapshotted';
       }
       _arm(sink, summary, '');
       return 'empty';
     }
-    const json = snapshotJson(stores, summary, now());
+    const json = snapshotJson(stores, summary, now(), meta);
     if (json.length > _maxSnapshotBytes) {
       // ds5 s34.1: said, and the leave checks stay armed: a loss this session is still caught.
       _tooBig(json.length);
@@ -400,9 +410,9 @@ async function _run(opts) {
     // The weekly copy rides the same healthy pass: never from a library that looked
     // damaged or empty above, so a loss can never rotate the good copies out. Nor
     // after a Clear All that landed while the snapshot saved (vs3).
-    if (!_cleared) await weeklyCopy({ now, stores, bridge: opts && opts.weeklyBridge });
+    if (!_cleared) await weeklyCopy({ now, stores, meta, bridge: opts && opts.weeklyBridge });
     if (!saved) return 'failed';
-    _arm(sink, summary, _memoryJson());
+    _arm(sink, summary, _withMeta(_memoryJson(), meta));
     return 'snapshotted';
   } catch (e) {
     DiagnosticLog.warn('data-health', 'snapshot pass failed: ' + ((e && /** @type {any} */ (e).name) || e));
@@ -538,9 +548,10 @@ async function _saveLatest(opts) {
       if (newest) StorageHealth.setDataMissing({ name: newest.name, at: newest.at || snapshotTime(newest.name), then: _lastSummary, now: summary });
       return 'damaged';
     }
-    const storesJson = JSON.stringify(stores);
+    const meta = await _collectMeta();
+    const storesJson = _withMeta(JSON.stringify(stores), meta);
     if (storesJson === _lastStoresJson) return 'unchanged';
-    const json = snapshotJson(stores, summary, now());
+    const json = snapshotJson(stores, summary, now(), meta);
     if (json.length > _maxSnapshotBytes) { _tooBig(json.length); return 'failed'; }
     if (_cleared || isStoreWriteFenced()) return 'off';
     if (!(await sink.save(json))) return 'failed';
@@ -805,6 +816,8 @@ async function _restoreLocked(sink, missing, snap, opts) {
       const merged = mergeForRestore(name, live[name], snap.stores[name], { wiped });
       if (merged !== live[name]) { await IDBAdapter.put(name, 'v', merged); wrote = true; _syncShim(name, merged); }
     }
+    // data-rest-n1: Liked Songs come back too, merged (a vote is never taken away).
+    if (snap.meta && await applyBackupMeta(IDBAdapter, snap.meta)) wrote = true;
   } catch (e) {
     // Nothing reloads: lift the fence and the freeze so this session keeps saving
     // (an edit the fence held is saved now), and say so. The finding stays up.
@@ -933,12 +946,12 @@ export function weeklyStatus(opts) {
  * No `media` key at all - an import of `media: {}` would prune every journal photo
  * on the phone; without one the import leaves media alone. `data` carries the
  * boot-shim keys a real export does (backup.js DEFAULT_DATA_LS_KEYS).
- * @param {Record<string, any>} stores @param {number} nowMs
+ * @param {Record<string, any>} stores @param {number} nowMs @param {any} [meta] Liked Songs (data-rest-n1)
  */
-export function weeklyCopyJson(stores, nowMs) {
+export function weeklyCopyJson(stores, nowMs, meta) {
   /** @type {Record<string, string>} */ const data = {};
   try { const v = localStorage.getItem('vot-state'); if (typeof v === 'string') data['vot-state'] = v; } catch (_e) { /* no storage */ }
-  return JSON.stringify({ app: 'VOTReader', exportVersion: 2, weeklyCopy: true, exportDate: new Date(nowMs).toISOString(), data, stores });
+  return JSON.stringify(Object.assign({ app: 'VOTReader', exportVersion: 2, weeklyCopy: true, exportDate: new Date(nowMs).toISOString(), data, stores }, meta ? { meta } : {}));
 }
 
 /**
@@ -958,7 +971,7 @@ export function clearWeeklyCopies(opts) {
 
 /**
  * Write this week's copy when one is due. Returns 'off' | 'unsupported' | 'recent' | 'written' | 'failed'.
- * @param {{ now: () => number, stores: Record<string, any>, bridge?: any }} p
+ * @param {{ now: () => number, stores: Record<string, any>, meta?: any, bridge?: any }} p
  */
 export async function weeklyCopy(p) {
   if (!weeklyOn()) return 'off';
@@ -969,7 +982,7 @@ export async function weeklyCopy(p) {
   if (st.newestAt && t - st.newestAt < WEEKLY_DUE_MS) return 'recent';
   const failed = st.failure;
   if (failed && t >= failed.at && t - failed.at < WEEKLY_RETRY_MS) return 'recent';
-  const json = weeklyCopyJson(p.stores, t);
+  const json = weeklyCopyJson(p.stores, t, p.meta);
   if (new TextEncoder().encode(json).length > WEEKLY_MAX_BYTES) {
     _setWeeklyFailure({ at: t, reason: 'too-big' });
     DiagnosticLog.warn('data-health', 'weekly copy skipped: ' + json.length + ' chars is over the Downloads cap');

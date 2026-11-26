@@ -793,6 +793,7 @@ export function createBackupFlow(ctx) {
         storesMap: storesMap,
         flagMap: flagMap,
         mediaStore: JournalMediaStore,
+        idbAdapter: IDBAdapter,   // data-rest-n1: Liked Songs merge in
         validateStorePayload: validateStorePayload,
       }));
     };
@@ -810,6 +811,7 @@ export function createBackupFlow(ctx) {
           storesMap: storesMap,
           flagMap: flagMap,
           mediaStore: JournalMediaStore,
+          idbAdapter: IDBAdapter,   // data-rest-n1: Liked Songs merge in
           validateStorePayload: validateStorePayload,
           validateMediaRecord: validateMediaRecord,
         }));
@@ -904,6 +906,7 @@ export function createBackupFlow(ctx) {
           storesMap: storesMap,
           flagMap: flagMap,
           mediaStore: JournalMediaStore,
+          idbAdapter: IDBAdapter,   // data-rest-n1: Liked Songs merge in
           validateStorePayload: validateStorePayload,
         }), () => integrityResult);
       } catch (e) {
