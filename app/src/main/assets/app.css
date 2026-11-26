@@ -2938,6 +2938,9 @@
     .volumes-landing .home-ornament { margin-bottom:0.8rem; }
     /* ── Scriptures landing: fill screen, no scroll ── */
     .scriptures-landing { padding:1.2rem 1.3rem 0.8rem; justify-content:flex-start; }
+    /* large-text-n2: rem gutters grow with Text Size (62 px a side at 300%: "All books" met the edge, the translation
+       name was cut); at large text the Bible index and the Listen screens take the page gutter in px. */
+    .vot-large-text .scriptures-landing, .vot-large-text .audio-library-screen { padding-left:var(--gutter); padding-right:var(--gutter); }
     .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
     /* mw17 A02.1: the eyebrow opens the translation picker; it keeps the eyebrow's look. */
 

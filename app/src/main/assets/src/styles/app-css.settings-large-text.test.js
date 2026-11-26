@@ -104,3 +104,15 @@ describe('My Progress and plan fact numbers at large Text Size (large-text-n5)',
     }
   });
 });
+
+/* large-text-n2 (audit 2026-11-23): the Bible book index (.scriptures-landing, 1.3rem a side = 62 px at 300%) and the
+   Listen screens (.audio-library-screen, 1rem-1.45rem) kept rem gutters, so at 300% "All books" met the screen edge and
+   "New King James" was cut 89 px. At large text both take the page gutter in px. */
+describe('Bible index and Listen gutters at large Text Size (large-text-n2)', () => {
+  it('use the px page gutter', () => {
+    for (const sel of ['.vot-large-text .scriptures-landing', '.vot-large-text .audio-library-screen']) {
+      expect(decls(sel)['padding-left'], sel).toBe('var(--gutter)');
+      expect(decls(sel)['padding-right'], sel).toBe('var(--gutter)');
+    }
+  });
+});
