@@ -3,7 +3,7 @@
    (InlineNotes / StudyPanels: hlKeyBase + '-' + suffix), and the label printed
    it raw: "Matthew 5:12-s0", "Matthew 5:panel-s0". */
 import { describe, it, expect, afterEach } from 'vitest';
-import { _bookmarkSourceLabel, _bookmarkSourceEndpoint } from './bookmark-source.js';
+import { _bookmarkSourceLabel, _bookmarkSourceEndpoint, _bookmarkSourcePlace, _bookmarkSourceNumber } from './bookmark-source.js';
 import { buildSourceEndpoint } from './nav-index.js';
 
 const G = /** @type {any} */ (globalThis);
@@ -43,6 +43,7 @@ afterEach(() => {
   delete G.JournalStore;
   delete G.JournalHelpers;
   delete G.BIBLE_BOOK_LIST;
+  delete G.bookCategory;
 });
 
 describe('_bookmarkSourceLabel: every key kind', () => {
@@ -163,5 +164,75 @@ describe('_bookmarkSourceEndpoint', () => {
 
   it('an unknown kind has no endpoint', () => {
     expect(_bookmarkSourceEndpoint('mystery:1')).toBeNull();
+  });
+
+  it('a Bible key with no chapter or verse numbers opens at 0', () => {
+    expect(_bookmarkSourceEndpoint('bible:john')).toMatchObject({ type: 'bible', bookId: 'john', chapter: 0, verse: 0 });
+    expect(_bookmarkSourceEndpoint('bible:john:3')).toMatchObject({ chapter: 3, verse: 0 });
+  });
+});
+
+describe('_bookmarkSourcePlace', () => {
+  it('an empty key has no place', () => {
+    expect(_bookmarkSourcePlace('')).toBe('');
+    expect(_bookmarkSourcePlace(null)).toBe('');
+  });
+
+  it.each(['letter', 'wtlb', 'blessed', 'holy-days'])('a %s key reads its collection from findEntryContext', (kind) => {
+    const calls = [];
+    G.findEntryContext = (id, k) => { calls.push([id, k]); return { collection: 'Volume One' }; };
+    expect(_bookmarkSourcePlace(kind + ':abc')).toBe('Volume One');
+    expect(calls).toEqual([['abc', kind]]);
+  });
+
+  it('an entry with no collection (or no resolver) has no place', () => {
+    expect(_bookmarkSourcePlace('letter:x')).toBe('');
+    G.findEntryContext = () => null;
+    expect(_bookmarkSourcePlace('wtlb:x')).toBe('');
+    G.findEntryContext = () => ({});
+    expect(_bookmarkSourcePlace('blessed:x')).toBe('');
+  });
+
+  it('a Bible key reads its testament from bookCategory when loaded', () => {
+    G.bookCategory = (id) => (id === 'john' ? 'New Testament' : '' );
+    expect(_bookmarkSourcePlace('bible:john:3:16')).toBe('New Testament');
+    expect(_bookmarkSourcePlace('bible:genesis:1:1')).toBe('');
+  });
+
+  it('a Bible key has no place when bookCategory is not loaded', () => {
+    expect(_bookmarkSourcePlace('bible:john:3:16')).toBe('');
+  });
+
+  it('study and journal keys name their shelf; an unknown kind has no place', () => {
+    expect(_bookmarkSourcePlace('study:matthew-5:12')).toBe('Studies');
+    expect(_bookmarkSourcePlace('journal:e1')).toBe('Journal');
+    expect(_bookmarkSourcePlace('mystery:x')).toBe('');
+  });
+});
+
+describe('_bookmarkSourceNumber', () => {
+  it('only letter and wtlb keys carry a number', () => {
+    G.findEntryContext = () => ({ entry: { num: 7 } });
+    expect(_bookmarkSourceNumber('letter:abc')).toBe('Letter 7');
+    expect(_bookmarkSourceNumber('wtlb:abc')).toBe('Letter 7');
+    expect(_bookmarkSourceNumber('blessed:abc')).toBe('');
+    expect(_bookmarkSourceNumber('bible:john:3:16')).toBe('');
+    expect(_bookmarkSourceNumber('')).toBe('');
+    expect(_bookmarkSourceNumber(null)).toBe('');
+  });
+
+  it('a preface or unnumbered entry has no number', () => {
+    G.findEntryContext = () => ({ entry: { num: 0 } });
+    expect(_bookmarkSourceNumber('letter:preface')).toBe('');
+    G.findEntryContext = () => ({ entry: {} });
+    expect(_bookmarkSourceNumber('wtlb:x')).toBe('');
+    G.findEntryContext = () => ({});
+    expect(_bookmarkSourceNumber('letter:x')).toBe('');
+    G.findEntryContext = () => null;
+    expect(_bookmarkSourceNumber('letter:x')).toBe('');
+  });
+
+  it('no resolver loaded means no number', () => {
+    expect(_bookmarkSourceNumber('letter:abc')).toBe('');
   });
 });

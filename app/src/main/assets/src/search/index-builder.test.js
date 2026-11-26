@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { buildDocs } from './index-builder.js';
 
 const VOT_DATA = {
@@ -268,5 +268,138 @@ describe('buildDocs — verse text comes from translateVerse; block-shaped Holy 
     const hd = buildDocs({ translation: 'nkjv' }).find((d) => d.letterId === 'hd-11');
     expect(hd.kind).toBe('holy-day');
     expect(hd.text).toBe('Purge out the old leaven, says the Lord.');
+  });
+});
+
+/* ── Fallback shapes (votreader-tests-7 item 7) ─────────────────────────
+   Every corpus global is optional in buildDocs, and every record field
+   has a default. These pin the arms the happy-path fixtures never take:
+   no corpora at all, junk where arrays belong, records with no fields,
+   the direct BIBLE_<CODE> read when translateVerse is not loaded, and
+   collectStudyText's whole node vocabulary. */
+describe('buildDocs — defaults, missing corpora and fallback shapes', () => {
+  const G = /** @type {any} */ (globalThis);
+  const DATA = {
+    VOLUME_COLLECTIONS: [
+      { id: 'v1', dataVar: 'LETTERS_V1', prefaceVar: 'LETTERS_V1_PREFACE', label: 'Volume One' },
+      { id: 'v2', dataVar: 'LETTERS_V2', prefaceVar: null, label: '' },
+      { id: 'v3', dataVar: 'NOPE_VAR', prefaceVar: null, label: 'Volume Three' },
+    ],
+    OT_BOOK_IDS: ['genesis'],
+    NT_BOOK_IDS: ['matthew'],
+    GENRE_GROUPS: { gospels: ['matthew'], law: ['genesis'] },
+  };
+  const KEYS = ['BOOKS', 'MATTHEW', 'LETTERS_V1_PREFACE', 'LETTERS_V1', 'LETTERS_V2', 'WTLB_ONE', 'WTLB_TWO', 'THE_BLESSED', 'HOLY_DAYS', 'ANSWERS', 'BIBLE_STUDIES', 'BIBLE_KJV', 'translateVerse'];
+  let prevData;
+  beforeEach(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = DATA;
+    for (const k of KEYS) delete G[k];
+  });
+  afterEach(() => {
+    window.VotSearchData = prevData;
+    for (const k of KEYS) delete G[k];
+  });
+
+  it('no corpora loaded: defaults apply and nothing is emitted', () => {
+    expect(buildDocs()).toEqual([]);
+    expect(buildDocs({})).toEqual([]);
+  });
+
+  it('BOOKS fallbacks: null books, non-array chapters, null chapters, missing sections, empty verse text', () => {
+    G.BOOKS = {
+      bad1: null,
+      bad2: { id: 'bad2', title: 'Bad2', chapters: 'nope' },
+      ok: { id: 'ok', title: 'Ok', chapters: [null, { num: 1 }, { num: 2, sections: [{ verses: [{ n: 1, text: '' }, { n: 2, text: 'two' }] }, {}] }] },
+    };
+    const verses = buildDocs({ translation: 'nkjv' }).filter((d) => d.kind === 'verse');
+    expect(verses.length).toBe(1);
+    expect(verses[0]).toMatchObject({ bookId: 'ok', verseNum: 2, text: 'two', heading: '' });
+  });
+
+  it('an alt translation without translateVerse reads BIBLE_<CODE> directly, verse by verse', () => {
+    G.BOOKS = {
+      genesis: { id: 'genesis', title: 'Genesis', chapters: [{ num: 1, sections: [{ verses: [{ n: 1, text: 'base one' }, { n: 2, text: 'base two' }, { n: 3, text: 'base three' }] }] }] },
+      'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [{ num: 5, sections: [{ verses: [{ n: 3, text: 'plain three' }] }] }] },
+    };
+    G.BIBLE_KJV = { genesis: { 1: [null, { n: 1, text: 'alt one' }, { n: 2, text: 'alt two' }] } };
+    const docs = buildDocs({ translation: 'kjv' });
+    const gen = (n) => docs.find((d) => d.bookId === 'genesis' && d.verseNum === n);
+    expect(gen(1).text).toBe('alt one');
+    expect(gen(2).text).toBe('alt two');
+    expect(gen(3).text).toBe('base three'); // no alt verse: the base text stands
+    expect(docs.find((d) => d.bookId === 'matthew-plain').text).toBe('plain three'); // book absent from the alt data
+    G.BIBLE_KJV = { genesis: { 1: 'junk' } };
+    expect(buildDocs({ translation: 'kjv' }).find((d) => d.bookId === 'genesis' && d.verseNum === 1).text).toBe('base one');
+  });
+
+  it('MATTHEW fallbacks: empty verses, missing sections, untitled chapters', () => {
+    G.MATTHEW = { chapters: [
+      { num: 1, verses: [] },
+      { num: 2 },
+      { num: 3, sections: [{ verses: [{ n: 1, text: 'sec verse' }] }, {}] },
+      { num: 4, verses: [{ n: 1, text: 'direct verse' }] },
+    ] };
+    const mt = buildDocs({ translation: 'nkjv' }).filter((d) => d.bookId === 'matthew');
+    expect(mt.map((d) => d.text)).toEqual(['sec verse', 'direct verse']);
+    expect(mt.every((d) => d.heading === '' )).toBe(true);
+    G.MATTHEW = {};
+    expect(buildDocs({ translation: 'nkjv' }).filter((d) => d.bookId === 'matthew')).toEqual([]);
+  });
+
+  it('letter collections: missing preface, null letters and default fields', () => {
+    G.LETTERS_V1 = [null, {}, { id: 'x', title: 'X' }];
+    G.LETTERS_V2 = [{ id: 'y', num: 2, title: 'Y', blocks: [{ segments: [{ v: 'why' }] }] }];
+    const letters = buildDocs({ translation: 'nkjv' }).filter((d) => d.kind === 'letter');
+    expect(letters.length).toBe(3);
+    const bare = letters.find((d) => d.volumeId === 'v1' && d.letterId === '' );
+    expect(bare).toMatchObject({ letterNum: 0, title: '' , text: '' , ref: 'Volume One · Letter ?' });
+    expect(letters.find((d) => d.letterId === 'x').ref).toBe('Volume One · Letter ?');
+    expect(letters.find((d) => d.letterId === 'y')).toMatchObject({ heading: '' , text: 'why' });
+  });
+
+  it('a letter collection whose data is not an array emits nothing', () => {
+    G.LETTERS_V2 = 'junk';
+    expect(buildDocs({ translation: 'nkjv' }).filter((d) => d.volumeId === 'v2')).toEqual([]);
+  });
+
+  it('entry collections: non-array data, null entries, missing fields, bold and italic markup', () => {
+    G.WTLB_ONE = 'junk';
+    G.WTLB_TWO = [null, {}, { id: 'e1', paragraphs: [null, {}, { text: 'hi **bold** and _ital_ end' }] }];
+    G.HOLY_DAYS = [{ id: 'hd-x', title: 'No Body' }];
+    const docs = buildDocs({ translation: 'nkjv' });
+    expect(docs.filter((d) => d.volumeId === 'wtlb1')).toEqual([]);
+    const two = docs.filter((d) => d.volumeId === 'wtlb2');
+    expect(two.length).toBe(2);
+    expect(two.find((d) => d.letterId === '' )).toMatchObject({ title: '' , text: '' , ref: 'Words To Live By: Part Two ' });
+    const e1 = two.find((d) => d.letterId === 'e1');
+    expect(e1.text).toContain('bold');
+    expect(e1.text).toContain('ital');
+    expect(e1.text).not.toContain('**');
+    expect(docs.find((d) => d.letterId === 'hd-x').text).toBe('');
+  });
+
+  it('bible studies: non-array data, null study and chapter, the content fallback and collectStudyText shapes', () => {
+    G.BIBLE_STUDIES = 'junk';
+    expect(buildDocs({ translation: 'nkjv' }).filter((d) => d.kind === 'bible-study')).toEqual([]);
+    G.BIBLE_STUDIES = [null, { chapters: [null, { content: [
+      'plain string', 42, null,
+      { text: 'See {{ref:John 3:16}} now' },
+      { content: [{ text: 'nested words' }] },
+      { paragraphs: [{ text: 'para words' }] },
+      { v: 'footnote num', t: 'fn' },
+      { v: 'loose verse' },
+    ] }, {}] }];
+    const studies = buildDocs({ translation: 'nkjv' }).filter((d) => d.kind === 'bible-study');
+    expect(studies.length).toBe(2);
+    const full = studies[0];
+    expect(full.text).toContain('plain string');
+    expect(full.text).toContain('See John 3:16 now');
+    expect(full.text).toContain('nested words');
+    expect(full.text).toContain('para words');
+    expect(full.text).toContain('loose verse');
+    expect(full.text).not.toContain('footnote num');
+    expect(full).toMatchObject({ letterId: '' , studyChapterId: '' , chapterNum: 0, heading: '' , ref: 'Study ' });
+    expect(studies[1].text).toBe('');
   });
 });
