@@ -444,19 +444,26 @@ export function BackupCounts({ s, here = null }) {
   if (s.annotatedPassages) keys.splice(2, 0, ['Annotated passages', 'annotatedPassages']);
   const absent = Array.isArray(s.absent) ? s.absent : [];
   const unknown = Array.isArray(s.unknown) ? s.unknown : [];
+  const skipped = Array.isArray(s.skipped) ? s.skipped : [];
   // data-7: the other kinds a restore overwrites, each when the file or this phone holds any, or the file carries
-  // one it cannot count (a plans-and-progress backup read as zeros, and 627 read marks on this phone never showed).
-  for (const kk of /** @type {Array<[string, string]>} */ ([['Links', 'links'], ['Notebooks', 'notebooks'], ['Reading plans', 'plans'], ['Marked read', 'readMarks']])) {
-    if (Number(s[kk[1]] || 0) || (here && Number(here[kk[1]] || 0)) || unknown.indexOf(kk[1]) >= 0) keys.splice(keys.length - 1, 0, kk);
+  // one it cannot count or will skip (a plans-and-progress backup read as zeros, and 627 read marks on this phone
+  // never showed). The two notebook stores are two rows: a file may carry one and leave the other alone.
+  for (const kk of /** @type {Array<[string, string]>} */ ([['Links', 'links'], ['Notebooks', 'notebooks'], ['Journal notebooks', 'journalNotebooks'], ['Reading plans', 'plans'], ['Marked read', 'readMarks']])) {
+    if (Number(s[kk[1]] || 0) || (here && Number(here[kk[1]] || 0)) || unknown.indexOf(kk[1]) >= 0 || skipped.indexOf(kk[1]) >= 0) keys.splice(keys.length - 1, 0, kk);
   }
   const n = (/** @type {any} */ v) => Number(v || 0).toLocaleString('en-US');
   // A kind the file does not carry reads as a dash, not 0: the restore leaves it untouched, and 0 reads as a wipe.
   // A kind it carries but cannot count (a counts-only file's highlights or read marks) is a dash too. 0 means empty.
-  const fileCell = (/** @type {string} */ k) => (absent.indexOf(k) >= 0
-    ? <span className="ws3-count-n" aria-label="Not in this backup" title="Not in this backup">–</span>
-    : unknown.indexOf(k) >= 0
-      ? <span className="ws3-count-n" aria-label="Not counted in this file" title="Not counted in this file">–</span>
-      : <span className="ws3-count-n">{n(s[k])}</span>);
+  // A kind the restore will skip (its part of the file fails the restore's shape check) is a dash as well.
+  // The dash is hidden from screen readers, which read the words instead.
+  const dash = (/** @type {string} */ words) => <span className="ws3-count-n"><span aria-hidden="true">–</span><span className="sr-only">{words}</span></span>;
+  const fileCell = (/** @type {string} */ k) => (skipped.indexOf(k) >= 0
+    ? dash('Will be skipped: this part of the backup is damaged')
+    : absent.indexOf(k) >= 0
+      ? dash('Not in this backup')
+      : unknown.indexOf(k) >= 0
+        ? dash('Not counted in this file')
+        : <span className="ws3-count-n">{n(s[k])}</span>);
   // data-2: the restore confirm shows this phone beside the file, so a reader sees what goes.
   return (
     <div className={'ui-group is-inset ws3-counts' + (here ? ' has-here' : '')}>

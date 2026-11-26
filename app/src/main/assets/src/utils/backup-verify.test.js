@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
-import { buildV3Manifest, buildExportPayload } from './backup.js';
+import { buildV3Manifest, buildExportPayload, readsStoresBlock } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 import { formatBytes } from './format-bytes.js';
 
@@ -47,7 +47,7 @@ describe('summarizeBackupManifest', () => {
 
   it('handles the legacy v1/v2 media OBJECT map', () => {
     const s = summarizeBackupManifest({
-      exportDate: '2026-01-01T00:00:00.000Z',
+      exportVersion: 2, exportDate: '2026-01-01T00:00:00.000Z',
       counts: { 'vot-notes': 1 },
       media: { m1: { size: 10 }, m2: { size: 20 } },
     });
@@ -56,7 +56,7 @@ describe('summarizeBackupManifest', () => {
   });
 
   it('never throws on garbage — zeros out', () => {
-    const s = summarizeBackupManifest({ counts: { 'vot-notes': 'NaN?' }, media: 'nope' });
+    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 'NaN?' }, media: 'nope' });
     expect(s.records).toBe(0);
     expect(s.storeCount).toBe(0);
     expect(s.mediaCount).toBe(0);
@@ -108,7 +108,7 @@ describe('formatVerifyReport', () => {
   });
 
   it('singulars + unknown date stay grammatical', () => {
-    const one = summarizeBackupManifest({ counts: { 'vot-notes': 1 }, media: [{ id: 'x', size: 5 }] });
+    const one = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 1 }, media: [{ id: 'x', size: 5 }] });
     const r = formatVerifyReport(one, 'ok', 'v3');
     expect(r.message).toContain('1 note — ');
     expect(r.message).toContain('1 record across 1 data store');
@@ -311,7 +311,7 @@ describe('Verify counts the journal a real export carries', () => {
     const s = summarizeBackupManifest(read.manifest);
     expect(s.journal).toBe(5);
     const r = formatVerifyReport(s, read.integrity, 'v3');
-    expect(r.message).toContain('2 notes, 5 journal entries, 1 bookmark, 2 notebooks — ');   // data-7: notebooks named too
+    expect(r.message).toContain('2 notes, 5 journal entries, 1 bookmark, 2 journal notebooks — ');   // data-7: notebooks named too
     // 5 entries + 2 journal notebooks + 2 notes + 1 bookmark.
     expect(r.message).toContain('10 records across 4 data stores');
   });
@@ -384,16 +384,23 @@ describe('Verify counts the highlights a real export carries', () => {
     expect(r.message).toContain(': 5 highlights — ');
   });
 
-  it('one mark is one highlight; a key with no list adds none', () => {
-    const s = summarizeBackupManifest({ stores: { 'vot-annotations': { k1: [mark('a1')], k2: null, k3: 'junk' } } });
+  it('one mark is one highlight; a key with an empty list adds none', () => {
+    const s = summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-annotations': { k1: [mark('a1')], k2: [] } } });
     expect(formatVerifyReport(s, 'ok', 'v3').message).toContain(': 1 highlight — ');
   });
 
+  it('a key that is not a list makes the restore skip the whole store: no highlights, marked skipped', () => {
+    const s = summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-annotations': { k1: [mark('a1')], k2: null, k3: 'junk' } } });
+    expect(s.highlights).toBe(0);
+    expect(s.skipped).toEqual(expect.arrayContaining(['highlights', 'annotatedPassages']));
+    expect(s.absent).not.toContain('highlights');
+  });
+
   it('a file that only declares counts says passages, the unit those counts are in', () => {
-    const many = formatVerifyReport(summarizeBackupManifest({ counts: { 'vot-annotations': 12 } }), 'absent', 'v3');
+    const many = formatVerifyReport(summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-annotations': 12 } }), 'absent', 'v3');
     expect(many.message).toContain(': 12 annotated passages — ');
     expect(many.message).not.toContain('highlight');
-    const one = formatVerifyReport(summarizeBackupManifest({ counts: { 'vot-annotations': 1 } }), 'absent', 'v3');
+    const one = formatVerifyReport(summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-annotations': 1 } }), 'absent', 'v3');
     expect(one.message).toContain(': 1 annotated passage — ');
   });
 });
@@ -406,7 +413,7 @@ describe('Verify counts the highlights a real export carries', () => {
    ───────────────────────────────────────────────────────────────────────── */
 describe('summarizeBackupManifest: the kinds past the first four (data-7)', () => {
   const doc = {
-    exportDate: '2026-11-20T10:00:00.000Z',
+    exportVersion: 3, exportDate: '2026-11-20T10:00:00.000Z',
     stores: {
       'vot-links': [{ id: 'l1' }, { id: 'l2' }],
       'vot-reading-plans': [{ id: 'p1' }],
@@ -418,28 +425,29 @@ describe('summarizeBackupManifest: the kinds past the first four (data-7)', () =
 
   it('counts them from the stores the file carries', () => {
     const s = summarizeBackupManifest(doc);
-    expect([s.links, s.plans, s.notebooks, s.readMarks]).toEqual([2, 1, 3, 3]);
+    expect([s.links, s.plans, s.notebooks, s.journalNotebooks, s.readMarks]).toEqual([2, 1, 2, 1, 3]);
   });
 
   it('the Verify line names them', () => {
     const r = formatVerifyReport(summarizeBackupManifest(doc), 'mismatch', 'v3');
-    expect(r.message).toContain(': 2 links, 3 notebooks, 1 reading plan, 3 places marked read — ');
-    const one = formatVerifyReport(summarizeBackupManifest({ stores: { 'vot-links': [{ id: 'l' }], 'vot-state': { readItems: { 'v1:john:3': 1 } } } }), 'ok', 'v3');
+    expect(r.message).toContain(': 2 links, 2 notebooks, 1 journal notebook, 1 reading plan, 3 places marked read — ');
+    const one = formatVerifyReport(summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-links': [{ id: 'l' }], 'vot-state': { readItems: { 'v1:john:3': 1 } } } }), 'ok', 'v3');
     expect(one.message).toContain(': 1 link, 1 place marked read — ');
   });
 
   it('a counts-only file still names links, plans and notebooks; read marks need the stores', () => {
-    const s = summarizeBackupManifest({ counts: { 'vot-links': 4, 'vot-reading-plans': 2, 'vot-notebooks': 1, 'vot-state': 1 } });
+    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-links': 4, 'vot-reading-plans': 2, 'vot-notebooks': 1, 'vot-state': 1 } });
     expect([s.links, s.plans, s.notebooks, s.readMarks]).toEqual([4, 2, 1, 0]);
   });
 
   it('an old backup without those sections reads 0 for each, and odd shapes do not throw', () => {
     const old = summarizeBackupManifest({ exportVersion: 2, data: {}, stores: { 'vot-notes': { g1: { groupId: 'g1' } } } });
     expect([old.notes, old.links, old.plans, old.notebooks, old.readMarks]).toEqual([1, 0, 0, 0, 0]);
-    const odd = summarizeBackupManifest({ stores: { 'vot-state': { readItems: ['x'] }, 'vot-links': 'junk', 'vot-notebooks': null } });
-    expect([odd.links, odd.notebooks, odd.readMarks]).toEqual([1, 0, 0]);   // a scalar store is one record by the store rule
-    expect(summarizeBackupManifest({ stores: { 'vot-state': null } }).readMarks).toBe(0);
-    expect(summarizeBackupManifest({ stores: { 'vot-state': 'x' } }).readMarks).toBe(0);
+    const odd = summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-state': { readItems: ['x'] }, 'vot-links': 'junk', 'vot-notebooks': null } });
+    expect([odd.links, odd.notebooks, odd.readMarks]).toEqual([0, 0, 0]);
+    expect(odd.skipped).toEqual(['links', 'notebooks']);   // the restore refuses both shapes, so it writes neither
+    expect(summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-state': null } }).readMarks).toBe(0);
+    expect(summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-state': 'x' } }).readMarks).toBe(0);
     expect(formatVerifyReport(old, 'ok', 'v3').message).toContain(': 1 note — ');
   });
 
@@ -495,12 +503,50 @@ describe('summarizeBackupManifest: a v1 backup counted from its data block', () 
     expect(formatVerifyReport(s, 'absent', 'legacy').message).toContain(': 2 notes, 1 bookmark, 3 links, 2 places marked read — 8 records across 4 data stores.');
   });
 
-  it('a file with stores or declared counts is read from those, never also from data', () => {
+  it('a v2 file with a stores block is read from it, never also from data', () => {
     const v2 = { ...v1, exportVersion: 2, stores: { 'vot-notes': { g9: {} } } };
     const s2 = summarizeBackupManifest(v2);
     expect([s2.notes, s2.links, s2.readMarks, s2.storeCount]).toEqual([1, 0, 0, 1]);
+  });
+
+  /* Hostile review of d3601d5a9: the summary chose `stores` whenever it was an object and `counts` whenever
+     they were declared, but the restore (applyImportPayload) reads `data` for a v1 file or a missing stamp, and
+     for a v2 file without stores. Its dashes then said "Not in this backup" for kinds the restore overwrites. */
+  it('REVIEW PROBE: no exportVersion, a full data block and stores: {} is counted from data, as the restore reads it', () => {
+    const s = summarizeBackupManifest({ ...v1, stores: {} });
+    expect(readsStoresBlock({ ...v1, stores: {} })).toBe(false);
+    expect([s.notes, s.bookmarks, s.links, s.readMarks]).toEqual([2, 1, 3, 2]);
+    expect(s.absent).not.toEqual(expect.arrayContaining(['notes']));
+    expect(s.absent).toContain('journal');   // not in data: the restore leaves it alone
+  });
+
+  it('REVIEW PROBE: v2 without stores, with counts, and data bookmarks [] reads 0 bookmarks (a wipe), not a dash', () => {
+    const doc = { exportVersion: 2, counts: { 'vot-notes': 5 }, data: { 'vot-bookmarks': '[]' } };
+    expect(readsStoresBlock(doc)).toBe(false);
+    const s = summarizeBackupManifest(doc);
+    expect(s.bookmarks).toBe(0);
+    expect(s.absent).not.toContain('bookmarks');
+    expect(s.absent).toContain('notes');   // the declared count is not what the restore writes
+    expect(s.notes).toBe(0);
+  });
+
+  it('a v1 file is read from data whatever counts it declares', () => {
     const counted = summarizeBackupManifest({ ...v1, counts: { 'vot-notes': 5 } });
-    expect([counted.notes, counted.links, counted.storeCount]).toEqual([5, 0, 1]);
+    expect([counted.notes, counted.links, counted.storeCount]).toEqual([2, 3, 4]);
+  });
+
+  it('a v1 store whose JSON does not pass the restore\'s shape check is skipped, not counted', () => {
+    const s = summarizeBackupManifest({ data: { 'vot-links': JSON.stringify({ not: 'a list' }), 'vot-notes': '{oops' } });
+    expect([s.links, s.notes]).toEqual([0, 0]);
+    expect(s.skipped).toEqual(expect.arrayContaining(['links', 'notes']));
+  });
+
+  it('a v1 file\'s media map is never restored, so it reads as a dash, not a count', () => {
+    const s = summarizeBackupManifest({ ...v1, media: { m1: { size: 10 } } });
+    expect(s.mediaCount).toBe(0);
+    expect(s.absent).toContain('mediaCount');
+    const v2 = summarizeBackupManifest({ ...v1, exportVersion: 2, stores: {}, media: { m1: { size: 10 } } });
+    expect(v2.mediaCount).toBe(1);
   });
 
   it('an empty or odd data block still reads zeros', () => {
@@ -523,25 +569,26 @@ describe('summarizeBackupManifest: kinds the file does not carry, or cannot coun
     expect(s.unknown).toEqual([]);
   });
 
-  it('either notebook store carries notebooks; vot-state carries read marks even with none marked', () => {
-    const s = summarizeBackupManifest({ stores: { 'vot-journal-notebooks': { list: [] }, 'vot-state': { settings: {} } } });
-    expect(s.absent).not.toContain('notebooks');
+  it('each notebook store is its own row: carrying one does not claim the other; vot-state carries read marks even with none marked', () => {
+    const s = summarizeBackupManifest({ exportVersion: 3, stores: { 'vot-journal-notebooks': { list: [] }, 'vot-state': { settings: {} } } });
+    expect(s.absent).not.toContain('journalNotebooks');
+    expect(s.absent).toContain('notebooks');
     expect(s.absent).not.toContain('readMarks');
     expect(s.readMarks).toBe(0);
   });
 
   it('media: a v3 array or v1/v2 map carries it (empty too); no table and no _media count does not', () => {
-    expect(summarizeBackupManifest({ stores: {}, media: [] }).absent).not.toContain('mediaCount');
-    expect(summarizeBackupManifest({ counts: { _media: 0 } }).absent).not.toContain('mediaCount');
-    expect(summarizeBackupManifest({ stores: {} }).absent).toContain('mediaCount');
+    expect(summarizeBackupManifest({ exportVersion: 3, stores: {}, media: [] }).absent).not.toContain('mediaCount');
+    expect(summarizeBackupManifest({ exportVersion: 3, counts: { _media: 0 } }).absent).not.toContain('mediaCount');
+    expect(summarizeBackupManifest({ exportVersion: 3, stores: {} }).absent).toContain('mediaCount');
   });
 
   it('a counts-only file cannot say its read marks or highlights: unknown, not absent and not 0', () => {
-    const s = summarizeBackupManifest({ counts: { 'vot-state': 1, 'vot-annotations': 4, 'vot-notes': 2 } });
+    const s = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-state': 1, 'vot-annotations': 4, 'vot-notes': 2 } });
     expect(s.unknown).toEqual(['highlights', 'readMarks']);
     expect(s.absent).not.toContain('readMarks');
     expect(s.absent).toContain('links');
-    const none = summarizeBackupManifest({ counts: { 'vot-notes': 2 } });
+    const none = summarizeBackupManifest({ exportVersion: 3, counts: { 'vot-notes': 2 } });
     expect(none.unknown).toEqual([]);
     expect(none.absent).toContain('readMarks');
   });

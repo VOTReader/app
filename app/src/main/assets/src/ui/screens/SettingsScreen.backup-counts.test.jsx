@@ -7,7 +7,11 @@ import { BackupCounts } from './SettingsScreen.jsx';
 import { summarizeBackupManifest } from '../../utils/backup-verify.js';
 
 afterEach(cleanup);
-const rows = (c) => [...c.querySelectorAll('.ws3-count')].map((r) => [r.children[0].textContent, ...[...r.querySelectorAll('.ws3-count-n')].map((x) => x.textContent)]);
+/** What a cell shows on screen: its text without the words kept for screen readers. */
+const vis = (x) => [...x.childNodes].filter((c) => !(c.classList && c.classList.contains('sr-only'))).map((c) => c.textContent).join('');
+const rows = (c) => [...c.querySelectorAll('.ws3-count')].map((r) => [r.children[0].textContent, ...[...r.querySelectorAll('.ws3-count-n')].map(vis)]);
+/** The words a screen reader hears for a dash cell, and that the dash itself is hidden from it. */
+const spoken = (cell) => { expect(cell.querySelector('[aria-hidden="true"]').textContent).toBe('–'); expect(cell.getAttribute('aria-label')).toBeNull(); expect(cell.getAttribute('title')).toBeNull(); return cell.querySelector('.sr-only').textContent; };
 
 describe('BackupCounts (data-2)', () => {
   const file = { notes: 0, highlights: 0, journal: 0, bookmarks: 1, mediaCount: 0 };
@@ -59,7 +63,7 @@ describe('BackupCounts: the kinds past the first four (data-7)', () => {
 /* A kind the backup does not carry is left untouched by a restore: "0" there read as a wipe. A dash says the file
    has none of it; 0 stays for a kind the file carries empty. Counted through the real summary, as the sheet is. */
 describe('BackupCounts: a dash for a kind the file does not carry', () => {
-  const sum = (doc) => summarizeBackupManifest(doc);
+  const sum = (doc) => summarizeBackupManifest({ exportVersion: 3, ...doc });
 
   it('REPRO: missing kinds read "–" beside this phone; a carried empty kind reads 0', () => {
     const s = sum({ exportVersion: 2, data: {}, stores: { 'vot-notes': {}, 'vot-links': [{ id: 'l1' }] } });
@@ -70,8 +74,8 @@ describe('BackupCounts: a dash for a kind the file does not carry', () => {
       ['Links', '1', '0'], ['Marked read', '–', '627'],
       ['Photos and recordings', '–', '3'],
     ]);
-    const dash = [...container.querySelectorAll('.ws3-count-n')].find((x) => x.textContent === '–');
-    expect(dash.getAttribute('aria-label')).toBe('Not in this backup');
+    const dash = [...container.querySelectorAll('.ws3-count-n')].find((x) => vis(x) === '–');
+    expect(spoken(dash)).toBe('Not in this backup');
   });
 
   it('the check sheet (one column) shows the same dashes', () => {
@@ -87,6 +91,21 @@ describe('BackupCounts: a dash for a kind the file does not carry', () => {
     expect(r).toContainEqual(['Marked read', '–']);
     expect(r).toContainEqual(['Notes', '2']);
     const marked = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Marked read');
-    expect(marked.querySelector('.ws3-count-n').getAttribute('aria-label')).toBe('Not counted in this file');
+    expect(spoken(marked.querySelector('.ws3-count-n'))).toBe('Not counted in this file');
+  });
+
+  it('a store the restore will skip (it fails the shape check) is a dash with its row, said to be skipped', () => {
+    const { container } = render(<BackupCounts s={sum({ stores: { 'vot-notes': {}, 'vot-links': 'junk' }, media: [] })} here={{ notes: 1, links: 4 }} />);
+    expect(rows(container)).toContainEqual(['Links', '–', '4']);
+    const links = [...container.querySelectorAll('.ws3-count')].find((x) => x.children[0].textContent === 'Links');
+    expect(spoken(links.querySelector('.ws3-count-n'))).toBe('Will be skipped: this part of the backup is damaged');
+  });
+
+  it('the two notebook stores are two rows: a file with only journal notebooks does not claim the others', () => {
+    const s = sum({ stores: { 'vot-journal-notebooks': { list: [{ id: 'j1' }, { id: 'j2' }] } }, media: [] });
+    const { container } = render(<BackupCounts s={s} here={{ notebooks: 3, journalNotebooks: 1 }} />);
+    const r = rows(container);
+    expect(r).toContainEqual(['Notebooks', '–', '3']);
+    expect(r).toContainEqual(['Journal notebooks', '2', '1']);
   });
 });

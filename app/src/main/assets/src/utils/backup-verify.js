@@ -12,7 +12,8 @@
    backup utils). */
 
 import { formatBytes } from './format-bytes.js';
-import { countStoreRecords } from './backup.js';
+import { countStoreRecords, readsStoresBlock } from './backup.js';
+import { validateStorePayload } from './import-validators.js';
 
 /**
  * Summarize a backup manifest (v3) or whole payload (legacy v1/v2 — same
@@ -28,11 +29,12 @@ import { countStoreRecords } from './backup.js';
  * before they need them. `counts` stands in only when there is no `stores`
  * block.
  *
- * A v1 backup carries neither: its stores sit in `data` as the JSON strings
- * localStorage held, and the restore reads them from there (applyImportPayload's
- * V1 fallback). With no `stores` and no `counts`, the summary reads them from
- * `data` the same way, so a v1 file no longer verifies as 0 records across 0
- * data stores while its restore overwrites the library.
+ * Which block it counts is the restore's own choice (readsStoresBlock, shared
+ * with applyImportPayload): a v1 file, or a v2 file without a stores block, is
+ * restored from the JSON strings in `data` (the V1 fallback), so it is counted
+ * from there too, whatever `stores` or `counts` it also carries. Each store is
+ * run past validateStorePayload as the restore runs it; one the restore will
+ * skip is listed in `skipped` and counted as nothing.
  *
  * Annotations are the one store whose record count is not the reader's unit.
  * vot-annotations persists hlKey → [marks], so the store rule counts annotated
@@ -57,28 +59,42 @@ import { countStoreRecords } from './backup.js';
  *   mediaCount: number, mediaBytes: number,
  *   notes: number, highlights: number, annotatedPassages: number,
  *   journal: number, bookmarks: number,
- *   links: number, plans: number, notebooks: number, readMarks: number,
- *   absent: string[], unknown: string[]
+ *   links: number, plans: number, notebooks: number, journalNotebooks: number, readMarks: number,
+ *   absent: string[], skipped: string[], unknown: string[]
  * }}
  */
 export function summarizeBackupManifest(manifest) {
   const counts = (manifest && manifest.counts && typeof manifest.counts === 'object')
     ? manifest.counts : {};
   const isMap = (/** @type {any} */ v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const exportVersion = (manifest && manifest.exportVersion !== undefined) ? manifest.exportVersion : 1;
+  /** Stores the restore would skip (validateStorePayload refuses them, or their v1 string does not parse). */
+  /** @type {Set<string>} */ const skippedStores = new Set();
   /** @type {Record<string, any> | null} */
-  let stores = (manifest && isMap(manifest.stores)) ? manifest.stores : null;
-  const declares = Object.keys(counts).some((k) => k !== '_media' && typeof counts[k] === 'number' && Number.isFinite(counts[k]));
-  if (!stores && !declares && manifest && isMap(manifest.data)) {
-    // v1: each store's localStorage JSON. Only objects and arrays are stores; a flag ('1') or any other
-    // scalar is not a reader's record, and a string that does not parse is skipped, never thrown.
+  let stores = null;
+  if (readsStoresBlock(manifest)) {
+    /** @type {Record<string, any>} */ const block = isMap(manifest.stores) ? manifest.stores : {};
+    for (const k of Object.keys(block)) if (validateStorePayload(k, block[k]).length) skippedStores.add(k);
+    stores = block;
+  } else if (exportVersion === 1 || exportVersion === 2) {
+    // The restore's V1 fallback (applyImportPayload): a v1 file, or a v2 file with no stores block, is
+    // restored from the localStorage JSON strings in `data`, whatever its `stores` or `counts` say. Only
+    // objects and arrays are stores; a flag ('1') is not a reader's record, and a string that does not
+    // parse is a store the restore fails to write.
     /** @type {Record<string, any>} */ const fromData = {};
-    for (const k of Object.keys(manifest.data)) {
-      const raw = manifest.data[k];
-      if (k.indexOf('vot-') !== 0 || typeof raw !== 'string') continue;
-      try { const v = JSON.parse(raw); if (v && typeof v === 'object') fromData[k] = v; } catch (_e) { /* not a store */ }
+    if (manifest && isMap(manifest.data)) {
+      for (const k of Object.keys(manifest.data)) {
+        const raw = manifest.data[k];
+        if (k.indexOf('vot-') !== 0 || typeof raw !== 'string') continue;
+        let v;
+        try { v = JSON.parse(raw); } catch (_e) { skippedStores.add(k); continue; }
+        if (validateStorePayload(k, v).length) skippedStores.add(k);
+        else if (v && typeof v === 'object') fromData[k] = v;
+      }
     }
-    if (Object.keys(fromData).length) stores = fromData;
+    stores = fromData;
   }
+  // Otherwise a v3 manifest without its stores block: only its declared `counts` can speak for it.
   let records = 0;
   let storeCount = 0;
   /** @type {Map<string, number>} */
@@ -93,52 +109,62 @@ export function summarizeBackupManifest(manifest) {
       if (typeof n === 'number' && Number.isFinite(n)) add(k, n);
     }
   }
-  const media = manifest ? manifest.media : null;
+  // Media: a v3 array or a v2 id map is restored (and what it omits pruned); a v1 file's media is never read.
+  const media = manifest && exportVersion !== 1 ? manifest.media : null;
   let mediaCount = 0;
   let mediaBytes = 0;
   const tally = (m) => { if (m && typeof m.size === 'number') mediaBytes += m.size; };
   if (Array.isArray(media)) {            // v3 manifest: metadata array
     mediaCount = media.length;
     media.forEach(tally);
-  } else if (media && typeof media === 'object') {  // v1/v2: id → record map
+  } else if (media && typeof media === 'object') {  // v2: id → record map
     const vals = Object.values(media);
     mediaCount = vals.length;
     vals.forEach(tally);
-  } else if (typeof counts._media === 'number') {
+  } else if (exportVersion !== 1 && typeof counts._media === 'number') {
     mediaCount = counts._media;
   }
-  const pick = (k) => byStore.get(k) || 0;
+  const writes = (/** @type {string} */ k) => byStore.has(k) && !skippedStores.has(k);
+  const pick = (/** @type {string} */ k) => (writes(k) ? byStore.get(k) || 0 : 0);
   let highlights = 0;
-  if (stores) {
+  if (stores && writes('vot-annotations')) {
     const ann = stores['vot-annotations'];
     if (ann && typeof ann === 'object' && !Array.isArray(ann)) {
       for (const list of Object.values(ann)) if (Array.isArray(list)) highlights += list.length;
     }
   }
   // data-7: read marks live in vot-state's readItems, inside the one record the store rule counts for the
-  // whole state; only a file that carries its stores can say how many (a counts-only file reads 0).
+  // whole state; only a file that carries its stores can say how many.
   let readMarks = 0;
-  if (stores) {
+  if (stores && writes('vot-state')) {
     const st = stores['vot-state'];
     const items = st && typeof st === 'object' && !Array.isArray(st) ? st.readItems : null;
     if (items && typeof items === 'object' && !Array.isArray(items)) readMarks = Object.keys(items).length;
   }
-  // What the file says nothing about. Media is carried by a v3 array, a v1/v2 id map or a declared _media count;
-  // a restore without one leaves this phone's media alone (applyImportPayload only prunes when the file lists media).
-  const has = (/** @type {string} */ k) => byStore.has(k);
+  // Each row's state, by what the restore will do with its store: absent (not in the file: left untouched),
+  // skipped (in the file, refused by the restore: left untouched), unknown (written, but the file cannot say
+  // how many: a counts-only file's highlights and read marks). The sheet shows a dash for all three.
   /** @type {string[]} */ const absent = [];
+  /** @type {string[]} */ const skipped = [];
   /** @type {string[]} */ const unknown = [];
-  if (!has('vot-notes')) absent.push('notes');
-  if (!has('vot-annotations')) absent.push('highlights', 'annotatedPassages');
+  /** @param {string} store @param {string[]} fields @param {boolean} [countable] */
+  const row = (store, fields, countable = true) => {
+    if (skippedStores.has(store)) skipped.push(...fields);
+    else if (!byStore.has(store)) absent.push(...fields);
+    else if (!countable) unknown.push(fields[0]);
+  };
+  row('vot-notes', ['notes']);
+  if (skippedStores.has('vot-annotations')) skipped.push('highlights', 'annotatedPassages');
+  else if (!byStore.has('vot-annotations')) absent.push('highlights', 'annotatedPassages');
   else if (!stores) unknown.push('highlights');
-  if (!has('vot-journal')) absent.push('journal');
-  if (!has('vot-bookmarks')) absent.push('bookmarks');
-  if (!has('vot-links')) absent.push('links');
-  if (!has('vot-reading-plans')) absent.push('plans');
-  if (!has('vot-notebooks') && !has('vot-journal-notebooks')) absent.push('notebooks');
-  if (!has('vot-state')) absent.push('readMarks');
-  else if (!stores) unknown.push('readMarks');
-  if (!(Array.isArray(media) || (media && typeof media === 'object') || typeof counts._media === 'number')) absent.push('mediaCount');
+  row('vot-journal', ['journal']);
+  row('vot-bookmarks', ['bookmarks']);
+  row('vot-links', ['links']);
+  row('vot-reading-plans', ['plans']);
+  row('vot-notebooks', ['notebooks']);
+  row('vot-journal-notebooks', ['journalNotebooks']);
+  row('vot-state', ['readMarks'], !!stores);
+  if (!(Array.isArray(media) || (media && typeof media === 'object') || (exportVersion !== 1 && typeof counts._media === 'number'))) absent.push('mediaCount');
   return {
     date: (manifest && typeof manifest.exportDate === 'string') ? manifest.exportDate : null,
     records,
@@ -153,9 +179,12 @@ export function summarizeBackupManifest(manifest) {
     // data-7: a backup of plans, links and progress read as four zeros.
     links: pick('vot-links'),
     plans: pick('vot-reading-plans'),
-    notebooks: pick('vot-notebooks') + pick('vot-journal-notebooks'),
+    // Two stores, two rows: a file that carries one of them must not read as replacing the other.
+    notebooks: pick('vot-notebooks'),
+    journalNotebooks: pick('vot-journal-notebooks'),
     readMarks,
     absent,
+    skipped,
     unknown,
   };
 }
@@ -180,6 +209,7 @@ export function describeBackupKinds(s) {
   // data-7: the line named only the kinds above, so a plans-and-progress backup's warning line named nothing.
   add(s.links, 'link', 'links');
   add(s.notebooks, 'notebook', 'notebooks');
+  add(s.journalNotebooks || 0, 'journal notebook', 'journal notebooks');
   add(s.plans, 'reading plan', 'reading plans');
   add(s.readMarks, 'place marked read', 'places marked read');
   return parts;

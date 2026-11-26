@@ -35,7 +35,7 @@ const MANIFEST = {
 };
 const LEGACY = {
   app: 'VOTReader', exportVersion: 2, exportDate: '2026-07-01T12:00:00.000Z',
-  data: {}, stores: { 'vot-annotations': { a: 1, b: 2 } }, media: {},
+  data: {}, stores: { 'vot-annotations': { a: [{ id: 'a1' }], b: [{ id: 'b1' }] } }, media: {},
 };
 
 const INSTALLED = [];
@@ -313,6 +313,7 @@ describe('Import (web)', () => {
     await settle();
     expect(ctx.confirmImport).toHaveBeenCalledTimes(1);
     expect(ctx.confirmImport.mock.calls[0][0]).toContain('Importing the backup from ');
+    expect(ctx.confirmImport.mock.calls[0][0]).toContain(' This backup contains 2 highlights.');   // was '2 annotated keys'
     expect(globalThis.applyImportPayload).toHaveBeenCalled();
     expect(globalThis.__freezePersistState).toHaveBeenCalledWith(true);
     expect(localStorage.getItem('vot-restore-inflight')).toBeNull();
@@ -1066,7 +1067,7 @@ describe('data-2: before an import writes, the library is kept; the sheet shows 
     await settle();
     const details = ctx.confirmImport.mock.calls[0][1];
     expect(details.here).toMatchObject({ notes: 3, bookmarks: 1, mediaCount: 2 });
-    expect(details.summary).toMatchObject({ highlights: 0, mediaCount: 0 });
+    expect(details.summary).toMatchObject({ highlights: 2, mediaCount: 0 });
   });
 
   it('data-7: this phone\'s links, plans, notebooks and read marks are counted beside the file too', async () => {
@@ -1082,7 +1083,7 @@ describe('data-2: before an import writes, the library is kept; the sheet shows 
     await createBackupFlow(ctx).importPersonalData();
     await settle();
     const details = ctx.confirmImport.mock.calls[0][1];
-    expect(details.here).toMatchObject({ links: 2, plans: 1, notebooks: 1, readMarks: 3 });
+    expect(details.here).toMatchObject({ links: 2, plans: 1, notebooks: 0, journalNotebooks: 1, readMarks: 3 });
   });
 
   it('data-7: the confirm text (the sheet\'s fallback) names the kinds the counts sheet names', async () => {

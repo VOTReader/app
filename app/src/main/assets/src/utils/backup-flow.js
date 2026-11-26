@@ -573,7 +573,7 @@ export function createBackupFlow(ctx) {
           if (v !== undefined) stores[name] = v;
         }
         const ids = typeof JournalMediaStore !== 'undefined' && typeof JournalMediaStore.allIds === 'function' ? await JournalMediaStore.allIds() : [];
-        return summarizeBackupManifest({ stores, media: (ids || []).map(() => ({})) });
+        return summarizeBackupManifest({ exportVersion: 3, stores, media: (ids || []).map(() => ({})) });
       } catch (_e) { return null; }
     };
 
@@ -582,12 +582,17 @@ export function createBackupFlow(ctx) {
       // Summarize what's about to land for the confirm dialog: the text the sheet shows when its counts could not
       // be built. data-7: it names the kinds the counts sheet and Verify name (it named annotated keys, bookmarks
       // and journal entries only), counted by the same summary.
+      // Counted once: the same summary feeds this text and the sheet's counts below.
+      /** @type {ReturnType<typeof summarizeBackupManifest> | null} */
+      let fileSummary = null;
+      try { fileSummary = summarizeBackupManifest(parsed); } catch (_e) { fileSummary = null; }
       /** @type {string[]} */
       let summaryParts = [];
       try {
-        const sum = summarizeBackupManifest(parsed);
-        summaryParts = typeof describeBackupKinds === 'function' ? describeBackupKinds(sum) : [];
-        if (sum.mediaCount) summaryParts.push(sum.mediaCount + (sum.mediaCount === 1 ? ' photo or recording' : ' photos and recordings'));
+        if (fileSummary) {
+          summaryParts = typeof describeBackupKinds === 'function' ? describeBackupKinds(fileSummary) : [];
+          if (fileSummary.mediaCount) summaryParts.push(fileSummary.mediaCount + (fileSummary.mediaCount === 1 ? ' photo or recording' : ' photos and recordings'));
+        }
       } catch (_e) { summaryParts = []; }
       const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
 
@@ -620,7 +625,7 @@ export function createBackupFlow(ctx) {
       // WS3 settings (st-restore): the sheet also gets what the file holds, to show it as counts. Display only.
       /** @type {{ date: string | null, summary: any, space: string, here: any } | null} */
       let details = null;
-      try { details = { date: parsed.exportDate || null, summary: summarizeBackupManifest(parsed), space: spaceNote, here: await _hereSummary() }; } catch (_e) { details = null; }
+      try { details = fileSummary ? { date: parsed.exportDate || null, summary: fileSummary, space: spaceNote, here: await _hereSummary() } : null; } catch (_e) { details = null; }
       const confirmed = await confirmImport(
         `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${spaceNote} This cannot be undone.`,
         details,

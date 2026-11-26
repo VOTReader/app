@@ -50,6 +50,18 @@ const DEFAULT_DATA_LS_KEYS = ['vot-state'];
 export const COUNTS_VERSION = 2;
 
 /**
+ * Whether a v1/v2 restore writes this file's `stores` block, or (false) its V1 `data` strings: the one test
+ * applyImportPayload makes, shared with the counts sheet (backup-verify summarizeBackupManifest) so the sheet
+ * counts what the restore will write. An ABSENT stamp is v1, as validateImportEnvelope reads it.
+ * @param {any} parsed
+ * @returns {boolean}
+ */
+export function readsStoresBlock(parsed) {
+  const exportVersion = (parsed && parsed.exportVersion !== undefined) ? parsed.exportVersion : 1;
+  return !!(exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object');
+}
+
+/**
  * How many records one store carries in a backup: the rule behind the
  * `counts` block both builders write, BAK3's import reconciliation
  * (verifyImportCounts) and Verify's summary (backup-verify.js). An array
@@ -721,7 +733,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
   _reseedLsData(parsed && parsed.data, dataLsKeys);
 
   // (2) Apply stores → IDB-backed stores.
-  if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
+  if (readsStoresBlock(parsed)) {
     const applied = _applyStoresAndFlags(parsed.stores, storesMap, flagMap, validateStorePayload);
     importFailures += applied.importFailures;
     skippedStores.push(...applied.skippedStores);

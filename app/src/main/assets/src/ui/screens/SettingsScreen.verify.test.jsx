@@ -34,7 +34,7 @@ const MANIFEST = {
   exportDate: '2026-07-01T12:00:00.000Z',
   counts: { _media: 1, 'vot-notes': 3, 'vot-bookmarks': 2 },
   data: {},
-  stores: { 'vot-notes': [1, 2, 3], 'vot-bookmarks': [1, 2] },
+  stores: { 'vot-notes': { n1: {}, n2: {}, n3: {} }, 'vot-bookmarks': [1, 2] },
   media: [{ id: 'm1', type: 'image', size: 4, mime: 'application/octet-stream' }],
 };
 
