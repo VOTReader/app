@@ -44,7 +44,10 @@ export function CollectionDownload({ label, unitsFor, readers, onOpenDownloads }
   const urls = units.flatMap((u) => u.tracks.map((t) => t.url));
   if (!urls.length) return null;
   const u = unitState(off, urls);
-  if (u.status === 'saved') {
+  // Fix list 13: whether the collection is on the phone is decided for the voice Listen plays. A picked voice that is
+  // all there keeps the sheet (it says so), or the reader could not pick back the voice they wanted.
+  const base = voice ? unitState(off, unitsFor('').flatMap((x) => x.tracks.map((t) => t.url))) : u;
+  if (base.status === 'saved') {
     return <UiButton icon="check" onClick={() => onOpenDownloads('phone')} ariaLabel={'On this phone: ' + label}>On this phone</UiButton>;
   }
   if (u.status === 'downloading') {
@@ -70,10 +73,10 @@ export function CollectionDownload({ label, unitsFor, readers, onOpenDownloads }
   const runsClosed = typeof off.runsClosed === 'function' && off.runsClosed();
   return (
     <>
-      <UiButton icon="dl" onClick={ask} ariaLabel={'Download ' + label}>{some ? 'Download the other ' + todo.length : 'Download'}</UiButton>
+      <UiButton icon="dl" onClick={ask} ariaLabel={'Download ' + label}>{some && todo.length ? 'Download the other ' + todo.length : 'Download'}</UiButton>
       <ActionSheet open={open} onClose={() => setOpen(false)} title={'Download ' + label} className="listen-dl-sheet">
         <ListGroup inset ariaLabel={'What downloads'}>
-          <ListRow noLead one title={countOf(todo.length, 'recording')} value={need ? formatBytes(need) : ''} />
+          <ListRow noLead one title={todo.length ? countOf(todo.length, 'recording') : 'All on this phone'} value={need ? formatBytes(need) : ''} />
           <ListRow noLead one title="Voice" value={voiceName} onClick={() => { setOpen(false); setPicking(true); }} />
           {free > 0 ? <ListRow noLead one title="Free on this phone" value={formatBytes(free)} /> : null}
         </ListGroup>
