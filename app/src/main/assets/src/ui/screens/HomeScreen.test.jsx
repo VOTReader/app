@@ -311,6 +311,32 @@ describe('HomeScreen — the Continue row', () => {
     expect(continueLabel(null)).toBeNull();
   });
 
+  /* visual2-8 + reader-behaviour-n3 (audit 11-23): Continue (and the Library's Recently read) name a place as the
+     History row does: a study visit by its part under the study, an entry collection's number as an Entry, and an
+     Answers topic with no number (its number is only its place in the file). */
+  it('names a place in History\'s words: study part, Entry N, and no number for an Answers topic', () => {
+    globalThis.COL_BY_INDEX_SC = new Map([
+      ['vot-one-index', { volKey: 'one', label: 'Volume One', kind: 'letter' }],
+      ['wtlb-two-index', { volKey: 'wtlb2', label: 'Words To Live By: Part Two', kind: 'wtlb' }],
+      ['answers-home', { volKey: 'answers', label: 'Answers Only God Can Give', kind: 'wtlb' }],
+    ]);
+    globalThis.studyAbbrev = (_slug, fallback) => fallback || '';
+    try {
+      expect(continueLabel({ type: 'letter', letterTitle: 'Impasse', letterNum: 31, volumeScreen: 'wtlb-two-index' }))
+        .toEqual({ title: 'Impasse', place: 'Words To Live By: Part Two, Entry 31' });
+      expect(continueLabel({ type: 'letter', letterTitle: 'Regarding the Sabbath', letterNum: 63, volumeScreen: 'answers-home' }))
+        .toEqual({ title: 'Regarding the Sabbath', place: 'Answers Only God Can Give' });
+      expect(continueLabel({ type: 'letter', letterTitle: 'Chosen by God', letterNum: 1, volumeScreen: 'vot-one-index' }))
+        .toEqual({ title: 'Chosen by God', place: 'Volume One, Letter 1' });
+      expect(continueLabel({ type: 'study-chapter', studySlug: 'purity', studyTitle: 'Purity', chapterNum: 2, chapterTitle: 'The Narrow Gate' }))
+        .toEqual({ title: 'The Narrow Gate', place: 'Purity, Part 2' });
+      expect(continueLabel({ type: 'study-chapter', studySlug: 'purity', studyTitle: 'Purity', chapterNum: 2, chapterTitle: null }))
+        .toEqual({ title: 'Part 2', place: 'Purity' });
+    } finally {
+      delete globalThis.studyAbbrev;
+    }
+  });
+
   it('with History switched off there is no row', () => {
     setupGlobals();
     renderHome({ historyEnabled: false, history: [LETTER], onContinue: vi.fn(), onStartHere: vi.fn() });

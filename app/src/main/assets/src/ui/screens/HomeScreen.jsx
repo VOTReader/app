@@ -20,6 +20,7 @@ import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { TourPrompt } from '../components/TourPrompt.jsx';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
+import { historyEntryWords } from '../components/HistoryEntryCard.jsx';
 
 /** The four READ tiles, in their default order. */
 export const READ_TILES = Object.freeze(['volumes', 'scriptures', 'answers', 'studies']);
@@ -27,15 +28,17 @@ export const READ_TILES = Object.freeze(['volumes', 'scriptures', 'answers', 'st
 /** localStorage: the reader said "Not now" to the up-next card's reading-plan offer (C8). */
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
-/** Home's Continue row: what the newest History row names, as a title and its place. @param {any} entry */
+/** Home's Continue row (and the Library's Recently read): what the newest History row names, in History's own
+ *  words (historyEntryWords, visual2-8): the title, then its place, "Words To Live By: Part One, Entry 31" or
+ *  "Purity, Part 2". A Bible chapter keeps its short "John 3". @param {any} entry */
 export function continueLabel(entry) {
   if (!entry) return null;
-  if (entry.type === 'letter') {
-    const col = entry.volumeScreen && typeof COL_BY_INDEX_SC !== 'undefined' ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
-    const place = col ? col.label + (entry.letterNum ? ', Letter ' + entry.letterNum : '') : '';
-    return entry.letterTitle ? { title: entry.letterTitle, place } : null;
+  if (entry.type === 'letter' || entry.type === 'study-chapter') {
+    if (entry.type === 'letter' ? !entry.letterTitle : !entry.studyTitle) return null;
+    const w = historyEntryWords(entry);
+    const title = w.title || w.fallback;
+    return { title, place: [w.label, w.title ? w.num : null].filter((p) => p && p !== title).join(', ') };
   }
-  if (entry.type === 'study-chapter') return entry.studyTitle ? { title: entry.studyTitle, place: entry.chapterTitle || (entry.chapterNum ? 'Part ' + entry.chapterNum : '') } : null;
   return entry.bookTitle ? { title: entry.bookTitle + (entry.chapterNum ? ' ' + entry.chapterNum : ''), place: '' } : null;
 }
 

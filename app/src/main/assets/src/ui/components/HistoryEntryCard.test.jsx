@@ -107,6 +107,38 @@ describe('HistoryEntryCard — chapter and study rows', () => {
   });
 });
 
+/* reader-behaviour-n3 (audit 11-23): an entry collection's row said "Letter 63", and an Answers topic carried a
+   number that is only its place in the file. The number takes the collection's own noun; Answers shows none. */
+describe('HistoryEntryCard — each collection names its own pieces', () => {
+  beforeEach(() => {
+    globalThis.COL_BY_INDEX_SC = new Map([
+      ['wtlb-two-index', { volKey: 'wtlb2', label: 'Words To Live By: Part Two', kind: 'wtlb' }],
+      ['answers-home', { volKey: 'answers', label: 'Answers Only God Can Give', kind: 'wtlb' }],
+      ['holy-days-index', { volKey: 'holydays', label: 'Regarding The Holy Days', kind: 'holy-days' }],
+    ]);
+  });
+
+  it('a Words To Live By row says Entry N', () => {
+    show({ ...LETTER, letterNum: 31, volumeScreen: 'wtlb-two-index' });
+    expect(document.querySelector('.history-entry-num').textContent).toBe('Entry 31');
+    cleanup();
+    show({ ...LETTER, letterTitle: null, letterNum: 31, volumeScreen: 'wtlb-two-index' });
+    expect(title()).toBe('Entry 31');
+  });
+
+  it('an Answers topic shows no number', () => {
+    show({ ...LETTER, letterTitle: 'Regarding the Sabbath', letterNum: 63, volumeScreen: 'answers-home' });
+    expect(label()).toBe('Answers Only God Can Give');
+    expect(document.querySelector('.history-entry-num')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Letter 63|Entry 63/);
+  });
+
+  it('the Holy Days keep Letter N', () => {
+    show({ ...LETTER, letterNum: 2, volumeScreen: 'holy-days-index' });
+    expect(document.querySelector('.history-entry-num').textContent).toBe('Letter 2');
+  });
+});
+
 describe('HistoryEntryCard — row mechanics', () => {
   it('renders the chip it is handed, and passes the entry back on select', () => {
     const picked = [];

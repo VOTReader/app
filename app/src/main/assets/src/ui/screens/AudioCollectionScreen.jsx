@@ -31,6 +31,7 @@ import { formatClock } from '../components/AudioSeekSlider.jsx';
 import { queueTime } from '../components/PlayerSheets.jsx';
 import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
+import { itemNoun } from '../../utils/item-noun.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -97,13 +98,8 @@ function resolveSource(volKey) {
   return { label: col.label || '', items: preface ? [preface, ...letters] : letters, col, preface };
 }
 
-/** Letters, a study's chapters, or entries for the WTLB and Blessed families. The Holy Days hold letters: their
- *  Read tile says 'N Letters' (VolumesHome), and the two screens name a collection's pieces alike (L4). */
-export function itemNoun(col, count) {
-  if (col && col.kind === 'chapter') return count === 1 ? 'chapter' : 'chapters';
-  const entry = !!(col && col.kind && col.kind !== 'letter' && col.kind !== 'holy-days');
-  return count === 1 ? (entry ? 'entry' : 'letter') : (entry ? 'entries' : 'letters');
-}
+/** Letters, a study's chapters, or entries (utils/item-noun.js, shared with History and Continue). */
+export { itemNoun };
 
 /** A reading's whole length from the lengths baked into the build (U04.1), or 0 while any part is unknown.
  *  @param {any[]} tracks @returns {number} */
