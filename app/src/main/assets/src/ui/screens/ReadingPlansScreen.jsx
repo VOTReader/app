@@ -20,7 +20,7 @@
    Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runRow, letterSource, planStatus, finishDate, readSpan } from '../../utils/plan-runs-view.js';
+import { runRow, letterSource, planStatus, finishDate, readSpan, weekdayDate } from '../../utils/plan-runs-view.js';
 import { runStatus, itemsLabel, itemsCount } from '../../data/plan-engine.js';
 import { PLAN_CATALOG, PLAN_GROUPS, catalogFacts, runName, bookTitle } from '../../data/plan-catalog.js';
 import { PlanRing, PlanSec, CHEVRON, countOf } from '../components/PlanBits.jsx';
@@ -33,13 +33,16 @@ export function planStateLine(run, now) {
   const st = runStatus(run, now);
   const status = planStatus(run, now, st);
   const line = (/** @type {string} */ lead, rest = '') => ({ lead, rest, paused: status.key === 'paused', behind: status.key === 'behind' });
-  if (status.key === 'paused') return line('Paused', 'Day ' + (st.day + 1) + ' of ' + st.total);
+  // The Today card's own fields (runStatus todayDay and spreadOn): a spread-out plan's next reading may fall after
+  // tomorrow, and its empty day has nothing to read.
+  if (status.key === 'paused') return line('Paused', 'Day ' + (st.todayDay + 1) + ' of ' + st.total);
   if (status.key === 'starts' || status.key === 'finished' || status.key === 'behind') return line(status.text);
-  if (status.key === 'done') {
-    const next = st.todayItems;
-    const label = itemsLabel(next, bookTitle);
-    return line('Done today', next.length ? 'tomorrow: ' + (label.length <= 24 ? label : itemsCount(next)) : '');
-  }
+  const next = st.todayItems;
+  const label = itemsLabel(next, bookTitle);
+  const short = label.length <= 24 ? label : itemsCount(next);
+  const when = st.spreadOn ? weekdayDate(st.spreadOn, now) : '';
+  if (status.key === 'done') return line('Done today', next.length ? (when || 'tomorrow') + ': ' + short : '');
+  if (when) return line('On track', 'Nothing to read today · ' + when + ': ' + short);
   const row = runRow(run, now);
   const n = row.items.length;
   return line('On track', 'Today: ' + row.label + (n > 1 ? ' · ' + row.todayTicked + ' of ' + n : ''));
@@ -48,7 +51,7 @@ export function planStateLine(run, now) {
 /** "Stopped Nov 10 · day 11 of 365" for a stopped run. @param {any} r @param {Date} now */
 export function stoppedLine(r, now) {
   const st = runStatus(r, now);
-  return planStatus(r, now, st).text + ' · day ' + Math.min(st.total, st.day + 1) + ' of ' + st.total.toLocaleString('en-US');
+  return planStatus(r, now, st).text + ' · day ' + Math.min(st.total, st.todayDay + 1) + ' of ' + st.total.toLocaleString('en-US');
 }
 
 /** "8 days · finished Oct 30" for a finished run. @param {any} r */

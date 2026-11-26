@@ -278,7 +278,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       <div className="ui-card plan-today plan-today-paused">
         <p className="plan-today-head"><span className="root-eyebrow">Paused</span></p>
         <p className="plan-today-title">{run.paused ? 'Paused since ' + monthDay(run.paused) : 'Paused'}</p>
-        <p className="plan-today-sub">{'Day ' + (st.day + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
+        <p className="plan-today-sub">{'Day ' + (st.todayDay + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
         <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume</button>
       </div>
     );
