@@ -65,6 +65,37 @@ describe('heart-5: a drawing keeps only the readers, named one by one', () => {
     }
     expect(deps.setScreen).not.toHaveBeenCalled();
   });
+  // Every dep is classified by a person: a reader (BG_READERS, runs in the drawing) or not (a value, or an action
+  // the drawing no-ops). A dep added to app.jsx without a decision fails here instead of silently going inert.
+  const NOT_READERS = new Set([
+    'UNIFIED_CHAIN', 'activeLetter', 'activeReadKey', 'activeVolKey', 'audioColKey', 'backActive', 'backAt',
+    'backHint', 'bcvNextBook', 'bcvNextBoundaryTitle', 'bcvOnNextBook', 'bcvOnPrevBook', 'bcvPrevBook',
+    'bcvPrevBoundaryTitle', 'book', 'bookId', 'chapter', 'chapterNum', 'clearAllProgress', 'clearHistory',
+    'clearReadForBook', 'createAndEditJournal', 'fromLetterRef', 'fromMatthewChRef', 'fromSearch', 'fromSearchIndex',
+    'fromStudies', 'fromSurprise', 'fromWtlb', 'gardenPage', 'genreId', 'goAbout', 'goBibleIdx', 'goBookmarksIndex',
+    'goColIdx', 'goHighlightsIndex', 'goHistory', 'goHome', 'goJournalEditor', 'goJournalHub', 'goJournalViewer',
+    'goLinksIndex', 'goMatthewIdx', 'goNavOrigin', 'goNotesIndex', 'goProgress', 'goReadingPlans', 'goScriptureGenre',
+    'goScripturesHome', 'goSearch', 'goSearchOrigin', 'goSettings', 'goStudiesHome', 'goToChainEntryFirst',
+    'goToChainEntryLast', 'goToLetterFromMatthew', 'goVolumesHome', 'handleScriptureSelect', 'handleSearchCommand',
+    'handleSearchSelect', 'handleSelect', 'handleSurprise', 'handleVolumeSelect', 'headingsFocusHidden',
+    'journalEntryId', 'lastReadChapters', 'lastReadLetterMap', 'letterId', 'markRead', 'mode', 'navOrigin',
+    'navigateToLink', 'openInAppLetter', 'openLinkSidebar', 'prophecyCardStatesRef', 'pushFromLetter', 'readHistory',
+    'readItems', 'retargetTop', 'retryStudies', 'saveProphecyCardStates', 'screen', 'searchContext', 'searchLanding',
+    'searchQuery', 'searchScope', 'selectBibleCh', 'selectMatthewCh', 'selectStudy', 'selectStudyChapter',
+    'setActiveReadKey', 'setAudioColKey', 'setBookId', 'setChapterNum', 'setFromMatthewCh', 'setFromSearch',
+    'setFromSearchIndex', 'setFromStudies', 'setFromSurprise', 'setFromWtlb', 'setGardenPage', 'setGenreId',
+    'setHeadingsFocusHidden', 'setLastReadChapters', 'setLastReadForVol', 'setLetterId', 'setMode', 'setNavOrigin',
+    'setNoteSheetTarget', 'setNotebookPickerTarget', 'setScreen', 'setSearchQuery', 'setSearchScope', 'setShowStudy',
+    'setStudyChapterId', 'setStudyId', 'setSurpriseAnchor', 'setTheme', 'setTitleFocusHidden', 'settings', 'showStudy',
+    'studiesError', 'studiesLoading', 'studyChapterId', 'studyId', 'surpriseAnchor', 'tapThroughBack', 'theme',
+    'titleFocusHidden', 'toggleSetting', 'unmarkRead', 'updateSetting',
+  ]);
+  it('every dep of App is classified as a reader or not; a new one fails here until someone decides', () => {
+    const unclassified = keys.filter((k) => !BG_READERS.has(k) && !NOT_READERS.has(k));
+    expect(unclassified, 'new _routeDeps keys: add each to BG_READERS (TabSnapDrawer.jsx) if it only reads, else to NOT_READERS here').toEqual([]);
+    expect([...NOT_READERS].filter((k) => !keys.includes(k)), 'NOT_READERS names a dep app.jsx no longer has').toEqual([]);
+    expect([...BG_READERS].filter((k) => NOT_READERS.has(k)), 'a dep in both lists').toEqual([]);
+  });
   it('a dep App adds later is inert until named a reader', () => {
     const out = bgRouteDeps({ playEverything: vi.fn(() => 'ran'), screen: 'home' }, { screen: 'home' });
     expect(out.playEverything()).toBeUndefined();
