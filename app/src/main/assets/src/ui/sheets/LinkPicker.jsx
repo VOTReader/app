@@ -547,7 +547,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             ) : (
               <div className="navpick-empty">
                 <div className="navpick-empty-title">Search to link</div>
-                <div className="navpick-empty-hint">Try a title or a reference like &quot;Eph 6:5&quot; — or flip to Full text to search any phrase inside the verses and letters.</div>
+                <div className="navpick-empty-hint">Try a title or a reference like &quot;Eph 6:5&quot; — or choose Inside the text to search any phrase inside the verses and letters.</div>
               </div>
             )
           ) : searchScope === 'titles' ? (
@@ -585,7 +585,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                   <div className="navpick-empty-title">
                     {corpusScope === 'all' ? 'Nothing in the text matches' : 'Nothing in ' + corpusScopeLabel + ' matches'}
                   </div>
-                  <div className="navpick-empty-hint">Full text finds phrases inside verses and letters. For references like &quot;Eph 6:5&quot; or titles, switch to Titles &amp; refs.</div>
+                  <div className="navpick-empty-hint">Inside the text finds phrases inside verses and letters. For references like &quot;Eph 6:5&quot; or titles, choose Titles and references.</div>
                   {corpusScope !== 'all' && (
                     <button type="button" className="navpick-scope-jump" onClick={() => setCorpusScope('all')}>Search every corpus instead</button>
                   )}
