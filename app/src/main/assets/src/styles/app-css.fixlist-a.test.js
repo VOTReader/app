@@ -56,3 +56,14 @@ describe('fix list 20: Listen rows wrap their words instead of cutting them besi
     expect(value).toMatch(/flex-shrink:\s*1/);
   });
 });
+
+describe('fix list 43: the Speed sheet\'s fine-tune row puts its label above the stepper at large text', () => {
+  it('the speed row wraps and its label takes the whole first line, as Your own does', () => {
+    const wrap = ruleBlock(CSS, '.vot-large-text :is(.np-custom, .audio-speed-row) {');
+    expect(wrap).not.toBeNull();
+    expect(wrap).toMatch(/flex-wrap:\s*wrap/);
+    const label = ruleBlock(CSS, '.vot-large-text :is(.np-custom-label, .audio-speed-fine) {');
+    expect(label).not.toBeNull();
+    expect(label).toMatch(/flex-basis:\s*100%/);
+  });
+});
