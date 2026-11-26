@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.app.Application
+import android.content.ComponentName
 import android.os.Build
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
@@ -27,7 +28,8 @@ import kotlin.test.assertTrue
  * yet: no emit, no throw, synchronously.
  *
  * What it cannot pin (device walk, like NativeAudioRecorderTest's NK7):
- * anything past the connect. Under Robolectric the MediaController
+ * anything past a successful connect. A refused connect is pinned (the
+ * no-service tests below declare the service unbindable). Under Robolectric the MediaController
  * service bind delivers a null ComponentName, so the Media3 session
  * connection throws NullPointerException when the main looper idles
  * after a connect was triggered - an environment limit, not a
@@ -221,6 +223,42 @@ class NativeAudioControllerTest {
     @Test
     fun `journal is empty before any state event`() {
         assertEquals("", controller.journal())
+    }
+
+    // --- a playback service that cannot be bound (audio-retire-n1) ---
+    //
+    // Declaring the service's component unbindable makes Robolectric's bindService answer false, so Media3
+    // rejects the connection without ever reaching the onServiceConnected path the class doc warns about,
+    // and the main looper is safe to idle.
+
+    private fun unbindable() = shadowOf(application)
+        .declareComponentUnbindable(ComponentName(application, PlaybackService::class.java))
+
+    @Test
+    fun `a service that cannot be reached tells the page no-service`() {
+        unbindable()
+        controller.load(loadJson(playable))
+        idleMain()
+        assertEquals(1, emitted.size)
+        val o = JSONObject(emitted[0])
+        assertEquals("error", o.getString("type"))
+        assertEquals("no-service", o.getString("name"))
+        assertEquals(0, o.getInt("code"))
+        // The load was queued behind the connect and never ran, so no url is playing yet.
+        assertEquals("", o.getString("url"))
+        assertEquals("", controller.journal())
+    }
+
+    @Test
+    fun `after a failed connect the next call tries again`() {
+        unbindable()
+        controller.load(loadJson(playable))
+        idleMain()
+        controller.play()
+        idleMain()
+        // A connect left half-open would swallow every later call silently; each call gets its own answer.
+        assertEquals(2, emitted.size)
+        assertTrue(emitted.all { JSONObject(it).getString("name") == "no-service" })
     }
 
     // --- after shutdown: everything is a no-op, except the sync error ---
