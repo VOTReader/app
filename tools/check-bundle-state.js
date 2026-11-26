@@ -47,10 +47,10 @@ export const BUNDLES = ['b', 'c', 'd'];
 export const ALLOWED = {
   'data/plan-engine.js': 'a WeakMap memo of a pure computation: each copy fills it with the same values',
   'utils/word-count.js': 'a WeakMap memo of a pure count: each copy fills it with the same values',
+  'utils/fold-accents.js': 'a Map memo of a pure per-character accent fold: each copy fills the same values',
   'utils/answers-shelves.js': 'a memo of the topic list by identity, and a subject table built once from constant data',
   'utils/answers-site.js': 'a memo of the site built from the entry list by identity: each copy builds the same site',
   'stores/idb-chunks.js': 'the generation counter only salts ids that also carry Date.now and Math.random, and the told-inexact set only dedupes a warning (a second copy can warn once more); d\'s copy serves thumb-store',
-  'utils/diagnostic-log.js': 'd\'s copy (via idb-chunks for thumb-store) has never been seen to log (audit 2026-11-23); an entry it logged would miss the export. Move its buffer into sharedState if d starts logging',
 };
 
 /** Strip comments, keep strings and line breaks (so line numbers and column 0 survive). @param {string} src */
