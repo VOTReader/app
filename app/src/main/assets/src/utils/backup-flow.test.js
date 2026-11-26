@@ -721,6 +721,14 @@ describe('Clear All Personal Data', () => {
     expect(lastToast()).toBe('All personal data cleared. Reloading…');
   });
 
+  it('a browser opted out of the website analytics stays opted out (data-rest-n3)', async () => {
+    localStorage.setItem('vot-no-stats', '1');
+    localStorage.setItem('vot-state', '{}');
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(localStorage.getItem('vot-state')).toBeNull();
+    expect(localStorage.getItem('vot-no-stats')).toBe('1');
+  });
+
   it('a weekly copy that will not delete never blocks the wipe', async () => {
     put('DataSafety', { clearSnapshots: async () => true, clearWeeklyCopies: () => { throw new Error('binder'); } });
     await createBackupFlow(ctx).clearAllPersonalData();

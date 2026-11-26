@@ -1382,7 +1382,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
     expect(LS_SKIP_LIST).toContain('vot-plan-session');         // utils/plan-session.js: today's paused plan sitting
-    expect(LS_SKIP_LIST.length).toBe(34);   // data-1 added vot-media-orphans-seen; plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session
+    expect(LS_SKIP_LIST.length).toBe(35);   // data-1 added vot-media-orphans-seen; plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session; data-rest-n3 added vot-no-stats
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

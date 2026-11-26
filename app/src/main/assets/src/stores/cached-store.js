@@ -1508,6 +1508,9 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-auto-downloads',           // utils/auto-download.js (the offline downloads lane's keys)
   'vot-auto-gone',
   'vot-plan-session',             // utils/plan-session.js PLAN_SESSION_KEY: today's paused plan sitting (same-day, not backed up)
+  // data-rest-n3 (audit 2026-11-23): the website's analytics opt-out, set by index.html's beacon script
+  // (?nostats=1). Swept, a marked browser started counting as a visitor again.
+  'vot-no-stats',
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */

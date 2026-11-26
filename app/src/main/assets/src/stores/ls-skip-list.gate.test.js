@@ -135,7 +135,8 @@ function declSite(file, needle) {
   return file + ':' + lineAt(src, Math.max(0, src.indexOf(needle)));
 }
 
-/** Every non-test .js / .jsx module under src/. @returns {Map<string, string>} */
+/** Every non-test .js / .jsx module under src/, and index.html beside it (its inline scripts write
+    keys too: the beacon's vot-no-stats, data-rest-n3). @returns {Map<string, string>} */
 function sourceTree() {
   /** @type {Map<string, string>} */
   const out = new Map();
@@ -146,6 +147,7 @@ function sourceTree() {
       else if (/\.(js|jsx)$/.test(e.name) && !/\.test\./.test(e.name)) out.set(relative(SRC, p).replace(/\\/g, '/'), readFileSync(p, 'utf8'));
     }
   })(SRC);
+  out.set('../index.html', readFileSync(join(SRC, '..', 'index.html'), 'utf8'));
   return out;
 }
 
@@ -167,7 +169,7 @@ describe('LS_SKIP_LIST names every live vot-* localStorage key', () => {
     ]);
     expect([...lsKeysIn(synthetic).keys()].sort()).toEqual(['vot-by-const', 'vot-exported', 'vot-literal', 'vot-param-a']);
     // and on the real tree: one key of each kind
-    for (const key of ['vot-state', 'vot-notes-tab', 'vot-auto-downloads', 'vot-restore-inflight']) {
+    for (const key of ['vot-state', 'vot-notes-tab', 'vot-auto-downloads', 'vot-restore-inflight', 'vot-no-stats']) {
       expect(found.has(key), key).toBe(true);
     }
   });

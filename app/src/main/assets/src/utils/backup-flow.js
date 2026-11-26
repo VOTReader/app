@@ -40,6 +40,9 @@ const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 // The reader's "weekly copy off" choice, which Clear All keeps (vs3). Keep the literal
 // in sync with WEEKLY_OFF_KEY in utils/data-safety.js (bundle-b; no import from here).
 const WEEKLY_OFF_KEY = 'vot-weekly-copy-off';
+// The website's analytics opt-out (index.html, ?nostats=1), which Clear All keeps too
+// (data-rest-n3): a wipe for privacy must not start counting this browser again.
+const NO_STATS_KEY = 'vot-no-stats';
 
 // Android's native import refuses a v3 manifest over MAX_V3_MANIFEST_SIZE
 // (16 MiB, StorageManager.kt). Warn at EXPORT time — while the data still
@@ -1243,8 +1246,8 @@ export function createBackupFlow(ctx) {
         try { if (window.DiagnosticLog) window.DiagnosticLog.warn('settings', 'Clear All: failed to delete ' + failedCaches.join(', ')); } catch (_e) { /* best-effort */ }
       }
       // vs3: a weekly copy the reader turned off stays off; a wipe for privacy must not
-      // start writing their data to Downloads again.
-      _collectVotKeys().filter((k) => k !== WEEKLY_OFF_KEY).forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
+      // start writing their data to Downloads again. data-rest-n3: nor count the browser again.
+      _collectVotKeys().filter((k) => k !== WEEKLY_OFF_KEY && k !== NO_STATS_KEY).forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // Wave-0: was alert('All personal data cleared…') — a native blocking
       // dialog. Same toast-then-reload pattern the import path uses: the
       // persistent toast renders first, the 600ms delay lets it paint.
