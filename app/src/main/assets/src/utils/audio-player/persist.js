@@ -10,6 +10,7 @@ import {
   normalizeAudioTrack,
   songIdOfKey,
 } from '../audio-track.js';
+import { neutralSections } from '../section-labels.js';
 import { cleanDownIds, cleanSongSwaps, loadSongCatalog, normalizeSongFilter } from '../song-catalog.js';
 import {
   _followLibraryRate,
@@ -425,7 +426,9 @@ function _applySnapshot(s) {
       down: mode === 'songs' && !songIds && s.shuffle === true ? _downList(s.down) : null,
     });
     _restoredAt = typeof s.at === 'number' ? s.at : 0;
-    _state.queue = [track];
+    // A compilation's saved title may carry a hand range the timings correct (r3 review): its name only until
+    // the rebuild, or the timings landing, gives the right one (sections.js).
+    _state.queue = [mode === 'section' ? { ...track, title: neutralSections([[track.title]])[0][0] } : track];
     _state.qi = 0;
     _state.time = _pendingRestore.time;
     _state.duration = 0;

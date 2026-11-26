@@ -90,7 +90,7 @@ import {
   undoClearUpcoming,
 } from './audio-player/queue.js';
 import { _flushOnHide, _onBeforeUpdateReload, _resumeAfterUpdate } from './audio-player/restore.js';
-import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey } from './audio-player/sections.js';
+import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey, _watchSectionTitles } from './audio-player/sections.js';
 import { _sleepOnVisible, clearSleepTimer, getSleepRemainingSeconds, setSleepAtQueueEnd, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
 import { playSongs, setRepeat, setShuffle, switchSongVersion } from './audio-player/songs.js';
 import {
@@ -162,6 +162,9 @@ export { SONG_OFFLINE_TOAST_ID } from './audio-player/offline.js';
 // the bar up PAUSED at that spot (display-only state; no network, no corpus).
 // Runs at module eval — deliberately touches only localStorage + _state.
 _restoreFromSaved();
+// A restored compilation (or an edited queue holding one) takes its synced title when the timings land; this only
+// listens, it asks for nothing (sections.js).
+if (getState().queue.some((t) => t && t.key == null)) _watchSectionTitles();
 
 /* One live player per window. A re-import (the test harness's vi.resetModules)
    retires the previous instance's window listeners first, so a stale instance

@@ -2,9 +2,9 @@
 /* audio-player/sections — WTLB compilations: one file, many letters. Which letter the clock is in, and
    the follower that names it and credits one heard through. */
 
-import { loadAudioSyncSections } from '../sync-loaders.js';
-import { _collectionItems } from './catalog.js';
-import { _g, late, _sections, _state } from './core.js';
+import { audioSyncSectionsStore, loadAudioSyncSections } from '../sync-loaders.js';
+import { _collectionItems, sectionTracks } from './catalog.js';
+import { _g, late, _notify, _sections, _state } from './core.js';
 
 /* ── WTLB compilations: one file, many letters (2026-09-20) ─────────────────
    A range-compilation section (AUDIO_SECTIONS: WTLB Part 1-7, Section 1-7) is
@@ -22,6 +22,38 @@ import { _g, late, _sections, _state } from './core.js';
    PRESENT one. The table is its own lazy file (src/data/audio-sync-sections.js):
    asking for a section's letter before it lands kicks the fetch (idempotent)
    and answers null until it does. */
+
+/* A compilation's title in the queue (r3 review). The title is copied into a queue track when it is queued or
+   restored, often before audio-sync-sections.js lands, and nothing read it again: a restored WTLB Part Two showed
+   "Section 2 · 29–56" in the mini-player and Up next all session. When the timings land (or fail), every compilation
+   track in the queue takes the title sectionTracks gives now: the synced range, or the hand label after a failure. */
+/** @type {(() => void) | null} */
+let _unwatchTitles = null;
+
+/** Follow the compilation timings for the queue's titles (idempotent), and bring them up to date now. @returns {void} */
+export function _watchSectionTitles() {
+  if (_unwatchTitles) _unwatchTitles();
+  _unwatchTitles = audioSyncSectionsStore.subscribe(_refreshSectionTitles);
+  _refreshSectionTitles();
+}
+
+/** Give each compilation track in the queue its current title. The queue array stays the same (a restore checks it). @returns {void} */
+export function _refreshSectionTitles() {
+  const all = _sections();
+  if (!all || !_state.queue.length) return;
+  /** @type {Map<string, string>} */
+  const byUrl = new Map();
+  for (const vk of Object.keys(all)) for (const t of sectionTracks(vk)) byUrl.set(t.url, t.title);
+  let changed = false;
+  _state.queue.forEach((t, i) => {
+    if (!t || t.key != null) return;
+    const title = byUrl.get(t.url);
+    if (!title || title === t.title) return;
+    _state.queue[i] = { ...t, title };
+    changed = true;
+  });
+  if (changed) _notify();
+}
 
 /** The section-table entry for a track, or null (keyed track, not a section asset, table not landed). */
 export function _sectionTableFor(track) {

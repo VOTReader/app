@@ -5,7 +5,8 @@
 
 import { audioReaderLabel, isSongKey } from '../audio-track.js';
 import { songTrack } from '../song-catalog.js';
-import { relabelSections } from '../section-labels.js';
+import { neutralSections, relabelSections } from '../section-labels.js';
+import { audioSyncSectionsSettled } from '../sync-loaders.js';
 import {
   _alternates,
   _assetUrlFor,
@@ -172,7 +173,11 @@ export function syncedSections(raw) {
  * @returns {Track[]}
  */
 export function sectionTracks(volKey, collectionLabel) {
-  return (sectionsFor(volKey) || []).map((s) => ({
+  const secs = sectionsFor(volKey) || [];
+  // A track's title is copied into the queue and the saved snapshot, so while the timings are on their way it is
+  // the file's name only, never a hand range they will correct; sections.js puts the synced one in when they land.
+  const shown = _g().AUDIO_SYNC_SECTIONS || audioSyncSectionsSettled() ? secs : neutralSections(secs);
+  return shown.map((s) => ({
     key: null,
     title: s[0] || '',
     sub: collectionLabel || null,

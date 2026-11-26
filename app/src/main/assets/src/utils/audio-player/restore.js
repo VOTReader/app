@@ -8,7 +8,7 @@ import {
   playbackTracks,
   _renditionByReader,
   renditionsFor,
-  sectionsFor,
+  sectionTracks,
   _slicePartHorizon,
   _songTracks,
 } from './catalog.js';
@@ -24,10 +24,10 @@ import {
   _setPendingRestore,
   _setSource,
   _state,
-  trackUrl,
 } from './core.js';
 import { getPreciseTime, _markPaused, _startAt } from './engine.js';
 import { _offlineNotice, _unreachable } from './offline.js';
+import { _watchSectionTitles } from './sections.js';
 import { _persist, _setLastPersistSec } from './persist.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
@@ -234,8 +234,7 @@ async function _rebuild() {
     queue = _songTracks(songQueue(r));
   } else if (r.mode === 'section') {
     // Forward-only horizon: rebuild only from the section the listener chose.
-    const sections = (sectionsFor(r.volKey) || []).slice(r.startIndex || 0);
-    queue = sections.map((s) => ({ key: null, title: s[0] || '', sub: r.label, url: trackUrl(s[1]), readerCode: s[2] || '', partLabel: null }));
+    queue = sectionTracks(r.volKey, r.label).slice(r.startIndex || 0);
   } else if (_isBibleVol(r.volKey)) {
     // Bible editions have no COL_BY_KEY registry — canonical book order ships
     // in the manifest bundle as BIBLE_AUDIO_BOOKS [[id, title], …]. Queue
@@ -326,6 +325,7 @@ async function _rebuild() {
     ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, one: !!r.one, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids, wrap: !!r.wrap, swaps: r.swaps || null, down: r.down || null }
     : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null, portion: !!r.portion });
   _state.queue = queue;
+  _watchSectionTitles();
   _state.qi = qi;
   // The snapshot's own clock is authoritative here — it is the freshest thing
   // known about this exact track — so the boot restore does NOT consult the

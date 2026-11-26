@@ -40,6 +40,7 @@ import { _seekOnMetadata, _start, _startAt } from './engine.js';
 import { _syncMediaSessionActions } from './media-session.js';
 import { _offlineNotice, _offlineRefuses } from './offline.js';
 import { _persist, _rememberOutgoingPosition, _resumeAt, _setLastPersistSec } from './persist.js';
+import { _watchSectionTitles } from './sections.js';
 import { playSongs } from './songs.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
@@ -292,6 +293,7 @@ export function playSection(volKey, index, collectionLabel) {
   _setSource({ mode: 'section', volKey, label: collectionLabel || null, startIndex });
   _state.queue = queue;
   _state.qi = 0;
+  _watchSectionTitles();
   _countPlay();
   // Section compilations (the 2-hour WTLB parts) are the best resume case of
   // all — same consult as every other entry point.
