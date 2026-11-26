@@ -22,6 +22,7 @@
 
 import { backupWarn } from './backup-warn.js';
 import { storeLabel } from './store-labels.js';
+import { isSkippedWithSource } from './backup-related.js';
 
 /** The reader's own calendar date, YYYY-MM-DD, for backup file names. toISOString
  *  is UTC, so an evening export in the Americas was named for tomorrow (lw1).
@@ -743,7 +744,11 @@ export function createBackupFlow(ctx) {
       const problems = [];
       if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
       if (skippedStores.length > 0) {
-        problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
+        // Review 11-26: a part skipped only because its source was is not "invalid"; it is named apart.
+        const withThem = skippedStores.filter((n) => isSkippedWithSource(n, skippedStores));
+        const invalid = skippedStores.filter((n) => withThem.indexOf(n) < 0);
+        problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${invalid.join(', ')}`
+          + (withThem.length ? `; with them: ${withThem.join(', ')}` : '') + ')');
       }
       // BAK3: the manifest's `counts` block vs what actually landed. A clean import
       // always reconciles; a mismatch means a truncated/edited backup or a partial

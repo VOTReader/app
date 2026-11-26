@@ -342,6 +342,14 @@ describe('Import (web)', () => {
     expect(lastToast()).toBe('Import complete. Reloading…');
   });
 
+  it('review 11-26: the index and stats of a journal skipped with it are named apart, not as invalid', async () => {
+    globalThis.applyV3.mockResolvedValue({ importFailures: 0, writeFailures: 0, skippedStores: ['vot-journal', 'vot-journal-index', 'vot-journal-stats'], countMismatches: [] });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(lastToast()).toBe('Restored, with gaps: 3 sections skipped (invalid: vot-journal; with them: vot-journal-index, vot-journal-stats). Reloading…');
+  });
+
   it('problems get reading time before the reload', async () => {
     globalThis.applyV3.mockResolvedValue({ importFailures: 2, writeFailures: 0, skippedStores: ['vot-links'], countMismatches: ['vot-notes'] });
     bridge.pickImportFile.mockResolvedValue(await votbakFile());

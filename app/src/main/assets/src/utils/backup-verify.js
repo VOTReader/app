@@ -14,6 +14,7 @@
 import { formatBytes } from './format-bytes.js';
 import { countStoreRecords, readsStoresBlock } from './backup.js';
 import { validateStorePayload } from './import-validators.js';
+import { storesSkippedWith, isSkippedWithSource } from './backup-related.js';
 
 /**
  * Summarize a backup manifest (v3) or whole payload (legacy v1/v2 — same
@@ -75,6 +76,8 @@ export function summarizeBackupManifest(manifest) {
   if (readsStoresBlock(manifest)) {
     /** @type {Record<string, any>} */ const block = isMap(manifest.stores) ? manifest.stores : {};
     for (const k of Object.keys(block)) if (validateStorePayload(k, block[k]).length) skippedStores.add(k);
+    // As the restore: a part computed from a skipped part is skipped with it (backup-related.js).
+    for (const k of storesSkippedWith([...skippedStores], (n) => n in block)) skippedStores.add(k);
     stores = block;
   } else if (exportVersion === 1 || exportVersion === 2) {
     // The restore's V1 fallback (applyImportPayload): a v1 file, or a v2 file with no stores block, is
@@ -94,6 +97,8 @@ export function summarizeBackupManifest(manifest) {
         else if (v && typeof v === 'object') fromData[k] = v;
       }
     }
+    // As the restore's V1 fallback: a part computed from a skipped or unparsed part is skipped with it.
+    for (const k of storesSkippedWith([...skippedStores], (n) => n in fromData)) { skippedStores.add(k); delete fromData[k]; }
     stores = fromData;
   }
   // Otherwise a v3 manifest without its stores block: applyV3 restores `manifest.stores || {}`, which writes no
@@ -352,7 +357,9 @@ const ROW_STORES = ['vot-notes', 'vot-annotations', 'vot-journal', 'vot-bookmark
  */
 export function describeSkipped(s) {
   const kinds = (Array.isArray(s.skipped) ? s.skipped : []).filter((k) => SKIPPED_WORDS[k]).map((k) => SKIPPED_WORDS[k]);
-  const others = (Array.isArray(s.skippedStores) ? s.skippedStores : []).filter((k) => ROW_STORES.indexOf(k) < 0).length;
+  // A part skipped only because its source was (a skipped journal's index and stats) is part of that kind's row.
+  const all = Array.isArray(s.skippedStores) ? s.skippedStores : [];
+  const others = all.filter((k) => ROW_STORES.indexOf(k) < 0 && !isSkippedWithSource(k, all)).length;
   if (others) kinds.push(others === 1 ? '1 other part' : others + ' other parts');
   if (!kinds.length) return '';
   return 'WARNING: this app can\'t read some of this backup, so a restore will skip its ' + kinds.join(', ')

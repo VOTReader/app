@@ -26,6 +26,7 @@ import { validateV3MediaMetadata } from './import-validators.js';
 import { applyBackupMeta, readBackupMeta } from './song-votes-backup.js';
 import { backupWarn } from './backup-warn.js';
 import { BACKUP_LOCK } from './backup-lock.js';
+import { storesSkippedWith } from './backup-related.js';
 
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
@@ -564,7 +565,9 @@ function _dropDraftsOf(name) {
 /**
  * Apply a v2-shape `stores` object to the IDB-backed stores + flags: SKIP any
  * section that fails shape validation (so a corrupt section can't overwrite good
- * data), call the store's import method otherwise, set/clear each flag. Returns
+ * data), and any section computed from a skipped one (backup-related.js: a skipped
+ * journal keeps its index and stats too), call the store's import method otherwise,
+ * set/clear each flag. Returns
  * the failure tallies for the caller to fold into its running totals (its media
  * step also contributes to importFailures).
  * @param {Record<string, any>} storesObj
@@ -577,14 +580,23 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
   let importFailures = 0;
   /** @type {string[]} */
   const skippedStores = [];
+  /** @type {string[]} */
+  const invalid = [];
   for (const name of Object.keys(storesMap)) {
     if (!(name in storesObj)) continue;
     const violations = validateStorePayload(name, storesObj[name]);
     if (violations.length) {
-      skippedStores.push(name);
+      invalid.push(name);
       backupWarn('skipping store with invalid payload:', name, violations);
-      continue;
     }
+  }
+  // Review 11-26: a part computed from a skipped part's records goes with it, or it would describe records that
+  // never landed (only ever fewer writes: each one is a part that passed its own check, now not written).
+  const withThem = storesSkippedWith(invalid, (name) => name in storesObj && name in storesMap);
+  if (withThem.length) backupWarn('skipping stores computed from a skipped store:', withThem);
+  for (const name of Object.keys(storesMap)) {
+    if (!(name in storesObj)) continue;
+    if (invalid.indexOf(name) >= 0 || withThem.indexOf(name) >= 0) { skippedStores.push(name); continue; }
     const { store, method } = storesMap[name];
     try { _restoreStore(store, method, storesObj[name]); _dropDraftsOf(name); }
     catch (e) { importFailures += 1; backupWarn('store import failed for', name, e); }
@@ -740,21 +752,34 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
   } else {
     // V1 fallback: parse each LS-shape value in `data` and call the
     // store's replaceAll/setAll/set with the parsed object.
+    // Review 11-26: first find every store this file carries but will not write (refused by the shape check, or a
+    // string that does not parse), so a store computed from one of them is skipped with it.
+    /** @type {string[]} */ const invalid = [];
+    /** @type {string[]} */ const unparsed = [];
+    /** @type {Record<string, any>} */ const objs = {};
     for (const name of Object.keys(storesMap)) {
       const raw = parsed && parsed.data && parsed.data[name];
       if (typeof raw !== 'string') continue;
+      let obj;
+      try { obj = JSON.parse(raw); } catch (e) { importFailures += 1; unparsed.push(name); backupWarn('V1 import parse failed for', name, e); continue; }
+      const violations = validateStorePayload(name, obj);
+      if (violations.length) {
+        invalid.push(name);
+        backupWarn('skipping V1 store with invalid payload:', name, violations);
+        continue;
+      }
+      objs[name] = obj;
+    }
+    const withThem = storesSkippedWith(invalid.concat(unparsed), (name) => name in objs);
+    if (withThem.length) backupWarn('skipping V1 stores computed from a skipped store:', withThem);
+    for (const name of Object.keys(storesMap)) {
+      if (invalid.indexOf(name) >= 0 || withThem.indexOf(name) >= 0) { skippedStores.push(name); continue; }
+      if (!(name in objs)) continue;
       try {
-        const obj = JSON.parse(raw);
-        const violations = validateStorePayload(name, obj);
-        if (violations.length) {
-          skippedStores.push(name);
-          backupWarn('skipping V1 store with invalid payload:', name, violations);
-          continue;
-        }
         const { store, method } = storesMap[name];
-        _restoreStore(store, method, obj);
+        _restoreStore(store, method, objs[name]);
         _dropDraftsOf(name);
-      } catch (e) { importFailures += 1; backupWarn('V1 import parse failed for', name, e); }
+      } catch (e) { importFailures += 1; backupWarn('V1 import failed for', name, e); }
     }
     for (const name of Object.keys(flagMap)) {
       if (parsed && parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
