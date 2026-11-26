@@ -13,6 +13,7 @@ import * as AudioCoverage from '../../utils/audio-coverage.js';
 import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import { AudioLibraryStore } from '../../stores/audio-library-store.js';
+import { resetSyncLoadersForTests } from '../../utils/sync-loaders.js';
 
 /** The bits of HTMLAudioElement the player touches (audio-player.test.js pattern). */
 class FakeAudio extends EventTarget {
@@ -172,6 +173,24 @@ describe('AudioCollectionScreen -- a VOT collection', () => {
       expect(screen.getByRole('button', { name: 'Remove Letter A from Saved' }).getAttribute('aria-pressed')).toBe('true');
       AudioLibraryStore.toggleSaved({ url: URL_OF('idA'), key: 'one:letter-a', title: 'Letter A' });
     } finally { delete globalThis.AudioLibraryStore; }
+  });
+});
+
+/* r3 review: the screen's compilation chips go through useSyncedSections (AudioCollectionScreen.jsx), so while the
+   timings are on their way a chip shows its file's name only, never the hand range they will correct. Rendering the
+   raw sectionsFor list fails this. */
+describe('AudioCollectionScreen -- compilations while the timings load', () => {
+  afterEach(() => { resetSyncLoadersForTests(); delete globalThis.__makeLazyLoader; });
+
+  it('names each compilation without its hand range until the timings land', () => {
+    globalThis.__makeLazyLoader = vi.fn((name, path) => ({
+      name, path, load: () => new Promise(() => {}),
+      corpus: { loaded: false, error: false, subscribe: () => () => {}, getVersion: () => 0 },
+    }));
+    renderScreen('one');
+    expect(screen.getByRole('button', { name: /^Part 1/ }).textContent).not.toContain('1-2');
+    expect(document.body.textContent).not.toContain('Part 1 · 1-2');
+    expect(document.body.textContent).toContain('Part 2');
   });
 });
 

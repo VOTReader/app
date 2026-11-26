@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { render, cleanup, act } from '@testing-library/react';
-import { useSyncedSections } from './AudioPlayButton.jsx';
+import { useSyncedSections, AudioSectionChips } from './AudioPlayButton.jsx';
 import { resetSyncLoadersForTests, audioSyncSectionsSettled } from '../../utils/sync-loaders.js';
 import { neutralSections } from '../../utils/section-labels.js';
 
@@ -93,6 +93,17 @@ describe('useSyncedSections: no chip flash while the timings load', () => {
       render(<Chips />);
       expect(chips()).toEqual(['Section 1 · Intro–28', 'Section 2 · 29–56']);
     } finally { delete globalThis.__votCorpus; }
+  });
+
+  // r3 review: the real chip component, so passing its sections straight through (no useSyncedSections) fails here.
+  it('AudioSectionChips renders the waiting names, and plays the file it names', () => {
+    installFactory();
+    const onPlay = vi.fn();
+    const { container, getByRole } = render(<AudioSectionChips sections={SECS} onPlay={onPlay} />);
+    expect(container.textContent).toContain('Section 2');
+    expect(container.textContent).not.toContain('29–56');
+    act(() => { getByRole('button', { name: /Section 2/ }).click(); });
+    expect(onPlay).toHaveBeenCalledWith(1);
   });
 
   it('neutralSections keeps the name and the rest of each row', () => {
