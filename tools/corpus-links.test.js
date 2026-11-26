@@ -255,7 +255,7 @@ describe('corpus-links models the app', () => {
   it('the lookups the walk mirrors are still the ones the readers run', () => {
     // If one of these moves, re-read its new code and bring corpus-links.js in step.
     const pins = [
-      ['hooks/use-tap-through.js', 'const dest = resolveVotLetter(target.collection, target.letterTitle);\n    if (!dest) return;'],
+      ['hooks/use-tap-through.js', 'let dest = resolveVotLetter(target.collection, target.letterTitle);\n    if (!dest) return;'],
       ['ui/components/Segments.jsx', 'if (seg.link && onInAppLink) {'],
       ['ui/components/FootnoteSheet.jsx', 'nkjv?.[fn.ref] || lookupVersesFromBooks(fn.ref) || null'],
       ['ui/screens/LetterView.jsx', 'const baked = letter.nkjv && letter.nkjv[scripRef];'],
