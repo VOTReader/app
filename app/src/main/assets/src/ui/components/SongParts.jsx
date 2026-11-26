@@ -33,6 +33,8 @@ import { showToast } from '../../utils/toast.js';
  * @param {unknown} value @returns {string}
  */
 export function songClock(value) {
+  // Fix list 46: no length in the catalog prints nothing ('Collection · 0:00' read as a song of no length).
+  if (!(Number(value) > 0)) return '';
   const total = Math.max(0, Math.round(Number(value) || 0));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
