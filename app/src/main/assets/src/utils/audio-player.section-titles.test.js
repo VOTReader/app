@@ -112,6 +112,26 @@ describe('the player names a compilation by what it reads', () => {
     expect(titles()).toEqual(['Section 2 · 31–58']);
   });
 
+  it('played from Downloads (key \'\') before the timings land: the synced range once they do', () => {
+    installFactory();
+    AudioPlayer.playTrack({ key: '', title: 'Section 2', url: trackUrl(A2), sub: null, readerCode: '', partLabel: null });
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual([null]);
+    expect(titles()).toEqual(['Section 2']);
+    globalThis.AUDIO_SYNC_SECTIONS = TABLE;
+    loader.corpus.land();
+    expect(titles()).toEqual(['Section 2 · 31–58']);
+  });
+
+  it('added to an idle queue, or inserted as it comes (key \'\'), takes the synced range too', () => {
+    installFactory();
+    expect(AudioPlayer.addToQueue({ key: '', title: 'Section 1', url: trackUrl(A1) })).toBe(true);
+    expect(AudioPlayer.insertUpcoming(1, { key: '', title: 'Section 2', url: trackUrl(A2) })).toBe(true);
+    expect(titles()).toEqual(['Section 1', 'Section 2']);
+    globalThis.AUDIO_SYNC_SECTIONS = TABLE;
+    loader.corpus.land();
+    expect(titles()).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
+  });
+
   it('when the timings fail to load, the hand label comes back', () => {
     installFactory();
     AudioPlayer.playSection('wtlb2', 0, 'Words To Live By: Part Two');

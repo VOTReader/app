@@ -366,6 +366,7 @@ export function playTrack(track) {
   _setSource({ mode: 'custom', volKey: '', label: normalized.sub });
   _state.queue = [normalized];
   _state.qi = 0;
+  _watchTitlesFor(_state.queue);
   _countPlay();
   // What makes every unresolvable Listening Library row still pick up where the
   // reader left off instead of restarting from zero.
@@ -556,8 +557,16 @@ function _continues() {
 }
 
 /** @param {Track[]} queue @param {boolean} [ends] the listener cleared what was next: the run ends after this track */
+/* A compilation track (no key) can reach the queue by playTrack (Downloads, the shelves) or a queue edit as well as
+   by playSection; each one follows the timings for its title, or the name it was queued with stays all session. */
+/** @param {readonly any[]} queue @returns {void} */
+function _watchTitlesFor(queue) {
+  if (queue.some((t) => t && !t.key)) _watchSectionTitles();
+}
+
 function _commitQueueEdit(queue, ends = false) {
   _state.queue = queue;
+  _watchTitlesFor(queue);
   const current = queue[_state.qi];
   // An edited SONGS queue stays a songs descriptor — its explicit ids, in the
   // edited order — never a `custom` queue: a custom queue persists every track
@@ -690,6 +699,7 @@ function _enqueue(tracks, where) {
     _setSource({ mode: 'custom', volKey: '', label: list[0].sub });
     _state.queue = list;
     _state.qi = 0;
+    _watchTitlesFor(list);
     _countPlay();
     _startAt(_resumeAt);
     return true;
