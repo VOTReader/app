@@ -48,7 +48,6 @@ import { bookTitle, runName } from '../data/plan-catalog.js';
 import { runStatus } from '../data/plan-engine.js';
 import { beginPlanSession, setPlanSessionHost, refOf, notePlanSessionPlace, sessionOpenKey } from '../utils/plan-session.js';
 import { openPlanNav, keepPlanNav, planNavOnScreen } from '../utils/plan-nav.js';
-import { suppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { removeHistoryRow } from '../utils/history-undo.js';
 import { writePlanNote } from './screens/PlansHub.jsx';
 import { AudioPlayer } from '../utils/audio-player.js';
@@ -72,7 +71,7 @@ import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
-import { bibleChapterEdges } from '../hooks/use-reading-chain-nav.js';
+import { bibleChapterEdges } from '../utils/bible-chapter-edges.js';
 import { openYourData } from '../utils/your-data-link.js';
 import { readKind, countedReads } from '../utils/read-kind.js';
 
@@ -386,7 +385,10 @@ export function buildScreenRoutes({
   const _movePlanItem = (/** @type {{ bid: string, cid: any }} */ ref) => {
     const col = _planCol(ref.bid);
     if (!col && ref.bid === 'matthew') { openPlanItem(ref); return; }
-    suppressNextHistoryPush();
+    // arch-1: bundle-b's own instance (the window global), the one useHistorySync reads. An import here bundled a
+    // second copy of use-history-sync into bundle-d whose flag nothing read, so every in-sitting move pushed a history
+    // entry (tools/check-bundle-state.js now refuses a stateful module in two bundles).
+    if (typeof suppressNextHistoryPush === 'function') suppressNextHistoryPush();
     setSurpriseAnchor(null);
     let dest;
     if (col) {
