@@ -181,6 +181,23 @@ describe('Spanish book names (Reina-Valera 1960, es1)', () => {
     expect(at('lucas')).toBe('text');   // Philemon 24
   });
 
+  it('the Reina-Valera abbreviations open their books before a chapter (i18n-text-n3)', () => {
+    const want = { 'Sant 1:5': 'james 1:5', 'Stg 1:5': 'james 1:5', 'Hch 2:38': 'acts 2:38', 'Hech 2:38': 'acts 2:38',
+      'Jue 6': 'judges 6', 'Rt 1:16': 'ruth 1:16', '1 R 18': '1kings 18', '2 Re 2': '2kings 2', '1 Cr 16': '1chronicles 16',
+      'Esd 7:10': 'ezra 7:10', 'Sal 23:1': 'psalms 23:1', 'Ecl 3:1': 'ecclesiastes 3:1', 'Cnt 2:1': 'songofsolomon 2:1',
+      'Lm 3:22': 'lamentations 3:22', 'Os 6:6': 'hosea 6:6', 'Abd 15': 'obadiah 1:15', 'Miq 6:8': 'micah 6:8',
+      'Sof 3:17': 'zephaniah 3:17', 'Zac 4:6': 'zechariah 4:6', 'Lc 2:10': 'luke 2:10', 'Luc 2:10': 'luke 2:10',
+      'Ef 2:8': 'ephesians 2:8', 'Efe 2:8': 'ephesians 2:8', 'Fil 4:13': 'philippians 4:13', 'Flp 4:13': 'philippians 4:13',
+      '1 Tes 4:16': '1thessalonians 4:16', 'Flm 6': 'philemon 1:6', 'Ap 21:4': 'revelation 21:4' };
+    for (const [q, w] of Object.entries(want)) expect([q, at(q)]).toEqual([q, w]);
+  });
+
+  it('an abbreviation alone stays a word search, and one English already owns keeps its English book', () => {
+    for (const q of ['sal', 'os', 'ap', 'fil', 'sant', 'luc']) expect([q, at(q)]).toEqual([q, 'text']);
+    expect(at('Ez 36:26')).toBe('ezra 36:26');   // English "Ez" is Ezra; RVR's Ezequiel stays "Ezeq"
+    expect(at('Mc 6:8')).toBe('micah 6:8');      // English "Mc" is Micah
+  });
+
   it('never a near miss: an English slip keeps its English book', () => {
     expect(at('judgs 3')).toBe('judges 3');       // one edit from "judas" too
     expect(at('deuter 3')).toBe('deuteronomy 3'); // two from "ester"

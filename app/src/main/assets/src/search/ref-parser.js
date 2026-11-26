@@ -114,7 +114,17 @@ export function resolveBookToken(raw) {
   // Spanish names, exact only (search-data.js BOOK_NAMES_ES, es1).
   const es = D.BOOK_NAMES_ES;
   if (es && Object.prototype.hasOwnProperty.call(es, collapsed)) return es[collapsed];
+  const esAb = D.BOOK_ABBREVS_ES;
+  if (esAb && Object.prototype.hasOwnProperty.call(esAb, collapsed)) return esAb[collapsed];
   return null;
+}
+
+/** A Reina-Valera abbreviation ("Sal", "Ap"): a book only before a chapter, alone a word search (i18n-text-n3).
+ * @param {string} attempt */
+function isSpanishAbbrev(attempt) {
+  const esAb = searchData().BOOK_ABBREVS_ES;
+  const k = foldAccents(attempt).replace(/\s+/g, '');
+  return !!esAb && Object.prototype.hasOwnProperty.call(esAb, k) && !searchData().BOOK_ABBREVS[k];
 }
 
 /**
@@ -444,7 +454,7 @@ export function parseReference(query, parseOpts) {
     const bookId = pass === 0 ? resolveBookToken(attempt) : (/^\d/.test(rest) ? nearBookToken(attempt, rest.indexOf(':') > 0) : null);
     if (!bookId) continue;
     const bookTitle = D.BOOK_DISPLAY[bookId] || bookId;
-    if (!rest && WORD_BOOK_NAMES.has(attempt)) continue;
+    if (!rest && (WORD_BOOK_NAMES.has(attempt) || isSpanishAbbrev(attempt))) continue;
     if (!rest) return { kind: 'ref-book', bookId, bookTitle };
     const rangeM = rest.match(/^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/);
     if (rangeM) {

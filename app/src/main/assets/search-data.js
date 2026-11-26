@@ -211,6 +211,18 @@ var BOOK_NAMES_ES = {
   'apocalipsis':'revelation'
 };
 
+// The Reina-Valera abbreviations (i18n-text-n3): "Sant 1:5" opened Song of Solomon by a near miss and "Hch 2:38"
+// found nothing. Exact, despaced, accents folded, and a book only before a chapter (ref-parser): "sal", "os" or
+// "ap" typed alone stays a word search. One English already owns stays English: "Ez" is Ezra (RVR's Ezequiel is
+// also "Ezeq", which resolves) and "Mc" is Micah.
+var BOOK_ABBREVS_ES = {
+  'jue':'judges','rt':'ruth','1r':'1kings','2r':'2kings','1re':'1kings','2re':'2kings',
+  '1cr':'1chronicles','2cr':'2chronicles','esd':'ezra','sal':'psalms','ecl':'ecclesiastes','cnt':'songofsolomon',
+  'lm':'lamentations','os':'hosea','abd':'obadiah','miq':'micah','sof':'zephaniah','zac':'zechariah',
+  'lc':'luke','luc':'luke','hch':'acts','hech':'acts','ef':'ephesians','efe':'ephesians','fil':'philippians','flp':'philippians',
+  '1tes':'1thessalonians','2tes':'2thessalonians','flm':'philemon','stg':'james','sant':'james','ap':'revelation'
+};
+
 // ─── Canonical display titles ───
 var BOOK_DISPLAY = {
   genesis:'Genesis',exodus:'Exodus',leviticus:'Leviticus',numbers:'Numbers',
@@ -624,6 +636,7 @@ window.VotSearchData = {
   SYNONYM_MAP: _bare(SYNONYM_MAP),   // SR4: scripture-aware synonym expansion (opt-in via settings.searchSynonyms)
   BOOK_ABBREVS: _bare(BOOK_ABBREVS),
   BOOK_NAMES_ES: _bare(BOOK_NAMES_ES),
+  BOOK_ABBREVS_ES: _bare(BOOK_ABBREVS_ES),
   BOOK_DISPLAY: _bare(BOOK_DISPLAY),
   NAMED_PASSAGES: NAMED_PASSAGES,
   NAMED_PASSAGE_INDEX: _bare(NAMED_PASSAGE_INDEX),
