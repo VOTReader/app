@@ -3133,8 +3133,9 @@
     .vot-large-text .ui-seg { display: flex; flex-wrap: wrap; }
     .vot-large-text .ui-seg-item { flex: 1 1 auto; padding: 0 10px; }
     .vot-large-text .rd-tiles, .vot-large-text .rd-tiles.is-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .vot-large-text .np-custom { flex-wrap: wrap; }
-    .vot-large-text .np-custom-label { flex-basis: 100%; }
+    /* Fix list 43: the Speed sheet's 'Fine-tune by 1 %' row stacks its label above the stepper as Your own does. */
+    .vot-large-text :is(.np-custom, .audio-speed-row) { flex-wrap: wrap; }
+    .vot-large-text :is(.np-custom-label, .audio-speed-fine) { flex-basis: 100%; }
     .vot-large-text .listen-continue-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
     .vot-large-text input { text-overflow: ellipsis; }
     .vot-large-text .note-row-source-line { flex-wrap: wrap; row-gap: 2px; }
