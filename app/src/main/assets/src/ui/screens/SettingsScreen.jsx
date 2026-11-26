@@ -442,6 +442,11 @@ function growthLine(samples) {
 export function BackupCounts({ s, here = null }) {
   const keys = [['Notes', 'notes'], ['Highlights', 'highlights'], ['Journal entries', 'journal'], ['Bookmarks', 'bookmarks'], ['Photos and recordings', 'mediaCount']];
   if (s.annotatedPassages) keys.splice(2, 0, ['Annotated passages', 'annotatedPassages']);
+  // data-7: the other kinds a restore overwrites, each when the file or this phone holds any (a plans-and-progress
+  // backup read as zeros, and 627 read marks on this phone never showed beside a file with none).
+  for (const kk of /** @type {Array<[string, string]>} */ ([['Links', 'links'], ['Notebooks', 'notebooks'], ['Reading plans', 'plans'], ['Marked read', 'readMarks']])) {
+    if (Number(s[kk[1]] || 0) || (here && Number(here[kk[1]] || 0))) keys.splice(keys.length - 1, 0, kk);
+  }
   const n = (/** @type {any} */ v) => Number(v || 0).toLocaleString('en-US');
   // data-2: the restore confirm shows this phone beside the file, so a reader sees what goes.
   return (

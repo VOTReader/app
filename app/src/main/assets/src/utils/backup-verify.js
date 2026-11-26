@@ -43,7 +43,8 @@ import { countStoreRecords } from './backup.js';
  *   records: number, storeCount: number,
  *   mediaCount: number, mediaBytes: number,
  *   notes: number, highlights: number, annotatedPassages: number,
- *   journal: number, bookmarks: number
+ *   journal: number, bookmarks: number,
+ *   links: number, plans: number, notebooks: number, readMarks: number
  * }}
  */
 export function summarizeBackupManifest(manifest) {
@@ -87,6 +88,14 @@ export function summarizeBackupManifest(manifest) {
       for (const list of Object.values(ann)) if (Array.isArray(list)) highlights += list.length;
     }
   }
+  // data-7: read marks live in vot-state's readItems, inside the one record the store rule counts for the
+  // whole state; only a file that carries its stores can say how many (a counts-only file reads 0).
+  let readMarks = 0;
+  if (stores) {
+    const st = stores['vot-state'];
+    const items = st && typeof st === 'object' && !Array.isArray(st) ? st.readItems : null;
+    if (items && typeof items === 'object' && !Array.isArray(items)) readMarks = Object.keys(items).length;
+  }
   return {
     date: (manifest && typeof manifest.exportDate === 'string') ? manifest.exportDate : null,
     records,
@@ -98,6 +107,11 @@ export function summarizeBackupManifest(manifest) {
     annotatedPassages: stores ? 0 : pick('vot-annotations'),
     journal: pick('vot-journal'),
     bookmarks: pick('vot-bookmarks'),
+    // data-7: a backup of plans, links and progress read as four zeros.
+    links: pick('vot-links'),
+    plans: pick('vot-reading-plans'),
+    notebooks: pick('vot-notebooks') + pick('vot-journal-notebooks'),
+    readMarks,
   };
 }
 
@@ -145,6 +159,11 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
   }
   if (s.journal) parts.push(s.journal + (s.journal === 1 ? ' journal entry' : ' journal entries'));
   if (s.bookmarks) parts.push(s.bookmarks + (s.bookmarks === 1 ? ' bookmark' : ' bookmarks'));
+  // data-7: the line named only the four kinds above, so a plans-and-progress backup's warning line named nothing.
+  if (s.links) parts.push(s.links + (s.links === 1 ? ' link' : ' links'));
+  if (s.notebooks) parts.push(s.notebooks + (s.notebooks === 1 ? ' notebook' : ' notebooks'));
+  if (s.plans) parts.push(s.plans + (s.plans === 1 ? ' reading plan' : ' reading plans'));
+  if (s.readMarks) parts.push(s.readMarks + (s.readMarks === 1 ? ' place marked read' : ' places marked read'));
   const detail = parts.length ? parts.join(', ') + ' — ' : '';
   const plural = s.mediaCount === 1 ? '' : 's';
   let mediaBit = '';

@@ -1067,4 +1067,20 @@ describe('data-2: before an import writes, the library is kept; the sheet shows 
     expect(details.here).toMatchObject({ notes: 3, bookmarks: 1, mediaCount: 2 });
     expect(details.summary).toMatchObject({ highlights: 0, mediaCount: 0 });
   });
+
+  it('data-7: this phone\'s links, plans, notebooks and read marks are counted beside the file too', async () => {
+    const disk = {
+      'vot-links': [{ id: 'l1' }, { id: 'l2' }],
+      'vot-reading-plans': [{ id: 'p1' }],
+      'vot-journal-notebooks': { list: [{ id: 'j1' }] },
+      'vot-state': { readItems: { 'v1:genesis:1': 1, 'v1:john:3': 1, 'v1:psalms:23': 1 }, settings: {} },
+    };
+    put('IDBAdapter', { get: async (name) => disk[name] });
+    put('JournalMediaStore', { allIds: async () => [] });
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    const details = ctx.confirmImport.mock.calls[0][1];
+    expect(details.here).toMatchObject({ links: 2, plans: 1, notebooks: 1, readMarks: 3 });
+  });
 });

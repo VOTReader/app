@@ -311,7 +311,7 @@ describe('Verify counts the journal a real export carries', () => {
     const s = summarizeBackupManifest(read.manifest);
     expect(s.journal).toBe(5);
     const r = formatVerifyReport(s, read.integrity, 'v3');
-    expect(r.message).toContain('2 notes, 5 journal entries, 1 bookmark — ');
+    expect(r.message).toContain('2 notes, 5 journal entries, 1 bookmark, 2 notebooks — ');   // data-7: notebooks named too
     // 5 entries + 2 journal notebooks + 2 notes + 1 bookmark.
     expect(r.message).toContain('10 records across 4 data stores');
   });
@@ -395,5 +395,76 @@ describe('Verify counts the highlights a real export carries', () => {
     expect(many.message).not.toContain('highlight');
     const one = formatVerifyReport(summarizeBackupManifest({ counts: { 'vot-annotations': 1 } }), 'absent', 'v3');
     expect(one.message).toContain(': 1 annotated passage — ');
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   data-7 (audit 2026-11-23): links, reading plans, notebooks and read marks.
+   A restore overwrites them too, but the summary counted four kinds, so a
+   backup of plans and progress read as four zeros on the restore sheet and in
+   Verify, and its warning line named none of what it held.
+   ───────────────────────────────────────────────────────────────────────── */
+describe('summarizeBackupManifest: the kinds past the first four (data-7)', () => {
+  const doc = {
+    exportDate: '2026-11-20T10:00:00.000Z',
+    stores: {
+      'vot-links': [{ id: 'l1' }, { id: 'l2' }],
+      'vot-reading-plans': [{ id: 'p1' }],
+      'vot-notebooks': { list: [{ id: 'nb1' }, { id: 'nb2' }] },
+      'vot-journal-notebooks': { list: [{ id: 'jnb1' }] },
+      'vot-state': { readItems: { 'v1:genesis:1': 1, 'v1:genesis:2': 1, 'v1:exodus:1': 1 }, settings: {} },
+    },
+  };
+
+  it('counts them from the stores the file carries', () => {
+    const s = summarizeBackupManifest(doc);
+    expect([s.links, s.plans, s.notebooks, s.readMarks]).toEqual([2, 1, 3, 3]);
+  });
+
+  it('the Verify line names them', () => {
+    const r = formatVerifyReport(summarizeBackupManifest(doc), 'mismatch', 'v3');
+    expect(r.message).toContain(': 2 links, 3 notebooks, 1 reading plan, 3 places marked read — ');
+    const one = formatVerifyReport(summarizeBackupManifest({ stores: { 'vot-links': [{ id: 'l' }], 'vot-state': { readItems: { 'v1:john:3': 1 } } } }), 'ok', 'v3');
+    expect(one.message).toContain(': 1 link, 1 place marked read — ');
+  });
+
+  it('a counts-only file still names links, plans and notebooks; read marks need the stores', () => {
+    const s = summarizeBackupManifest({ counts: { 'vot-links': 4, 'vot-reading-plans': 2, 'vot-notebooks': 1, 'vot-state': 1 } });
+    expect([s.links, s.plans, s.notebooks, s.readMarks]).toEqual([4, 2, 1, 0]);
+  });
+
+  it('an old backup without those sections reads 0 for each, and odd shapes do not throw', () => {
+    const old = summarizeBackupManifest({ exportVersion: 2, data: {}, stores: { 'vot-notes': { g1: { groupId: 'g1' } } } });
+    expect([old.notes, old.links, old.plans, old.notebooks, old.readMarks]).toEqual([1, 0, 0, 0, 0]);
+    const odd = summarizeBackupManifest({ stores: { 'vot-state': { readItems: ['x'] }, 'vot-links': 'junk', 'vot-notebooks': null } });
+    expect([odd.links, odd.notebooks, odd.readMarks]).toEqual([1, 0, 0]);   // a scalar store is one record by the store rule
+    expect(summarizeBackupManifest({ stores: { 'vot-state': null } }).readMarks).toBe(0);
+    expect(summarizeBackupManifest({ stores: { 'vot-state': 'x' } }).readMarks).toBe(0);
+    expect(formatVerifyReport(old, 'ok', 'v3').message).toContain(': 1 note — ');
+  });
+
+  it('a real export: read marks across several books verify as one each, though the state is one record', async () => {
+    const readItems = {};
+    for (const [book, n] of /** @type {Array<[string, number]>} */ ([['genesis', 50], ['psalms', 23], ['john', 21], ['revelation', 3]])) {
+      for (let c = 1; c <= n; c += 1) readItems['v1:' + book + ':' + c] = 1764158400000;
+    }
+    const saved = { 'vot-state': { readItems, settings: { theme: 'dark' } }, 'vot-links': [{ id: 'l1', created: 1 }] };
+    const built = await buildV3Manifest({
+      storesMap: Object.fromEntries(Object.keys(saved).map((k) => [k, { store: {}, method: k === 'vot-state' ? 'set' : 'replaceAll' }])),
+      flagMap: {},
+      idbAdapter: { get: async (name) => saved[name] },
+      mediaStore: { allIds: async () => [], get: async () => null },
+      storageEstimate: async () => ({ quota: null, usage: null }),
+      nowIso: () => '2026-11-26T12:00:00.000Z',
+    });
+    if (!built.ok) throw new Error('export failed');
+    const chunks = [];
+    await writeContainer(built.manifest, built.mediaEntries, (u8) => { chunks.push(u8.slice()); });
+    const read = await readContainer(new Blob(chunks));
+    const s = summarizeBackupManifest(read.manifest);
+    expect(s.readMarks).toBe(97);
+    expect(s.links).toBe(1);
+    const r = formatVerifyReport(s, read.integrity, 'v3');
+    expect(r.message).toContain(': 1 link, 97 places marked read — ');
   });
 });
