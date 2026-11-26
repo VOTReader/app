@@ -8556,6 +8556,10 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
 .ans-ts2 .ans-tablets{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row}
 .ans-ts2 .ans-tablet{flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;min-height:56px} /* justify: A25 */
 .ans-ts2 .ans-tablet .ans-num{flex:0 0 max(40px,2.4em);font-size:min(var(--fs-18),7vw)} /* r2: 2.4em holds "VIII" (about 2em), so every label starts on one line */
+/* large-text-n4: the row wraps; the name keeps half of it and "2 topics ›" goes under it at the right (it ran 69 px past the card at 300%) */
+.ans-ts2 .ans-tablet{flex-wrap:wrap}
+.ans-ts2 .ans-tablet .ans-row-title{flex:1 1 0;min-width:50%}
+.ans-ts2 .ans-tablet .ans-row-sub{margin-left:auto}
 
 /* Desktop. The rail shows at 1024 and up only (A13) */
 .ans-rail{display:none}
