@@ -3233,6 +3233,10 @@
     .ui-empty { display: flex; flex-direction: column; align-items: center; padding: 64px var(--gutter) 0; text-align: center; } #dl-tabpanel > .ui-empty { padding-top: 44px; }
     .ui-empty .ui-btn { max-width: 100%; height: auto; min-height: var(--btn-h); white-space: normal; }
     .library-root .ui-row-title, .library-root .ui-row-meta { white-space: normal; }
+    /* Settings' first screen, like the Library's: a group's name and its line wrap at their spaces instead of ending in an
+       ellipsis. "A Return to The Garden" was cut from 130 % on a 360 px phone and "Install VOTReader" from 160 %; at
+       100 % every name still fits on one line, so nothing moves there. */
+    .ws1-settings.is-root :is(.ui-row-title, .ui-row-meta) { white-space: normal; overflow-wrap: break-word; }
     .library-root .ui-row-text { min-width: 50%; }
     .library-root .ui-row-value { white-space: normal; text-align: right; }
     /* Fix list 20 (Listen's share): Saved's and Letter voice's subtitles and Downloads' 'Voice to download' were cut
