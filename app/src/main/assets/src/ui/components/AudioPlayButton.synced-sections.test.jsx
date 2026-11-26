@@ -53,6 +53,18 @@ describe('useSyncedSections: no chip flash while the timings load', () => {
     expect(chips()).toEqual(['Section 1 · Intro–28', 'Section 2 · 29–56']);
   });
 
+  // reader-behaviour-n4: once the timings land, a chip names the entries its file reads (the hook is wired to them).
+  it('once the timings land, each chip names the entries its file reads', () => {
+    const entries = [{ id: 'introduction', num: 1 }, ...Array.from({ length: 60 }, (_, i) => ({ id: 'e' + (i + 2), num: i + 2 }))];
+    globalThis.COL_BY_KEY = new Map([['wtlb2', { key: 'wtlb2' }]]);
+    globalThis.colLetterArr = () => entries;
+    globalThis.AUDIO_SYNC_SECTIONS = { a1: { 'wtlb2:introduction': 1, 'wtlb2:e30': 1 }, a2: { 'wtlb2:e31': 1, 'wtlb2:e58': 1 } };
+    try {
+      render(<Chips />);
+      expect(chips()).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
+    } finally { delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; }
+  });
+
   it('neutralSections keeps the name and the rest of each row', () => {
     expect(neutralSections(SECS)).toEqual([['Section 1', 'a1', 'r'], ['Section 2', 'a2', 'r']]);
   });
