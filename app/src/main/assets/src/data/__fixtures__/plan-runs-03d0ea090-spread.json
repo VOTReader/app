@@ -1,0 +1,414 @@
+{
+ "from": "03d0ea090's plan-engine.js (newRun, tickItem, catchUp, pauseRun, resumeRun), serialized",
+ "now": "2026-12-10T21:00:00",
+ "runs": [
+  {
+   "id": "sp-schedule",
+   "plan": "custom",
+   "created": 1795705200000,
+   "updated": 1796436000000,
+   "start": "2026-11-26",
+   "status": "running",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "ruth:1",
+       "w": 600
+      },
+      {
+       "k": "ruth:2",
+       "w": 600
+      },
+      {
+       "k": "ruth:3",
+       "w": 600
+      },
+      {
+       "k": "ruth:4",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      4
+     ],
+     "days": 24,
+     "even": true
+    }
+   ],
+   "target": "2026-12-19",
+   "ticks": {
+    "ruth:1": "2026-11-28",
+    "ruth:2": "2026-12-04"
+   },
+   "pauses": [],
+   "pace": {
+    "mode": "days",
+    "n": 24
+   },
+   "name": "ruth"
+  },
+  {
+   "id": "sp-eager",
+   "plan": "custom",
+   "created": 1795705200000,
+   "updated": 1796263200000,
+   "start": "2026-11-26",
+   "status": "finished",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "jonah:1",
+       "w": 600
+      },
+      {
+       "k": "jonah:2",
+       "w": 600
+      },
+      {
+       "k": "jonah:3",
+       "w": 600
+      },
+      {
+       "k": "jonah:4",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      4
+     ],
+     "days": 30,
+     "even": true
+    }
+   ],
+   "target": "2026-12-25",
+   "ticks": {
+    "jonah:1": "2026-11-26",
+    "jonah:2": "2026-11-28",
+    "jonah:3": "2026-11-30",
+    "jonah:4": "2026-12-02"
+   },
+   "pauses": [],
+   "pace": {
+    "mode": "days",
+    "n": 30
+   },
+   "name": "jonah",
+   "finished": "2026-12-02",
+   "seen": false
+  },
+  {
+   "id": "sp-late",
+   "plan": "custom",
+   "created": 1795705200000,
+   "updated": 1796695200000,
+   "start": "2026-11-26",
+   "status": "finished",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "james:1",
+       "w": 600
+      },
+      {
+       "k": "james:2",
+       "w": 600
+      },
+      {
+       "k": "james:3",
+       "w": 600
+      },
+      {
+       "k": "james:4",
+       "w": 600
+      },
+      {
+       "k": "james:5",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      5
+     ],
+     "days": 30,
+     "even": true
+    }
+   ],
+   "target": "2026-12-25",
+   "ticks": {
+    "james:1": "2026-11-27",
+    "james:2": "2026-11-27",
+    "james:3": "2026-12-05",
+    "james:4": "2026-12-05",
+    "james:5": "2026-12-07"
+   },
+   "pauses": [],
+   "pace": {
+    "mode": "days",
+    "n": 30
+   },
+   "name": "james",
+   "finished": "2026-12-07",
+   "seen": false
+  },
+  {
+   "id": "sp-weekdays",
+   "plan": "custom",
+   "created": 1795705200000,
+   "updated": 1796745600000,
+   "start": "2026-11-26",
+   "status": "running",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "titus:1",
+       "w": 600
+      },
+      {
+       "k": "titus:2",
+       "w": 600
+      },
+      {
+       "k": "titus:3",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      3
+     ],
+     "days": 20,
+     "even": true
+    }
+   ],
+   "target": "2026-12-22",
+   "ticks": {
+    "titus:1": "2026-11-26"
+   },
+   "pauses": [],
+   "pace": {
+    "mode": "days",
+    "n": 20
+   },
+   "name": "titus"
+  },
+  {
+   "id": "sp-paused",
+   "plan": "custom",
+   "created": 1795705200000,
+   "updated": 1796227200000,
+   "start": "2026-11-26",
+   "status": "running",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "jude:1",
+       "w": 600
+      },
+      {
+       "k": "jude:2",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      2
+     ],
+     "days": 20,
+     "even": true
+    }
+   ],
+   "target": "2026-12-18",
+   "ticks": {},
+   "pauses": [
+    [
+     "2026-11-29",
+     "2026-12-01"
+    ]
+   ],
+   "pace": {
+    "mode": "days",
+    "n": 20
+   },
+   "name": "jude"
+  },
+  {
+   "id": "pre-scattered",
+   "plan": "custom",
+   "created": 1793545200000,
+   "updated": 1796781600000,
+   "start": "2026-11-01",
+   "status": "running",
+   "tracks": [
+    {
+     "kind": "bible",
+     "by": "count",
+     "items": [
+      {
+       "k": "mark:1",
+       "w": 600
+      },
+      {
+       "k": "mark:2",
+       "w": 600
+      },
+      {
+       "k": "mark:3",
+       "w": 600
+      },
+      {
+       "k": "mark:4",
+       "w": 600
+      },
+      {
+       "k": "mark:5",
+       "w": 600
+      },
+      {
+       "k": "mark:6",
+       "w": 600
+      }
+     ]
+    }
+   ],
+   "share": "side",
+   "weekdays": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "segs": [
+    {
+     "day0": 0,
+     "from": [
+      0
+     ],
+     "to": [
+      6
+     ],
+     "days": 50
+    }
+   ],
+   "target": "2026-12-20",
+   "ticks": {
+    "mark:1": "2026-11-05",
+    "mark:2": "2026-11-13",
+    "mark:3": "2026-11-21",
+    "mark:4": "2026-11-30",
+    "mark:5": "2026-12-08"
+   },
+   "pauses": [],
+   "pace": {
+    "mode": "days",
+    "n": 50
+   },
+   "name": "mark"
+  }
+ ]
+}
