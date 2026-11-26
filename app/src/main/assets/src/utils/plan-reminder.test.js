@@ -1,6 +1,6 @@
 /* plan-reminder (rp-s1): the runs turned into the list PlanReminder.kt keeps, and the guarded bridge around it. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { newRun, tickItem, pauseRun, resumeRun } from '../data/plan-engine.js';
+import { newRun, tickItem, pauseRun, resumeRun, runStatus } from '../data/plan-engine.js';
 import {
   supported, isReminderTime, lastActive, doneToday, reminderPayload, restDates, syncPlanReminders, reminderStatus,
   askForReminders, openReminderSettings, onReminderOpen, _resetForTests,
@@ -191,5 +191,16 @@ describe('a spread-out plan\'s empty days (the reminder said "ready" while the c
     expect(restDates(run, at('2026-11-28'))).toEqual([]);
     expect('rest' in reminderPayload([run], at('2026-11-28')).plans[0]).toBe(false);
     expect('rest' in reminderPayload([{ ...run3({ id: 'g' }), remind: '07:30' }], at('2026-11-26')).plans[0]).toBe(false);
+  });
+  it('a long wait (2 chapters over 30 days, 14 rest days): a list sent days later still names the rest days since the read', () => {
+    // Day 8 (Dec 3) holds chapter 1, day 23 (Dec 18) chapter 2: Dec 4 to Dec 17 have nothing to read.
+    const run = { ...newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2].map((c) => ({ k: 'phm:' + c, w: 600 })) }], pace: { mode: 'days', n: 30 } }, at('2026-11-26')), id: 'p', remind: '07:30' };
+    const read = tickItem(run, 'phm:1', '2026-12-03', 1);
+    expect(runStatus(read, at('2026-12-09')).spreadOn).toBe('2026-12-18');
+    const p = reminderPayload([read], at('2026-12-09')).plans[0];
+    expect(p.active).toBe('2026-12-03');
+    expect(p.rest[0]).toBe('2026-12-04');
+    expect(p.rest.length).toBe(14);
+    expect(p.rest[p.rest.length - 1]).toBe('2026-12-17');
   });
 });

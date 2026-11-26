@@ -99,11 +99,13 @@ object PlanReminderLogic {
 
     /**
      * Whether [plan] has gone quiet by [day]: untouched for more than [QUIET_AFTER_DAYS] days. [setOn] (the day the
-     * page last sent the list) stands in for a missing `active`.
+     * page last sent the list) stands in for a missing `active`. A spread-out plan's rest days (nothing to read, no
+     * reminder) are not untouched days: a long wait for the next reading never makes the plan go quiet.
      */
     fun isQuiet(plan: Plan, day: LocalDate, setOn: LocalDate?): Boolean {
         val since = plan.active ?: setOn ?: return false
-        return ChronoUnit.DAYS.between(since, day) > QUIET_AFTER_DAYS
+        val rested = plan.rest.count { it.isAfter(since) && !it.isAfter(day) }
+        return ChronoUnit.DAYS.between(since, day) - rested > QUIET_AFTER_DAYS
     }
 
     /** Whether [plan] wants a reminder on [day]: a reading day, not done, not a rest day, not gone quiet. */

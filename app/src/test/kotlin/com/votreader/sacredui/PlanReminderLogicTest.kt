@@ -118,6 +118,14 @@ class PlanReminderLogicTest {
         // No active date: the day the list came stands in.
         assertTrue(PlanReminderLogic.isQuiet(plan(active = null), fri, fri.minusDays(8)))
         assertFalse(PlanReminderLogic.isQuiet(plan(active = null), fri, null))
+        // A spread-out plan waiting 14 rest days for its next reading is not untouched on those days: still asked on
+        // its reading day, quiet only after 7 days that had a reading due and went unread.
+        val rests = (1L..14L).map { fri.plusDays(it) }.toSet()
+        val waiting = plan(active = fri).copy(rest = rests)
+        assertFalse(PlanReminderLogic.isQuiet(waiting, fri.plusDays(15), fri))
+        assertFalse(PlanReminderLogic.isQuiet(waiting, fri.plusDays(21), fri))
+        assertTrue(PlanReminderLogic.isQuiet(waiting, fri.plusDays(22), fri))
+        assertEquals(emptyList(), PlanReminderLogic.quiet(listOf(waiting), fri.plusDays(15), fri))
         // A day the plan does not read is not listed as quiet (nothing would have reminded anyway).
         val sunOnly = listOf(true, false, false, false, false, false, false)
         assertEquals(emptyList(), PlanReminderLogic.quiet(listOf(plan(active = fri.minusDays(30), weekdays = sunOnly)), fri, fri))

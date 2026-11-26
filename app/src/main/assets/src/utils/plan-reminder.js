@@ -71,18 +71,25 @@ export function doneToday(run, now) {
 }
 
 /**
- * The reading days from today on that a spread-out plan gives nothing to read: its empty days before the next reading
- * (the Today card's "Nothing to read today"), at most 14. The page sends them because the native side decides the days
- * ahead from the list alone; the next sync (a tick, a boot) sends the ones after. [] for every other plan.
+ * The reading days that a spread-out plan gives nothing to read: its empty days before the next reading (the Today
+ * card's "Nothing to read today"), from the day after the plan was last touched (`active`), at most 31 (the native
+ * side's cap), the days from today on first. The native side decides the days ahead from the list alone, and counts
+ * a plan's quiet days without the rest days since `active`; the next sync (a tick, a boot) sends the ones after.
+ * [] for every other plan, and for a reader behind the plan (who gets the next reading today).
  * @param {RemindRun} run @param {Date} now @returns {string[]}
  */
 export function restDates(run, now) {
   const st = runStatus(run, now);
   const due = dayNum(st.spreadOn);
   if (due == null) return [];
-  const out = [];
-  for (let n = /** @type {number} */ (dayNum(todayKey(now))) + (st.doneToday ? 1 : 0); n < due && out.length < 14; n++) if (isReadingDay(run, n)) out.push(dateOf(n));
-  return out;
+  const todayN = /** @type {number} */ (dayNum(todayKey(now)));
+  const from = todayN + (st.doneToday ? 1 : 0);
+  const ahead = [], past = [];
+  for (let n = from; n < due && ahead.length < 31; n++) if (isReadingDay(run, n)) ahead.push(dateOf(n));
+  // Before today: every reading day since the plan was last touched waited for the same reading.
+  const sinceN = dayNum(lastActive(run));
+  if (sinceN != null) for (let n = from - 1; n > sinceN && ahead.length + past.length < 31; n--) if (isReadingDay(run, n)) past.unshift(dateOf(n));
+  return [...past, ...ahead];
 }
 
 /**
