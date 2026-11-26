@@ -5495,6 +5495,12 @@
     /* a destroying confirm: red words on the plain inset button (mock .btn.in.red), not a red fill */
     .ui-sheet-foot .ui-btn.is-danger.is-primary { background: var(--surface-2); color: var(--tone-danger); font-weight: 500; }
     .ui-sheet-foot .ui-btn.is-danger.is-primary svg { color: var(--tone-danger); }
+    /* At large text a nowrap label sets its grid column's minimum: "Restore and overwrite" (345 px at 30 px) pushed
+       the restore confirm's second button past the screen's right edge. The two buttons stack, and a label still
+       too wide wraps at its spaces in a px inline padding (as #54's Safari buttons), so the words get the width. */
+    .vot-large-text .ui-sheet-foot { grid-template-columns: minmax(0, 1fr); }
+    .vot-large-text .ui-sheet-foot > .ui-btn { min-width: 0; height: auto; white-space: normal; text-align: center; padding: 6px 12px; border-radius: var(--r-card); }
+    .vot-large-text .ui-sheet-foot > span:empty { display: none; }   /* the Verify sheet's stand-in for a missing Restore it */
     /* the ⋯ dropdown (MoreMenu.jsx) on the tokens: a surface card with no outline, worded rows in the UI
        face with a gold icon, inset hairlines; its steppers and segments are surface pills, the chosen one soft gold */
     .more-menu { padding: 6px 0; background: var(--surface-1); color: var(--text-1); border: 0; border-radius: var(--r-card); box-shadow: var(--shadow-float); font-family: var(--font-ui); }
