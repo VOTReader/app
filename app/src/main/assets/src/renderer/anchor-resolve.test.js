@@ -108,7 +108,9 @@ describe('resolveAnchor — tier 3: punctuation-insensitive', () => {
     expect(exact.exact).toBe(true);
     // a tie keeps the earlier occurrence, as before
     expect(resolveAnchor('ab  ab', { start: 2, end: 2, text: 'ab' }).start).toBe(0);
-    expect(resolveAnchor('xab ab', { start: 2, end: 9, text: 'ab' }).start).toBe(1);
+    expect(resolveAnchor('ab x ab', { start: 2, end: 9, text: 'ab' }).start).toBe(0);
+    // i18n-text-n1: the nearer 'ab' inside 'xab' is no word, so the farther standalone one wins
+    expect(resolveAnchor('xab ab', { start: 2, end: 9, text: 'ab' }).start).toBe(4);
   });
 });
 

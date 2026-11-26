@@ -39,6 +39,8 @@
      3. LOOSE    search again ignoring case, punctuation and whitespace
                  runs — this is what absorbs a translation's comma and
                  quote differences — then map back to raw offsets.
+     Tiers 2 and 3 accept only an occurrence on word boundaries
+     (i18n-text-n1): "the" never lands inside "there".
 
    No tier matches ⇒ return null: the wording genuinely differs (the YLT
    case) and there is nothing honest to paint. The caller SKIPS that mark
@@ -50,6 +52,8 @@
    whatever is on screen would corrupt the original anchor — and the
    reader's own data is the one thing this app must not lose.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { isLetterOrDigit } from './word-char.js';
 
 /**
  * Fold text for the LOOSE tier: lowercase, drop punctuation that varies
@@ -89,16 +93,36 @@ function fold(src) {
  * one and a far occurrence is never missed (mw14 refuter: a scan capped at 64
  * occurrences missed a later, nearer one).
  * @param {string} hay @param {string} needle @param {number} target
+ * @param {(at: number) => boolean} [ok] skip an occurrence this refuses (the word-boundary test)
  * @returns {number}
  */
-function nearestIndex(hay, needle, target) {
+function nearestIndex(hay, needle, target, ok) {
   if (!needle) return -1;
   var t = Math.max(0, Math.min(target, hay.length));
   var after = hay.indexOf(needle, t);
+  while (after >= 0 && ok && !ok(after)) after = hay.indexOf(needle, after + 1);
   var before = t > 0 ? hay.lastIndexOf(needle, t - 1) : -1;
+  while (before >= 0 && ok && !ok(before)) before = before > 0 ? hay.lastIndexOf(needle, before - 1) : -1;
   if (before < 0) return after;
   if (after < 0) return before;
   return t - before <= after - t ? before : after;
+}
+
+/**
+ * i18n-text-n1: a re-anchored mark must sit on whole words, so a stored "the" never paints inside "there" and a cut
+ * "l" never paints inside "should". A side is held to the boundary only when the stored text begins (or ends) with a
+ * letter or digit there; a mark that starts or ends on punctuation is free on that side.
+ * @param {string} text @param {string} stored
+ * @returns {(rawStart: number, rawEnd: number) => boolean}
+ */
+function wordBounded(text, stored) {
+  var checkLeft = isLetterOrDigit(stored.charAt(0));
+  var checkRight = isLetterOrDigit(stored.charAt(stored.length - 1));
+  return function (rawStart, rawEnd) {
+    if (checkLeft && rawStart > 0 && isLetterOrDigit(text.charAt(rawStart - 1))) return false;
+    if (checkRight && rawEnd < text.length && isLetterOrDigit(text.charAt(rawEnd))) return false;
+    return true;
+  };
 }
 
 /**
@@ -124,7 +148,8 @@ export function resolveAnchor(text, ann) {
   if (!stored) return s < e ? { start: s, end: e, exact: false } : null;
 
   // Tier 2 — exact search.
-  var at = nearestIndex(text, stored, s);
+  var bounded = wordBounded(text, stored);
+  var at = nearestIndex(text, stored, s, function (i) { return bounded(i, i + stored.length); });
   if (at >= 0) return { start: at, end: at + stored.length, exact: true };
 
   // Tier 3 — punctuation/case/whitespace-insensitive search.
@@ -136,10 +161,13 @@ export function resolveAnchor(text, ann) {
   // mw14: that sent the mark to the first occurrence).
   var foldedTarget = ft.map.length;
   for (var m = 0; m < ft.map.length; m++) { if (ft.map[m] >= s) { foldedTarget = m; break; } }
-  var f = nearestIndex(ft.folded, fs.folded, foldedTarget);
+  var fLen = fs.folded.length;
+  var f = nearestIndex(ft.folded, fs.folded, foldedTarget, function (i) {
+    return i + fLen - 1 < ft.map.length && bounded(ft.map[i], ft.map[i + fLen - 1] + 1);
+  });
   if (f < 0) return null;
   var rawStart = ft.map[f];
-  var lastIdx = f + fs.folded.length - 1;
+  var lastIdx = f + fLen - 1;
   if (rawStart == null || lastIdx >= ft.map.length) return null;
   var rawEnd = ft.map[lastIdx] + 1;
   if (!(rawStart < rawEnd)) return null;

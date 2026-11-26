@@ -13,7 +13,8 @@
    - falls back to the container's end when endPos is past the text.
    ═══════════════════════════════════════════════════════════════════════ */
 
-var WORD = /[\w’'-]/;
+import { isWordChar } from './word-char.js';
+
 var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
 // Block-level tags that break the reading flow: the slide stops at one.
 var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
@@ -33,7 +34,7 @@ export function insertIconAt(container, endPos, skipRx, icon) {
   function isSkip(/** @type {any} */ el) {
     return el && el.nodeType === 1 && el.className && skipRx.test(el.className);
   }
-  function isPhraseChar(/** @type {string} */ c) { return !!c && (WORD.test(c) || CLOSE_PUNCT.test(c)); }
+  function isPhraseChar(/** @type {string} */ c) { return !!c && (isWordChar(c) || CLOSE_PUNCT.test(c)); }
   function place(/** @type {Node | null} */ before) {
     if (before && before.parentNode) before.parentNode.insertBefore(icon, before);
     else container.appendChild(icon);

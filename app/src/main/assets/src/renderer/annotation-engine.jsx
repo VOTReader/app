@@ -32,6 +32,7 @@
    CROSS-cluster dep here is still a bare global by design; this one is
    internal to the renderer, so it stays a real import. */
 import { resolveAnchor } from './anchor-resolve.js';
+import { isWordChar } from './word-char.js';
 import { chromeAwareView, viewIndexOf } from './anchor-view.js';
 import { makeIconButton, iconButtonProps, iconPoint } from './icon-button.js';
 import { annVisible, annAbove } from './mark-overlap.js';
@@ -66,11 +67,11 @@ export function snapRangeToWords(text, start, end, boundaries) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
-  // A2: word chars include BOTH apostrophes (U+2019 + ASCII ') — both appear in
-  // the corpus ("don't"/"don’t") — plus the hyphen (last in the class = literal)
-  // so hyphenates ("self-control") stay whole. Everything else (space, comma,
-  // colon, period, emoji…) is a boundary the trim strips from the two ends.
-  const isWord = (c) => !!c && /[\w’'-]/.test(c);
+  // A2 + heart-1: word chars are letters in any script with their accents, digits,
+  // BOTH apostrophes ("don't"/"don’t") and the hyphen ("self-control") — see
+  // word-char.js. Everything else (space, comma, colon, period, superscript verse
+  // number, emoji…) is a boundary the trim strips from the two ends.
+  const isWord = isWordChar;
   const atBoundary = (i) => !!boundaries && boundaries.has(i);
   // START: walk left out of a partial word (but never across a line break), then
   // trim leading non-word chars so the mark begins on a letter.
@@ -413,7 +414,6 @@ export const HighlightableText = React.memo(/** @param {{ text: string, hlKey: s
     });
   }
   // Mid-word boundary detection.
-  const isWordChar = (c) => !!c && /[\w’'-]/.test(c);
   segments.forEach((seg, idx) => {
     if (idx < segments.length - 1) {
       const lastCh = text[seg.end - 1];
@@ -854,7 +854,7 @@ export function applyDOMHighlights() {
         var fullText = container.textContent;
         var lastCh = fullText.charAt(ann.end - 1);
         var nextCh = fullText.charAt(ann.end);
-        if (lastCh && nextCh && /[\w’'-]/.test(lastCh) && /[\w’'-]/.test(nextCh)) {
+        if (isWordChar(lastCh) && isWordChar(nextCh)) {
           lastMark.setAttribute('data-no-break-after', '1');
         }
       }
