@@ -278,6 +278,24 @@ describe('notebook drill', () => {
     expect(screen.getByPlaceholderText('Search notebooks…')).toBeTruthy();
   });
 
+  // r3 review: a search that matches nothing said "No notebooks yet." even with notebooks there, and "uncat" (the
+  // bucket's old name, and its id) did not find Not in a notebook.
+  it('a search that matches nothing says so, and "uncat" still finds Not in a notebook', () => {
+    window.NoteStore = { list: () => [] };
+    for (const list of [[{ id: 'nb1', name: 'Prayers' }], []]) {
+      window.NotebookStore = { list: () => list };
+      mountSheet();
+      fireEvent.click(screen.getByText('Notebook'));
+      const box = screen.getByPlaceholderText('Search notebooks…');
+      fireEvent.change(box, { target: { value: 'zzz' } });
+      expect(screen.getByText('No notebooks match.')).toBeTruthy();
+      expect(screen.queryByText('No notebooks yet.')).toBeNull();
+      fireEvent.change(box, { target: { value: 'uncat' } });
+      expect(screen.getByText('Not in a notebook')).toBeTruthy();
+      cleanup();
+    }
+  });
+
   // Sweep W69: every notebook row re-listed (and re-sorted) every note to count its own.
   it('counts each notebook from one note list per render, a repeated id once', () => {
     let lists = 0;

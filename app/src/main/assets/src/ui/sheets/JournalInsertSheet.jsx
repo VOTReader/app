@@ -363,13 +363,14 @@ export function JournalInsertSheet(props) {
     var noteCount = function(nbId) { return nbId === 'uncategorized' ? uncategorized : (counts.get(nbId) || 0); };
     var rows = [{ id: 'uncategorized', name: NOT_IN_A_NOTEBOOK }].concat(nbs);
     var q = foldLower(query.trim());
-    if (q) rows = rows.filter(function(nb) { return foldLower(nb.name || '').indexOf(q) >= 0; });
+    // The unfiled bucket also answers to its id ("uncategorized", its name until product-8), so "uncat" finds it.
+    if (q) rows = rows.filter(function(nb) { return foldLower(nb.name || '').indexOf(q) >= 0 || (nb.id === 'uncategorized' && nb.id.indexOf(q) >= 0); });
     return (
       <>
         {searchPill()}
         <div className="jrn-picker-results">
           {rows.length === 0
-            ? <div className="jrn-picker-empty">{nbs.length === 0 ? 'No notebooks yet.' : 'No matches.'}</div>
+            ? <div className="jrn-picker-empty">No notebooks match.</div>
             : rows.map(function(nb) {
                 var cnt = noteCount(nb.id);
                 return (

@@ -124,7 +124,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
               return (
                 <ConfirmStrip
                   key={nb.id}
-                  question={`Delete “${nb.name}”? Its notes stay, in ${NOT_IN_A_NOTEBOOK}.`}
+                  question={`Delete “${nb.name}”? Its notes stay. Those in no other notebook go to ${NOT_IN_A_NOTEBOOK}.`}
                   onCancel={() => setConfirmDeleteNb(null)}
                   onConfirm={() => deleteNb(nb.id)}
                 />

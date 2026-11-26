@@ -160,7 +160,8 @@ describe('NotebookPickerSheet — the unfiled bucket says Not in a notebook', ()
     render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);
     expect(screen.getByText('Not in a notebook')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Delete notebook Prayers'));
-    expect(screen.getByText(/Delete “Prayers”\? Its notes stay, in Not in a notebook\./)).toBeTruthy();
+    // r3 review: a note can be in several notebooks (notebookIds), so only those in no other one go to Not in a notebook.
+    expect(screen.getByText('Delete “Prayers”? Its notes stay. Those in no other notebook go to Not in a notebook.')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/Uncategorized/);
   });
 });

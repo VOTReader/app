@@ -10,6 +10,7 @@ import { passageSourceFor } from '../../utils/passage-copy.js';
 import { sharedText, canSwapLink } from '../../utils/share-ending.js';
 import { relativeDate } from '../../utils/dates.js';
 import { UiIcon } from '../components/UiIcon.jsx';
+import { NOT_IN_A_NOTEBOOK } from '../../data/notebook-label.js';
 import {
   readNoteDraft, writeNoteDraft, clearNoteDraft, noteDraftRecoverable, clearNoteDraftWhenSaved, NOTE_DRAFT_DELAY_MS,
 } from '../../utils/note-draft.js';
@@ -277,7 +278,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     </div>
   );
   const when = (note.updated || note.created) ? relativeDate(note.updated || note.created) : '';
-  const where = nbNames.length ? nbNames.join(', ') : 'Not in a notebook';
+  const where = nbNames.length ? nbNames.join(', ') : NOT_IN_A_NOTEBOOK;
 
   return (
     <div className="note-sheet-overlay" onClick={requestClose}>
