@@ -21,6 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { SongVotes } from '../../utils/song-votes.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** @param {{ filled?: boolean }} props */
 export function ThumbUpIcon({ filled = false }) {
@@ -45,7 +46,7 @@ export function ThumbDownIcon({ filled = false }) {
 /** The vote on a song, redrawn when it changes. @param {string} id @returns {number} */
 export function useSongVote(id) {
   React.useEffect(() => { void SongVotes.load(); }, []);
-  React.useSyncExternalStore(SongVotes.subscribe, SongVotes.getVersion);
+  useStoreVersion(SongVotes);
   return SongVotes.voteOf(id);
 }
 

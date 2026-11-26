@@ -32,7 +32,7 @@ export function BibleChapterView(props) {
   // book's recording is loaded, the chapter shows the recording's translation
   // (utils/audio-text-edition.js). The snapshot is a string, so the clock's
   // ticks do not re-render the chapter; only a change of recording does.
-  const recording = React.useSyncExternalStore(AudioPlayer.subscribe, () => recordingTranslationFor(AudioPlayer, book.id));
+  const recording = React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), () => recordingTranslationFor(AudioPlayer, book.id));
   // FIXC: a translation the reader picks here (the ⋯ menu's "Bible translation", which says so with
   // vot:translation-pick) is shown at once, though this book's recording is loaded or a search showed the KJV: the
   // pick did nothing while either held the page. It holds while that recording stays loaded, from chapter to chapter.

@@ -26,6 +26,7 @@ import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC } from '../../utils/aud
 import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /**
  * The Listen pill's words when a tap would resume (ra4): "Resume · N min left", N the nearest whole minute
@@ -164,7 +165,7 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className,
  */
 export function HeroListen({ onClick, canPlay, resume, here, tracks, name = '', alt }) {
   useSongsOnline();
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useStoreVersion(AudioPlayer);
   useAudioPositions();
   const st = AudioPlayer.getState();
   const isHere = !!(st && st.status !== 'idle' && here && here());

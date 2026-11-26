@@ -31,6 +31,7 @@ export { chapterTitleOf };
 import { formatClock } from './AudioSeekSlider.jsx';
 import { NextIcon } from './SongParts.jsx';
 import { UiIcon } from './UiIcon.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** @param {string | null | undefined} value @returns {string} */
 function trackLabel(value) { return value || 'Untitled recording'; }
@@ -368,7 +369,7 @@ export function UpNextSheet({ state, onClose }) {
     return () => clearTimeout(timer);
   }, [undo]);
   // The lengths are their own lazy table: asked for when the sheet opens, the rows re-render when it lands.
-  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
+  useStoreVersion(lengthsStore);
   React.useEffect(() => { void lengthsReady(); }, []);
   if (!current) return null;
   const restoring = !!state.restoring;

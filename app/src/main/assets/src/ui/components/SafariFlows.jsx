@@ -8,8 +8,10 @@
       Guides user to import data from Safari.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useStoreVersion } from '../../hooks/use-store-version.js';
+
 export function Safari7DayModal() {
-  React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+  useStoreVersion(StorageHealth);
   var report = StorageHealth.getReport();
 
   var visible = report.safariGateBlocked && !StorageHealth.isDismissed('safari-7day');

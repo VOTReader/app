@@ -13,7 +13,7 @@ import { queueTime } from '../components/PlayerSheets.jsx';
 import { lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 import { itemNoun, tracksSeconds } from './AudioCollectionScreen.jsx';
 import { ListGroup, ListRow } from '../components/UiParts.jsx';
-import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -43,7 +43,7 @@ function votAudioReady() {
  */
 export function AudioVolumesScreen({ onBack, backLabel = 'Back to Listen', onOpenCollection }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   const online = useOnline();
   const off = useOfflineAudio();
   /** Recordings of this collection on the phone (counted by letter, as the rows are). @param {string} volKey */
@@ -77,7 +77,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Back to Listen', onOpe
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
     void lengthsReady();
   }, []);
-  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
+  useStoreVersion(lengthsStore);
   useStoreVersionByName('__votCorpus');
 
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];

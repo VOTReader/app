@@ -20,6 +20,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isTranslationLoaded, translationLabel } from '../data/translations.js';
+import { useStoreVersion } from '../hooks/use-store-version.js';
 
 /** Bytes of each edition's file (src/data/bible-<code>.js); offline-editions.test.js checks them against the files. */
 export const EDITION_BYTES = {
@@ -174,7 +175,7 @@ const EDITION_FILE = /\/src\/data\/bible-[a-z]+\.js(?:$|\?)/;
  * @param {string} [translation]
  */
 export function useOfflineEditions(translation) {
-  React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
+  useStoreVersion(OfflineEditions);
   React.useEffect(() => { void OfflineEditions.check(); }, [translation]);
   React.useEffect(() => {
     /** @param {Event} e */

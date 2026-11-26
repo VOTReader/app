@@ -22,11 +22,12 @@
 import { SongKeep, formatSongBytes, IOS_TAB_TEXT } from '../../utils/song-keep.js';
 import { SongCatalog } from '../../utils/song-catalog.js';
 import { NetStatus } from '../../utils/net-status.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** Re-render on every keep change and every catalog change. @returns {typeof SongKeep} */
 export function useSongKeep() {
-  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
-  React.useSyncExternalStore(SongCatalog.subscribe, SongCatalog.getVersion);
+  useStoreVersion(SongKeep);
+  useStoreVersion(SongCatalog);
   return SongKeep;
 }
 
@@ -37,7 +38,7 @@ export function useSongKeep() {
  * @returns {boolean}
  */
 export function useSongsOnline() {
-  React.useSyncExternalStore(NetStatus.subscribe, NetStatus.getVersion);
+  useStoreVersion(NetStatus);
   return !NetStatus.isOffline();
 }
 

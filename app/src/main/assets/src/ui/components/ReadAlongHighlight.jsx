@@ -100,6 +100,7 @@ import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore, audioSync
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 import { showToast } from '../../utils/toast.js';
 import { DOUBLE_TAP_MS, MAX_TAP_DISTANCE_PX, FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 const HL_NAME = 'vot-reading';
 /** How long a deliberate user scroll suspends follow-scroll. */
@@ -887,7 +888,7 @@ export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
 export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null, textKey = '', nearIds = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
-  const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  const playerVersion = useStoreVersion(AudioPlayer);
   const key = volKey + ':' + letterId;
   const st = AudioPlayer.getState();
   const track = st.queue[st.qi];
@@ -960,9 +961,9 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // has to be a render input (the c36 lesson): one number folded from both
   // stores, carried into the frags memo deps below. Subscribed HERE, above the
   // two loader effects, because those effects depend on it — see read-along-5.
-  const bibleVersion = React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
-  const letterVersion = React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
-  const sectionsVersion = React.useSyncExternalStore(audioSyncSectionsStore.subscribe, audioSyncSectionsStore.getVersion);
+  const bibleVersion = useStoreVersion(bibleSyncStore);
+  const letterVersion = useStoreVersion(audioSyncStore);
+  const sectionsVersion = useStoreVersion(audioSyncSectionsStore);
   const corpusVersion = bibleVersion + letterVersion + sectionsVersion;
 
   const needBibleSync = !!chapter && loaded && readAlongOn;

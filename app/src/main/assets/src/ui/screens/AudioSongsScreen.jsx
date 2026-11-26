@@ -400,7 +400,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
     React.useCallback((cb) => library && typeof library.subscribe === 'function' ? library.subscribe(cb) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
-  React.useSyncExternalStore(AudioPlayer.subscribe, playerMark);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), playerMark);
   // sy4-3: the All-time loved shelf reads the daily tallies.
   const vstore = votes();
   React.useSyncExternalStore(

@@ -21,6 +21,7 @@ import { resolveBibleAudio } from '../../utils/audio-track.js';
 import { segmentsDomPieces } from '../../utils/segment-dom-text.js';
 import { audioSyncStore, audioSyncSectionsStore, bibleSyncStore, loadAudioSync, loadBibleSync } from '../../utils/sync-loaders.js';
 import { fragmentAt, liveBibleFragments, liveFragments } from './ReadAlongHighlight.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** How many clauses before the one being read may share the card. */
 const LEAD_CLAUSES = 2;
@@ -340,9 +341,9 @@ function bibleCorpusVersion() {
  */
 export function LiveLine({ track, time, title, onOpen }) {
   // The timings are their own lazy files: asked for when the card shows, and the card re-renders when they land.
-  React.useSyncExternalStore(audioSyncStore.subscribe, audioSyncStore.getVersion);
-  React.useSyncExternalStore(audioSyncSectionsStore.subscribe, audioSyncSectionsStore.getVersion);
-  React.useSyncExternalStore(bibleSyncStore.subscribe, bibleSyncStore.getVersion);
+  useStoreVersion(audioSyncStore);
+  useStoreVersion(audioSyncSectionsStore);
+  useStoreVersion(bibleSyncStore);
   const keyed = !!(track && track.key);
   const bible = keyed && AudioPlayer.bibleChapterOfTrack(track) > 0;
   const bibleEd = bible ? resolveBibleAudio({ track }).paint : null;

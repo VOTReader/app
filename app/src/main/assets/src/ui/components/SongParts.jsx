@@ -27,6 +27,7 @@ import { ActionSheet } from './SelectField.jsx';
 import { UiIcon } from './UiIcon.jsx';
 import { AUDIO_TOAST_ID } from '../../utils/audio-player.js';
 import { showToast } from '../../utils/toast.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -166,7 +167,7 @@ export function SongPlayButton({ playing, label, onClick, className = '', disabl
  */
 export function SongListRow({ song, title, line = '', versions = 0, onVersions, len = '', current = false, playing = false, onPlay, children = null }) {
   // Each row hears the keep store and Saved itself: the letter card and the hub draw rows without subscribing to them.
-  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  useStoreVersion(SongKeep);
   const library = songLibrary();
   React.useSyncExternalStore(
     React.useCallback((cb) => (library && typeof library.subscribe === 'function' ? library.subscribe(cb) : () => {}), [library]),
@@ -227,7 +228,7 @@ function songLibrary() {
  */
 export function SongMenuSheet({ song, title, line = '', onOpenPage, onClose }) {
   const id = String(song.id);
-  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  useStoreVersion(SongKeep);
   // With no signal a song that is not on the phone cannot play: it is not lined up either (its row's play is off).
   const canPlay = useSongsOnline() || SongKeep.isKept(id);
   const vote = useSongVote(id);

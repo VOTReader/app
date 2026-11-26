@@ -43,11 +43,12 @@
  * @returns {StorageInfo}
  */
 import { StorageHealth } from '../utils/storage-health.js';
+import { useStoreVersion } from './use-store-version.js';
 
 export function useStorageInfo() {
   const [persistDenied, setPersistDenied] = React.useState(false);
 
-  React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+  useStoreVersion(StorageHealth);
   const report = StorageHealth.getReport();
 
   const status = report.lastAssessedAt === 0

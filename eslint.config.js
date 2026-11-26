@@ -123,6 +123,15 @@ export default [
         { name: 'cancelIdleCallback', message: 'Use the cancel function onIdle() returns; it knows which API it scheduled with.' },
       ],
 
+      /* hooks-2 (audit 2026-11-23). React.useSyncExternalStore(X.subscribe, ...) hands React the bare function:
+         a store whose subscribe uses `this` then subscribes nothing (in the sloppy-mode bundles `this` is window)
+         and the screen silently stops updating. Pass useStoreVersion(X) from hooks/use-store-version.js, or a
+         wrapper: React.useCallback((cb) => X.subscribe(cb), []). */
+      'no-restricted-syntax': ['error',
+        { selector: "CallExpression[callee.property.name='useSyncExternalStore'][arguments.0.type='MemberExpression']", message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js) or React.useCallback((cb) => X.subscribe(cb), []).' },
+        { selector: "CallExpression[callee.name='useSyncExternalStore'][arguments.0.type='MemberExpression']", message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js) or React.useCallback((cb) => X.subscribe(cb), []).' },
+      ],
+
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of
       // them (rules-of-hooks, exhaustive-deps) are the canonical pair every

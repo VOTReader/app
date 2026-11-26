@@ -25,6 +25,7 @@ import * as ReactDOM from 'react-dom';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES } from '../../utils/audio-track.js';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -98,7 +99,7 @@ let library;
 
 /** What AudioPlayerBar mounts in production: a live subscription + getState(). */
 function ManagerHarness({ onClose }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useStoreVersion(AudioPlayer);
   return <AudioManagerSheet open state={AudioPlayer.getState()} onClose={onClose} />;
 }
 

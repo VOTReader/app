@@ -63,7 +63,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   // Not the 1 Hz clock: nothing here draws it (s18.3).
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   useAudioPositions();
   // The VOT registry and manifest are lazy, and a row REBUILDS its collection around itself rather than playing alone
   // (2026-08-10), which it can only do once those have landed. This screen is reachable directly (a restored tab).

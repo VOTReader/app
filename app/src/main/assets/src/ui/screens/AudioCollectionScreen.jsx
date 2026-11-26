@@ -30,7 +30,7 @@ import { chapterTitleOf } from '../components/AudioShelf.jsx';
 import { formatClock } from '../components/AudioSeekSlider.jsx';
 import { queueTime } from '../components/PlayerSheets.jsx';
 import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
-import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -137,10 +137,10 @@ export function recordingsLine(col, items, playable, preface) {
  */
 export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Listen', onOpenText }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   useAudioPositions();
   // Recording lengths (U04.1) ride a lazy file: paint again when it lands.
-  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
+  useStoreVersion(lengthsStore);
   React.useEffect(() => { void lengthsReady(); }, []);
 
   const bible = isBibleVol(volKey);

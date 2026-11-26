@@ -77,7 +77,7 @@ function studyRowTitle(study) {
 
 export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpenStudy, onReadStudy }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   // The recordings ride the lazy VOT corpus (the manifest) and the studies are
   // their own lazy file: warm both, and re-render as each lands.
   React.useEffect(() => {

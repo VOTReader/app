@@ -42,13 +42,14 @@ import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
 import { ListGroup, ListLink } from './UiParts.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
 
 /** Subscribe to the catalog and ask for it once (the pill self-hides until it lands); answers the catalog's version. @param {boolean} want @returns {number} */
 function useSongCatalog(want) {
-  const ver = React.useSyncExternalStore(SongCatalog.subscribe, SongCatalog.getVersion);
+  const ver = useStoreVersion(SongCatalog);
   React.useEffect(() => {
     if (want && !SongCatalog.loaded && !SongCatalog.error) void SongCatalog.load();
   }, [want]);
@@ -75,8 +76,8 @@ const PAUSE = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><p
  * @param {{ volKey: string, letter: { id: string, title?: string }, collectionLabel: string | null, showSongs?: boolean }} props
  */
 export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = true }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
-  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  useStoreVersion(AudioPlayer);
+  useStoreVersion(SongKeep);
   useAudioPositions();
   const online = useSongsOnline();
   const letterKey = volKey + ':' + letter.id;
@@ -186,7 +187,7 @@ export function offlineLine(listenOff, singOff) {
  */
 export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = true, unit = 'letter' }) {
   // The card draws no clock: getShape skips the 1 Hz ticks that getVersion counts.
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   const letterKey = volKey + ':' + letterId;
   const songs = useLettersSongs(showSongs, letterKey);
   if (!songs.length) return null;

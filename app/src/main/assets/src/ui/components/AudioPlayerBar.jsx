@@ -35,6 +35,7 @@ import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { useStillLoading } from './AudioPlayButton.jsx';
 import { formatClock as fmt } from './AudioSeekSlider.jsx';
 import { onFullPlayerRequest, playerFailLine } from './player-open.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /**
  * Offline, the player plays a unit of the queue when some reading of it is on the phone (playableNow, the rule its
@@ -227,12 +228,12 @@ function FinishedBar({ fin, barRef }) {
 }
 
 export function AudioPlayerBar({ hidden = false } = {}) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useStoreVersion(AudioPlayer);
   // The song skin says "Not on this phone" the moment the signal goes (and stops when it returns): the player only
   // re-renders the bar on its own events, so the bar listens for online/offline itself. It also re-reads the keep
   // store, so a song kept while it plays stops saying so.
   const online = useSongsOnline();
-  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  useStoreVersion(SongKeep);
   const st = AudioPlayer.getState();
   const open = st.status !== 'idle';
   // The end of the order (player brief 3g "Ended"): the bar stays 10 s as Finished, with Replay. It never vanishes silently.

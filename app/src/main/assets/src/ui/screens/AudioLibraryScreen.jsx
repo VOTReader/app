@@ -28,7 +28,7 @@ import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { remainingLabel, relativePlayedAt } from '../components/AudioShelf.jsx';
 import { requestFullPlayer, playerFailLine } from '../components/player-open.js';
-import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
@@ -146,7 +146,7 @@ function minutesLeft(state) {
 
 /** The Continue listening card's progress line: the one part that moves every second, so the one that re-renders. */
 function ContinueProgress() {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useStoreVersion(AudioPlayer);
   const state = AudioPlayer.getState();
   const pct = state.duration ? Math.min(100, Math.max(0, (state.time / state.duration) * 100)) : 0;
   return (
@@ -204,7 +204,7 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   // Not the 1 Hz clock: only the card's progress line draws it, and it subscribes on its own (s18.3).
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   useAudioPositions();
 
   // The VOT registry and manifest are lazy. Warming them here lets the rows name real available recordings

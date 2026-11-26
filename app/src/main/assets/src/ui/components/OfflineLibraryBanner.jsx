@@ -21,6 +21,7 @@
 
 import { OfflineLibrary } from '../../utils/offline-library.js';
 import { Notice } from './UiParts.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /**
  * A strip under the top nav takes layout room while it shows: it declares body.offline-strip-open and its measured
@@ -60,7 +61,7 @@ export function offlineLibraryWords(phase, missing) {
 
 /** The Settings line, with Retry while files are missing. */
 export function OfflineLibraryStatus() {
-  React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
+  useStoreVersion(OfflineLibrary);
   React.useEffect(() => { OfflineLibrary.start(); }, []);
   const { phase, missing } = OfflineLibrary.getState();
   const retry = phase === 'incomplete' || phase === 'still' || phase === 'dismissed';
@@ -74,13 +75,13 @@ export function OfflineLibraryStatus() {
 
 /** FSET (st-data2): "Ready" as a pill at the Settings row's right, once every book is kept. */
 export function OfflineLibraryReady() {
-  React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
+  useStoreVersion(OfflineLibrary);
   const { phase } = OfflineLibrary.getState();
   return phase === 'complete' || phase === 'fixed' ? <span className="ws3-pill is-ready">Ready</span> : null;
 }
 
 export function OfflineLibraryBanner() {
-  React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
+  useStoreVersion(OfflineLibrary);
   React.useEffect(() => { OfflineLibrary.start(); }, []);
   const { phase, missing } = OfflineLibrary.getState();
 

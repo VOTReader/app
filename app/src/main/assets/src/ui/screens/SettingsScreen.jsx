@@ -23,7 +23,7 @@ import { ActionSheet, SelectSheet } from '../components/SelectField.jsx';
 import { SettingsNavRow, SettingsStepRow, SetRowText, DataRow, RadioRows } from '../components/SettingsRow.jsx';
 import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
 import { InstallRow } from '../components/InstallCard.jsx';
-import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
 
 /* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
 const GROUP_TITLES = {
@@ -748,7 +748,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   const matthewVer = useStoreVersionByName('__matthewCorpus');
   // U09.2: the Bible Translation value says "· NKJV until it downloads" while that is what the Bible shows. The
   // Editions row beside it reads the caches; this only re-renders when it does.
-  React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
+  useStoreVersion(OfflineEditions);
   const [studiesTick, setStudiesTick] = React.useState(0);
   useStoreVersionByName('ReadingStatsStore');
   const [openSections, setOpenSections] = React.useState(new Set());

@@ -35,7 +35,7 @@ export function editionReading(edition) {
  * @param {{ onBack: () => void, backLabel?: string, onOpenEdition: (volKey: string) => void }} props
  */
 export function AudioBibleScreen({ onBack, backLabel = 'Back to Listen', onOpenEdition }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
+  React.useSyncExternalStore(React.useCallback((cb) => AudioPlayer.subscribe(cb), []), AudioPlayer.getShape);
   const editions = Object.values(BIBLE_AUDIO_EDITIONS).filter(bibleAudioOffered);
   const counted = editions.map((edition) => ({ edition, books: bibleBookCount(edition.volKey) }));
   const whole = counted.filter((e) => e.books > 1);

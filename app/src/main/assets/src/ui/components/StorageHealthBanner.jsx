@@ -29,6 +29,7 @@ import { showToast } from '../../utils/toast.js';
 import { openYourData } from '../../utils/your-data-link.js';
 import { Notice } from './UiParts.jsx';
 import { storeLabel } from '../../utils/store-labels.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** ds5 s16.1: a banner action that failed says so; the banner itself stays. Runs fn now (a throw is a rejection). */
 function _attempt(/** @type {() => any} */ fn) {
@@ -44,7 +45,7 @@ function _say(text) {
  * @returns {import('../../utils/storage-health.js').StorageHealthReport}
  */
 export function useStorageHealth() {
-  React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+  useStoreVersion(StorageHealth);
   return StorageHealth.getReport();
 }
 
