@@ -1,7 +1,7 @@
 // @ts-nocheck — a fake NetworkInformation (an EventTarget with a type) stands in for navigator.connection
 // ra6 (Corbin 2026-10-14, brief design-10): Download only on Wi-Fi, the gate the download stores share.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { canTell, downloadsWait, networkType, onGateChange, setWifiOnly, wifiOnly, _resetDownloadGate } from './download-gate.js';
+import { bulkDownloadsOk, canTell, downloadsWait, networkType, onGateChange, setWifiOnly, wifiOnly, _resetDownloadGate } from './download-gate.js';
 
 /** navigator.connection as Chrome on Android keeps it: a type, and 'change' when it moves. */
 function fakeConnection(type) {
@@ -93,5 +93,47 @@ describe('download-gate (ra6)', () => {
     window.AndroidBridge = {};
     expect(() => setWifiOnly(true)).not.toThrow();
     expect(wifiOnly()).toBe(true);
+  });
+});
+
+/* platform-2 + web-platform-n2 (audit 2026-11-23): the meaning files and the song covers came on Data Saver and
+   mobile data too. A large download nobody asked for starts only on a link the browser does not call metered. */
+describe('bulkDownloadsOk (platform-2)', () => {
+  const PIXEL = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36';
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+  const DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36';
+  it('Data Saver waits, on any link', () => {
+    define(navigator, 'connection', Object.assign(fakeConnection('wifi'), { saveData: true }));
+    expect(bulkDownloadsOk()).toBe(false);
+  });
+  it('mobile data waits; Wi-Fi and Ethernet go', () => {
+    define(navigator, 'userAgent', PIXEL);
+    define(navigator, 'connection', fakeConnection('cellular'));
+    expect(bulkDownloadsOk()).toBe(false);
+    navigator.connection.type = 'wifi';
+    expect(bulkDownloadsOk()).toBe(true);
+    navigator.connection.type = 'ethernet';
+    expect(bulkDownloadsOk()).toBe(true);
+    navigator.connection.type = 'unknown';
+    expect(bulkDownloadsOk()).toBe(false);
+  });
+  it('a desktop browser that reports no type goes; a phone that cannot tell (an iPhone) waits', () => {
+    define(navigator, 'connection', { effectiveType: '4g' });
+    define(navigator, 'userAgent', DESKTOP);
+    expect(bulkDownloadsOk()).toBe(true);
+    define(navigator, 'connection', undefined);
+    define(navigator, 'userAgent', IPHONE);
+    expect(bulkDownloadsOk()).toBe(false);
+  });
+  it('the client hint wins over the user-agent string', () => {
+    define(navigator, 'connection', undefined);
+    define(navigator, 'userAgent', DESKTOP);
+    define(navigator, 'userAgentData', { mobile: true });
+    expect(bulkDownloadsOk()).toBe(false);
+  });
+  it('the phone app goes on any link: its files are on board', () => {
+    define(navigator, 'connection', Object.assign(fakeConnection('cellular'), { saveData: true }));
+    window.AndroidBridge = {};
+    expect(bulkDownloadsOk()).toBe(true);
   });
 });

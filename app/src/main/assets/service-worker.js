@@ -1313,17 +1313,26 @@ async function networkFirstCatalog(event, warm = true) {
 /* mw16 (seam walk 2026-10-22, O2): a letter's song covers came only from the
    covers a reader had already seen online, so a letter first opened offline
    showed the plain note tile. After a fresh catalog, the 256 px cover of every
-   listed song (~2.5 KB each, ~3 MB for the catalog) is fetched into the songs
+   listed song (~8.6 KB each: 1,613 covers were 13.85 MB on 11-23, and it grows
+   with the catalog) is fetched into the songs
    bucket in the background: a pause first so a launch's own requests go
    ahead, a few at a time, only the ones the bucket lacks (covers are named by
    song id and never change), and it stops at the first network failure. One
    run at a time: a catalog that lands during a run is warmed right after it
-   (the newest one only); an interrupted run continues after the next catalog. */
+   (the newest one only); an interrupted run continues after the next catalog.
+   Never on Data Saver or mobile data (web-platform-n2, audit 2026-11-23): there
+   the covers come as the reader sees them. */
 const SONG_THUMB_WARM_DELAY_MS = 15000;
 const SONG_THUMB_WARM_AT_ONCE = 3;
 const SONG_THUMB_ID = /^[0-9a-f]{12}$/;   // audio-track.js SONG_ID: the page builds no cover URL for any other id
 let songThumbWarm = null;
 let songThumbWarmNext = null;
+
+/** Data Saver, or the browser says mobile data (Chrome gives a worker navigator.connection; elsewhere it cannot tell). */
+function meteredLink() {
+  const conn = self.navigator && /** @type {any} */ (self.navigator).connection;
+  return !!(conn && (conn.saveData || conn.type === 'cellular'));
+}
 
 function warmSongThumbs(catalogResponse) {
   songThumbWarmNext = catalogResponse;
@@ -1349,6 +1358,7 @@ async function runSongThumbWarm(catalogResponse) {
     .map((s) => new URL('/songs/thumbs/256/' + s.id + '.webp', self.location.origin).href);
   if (!urls.length) return;
   await new Promise((resolve) => setTimeout(resolve, SONG_THUMB_WARM_DELAY_MS));
+  if (meteredLink()) return;
   const cache = await caches.open(SONGS_CACHE);
   const have = new Set((await cache.keys()).map((k) => (typeof k === 'string' ? k : k.url)));
   const todo = urls.filter((u) => !have.has(u));

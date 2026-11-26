@@ -85,4 +85,20 @@ describe('warmMeaningSearch', () => {
     await vi.advanceTimersByTimeAsync(60 * 1000);
     expect(got).toEqual(['manifest.json', 'vocab.txt', 'model.onnx', 'units-1.bin']);
   });
+  /* platform-2 (audit 2026-11-23): "Data Saver on: they wait" held only for this warm-up; the same gate as the
+     launch build's (download-gate bulkDownloadsOk) now holds it on mobile data and on a phone that cannot tell. */
+  it('Data Saver, mobile data or an iPhone: no warm-up at all', async () => {
+    vi.useFakeTimers();
+    stubWorker(true);
+    for (const [conn, ua] of /** @type {Array<[any, string]>} */ ([[{ type: 'wifi', saveData: true }, 'Windows NT'], [{ type: 'cellular' }, 'Android Mobile'], [undefined, 'iPhone']])) {
+      Object.defineProperty(navigator, 'connection', { value: conn, configurable: true });
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua);
+      const got = [];
+      stubFetch(got);
+      warmMeaningSearch();
+      await vi.advanceTimersByTimeAsync(120 * 1000);
+      expect(got).toEqual([]);
+    }
+    delete /** @type {any} */ (navigator).connection;
+  });
 });

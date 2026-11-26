@@ -42,6 +42,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
 import { showToast } from './toast.js';
 import { markUpdateReload } from './update-toast.js';
 import { onIdle } from './on-idle.js';
+import { bulkDownloadsOk } from './download-gate.js';
 import { updateHolds, whenUpdateUnheld } from './update-hold.js';
 import { registeredStores } from '../stores/cached-store.js';
 
@@ -244,20 +245,20 @@ export function registerServiceWorker() {
    search (src/search/semantic.js) runs a model of ~70 MB with its runtime and passage vectors.
    On the web they come once, a minute after the app is up and the page is idle, through the
    service worker's vot-semantic-v1 cache, where they stay: Search has them offline from its
-   first use, with no setting and no account. Data Saver on: they wait until Search first needs
-   them. A file already stored is not asked for, so a later boot costs one manifest.
+   first use, with no setting and no account. On Data Saver, mobile data or a phone that cannot
+   tell (download-gate bulkDownloadsOk, platform-2 2026-11-26) neither this warm-up nor the launch
+   build's start (engine.js startMeaningWhenIdle) runs: the first Search fetches them. A file already stored is not asked for, so a later boot costs one manifest.
    ONLY THROUGH THE WORKER (sweep W35, 2026-10-13): a page it does not control (the first visit
    before its claim, a hard reload) read ~55 MB the worker never saw, and the worker fetched them
    all again later. Such a page warms when the worker takes it over, or not at all. */
 const WARM_AFTER_MS = 60 * 1000;
 const SEMANTIC_STORE = 'vot-semantic-v1';
 export function warmMeaningSearch() {
-  const conn = /** @type {any} */ (navigator).connection;
-  if (conn && conn.saveData) return;
+  if (!bulkDownloadsOk()) return;
   const warm = () => onIdle(() => { void warmMeaningFiles(); }, { timeout: 30000, fallbackDelay: 1000 });
   setTimeout(() => {
     const sw = navigator.serviceWorker;
-    if (!sw) return;
+    if (!sw || !bulkDownloadsOk()) return; // the link can change in the minute
     if (sw.controller) warm();
     else sw.addEventListener('controllerchange', warm, { once: true });
   }, WARM_AFTER_MS);

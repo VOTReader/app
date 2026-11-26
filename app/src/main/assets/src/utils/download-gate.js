@@ -37,6 +37,25 @@ export function networkType() {
   return c && typeof c.type === 'string' ? c.type : '';
 }
 
+/* BULK DOWNLOADS NOBODY ASKED FOR (platform-2 + web-platform-n2, audit 2026-11-23). A first web visit pulled the
+   meaning search's ~45 MB at launch and the next one ~14 MB of song covers, on Data Saver and on mobile data too.
+   Such a download goes ahead only on a link that is not metered as far as the browser can tell: the phone app (its
+   files are on board), Wi-Fi or Ethernet, or a desktop browser that reports no type. Data Saver, mobile data, and a
+   phone that cannot tell (an iPhone) wait: the meaning files come with the first Search, the covers as they are seen. */
+const MOBILE_UA = /Mobi|Android|iPhone|iPad|iPod/i;
+/** @returns {boolean} a large background download may start now */
+export function bulkDownloadsOk() {
+  if (typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge) return true;
+  const c = _connection();
+  if (c && c.saveData) return false;
+  const t = networkType();
+  if (t) return t === 'wifi' || t === 'ethernet';
+  if (typeof navigator === 'undefined') return true;
+  const hint = /** @type {any} */ (navigator).userAgentData;
+  if (hint && typeof hint.mobile === 'boolean') return !hint.mobile;
+  return !MOBILE_UA.test(String(navigator.userAgent || ''));
+}
+
 /** @returns {boolean} the phone app (it tells for itself), or a browser that reports the connection's type */
 export function canTell() {
   return !!_native() || networkType() !== '';

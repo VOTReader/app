@@ -61,6 +61,7 @@ import {
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
+import { bulkDownloadsOk } from '../utils/download-gate.js';
 import { lemma, bestWindow } from './passage.js';
 import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey } from './semantic.js';
 import { TWIN_SEP, ORIGINAL_KINDS, sentenceSpans, nameAsPrinted, sentenceKey, eachShingle, addTo, HEADING, addOriginal, withKjvView, storeBuilder as storeBuilderFor } from './warm-read.js';
@@ -2354,9 +2355,14 @@ function init(options) {
   });
 }
 
-/** The meaning search loads once the words index is up, when the page is idle (the browser only: node callers start it). */
+/** The meaning search loads once the words index is up, when the page is idle (the browser only: node callers start it).
+ *  Its files are ~45 MB on the web, renamed with each meaning pack (platform-2, audit 2026-11-23): on Data Saver, mobile
+ *  data or a phone that cannot tell (download-gate bulkDownloadsOk), launch starts nothing, and the first text search
+ *  the model was not ready for starts it, behind that search (meaningHeld). */
+let meaningHeld = false;
 function startMeaningWhenIdle() {
   if (typeof document === 'undefined') return;
+  if (!bulkDownloadsOk()) { meaningHeld = true; return; }
   onIdle(() => { startSemantic(); }, { timeout: 20000, fallbackDelay: 5000 });
 }
 
@@ -2710,6 +2716,7 @@ async function searchWords(query, options) {
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ const sem = ctx.sem;
   /** A search the model was not ready for: its words' order stands, and says the meaning comes later (semanticReady). */
   const meaningLater = ctx.meaningLater;
+  if (meaningLater && meaningHeld) { meaningHeld = false; void startSemantic(); }
   // THE ORIGINAL BEFORE ITS REPRINT, the collections' caps, Matthew once: search/stage-originals.js
   Object.assign(ctx, { typedQ, inScope, perVolume, capped });
   originalsStage(ctx);
