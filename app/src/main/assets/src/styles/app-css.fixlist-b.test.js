@@ -35,3 +35,11 @@ describe('#18 the Safari warning scrolls inside the screen at large text', () =>
     expect(b).toMatch(/overflow-y:\s*auto/);
   });
 });
+
+describe('#20 a row with a value beside it wraps its words instead of cutting them', () => {
+  it('title and meta wrap in rows that hold a .ui-row-value', () => {
+    const b = rule(':is(.ui-row, .root-row):has(:is(.ui-row-value, .root-row-count)) :is(.ui-row-title, .ui-row-meta, .root-row-title, .root-row-sub)');
+    expect(b).toMatch(/white-space:\s*normal/);
+    expect(b).toMatch(/overflow-wrap:\s*break-word/);
+  });
+});

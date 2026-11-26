@@ -59,7 +59,11 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onMenu }) {
   var words = bookmarkWords(bkm, sourceLabel);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
   return (
-    <ListRow icon="mark" className="bkm-row" title={words.name} meta={[words.where, date].filter(Boolean).join(' · ')}
+    <ListRow icon="mark" className="bkm-row" title={words.name}
+      meta={date && words.where
+        // Fix list #20: the place is cut, the date stays whole (it read "2 …").
+        ? <><span className="ui-meta-cut">{words.where}</span><span className="ui-meta-keep">{' · ' + date}</span></>
+        : (words.where || date)}
       onClick={function() { if (onNavigate) onNavigate(bkm); }}
       menu={{ label: 'Bookmark options', onClick: function() { if (onMenu) onMenu(bkm); } }} />
   );
