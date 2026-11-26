@@ -15,7 +15,9 @@
  * window.__votShared for every copy), or the consumer in the other bundle
  * calls bundle-b's window global instead of importing the module.
  *
- * WHAT COUNTS AS STATE (comments stripped first, module scope = column 0):
+ * WHAT COUNTS AS STATE (comments stripped first; module scope = column 0,
+ * and the body of a top-level IIFE, `(function () { ... })()` or
+ * `(() => { ... })()`, at its own first indent):
  *   - a `let` or `var` declaration;
  *   - a `const` bound to a Map, Set, WeakMap, WeakSet, array or object
  *     literal that the module mutates (.set/.add/.delete/.clear/.push/...,
@@ -88,12 +90,69 @@ export function stripComments(src) {
 
 const MUTATORS = 'set|add|delete|clear|push|pop|shift|unshift|splice|sort|reverse|fill';
 
+/** The same code with every string's inside blanked (quotes and line breaks kept), so a brace in text is not a brace. @param {string} code comment-free */
+function blankStrings(code) {
+  let out = '';
+  let i = 0;
+  while (i < code.length) {
+    const c = code[i];
+    if (c === '\'' || c === '"' || c === '`') {
+      let j = i + 1;
+      while (j < code.length && code[j] !== c) { if (code[j] === '\\') j++; j++; }
+      out += c + code.slice(i + 1, j).replace(/[^\n]/g, ' ') + (j < code.length ? c : '');
+      i = j + 1;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/* A column-0 line that opens an immediately invoked function: (function () {, (function name() {, (() => {,
+   (async () => {, !function () {, ;(function () {. */
+const IIFE_OPEN = /^;?\(\s*(?:async\s+)?(?:function\b[^(]*\([^)]*\)|\([^)]*\)\s*=>|[\w$]+\s*=>)\s*\{/;
+const IIFE_OPEN_BANG = /^!\s*function\b[^(]*\([^)]*\)\s*\{/;
+
+/** The lines that run at module scope: column-0 lines, and each top-level IIFE's body lines at that body's first
+ *  indent, unindented (a declaration there lives as long as the module does). @param {string} code comment-free */
+function scopeLines(code) {
+  const lines = code.split('\n');
+  const flat = blankStrings(code).split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = flat[i];
+    if (!line || /^\s/.test(line)) continue;
+    out.push(lines[i]);
+    if (!IIFE_OPEN.test(line) && !IIFE_OPEN_BANG.test(line)) continue;
+    // Walk the braces (strings blanked) from the opening { to its match; the body is the lines in between.
+    let depth = 0;
+    let end = i;
+    for (let k = i, opened = false; k < flat.length; k++) {
+      for (const ch of flat[k]) {
+        if (ch === '{') { depth++; opened = true; } else if (ch === '}') depth--;
+      }
+      if (opened && depth <= 0) { end = k; break; }
+      end = k;
+    }
+    const body = lines.slice(i + 1, end);
+    const first = body.find((l, k) => flat[i + 1 + k].trim() !== '');
+    const indent = first ? first.match(/^\s*/)[0] : '';
+    if (!indent) continue;   // an unindented body is column 0: the plain scan reads it
+    for (let k = 0; k < body.length; k++) {
+      const f = flat[i + 1 + k];
+      if (f.startsWith(indent) && !/^\s/.test(f.slice(indent.length))) out.push(body[k].slice(indent.length));
+    }
+    i = end;
+  }
+  return out;
+}
+
 /** The module-scope state a source holds, as short descriptions ([] = stateless). @param {string} src */
 export function moduleState(src) {
   const code = stripComments(src);
   const found = [];
-  for (const line of code.split('\n')) {
-    if (!line || /^\s/.test(line)) continue;
+  for (const line of scopeLines(code)) {
     const lv = line.match(/^(?:export\s+)?(let|var)\s+([\w$]+)/);
     if (lv) { found.push(lv[1] + ' ' + lv[2]); continue; }
     const c = line.match(/^(?:export\s+)?const\s+([\w$]+)\s*=\s*(new\s+(?:Map|Set|WeakMap|WeakSet|Array)\b|\[|\{)/);

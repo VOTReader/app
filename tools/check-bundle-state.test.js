@@ -40,6 +40,24 @@ describe('moduleState: what counts as module state', () => {
     expect(moduleState("import { sharedState } from './shared-state.js';\nconst _s = sharedState('x', () => ({ n: 0 }));\nexport function bump() { _s.n++; }")).toEqual([]);
   });
 
+  it('the body of a top-level IIFE is module scope too: it runs once, and what it declares lives as long', () => {
+    expect(moduleState('(function () {\n  let n = 0;\n  window.next = () => ++n;\n})();')).toEqual(['let n']);
+    expect(moduleState('(() => {\n  const seen = new Set();\n  window.see = (k) => seen.add(k);\n})();')).toEqual(['mutated const seen']);
+    expect(moduleState('!function () {\n    var q = [];\n}();')).toEqual(['var q']);
+    expect(moduleState('(function () {\nlet flat = 1;\n})();')).toEqual(['let flat']);
+  });
+
+  it('inside an IIFE, only its own first level counts; a brace in a string does not end it', () => {
+    expect(moduleState('(function () {\n  function f() {\n    let i = 0;\n  }\n  f();\n})();')).toEqual([]);
+    expect(moduleState('(function () {\n  const css = `\n}\n`;\n  let late = 1;\n})();\nlet after = 2;')).toEqual(['let late', 'let after']);
+    expect(moduleState('(function () {\n  const T = { a: 1 };\n  Object.freeze(T);\n})();')).toEqual([]);
+    expect(moduleState('function plain() {\n  let local = 0;\n}')).toEqual([]);
+  });
+
+  it('a column-0 line inside a template literal is text, not a declaration', () => {
+    expect(moduleState('export const glsl = `\nlet fake = 1;\nvoid main(){}\n`;')).toEqual([]);
+  });
+
   it('stripComments keeps line breaks and string contents', () => {
     expect(stripComments('a /* x\ny */ b // c\n"//not a comment"')).toBe('a \n b \n"//not a comment"');
   });
