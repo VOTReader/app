@@ -556,7 +556,6 @@ function _continues() {
   return !!_source && (_source.mode === 'collection' || _source.mode === 'section' || (_source.mode === 'custom' && !!_source.volKey));
 }
 
-/** @param {Track[]} queue @param {boolean} [ends] the listener cleared what was next: the run ends after this track */
 /* A compilation track (no key) can reach the queue by playTrack (Downloads, the shelves) or a queue edit as well as
    by playSection; each one follows the timings for its title, or the name it was queued with stays all session. */
 /** @param {readonly any[]} queue @returns {void} */
@@ -564,6 +563,7 @@ function _watchTitlesFor(queue) {
   if (queue.some((t) => t && t.key == null)) _watchSectionTitles();
 }
 
+/** @param {Track[]} queue @param {boolean} [ends] the listener cleared what was next: the run ends after this track */
 function _commitQueueEdit(queue, ends = false) {
   _state.queue = queue;
   const current = queue[_state.qi];
