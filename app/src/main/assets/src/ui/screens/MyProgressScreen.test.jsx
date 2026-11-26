@@ -139,7 +139,15 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
   it('a new profile with Mark as Read off still says so', () => {
     setupGlobals();
     const { container } = renderScreen({ settings: { markAsRead: false } });
-    expect(container.textContent).toContain('Mark as Read is off');
+    expect(container.textContent).toContain('Mark as read is off');
+  });
+
+  // product-settings-n2 (audit 11-23): the streak still records with Mark as read off, so the note says so.
+  it('the off note says the streak still counts, not that nothing is recorded', () => {
+    setupGlobals();
+    const { container } = renderScreen({ settings: { markAsRead: false } });
+    expect(container.querySelector('.prg-note').textContent).toBe('Mark as read is off, so chapters and letters are not ticked. Your reading streak still counts. You can turn it on in Settings.');
+    expect(container.textContent).not.toMatch(/isn’t being recorded/);
   });
 
   it('one kept thing (a note) brings the rows back, zeros included', () => {
@@ -320,7 +328,7 @@ describe('MyProgressScreen — reading section', () => {
   it('shows the explanatory note INSTEAD of bars when Mark as Read is off', () => {
     setupGlobals({ groups: [GROUP] });
     const { container } = renderScreen({ settings: { markAsRead: false } });
-    expect(container.textContent).toContain('Mark as Read is off');
+    expect(container.textContent).toContain('Mark as read is off');
     expect(container.querySelector('.prg-bar')).toBeNull();
   });
 

@@ -364,7 +364,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
       {sub ? <span className="ui-row-meta prg-words-note">{sub}</span> : null}
     </div>
   );
-  const offNote = <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>;
+  /* product-settings-n2 (audit 11-23): the old note said nothing was recorded, but the streak dwell
+     (hooks/use-reading-dwell.js) still records a day with Mark as read off. */
+  const offNote = <div className="prg-note">Mark as read is off, so chapters and letters are not ticked. Your reading streak still counts. You can turn it on in Settings.</div>;
   const weekWords = wordDays ? wordDays.slice(-7).reduce((n, d) => n + d.words, 0) : 0;
   const firstDay = (() => {
     const m = wordDays && wordDays.length ? /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(wordDays[0].date) : null;
