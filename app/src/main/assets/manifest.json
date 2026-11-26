@@ -1,7 +1,7 @@
 {
   "name": "VOTReader",
   "short_name": "VOTReader",
-  "description": "Offline scripture reader for The Volumes of Truth",
+  "description": "Read, hear and study The Volumes of Truth and the Holy Bible, offline.",
   "start_url": "./index.html",
   "scope": "./",
   "id": "./",
