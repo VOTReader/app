@@ -10,6 +10,7 @@ import { expandArchaicTerms, ARCHAIC_NORMALIZE } from './tokenize.js';
 import { wordForms } from './word-forms.js';
 import { searchData } from './search-data.js';
 import { damerau } from './ref-parser.js';
+import { foldAccents } from '../utils/fold-accents.js';
 
 /* A short word (two letters or fewer) or a stop word matches only itself, as the
    engine now searches it (search audit 2026-09-27): "ye" marked "Yet", "me" marked
@@ -200,18 +201,20 @@ function occurrences(text, terms, marks = false, cap = 400) {
   const expanded = [...fams.keys()]
     .filter((t) => t.length >= 2)
     .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
-  const lower = text.toLowerCase();
+  // accents off, offsets kept: the index folds them, so a typed "jesus" found RVR's "Jesús" and marked nothing (heart-2)
+  const lower = foldAccents(text.toLowerCase());
   const at = new Map();
   /** @type {string[]} the terms the text holds nowhere as written */ const unmet = [];
   for (let i = 0; i < expanded.length; i++) {
     const t = expanded[i];
     const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
-    let idx = lower.indexOf(t);
+    const ft = foldAccents(t);
+    let idx = lower.indexOf(ft);
     let n = 0;
     while (idx >= 0 && n < cap) {
       // longer terms come later, so the last write at a position is the longest
       if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
-      idx = lower.indexOf(t, idx + t.length);
+      idx = lower.indexOf(ft, idx + t.length);
     }
     if (!n) unmet.push(t);
   }
@@ -219,14 +222,15 @@ function occurrences(text, terms, marks = false, cap = 400) {
   if (joined) {
     for (const t of unmet) {
       const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
-      let v = joined.view.indexOf(t);
+      const ft = foldAccents(t);
+      let v = joined.view.indexOf(ft);
       let n = 0;
       while (v >= 0 && n < cap) {
         const idx = joined.at(v);
         const len = joined.at(v + t.length - 1) + 1 - idx;
         const o = at.get(idx);
         if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(joined.view[v + t.length] || '')) && (!o || o.len < len)) { at.set(idx, { idx, len, term: f.fam, primary: f.primary }); n++; }
-        v = joined.view.indexOf(t, v + t.length);
+        v = joined.view.indexOf(ft, v + t.length);
       }
     }
   }
@@ -681,7 +685,7 @@ export function findPlaces(text, terms, maxLen, typed) {
 
 /** Lowercase, apostrophes out, spaces as one: a hit and a typed word read alike ("Tz’va’ot", tzvaot). @param {string} s */
 function bare(s) {
-  return String(s || '').toLowerCase().replace(/['’‘ʼ]/g, '').replace(/\s+/g, ' ').trim();
+  return foldAccents(String(s || '').toLowerCase()).replace(/['’‘ʼ]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -718,6 +722,22 @@ const SLIP_MIN = 5;
  * @returns {Array<{text:string, hit:boolean, rel?:boolean}>}
  */
 export function highlightSpans(text, terms, typed) {
+  // matched with accents off on both sides (heart-2), handed back as written: the fold keeps every offset
+  const folded = foldAccents(text || '');
+  const spans = foldedSpans(folded, terms && terms.map(foldAccents), typed && typed.map(foldAccents));
+  if (!text || folded === text) return spans;
+  let at = 0;
+  return spans.map((s) => { const w = text.slice(at, at + s.text.length); at += s.text.length; return { ...s, text: w }; });
+}
+
+/**
+ * highlightSpans over text and terms already folded.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {string[]} [typed]
+ * @returns {Array<{text:string, hit:boolean, rel?:boolean}>}
+ */
+function foldedSpans(text, terms, typed) {
   if (!text) return [{ text: '', hit: false }];
   if (!terms || !terms.length) return [{ text, hit: false }];
   const expanded = expandArchaicTerms(terms);

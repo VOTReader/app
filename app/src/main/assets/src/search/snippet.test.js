@@ -557,3 +557,31 @@ describe('findPlaces: no cap on the hits find in page steps through', () => {
     expect(hits).toBe(450);
   });
 });
+
+describe('accent fold (audit 2026-11-23 heart-2)', () => {
+  const john316 = 'Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree, no se pierda. Jesús respondió.';
+  it('findPlaces finds an accented word typed without its accent, at its place in the text', () => {
+    const p = findPlaces(john316, ['unigenito']);
+    expect(p.length).toBe(1);
+    const h = p[0].hits[0];
+    expect(john316.slice(h.idx, h.idx + h.len)).toBe('unigénito');
+    expect(findPlaces(john316, ['jesus']).length).toBe(1);
+  });
+  it('a typed accent still matches', () => {
+    expect(findPlaces(john316, ['Jesús']).length).toBe(1);
+  });
+  it('highlightSpans marks the accented word and keeps the text as written', () => {
+    const text = 'Os daré corazón nuevo, y pondré espíritu nuevo dentro de vosotros.';
+    const spans = highlightSpans(text, ['corazon']);
+    expect(spans.map((s) => s.text).join('')).toBe(text);
+    expect(spans.filter((s) => s.hit).map((s) => s.text)).toEqual(['corazón']);
+    const typedSpans = highlightSpans(john316, ['jesus'], ['jesus']);
+    const hit = typedSpans.find((s) => s.hit);
+    expect(hit && hit.text).toBe('Jesús');
+    expect(hit && hit.rel).toBeUndefined();
+  });
+  it('KJV text marks as before', () => {
+    const text = 'For God so loved the world, that he gave his only begotten Son.';
+    expect(highlightSpans(text, ['loved']).filter((s) => s.hit).map((s) => s.text)).toEqual(['loved']);
+  });
+});
