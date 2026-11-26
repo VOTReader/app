@@ -3319,6 +3319,11 @@
     .library-root .ui-row-title, .library-root .ui-row-meta { white-space: normal; }
     .library-root .ui-row-text { min-width: 50%; }
     .library-root .ui-row-value { white-space: normal; text-align: right; }
+    /* Fix list 20 (Listen's share): Saved's and Letter voice's subtitles and Downloads' 'Voice to download' were cut
+       beside their value; the words wrap and the value gives room, as on the Library root. */
+    .listen-root :is(.root-row-title, .root-row-sub), .dl-voice-group .ui-row-title { white-space: normal; }
+    .listen-root .root-row-text, .dl-voice-group .ui-row-text { min-width: 50%; }
+    .listen-root .root-row-count, .dl-voice-group .ui-row-value { white-space: normal; text-align: right; flex-shrink: 1; min-width: 0; }
     .ui-empty-icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 18px; border-radius: var(--r-sheet); background: var(--surface-1); color: var(--accent); }
     .ui-empty-icon svg { width: 28px; height: 28px; }
     .ui-empty-title { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-title); font-weight: 700; line-height: 1.25; }

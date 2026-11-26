@@ -37,3 +37,16 @@ describe('fix list 43: the Speed sheet\'s fine-tune row puts its label above the
     expect(label).toMatch(/flex-basis:\s*100%/);
   });
 });
+
+describe('fix list 20: Listen rows wrap their words instead of cutting them beside a value', () => {
+  it('Listen root and the Downloads voice row let title and subtitle wrap, and the value give room', () => {
+    const words = ruleBlock(CSS, '.listen-root :is(.root-row-title, .root-row-sub), .dl-voice-group .ui-row-title {');
+    expect(words).not.toBeNull();
+    expect(words).toMatch(/white-space:\s*normal/);
+    const text = ruleBlock(CSS, '.listen-root .root-row-text, .dl-voice-group .ui-row-text {');
+    expect(text).toMatch(/min-width:\s*50%/);
+    const value = ruleBlock(CSS, '.listen-root .root-row-count, .dl-voice-group .ui-row-value {');
+    expect(value).toMatch(/white-space:\s*normal/);
+    expect(value).toMatch(/flex-shrink:\s*1/);
+  });
+});
