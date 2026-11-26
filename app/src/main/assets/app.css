@@ -184,6 +184,9 @@
         background: #13131f; border: 1px solid var(--gold-border);
         border-radius: 12px; padding: 1.6rem 1.4rem;
         max-width: 380px; width: 100%;
+        /* Fix list #18: at text 200% the card ran off both ends of the screen with its buttons out of reach. */
+        max-height: calc(100vh - 3rem); max-height: calc(100dvh - 3rem);
+        overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
       }
       .sh-modal-title {
         margin: 0 0 0.7rem; font-size: var(--fs-18); color: var(--gold);

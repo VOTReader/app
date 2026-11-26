@@ -27,3 +27,11 @@ describe('#12 Home Explore pills size to their words', () => {
     expect(rule('.root-explore-btn')).toMatch(/flex:\s*1 1 auto/);
   });
 });
+
+describe('#18 the Safari warning scrolls inside the screen at large text', () => {
+  it('.sh-modal is capped to the viewport and scrolls', () => {
+    const b = rule('.sh-modal');
+    expect(b).toMatch(/max-height:\s*calc\(100dvh - 3rem\)/);
+    expect(b).toMatch(/overflow-y:\s*auto/);
+  });
+});
