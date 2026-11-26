@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-e6ff092793';
+const CACHE_VERSION = 'v1.0.2-64ba20afe9';
 const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video and the Related Topic "The Name of The Lord"), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,14 +316,14 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
  */
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
-  './': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
-  './dist/app.min.css': '4edf91242e834b4d85bc4c0dea08064b6c774ab2c16f03812f69a02859bb9f69',
+  './': '512ce2b920b7202ff2471e78435f04083a82fdd875c28c4da9989993c0d25c0e',
+  './dist/app.min.css': 'e059841ceb341f2d7624d994e9329b6884258f6061dc6ddf00c366ae1a0e903d',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '5fe8517df701214d3dbd8c99b17954e58d92cf3b55b3997a1daba97beb143b82',
+  './dist/bundle-b.js': '6c2aca8456c3c5945ae2d0fa13b0732a2de4d7e80f582157171849b1909d70b0',
   './dist/bundle-c.js': 'b9d0869acb9c0a9645d1788d3beeb6f4b229b7ad7ee67b0eadbd610bbd726129',
-  './dist/bundle-d.js': '763ac2c10e5246314ef8deee2fb97748406c9ef1df1356afca3a6290d98034cb',
+  './dist/bundle-d.js': '0599a3ca9a42fa8a4bac47dee1c10cd56bb24fc1b33039df8bb68e89d6785fd2',
   './dist/bundle-w.js': '35daf4e3e909673184de74a77d5e25b4435492e9af21071b6d22619b70ebb8e2',
-  './index.html': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
+  './index.html': '512ce2b920b7202ff2471e78435f04083a82fdd875c28c4da9989993c0d25c0e',
   './manifest.json': '03184e4a7e1e6f5bb544bbbaa536127cf9c41468946c6c423d05202144f336e4',
   './offline.html': '6cd0eafda9add519132a5c0e4c21380a520fe002bdf5308d70a2d2cb56d9bc83',
   './search-kjv-twin.json': 'ab14c48ce301351256986283805b0d8113d528dbd531ef6bad711042bbe447d6',
