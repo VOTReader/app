@@ -633,8 +633,6 @@ const SHARE_LINK_OPTIONS = [
   { id: 'site', label: 'The website', desc: 'Opens the letter on thevolumesoftruth.com, for anyone, with a connection' },
   { id: 'app', label: 'The app', desc: 'Opens the passage in VOTReader, even offline, for anyone who has the app' },
 ];
-/** The preview's words, quoted as passage-copy's quotedPassage quotes them (ASCII double quotes). */
-export const SHARE_PREVIEW_QUOTE = '"The words you picked"';
 /** The link the preview shows under its words: the one Share would send for The Wide Path's first paragraph,
     from passage-link (the app) or site-link (the website, the words as a text fragment when Highlight is on).
     @param {'app' | 'site'} which @param {boolean} highlight */

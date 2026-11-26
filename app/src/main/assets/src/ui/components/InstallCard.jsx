@@ -39,21 +39,6 @@ let _installNoted = false;
 /** Tests only. */
 export function _resetInstallCardSession() { _sessionUnit = null; _afterTold = false; _installNoted = false; }
 
-/* On screen (search200 UX B1): the long-press tip (AnnotationHint) waits while a card is in view, or the
-   pill sits on the card's heading (both live at the bottom of a chapter's end). One id per card in view. */
-const _onScreen = new Set();
-const _onScreenSubs = new Set();
-/** @param {string} id @param {boolean} on */
-function _setOnScreen(id, on) {
-  if (on === _onScreen.has(id)) return;
-  if (on) _onScreen.add(id); else _onScreen.delete(id);
-  _onScreenSubs.forEach((cb) => cb());
-}
-/** Whether an install card is on screen now. */
-export function isInstallCardOnScreen() { return _onScreen.size > 0; }
-/** @param {() => void} cb @returns {() => void} */
-export function subscribeInstallCardOnScreen(cb) { _onScreenSubs.add(cb); return () => { _onScreenSubs.delete(cb); }; }
-
 /** @returns {import('../../utils/install-offer.js').InstallOfferState} */
 function _readState() {
   try { return JSON.parse(localStorage.getItem(STATE_KEY) || 'null') || {}; } catch (_e) { return {}; }
@@ -228,8 +213,6 @@ export function InstallCard({ unitKey, inert = false }) {
   // The unit whose end the reader scrolled to (null until one): another unit's end is not this one's.
   const [reachedEnd, setReachedEnd] = React.useState(/** @type {string | null} */ (null));
   const sentinel = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  const cardRef = React.useRef(/** @type {HTMLElement | null} */ (null));
-  const cardId = React.useId();
 
   const flow = inert ? null : _cardFlow();
   const engaged = reachedEnd === unitKey || _readCount() > 0;
@@ -261,19 +244,6 @@ export function InstallCard({ unitKey, inert = false }) {
       scroller.removeEventListener('scroll', check);
     };
   }, [inert, unitKey]);
-
-  // On screen for the long-press tip: the card in view (or, without an observer, the card shown).
-  React.useEffect(() => {
-    const el = cardRef.current;
-    if (!show || !el) return undefined;
-    if (typeof IntersectionObserver === 'undefined') {
-      _setOnScreen(cardId, true);
-      return () => _setOnScreen(cardId, false);
-    }
-    const io = new IntersectionObserver((entries) => { if (entries.length) _setOnScreen(cardId, entries[entries.length - 1].isIntersecting); });
-    io.observe(el);
-    return () => { io.disconnect(); _setOnScreen(cardId, false); };
-  }, [show, cardId]);
 
   // One place a session: the card claims the session when it is on screen (or at once without an observer).
   React.useEffect(() => {
@@ -319,7 +289,7 @@ export function InstallCard({ unitKey, inert = false }) {
     <>
       <div ref={sentinel} className="install-card-sentinel" aria-hidden="true" />
       {show && (
-        <section ref={cardRef} className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
+        <section className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
           <img className="install-card-icon" src="icons/icon-192.png" alt="" width="28" height="28" />
           <span className="install-card-title" id={'install-card-title-' + unitKey}>
             {desktop ? 'Keep VOTReader on this computer' : 'Keep VOTReader on your home screen'}

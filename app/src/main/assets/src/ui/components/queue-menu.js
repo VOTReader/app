@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    queue-menu — "Play next" and "Add to queue" for a row's ⋯ menu (player
    brief 3c, pl-l2 L3). Cluster D: the Listening Library's collection rows and
-   every song row (SongListRow) offer them; RowMenu draws them. Its own module,
+   every song row (SongListRow) offer them in their row sheets. Its own module,
    so the song parts and the player's sheets never import each other.
    ═══════════════════════════════════════════════════════════════════════ */
 

@@ -177,20 +177,6 @@ export function answersTopicEntries(entries) {
   return _topics;
 }
 
-const SUBJECT_OF_TOPIC = new Map();
-ANSWERS_SUBJECTS.forEach((s) => s.topics.forEach((id) => SUBJECT_OF_TOPIC.set(id, s)));
-
-/** Where a topic is filed: "Commandment IV", its subject's title, or '' for neither. */
-export function answersFiledUnder(entry) {
-  const m = entry && /^Commandment (\d+)$/.exec(entry.group || '');
-  if (m) {
-    const c = ANSWERS_COMMANDMENTS.find((r) => r.n === Number(m[1]));
-    return c ? 'Commandment ' + c.numeral : entry.group;
-  }
-  const s = entry && SUBJECT_OF_TOPIC.get(entry.id);
-  return s ? s.title : '';
-}
-
 /** Passages in a topic = its "~ [From …]" attribution lines (0 for a page of prose). */
 export function answersPassageCount(entry) {
   const paras = (entry && entry.paragraphs) || [];

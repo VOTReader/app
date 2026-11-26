@@ -1383,7 +1383,6 @@
       .np-kicker-from { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
       .np-kicker-dot { flex-shrink: 0; white-space: pre; }
       .np-kicker-at { flex-shrink: 0; }
-      .np-head .row-menu-btn { width: 48px; height: 48px; justify-self: end; }
       .np-body {
         flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column;
         align-items: center; gap: 14px; padding: 8px 4px 16px; text-align: center;
@@ -1646,7 +1645,7 @@
       .audio-library-secondary-action .offline-icon { width:16px; height:16px; }
       .offline-collection-note { margin:0; font-size:var(--fs-12); color:var(--cream-dim); }
       /* D4 (downloads brief 3h, pictures 14, 17): the on-phone tick that ends a row's line, the ring + count under a
-         collection's title, and the row's ⋯ menu (RowMenu.jsx; the dropdown itself is .more-menu). */
+         collection's title. */
       .offline-ring { width:1.15em; height:1.15em; flex:none; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
       .offline-ring-track { stroke:var(--gold-border); }
       .offline-mark.is-all .offline-ring-track, .offline-tick .offline-ring-track { stroke:var(--gold); }
@@ -1654,12 +1653,6 @@
       .offline-tick { display:inline-flex; vertical-align:-.2em; color:var(--gold); }
       .offline-mark { position:relative; z-index:1; display:flex; align-items:center; gap:.55rem; margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); line-height:1.35; }
       .offline-mark .offline-ring { width:1.5em; height:1.5em; }
-      .row-menu-btn { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0; border:0; border-radius:var(--radius); background:none; color:var(--gold); cursor:pointer; -webkit-tap-highlight-color:transparent; }
-      .row-menu-btn svg { width:22px; height:22px; }
-      .row-menu-btn.open, .row-menu-btn:active { background:var(--gold-faint); }
-      .row-menu-btn:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
-      .row-menu .more-menu-item:disabled { color:var(--cream-dim); cursor:default; background:none; }
-      .row-menu .more-menu-item:disabled svg { color:var(--cream-dim); }
       /* ── W3b listen: the Downloads screens (R/mock/v2/listen.html au-dl .. au-dlremove, 2026-11-11). The storage card,
          Choose | On this phone, the voice row, the tree as shared row cards (tri-state boxes, a chapter grid), the foot
          bar, the run card, the kept rows with a bin. Brick = marked for removal. ── */
@@ -5768,7 +5761,7 @@
     .link-action-btn-danger, .link-action-btn-danger svg { color: var(--tone-danger); }
     .link-action-btn-danger:active { background: var(--surface-2); color: var(--tone-danger); }
     @media (hover: hover) { .link-action-btn-danger:hover { background: var(--surface-2); color: var(--tone-danger); } }
-    /* the ⋯ dropdown (MoreMenu.jsx, RowMenu.jsx) on the tokens: a surface card with no outline, worded rows in the UI
+    /* the ⋯ dropdown (MoreMenu.jsx) on the tokens: a surface card with no outline, worded rows in the UI
        face with a gold icon, inset hairlines; its steppers and segments are surface pills, the chosen one soft gold */
     .more-menu { padding: 6px 0; background: var(--surface-1); color: var(--text-1); border: 0; border-radius: var(--r-card); box-shadow: var(--shadow-float); font-family: var(--font-ui); }
     .more-menu-item { position: relative; color: var(--text-1); font-family: var(--font-ui); font-size: var(--fsc-16); font-weight: 500; transition: background-color var(--press) ease; }

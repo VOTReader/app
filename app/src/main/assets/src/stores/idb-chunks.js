@@ -392,5 +392,3 @@ export function writeQueue() {
     return run;
   };
 }
-
-export const IdbChunks = { INLINE_MAX_CHARS, CHUNK_CHARS, PIECES_PER_TX, isChunkKey, chunkOwner, chunkKey, isManifest, jsonExact, chunkText, writeValue, deleteValue, getValue, assemble, foldRows, writeQueue, commitNow };

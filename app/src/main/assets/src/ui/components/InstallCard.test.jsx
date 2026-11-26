@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { InstallCard, InstallRow, InstallPopup, ownBrowserUrl, _resetInstallCardSession, _resetInstallPopupSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
+import { InstallCard, InstallRow, InstallPopup, ownBrowserUrl, _resetInstallCardSession, _resetInstallPopupSession } from './InstallCard.jsx';
 import { attachInstallCapture, _resetInstallCapture } from '../../utils/install-offer.js';
 
 const UA = {
@@ -313,58 +313,6 @@ describe('InstallCard: the end of the chapter is the reader\'s own scroll (searc
     const field = document.createElement('input'); scroller.appendChild(field);
     fireEvent.keyDown(field, { key: ' ' }); scrollTo(1800); onScreen(sentinel, true);
     expect(card(container)).toBeNull();
-  });
-});
-
-/* search200 UX B1: the long-press tip waits while the card is on screen (AnnotationHint reads this). */
-describe('InstallCard: says when it is on screen', () => {
-  let ios;
-  class FakeIO {
-    constructor(cb) { this.cb = cb; this.els = []; ios.push(this); }
-    observe(el) { this.els.push(el); }
-    unobserve(el) { this.els = this.els.filter((e) => e !== el); }
-    disconnect() { this.els = []; }
-  }
-  const onScreen = (el, on) => act(() => { for (const io of ios.slice()) if (io.els.includes(el)) io.cb([{ target: el, isIntersecting: on }]); });
-  beforeEach(() => { ios = []; });
-  afterEach(() => { delete globalThis.IntersectionObserver; });
-
-  it('on screen while the card is in view; not once it scrolls away, is dismissed or unmounts', () => {
-    globalThis.IntersectionObserver = FakeIO;
-    const v = render(<InstallCard unitKey="genesis:1" />);
-    const section = card(v.container);
-    expect(section, 'PRECONDITION: the card is shown').not.toBeNull();
-    expect(isInstallCardOnScreen(), 'below the fold').toBe(false);
-    onScreen(section, true);
-    expect(isInstallCardOnScreen()).toBe(true);
-    onScreen(section, false);
-    expect(isInstallCardOnScreen(), 'scrolled away').toBe(false);
-    onScreen(section, true);
-    act(() => { fireEvent.click(section.querySelector('.install-card-later')); });
-    expect(isInstallCardOnScreen(), 'Maybe later').toBe(false);
-  });
-
-  it('a card on screen that unmounts is no longer on screen', () => {
-    globalThis.IntersectionObserver = FakeIO;
-    const v = render(<InstallCard unitKey="genesis:1" />);
-    onScreen(card(v.container), true);
-    expect(isInstallCardOnScreen()).toBe(true);
-    cleanup();
-    expect(isInstallCardOnScreen(), 'unmounted').toBe(false);
-  });
-
-  it('without an observer a shown card counts as on screen and tells its subscribers; a hidden one does not', () => {
-    const cb = vi.fn();
-    const off = subscribeInstallCardOnScreen(cb);
-    render(<InstallCard unitKey="genesis:1" />);
-    expect(isInstallCardOnScreen()).toBe(true);
-    expect(cb).toHaveBeenCalled();
-    cleanup();
-    expect(isInstallCardOnScreen()).toBe(false);
-    off();
-    readItems = {};
-    render(<InstallCard unitKey="genesis:1" />);
-    expect(isInstallCardOnScreen(), 'no card shown').toBe(false);
   });
 });
 

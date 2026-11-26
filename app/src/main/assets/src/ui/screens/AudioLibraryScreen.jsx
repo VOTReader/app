@@ -118,13 +118,6 @@ export function rootVoiceOptions() {
   return letterVoiceOptions().map((o) => ({ id: o.id, label: o.label, desc: o.id === 'auto' ? 'Each recording’s own reader' : '' }));
 }
 
-/** The Letter voice row's value: the current choice in its own words. @param {string | undefined} code @returns {string} */
-export function letterVoiceLabel(code) {
-  if (!code || code === 'auto') return 'Automatic · each recording’s own reader';
-  const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
-  return readers[code] ? String(readers[code]) : 'Automatic · each recording’s own reader';
-}
-
 /** The Letter voice row's value at the right (au-root): "Automatic", or the reader. @param {string | undefined} code */
 export function letterVoiceValue(code) {
   const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};

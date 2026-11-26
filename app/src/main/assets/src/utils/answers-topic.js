@@ -116,28 +116,6 @@ export const ANSWERS_SEE_HEAD = 'The Lord’s answer is in these';
 /** 0125 E: the row the Main Page's "See left column for all topics" line becomes. */
 export const ANSWERS_BROWSE_ALL = 'Browse all topics';
 
-/**
- * The hero's contents line (3 sections or more): the first names within 60 characters, skipping one
- * equal to the title and the generic ones, then "All 15 sections".
- * @param {any} entry
- * @param {any} meta
- * @returns {{ names: string, more: string } | null}
- */
-export function answersContentsLine(entry, meta) {
-  const s = answersTopSections(meta);
-  if (s.length < 3) return null;
-  const generic = (t) => /^(Section (One|Two|Three|Four|Five|Six)|Introduction)$/i.test(t);
-  /** @type {string[]} */
-  const names = [];
-  for (const x of s) {
-    if (x.title === entry.title || generic(x.title)) continue;
-    if (names.concat([x.title]).join(' · ').length > 60) break;
-    names.push(x.title);
-  }
-  const fd = entry.id === ANSWERS_FD_INDEX_ID;
-  return { names: names.length ? names.join(SEP) + SEP : '', more: 'All ' + pl(s.length, fd ? 'category' : 'section') };
-}
-
 /* ── Sections and Contents (f08 running head, f10) ─────────────────── */
 
 /**

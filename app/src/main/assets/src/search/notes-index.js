@@ -21,9 +21,6 @@ import { buildMiniSearchOptions } from './search-config.js';
 import { kjvEncode } from './tokenize.js';
 import { searchData } from './search-data.js';
 
-/** The kinds this index holds (each already has a badge, SRCH_KIND_LABEL, and a route, use-search.js). */
-export const NOTE_KINDS = ['heading', 'chapter-title', 'study-note'];
-
 /** The first chapter and verse of a Study Bible note's ref ("5:3-12" -> 5, 3). @param {string} ref @param {number} chNum */
 function noteVerse(ref, chNum) {
   const m = /^\s*(\d+):(\d+)/.exec(String(ref || ''));

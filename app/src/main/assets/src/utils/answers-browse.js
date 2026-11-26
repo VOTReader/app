@@ -206,7 +206,6 @@ export function shelfLabel(shelf) {
 /** The short names the browse screens give the index and the unnumbered shelf, and the numbered groups' shared head. */
 export const ANSWERS_FD_INDEX_SHORT = 'False Doctrines index';
 export { ANSWERS_OTHER_LABEL };
-export const ANSWERS_TSTL_HEAD = 'Thus Says The Lord...';
 
 /**
  * Where a topic sits on the site, in the words a row's sub uses.
