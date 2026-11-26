@@ -1158,8 +1158,23 @@ export function buildScreenRoutes({
     go: (id) => { setSurpriseAnchor(null); go(id); },
     openGroup: _openAnswersGroup,
     openLanding: () => { resetAnswersLanding(); setScreen('answers-home'); },
+    // A study link is a tap-through like a topic link (reading2-1): it records the way back to this topic, so the
+    // pill shows and Back returns here instead of to Studies. The entry's destination is where selectStudy lands:
+    // the one page of a single-page study, or the study's index (which draws the pill and honours Back too).
     openStudy: (slug, url) => {
-      if (typeof getStudyById === 'function' && getStudyById(slug)) { _startNewTrail(); selectStudy(slug); } else if (url) window.open(url, '_blank', 'noopener');
+      const study = typeof getStudyById === 'function' ? getStudyById(slug) : null;
+      if (study && !study.locked && study.chapters && study.chapters.length) {
+        const only = (study.chapters.length === 1 || study.singlePage) ? study.chapters[0] : null;
+        pushFromLetter({
+          sourceScreen: screen, sourceLetterId: letterId,
+          sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
+          sourceLetterTitle: fromTitle || 'Answers', sourceVolumeLabel: null,
+          destSnapshot: only
+            ? { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: slug, studyChapterId: only.id }
+            : { screen: 'bible-study-index', bookId: null, chapterNum: null, letterId: null, studyId: slug, studyChapterId: null },
+        });
+        _startNewTrail(); selectStudy(slug);
+      } else if (url) window.open(url, '_blank', 'noopener');
     },
     searchLibrary: (q) => { setSearchQuery(q); goSearch(); },
     goToRef: (ref) => {
@@ -1997,8 +2012,6 @@ export function buildScreenRoutes({
           goToChainEntryLast={goToChainEntryLast}
           setStudyChapterId={setStudyChapterId}
           setScreen={setScreen}
-          setBookId={setBookId}
-          setChapterNum={setChapterNum}
           setFromStudies={setFromStudies}
           setLetterId={setLetterId}
           setActiveReadKey={setActiveReadKey}
@@ -2010,7 +2023,6 @@ export function buildScreenRoutes({
           studyReadKey={studyReadKey}
           prophecyCardStatesRef={prophecyCardStatesRef}
           saveProphecyCardStates={saveProphecyCardStates}
-          selectStudy={selectStudy}
           selectStudyChapter={selectStudyChapter}
           goStudiesHome={goStudiesHome}
           pushFromLetter={pushFromLetter}

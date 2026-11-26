@@ -24,19 +24,19 @@ export function BibleStudyChapterView({
   prevChainEntry, nextChainEntry,
   goToChainEntryFirst, goToChainEntryLast,
   // Tab-state setters (study + Matthew + letter handoff)
-  setStudyChapterId, setScreen, setBookId, setChapterNum,
+  setStudyChapterId, setScreen,
   setFromStudies, setLetterId, setActiveReadKey, setSurpriseAnchor,
   // Read progress (from useReadProgress)
   markRead, unmarkRead, isRead, getReadKey, studyReadKey,
   // Reading position (from useReadingPositionNav)
   prophecyCardStatesRef, saveProphecyCardStates,
   // Study selection
-  selectStudy, selectStudyChapter,
+  selectStudyChapter,
   // Nav helpers
   goStudiesHome,
-  // useFromLetterStack — the two jumps below are cross-screen links, so they
-  // raise the same "‹ Back to …" pill every other in-content link does. They
-  // push DIRECTLY rather than routing through navigateToLink, because that
+  // useFromLetterStack — a letter link below is a cross-screen link, so it
+  // raises the same "‹ Back to …" pill every other in-content link does. It
+  // pushes DIRECTLY rather than routing through navigateToLink, because that
   // router nulls studyId/studyChapterId — which the `fromStudies` fallback
   // still needs after the single-shot pill is pruned.
   pushFromLetter,
@@ -145,26 +145,6 @@ export function BibleStudyChapterView({
     destSnapshot: destSnapshot,
   });
 
-  // onStudyNavigate: internal jump to another study. Saves current
-  // location so back returns here via existing fromSearch-style logic.
-  const jumpToStudy = (targetSlug) => {
-    if (targetSlug === 'matthew-study') {
-      setFromStudies(true);
-      setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx');
-      return;
-    }
-    const target = getStudyById(targetSlug);
-    if (!target || target.locked) return;
-    // selectStudy lands on bible-study-chapter only for a single-chapter /
-    // singlePage study; a multi-chapter one lands on bible-study-index, which
-    // has no pill renderer — pushing there would be a dead entry the prune
-    // effect evicts on the next tap. matthew-idx (above) likewise.
-    const only = (target.chapters && (target.chapters.length === 1 || target.singlePage)) ? target.chapters[0] : null;
-    if (only && pushFromLetter) {
-      pushFromLetter(pillSource({ screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: targetSlug, studyChapterId: only.id }));
-    }
-    selectStudy(targetSlug);
-  };
   const handleLetterClick = (lid, sc) => {
     setFromStudies(true);
     if (pushFromLetter) {
@@ -184,7 +164,6 @@ export function BibleStudyChapterView({
       volumeLabel={study.title}
       onHome={() => { if (study.chapters.length > 1) { setStudyChapterId(null); setScreen('bible-study-index'); } else { goStudiesHome(); } }}
       onNavigate={(chId) => { setSurpriseAnchor(null); selectStudyChapter(studyId, chId); }}
-      onStudyNavigate={jumpToStudy}
       onLetterClick={handleLetterClick}
       onMarkRead={(payload) => markRead(studyReadKey(study.slug), studyChapterId, payload)}
       readTrackKey={getReadKey ? getReadKey(studyReadKey(study.slug), studyChapterId) : undefined}

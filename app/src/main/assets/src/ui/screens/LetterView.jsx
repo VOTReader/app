@@ -78,7 +78,7 @@ function MarkReadRow({ read, onMark, onUndo }) {
 }
 
 export function LetterView(props) {
-  const { letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert: inertProp = false, restoreScroll = null, resolvePeek = null } = props;
+  const { letter, volKey, onHome, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert: inertProp = false, restoreScroll = null, resolvePeek = null } = props;
   // TABS6: drawn off screen for its Tabs card (TabSnapDrawer), the screen is inert as a swipe neighbour is.
   const bgDraw = React.useContext(BgDrawContext);
   const inert = inertProp || !!bgDraw;
@@ -684,8 +684,7 @@ export function LetterView(props) {
                       ? () => onNavigateToLink(answersAt, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null })
                       : answersAt && wrappedInAppLink ? () => openAnswersLink(answersLinkForUrl(t.url), wrappedInAppLink) : null;
                     const go = t.link && wrappedInAppLink ? () => wrappedInAppLink(t.link)
-                      : openAnswers ? openAnswers
-                      : t.internalStudy && onStudyNavigate ? () => onStudyNavigate(t.internalStudy) : null;
+                      : openAnswers || null;
                     return go ? <ListLink key={i} title={t.label} className="related-link" onClick={go} />
                       : <ListLink key={i} title={t.label} className="related-link" href={t.url} />;
                   })}
@@ -700,8 +699,7 @@ export function LetterView(props) {
               {letter.bibleStudies?.length > 0 ? (
                 <ListGroup label="Bible Study">
                   {letter.bibleStudies.map((s, i) => {
-                    const go = s.link && wrappedInAppLink ? () => wrappedInAppLink(s.link)
-                      : s.internalStudy && onStudyNavigate ? () => onStudyNavigate(s.internalStudy) : null;
+                    const go = s.link && wrappedInAppLink ? () => wrappedInAppLink(s.link) : null;
                     return go ? <ListLink key={i} title={s.label} className="related-link" onClick={go} />
                       : <ListLink key={i} title={s.label} className="related-link" href={s.url} />;
                   })}
