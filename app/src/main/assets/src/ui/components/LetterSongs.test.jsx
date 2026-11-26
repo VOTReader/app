@@ -8,10 +8,15 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 
 const { player, setPlayerState, audio } = vi.hoisted(() => {
   let playerState;
+  let ticks = 0;
+  const listeners = new Set();
   const audio = { has: true, playable: true };
   const player = {
-    subscribe: () => () => {},
-    getVersion: () => 0,
+    subscribe: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    getVersion: () => ticks,
+    getShape: () => 0,
+    /** The 1 Hz clock: getVersion moves, getShape does not (core.js _notifyTick). */
+    _tick: () => { ticks++; for (const fn of [...listeners]) fn(); },
     getState: () => playerState,
     hasAudio: vi.fn(() => audio.has),
     playableNow: vi.fn(() => audio.playable),
@@ -25,7 +30,7 @@ const { player, setPlayerState, audio } = vi.hoisted(() => {
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
 import { LetterListenRow, LetterSongsCard, LetterWebLinks } from './LetterSongs.jsx';
-import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
+import { adoptSongCatalog, _resetSongCatalogForTests, SongCatalog } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { NetStatus } from '../../utils/net-status.js';
 import { SongKeep } from '../../utils/song-keep.js';
@@ -106,6 +111,28 @@ describe('the hero row: LISTEN and HEAR IT SUNG', () => {
     fireEvent.click(listen);
     expect(player.toggle).toHaveBeenCalledTimes(2);
     expect(player.playLetter).not.toHaveBeenCalled();
+  });
+});
+
+describe('a clock tick does not walk the catalog (structure-n2)', () => {
+  it('the hero row asks the catalog for this letter\'s songs once, however often the player ticks', () => {
+    const spy = vi.spyOn(SongCatalog, 'songsForLetter');
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    const first = spy.mock.calls.length;
+    expect(first).toBe(1);
+    for (let i = 0; i < 5; i++) act(() => { player._tick(); });
+    expect(spy.mock.calls.length, 'five ticks, no new catalog walk').toBe(first);
+    // A new catalog is a real change: the row asks again and follows it.
+    act(() => { adoptSongCatalog(catalog({ aaaaaaaaaaa1: { src: { k: 'letter', id: 'one:the-letter', c: 'h' } }, aaaaaaaaaaa2: { src: { k: 'letter', id: 'one:the-letter', c: 'h' } } })); });
+    expect(spy.mock.calls.length).toBeGreaterThan(first);
+  });
+
+  it('the songs card draws no clock, so a tick does not redraw it', () => {
+    render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
+    expect(document.querySelector('.letter-songs-card')).not.toBeNull();
+    const getState = vi.spyOn(player, 'getState');
+    for (let i = 0; i < 5; i++) act(() => { player._tick(); });
+    expect(getState, 'the card read the player again on a tick').not.toHaveBeenCalled();
   });
 });
 

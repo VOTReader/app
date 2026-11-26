@@ -46,12 +46,20 @@ import { ListGroup, ListLink } from './UiParts.jsx';
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
 
-/** Subscribe to the catalog and ask for it once (the pill self-hides until it lands). @param {boolean} want */
+/** Subscribe to the catalog and ask for it once (the pill self-hides until it lands); answers the catalog's version. @param {boolean} want @returns {number} */
 function useSongCatalog(want) {
-  React.useSyncExternalStore(SongCatalog.subscribe, SongCatalog.getVersion);
+  const ver = React.useSyncExternalStore(SongCatalog.subscribe, SongCatalog.getVersion);
   React.useEffect(() => {
     if (want && !SongCatalog.loaded && !SongCatalog.error) void SongCatalog.load();
   }, [want]);
+  return ver;
+}
+
+/** lettersSongs, worked out again only when the catalog changes: a player tick re-renders the pills, not the catalog walk. */
+function useLettersSongs(want, letterKey) {
+  const ver = useSongCatalog(want);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ver is the catalog's version: songsForLetter reads the module's catalog, so a new catalog must recompute though the callback never names ver.
+  return React.useMemo(() => lettersSongs(want, letterKey), [want, letterKey, ver]);
 }
 
 /** The songs of `volKey:id` that sing its own words, each family's `vfeat` first, or [] (setting off, catalog not in). */
@@ -71,8 +79,8 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
   useAudioPositions();
   const online = useSongsOnline();
-  useSongCatalog(showSongs);
   const letterKey = volKey + ':' + letter.id;
+  const songs = useLettersSongs(showSongs, letterKey);
   const st = AudioPlayer.getState();
   const cur = Array.isArray(st.queue) ? st.queue[st.qi] : null;
   const readingHere = !!(cur && cur.key === letterKey);
@@ -82,7 +90,6 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   // What Listen plays (the Letter Voice where that reader recorded it): its length on the pill, its download beside it.
   const tracks = recorded && typeof AudioPlayer.playbackTracks === 'function' ? AudioPlayer.playbackTracks(volKey, letter, collectionLabel) : [];
   const minutes = useListenMinutes(tracks);
-  const songs = lettersSongs(showSongs, letterKey);
   if (!recorded && !songs.length) return null;
 
   const active = playerIsActive(st);
@@ -178,10 +185,10 @@ export function offlineLine(listenOff, singOff) {
  * @param {{ volKey: string, letterId: string, letterTitle?: string, showSongs?: boolean, unit?: string }} props
  */
 export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = true, unit = 'letter' }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
-  useSongCatalog(showSongs);
+  // The card draws no clock: getShape skips the 1 Hz ticks that getVersion counts.
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   const letterKey = volKey + ':' + letterId;
-  const songs = lettersSongs(showSongs, letterKey);
+  const songs = useLettersSongs(showSongs, letterKey);
   if (!songs.length) return null;
 
   /** One row per verbatim family, led by its `vfeat` (the version that sings the letter's words). */
