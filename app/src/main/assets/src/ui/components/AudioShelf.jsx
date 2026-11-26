@@ -18,6 +18,7 @@ import { formatClock } from './AudioSeekSlider.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { TrackOnPhone } from './OfflineAudioControls.jsx';
 import { calendarDaysAgo } from '../../utils/dates.js';
+import { readerName } from '../../utils/download-tree.js';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
 export function audioLibraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
@@ -101,9 +102,9 @@ export function trackMeta(track) {
   return [track && track.sub, track && track.partLabel, chapterTitleOf(track)].filter(Boolean).join(' · ') || 'The Volumes of Truth';
 }
 
-/** @param {any} track @returns {string} */
+/** What a search matches: the row's words, its reader by the name the row shows (fix list 8), never the reader's code. @param {any} track @returns {string} */
 export function trackSearchText(track) {
-  return [trackName(track), track && track.sub, track && track.partLabel, track && track.readerCode]
+  return [trackName(track), track && track.sub, track && track.partLabel, readerName(track && track.readerCode)]
     .filter(Boolean).join(' ').toLocaleLowerCase();
 }
 
