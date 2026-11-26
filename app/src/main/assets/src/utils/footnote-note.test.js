@@ -69,6 +69,15 @@ describe('inAppTitleForUrl / findTitleIn', () => {
     expect(inAppTitleForUrl('https://www.thevolumesoftruth.com/Trust_in_God_Alone#:~:text=And%20do%20not,from%20a%20tree.')).toEqual({ title: 'Trust in God Alone', answers: false });
     expect(inAppTitleForUrl('https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Who_You_Choose:~:text=Who%20you').part).toBe('Who You Choose');
   });
+  it('reads only the escapes MediaWiki writes: a literal ".2E" or a number like "3.50" survives', () => {
+    const at = (frag) => inAppTitleForUrl('https://www.thevolumesoftruth.com/Purity#' + frag).part;
+    expect(at('Verse_1.2E16')).toBe('Verse 1.16');          // "." is itself written ".2E"
+    expect(at('Version_.2E2E_notes')).toBe('Version .2E notes');   // so a literal ".2E" in a heading is ".2E2E"
+    expect(at('Chapter_3.50')).toBe('Chapter 3.50');        // .50 is "P": MediaWiki never escapes a letter
+    expect(at('Step_1.20_and_2')).toBe('Step 1.20 and 2');  // .20 is a space: MediaWiki writes "_", never ".20"
+    expect(at('Y.C3.A9shua')).toBe('Y\u00E9shua');          // UTF-8 bytes, read whole
+    expect(at('Odd.C3')).toBe('Odd.C3');                   // half a UTF-8 character stays as written
+  });
   it('finds the study chapter a section names: by title, by the title it holds, or by a heading', () => {
     const study = { chapters: [
       { id: 's-1', title: 'Introduction', blocks: [] },

@@ -204,12 +204,23 @@ export function inAppTitleForUrl(url) {
   return part ? { title, answers: /answers/i.test(host[1]), part } : { title, answers: /answers/i.test(host[1]) };
 }
 
-/** A MediaWiki section anchor in words (".28" is "(", "_" a space), or '' when it names nothing. @param {string} anchor */
+/**
+ * A MediaWiki section anchor in words, or '' when it names nothing. MediaWiki writes a heading's
+ * characters other than letters, digits, "_", "-", ":" as ".XX" (its UTF-8 bytes): "(" is ".28",
+ * "&" ".26", "." itself ".2E", "_" a space. Only such escapes are read: a run of ".XX" whose bytes
+ * MediaWiki would never escape (a letter or digit: "Chapter_3.50") stays as written, as does a run
+ * that is not whole UTF-8.
+ * @param {string} anchor
+ */
 function anchorWords(anchor) {
   if (!anchor) return '';
   let s = anchor;
   try { s = decodeURIComponent(s); } catch (_e) { /* keep it as written */ }
-  try { s = decodeURIComponent(s.replace(/%/g, '%25').replace(/\.([0-9A-Fa-f]{2})/g, '%$1')); } catch (_e) { /* keep it as written */ }
+  s = s.replace(/(?:\.[0-9A-Fa-f]{2})+/g, (run) => {
+    const bytes = run.slice(1).split('.').map((h) => parseInt(h, 16));
+    if (bytes.some((b) => b <= 0x20 || b === 0x7f || (b < 0x80 && /[0-9A-Za-z_:-]/.test(String.fromCharCode(b))))) return run;
+    try { return decodeURIComponent(bytes.map((b) => '%' + b.toString(16).padStart(2, '0')).join('')); } catch (_e) { return run; }
+  });
   return s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
