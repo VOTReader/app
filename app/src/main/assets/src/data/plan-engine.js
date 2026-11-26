@@ -53,6 +53,7 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
+ *   rested?: { until: string, dates: string[] },
  *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean, credited?: number,
  *   seen?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
@@ -127,6 +128,8 @@ function nthReadingDay(run, from, k) {
  */
 function restedOn(run, n, memo = rests(run)) {
   const key = dateOf(n);
+  // Before a change to the target or the layout (pinRests): what the card said then, kept.
+  if (memo.pinned && key < memo.pinned.until) return memo.pinned.dates.has(key);
   // The latest read date before n: the stretch n belongs to (none: from the start).
   const { dates, next } = memo;
   let lo = 0, hi = dates.length;
@@ -147,7 +150,7 @@ function restedOn(run, n, memo = rests(run)) {
   return due > key;
 }
 
-/** @typedef {{ dates: string[], next: Map<string, string>, of: unknown[] }} RestMemo */
+/** @typedef {{ dates: string[], next: Map<string, string>, of: unknown[], pinned: { until: string, dates: Set<string> } | null }} RestMemo */
 const _restMemo = new WeakMap();
 /**
  * The memo restedOn uses for one run: its read dates in order, and each stretch's next reading date. Kept per ticks
@@ -156,12 +159,34 @@ const _restMemo = new WeakMap();
  */
 function rests(run) {
   const ticks = run.ticks || {};
-  const of = [run.segs, run.tracks, run.weekdays, run.pauses, run.start, run.target, Object.keys(ticks).length];
+  const of = [run.segs, run.tracks, run.weekdays, run.pauses, run.start, run.target, run.rested, Object.keys(ticks).length];
   const hit = run.ticks ? _restMemo.get(run.ticks) : null;
   if (hit && hit.of.every((v, i) => v === of[i])) return hit;
-  const memo = { dates: [...new Set(Object.values(ticks).filter(Boolean))].sort(), next: new Map(), of };
+  const r = run.rested;
+  const pinned = r && typeof r.until === 'string' && Array.isArray(r.dates) ? { until: r.until, dates: new Set(r.dates) } : null;
+  const memo = { dates: [...new Set(Object.values(ticks).filter(Boolean))].sort(), next: new Map(), of, pinned };
   if (run.ticks) _restMemo.set(run.ticks, memo);
   return memo;
+}
+
+/**
+ * Keep what a spread-out plan's Today card said on the days before today when the target or the layout changes
+ * (Catch me up, Spread it out, a new pace or Finish by date, new days, new contents, Start today, Resume): whether a
+ * past day was a rest day depends on the target (a reader behind it gets no rest day), so judging the past against
+ * the new one turned rest days into missed days and missed days into rest days. `after` gets the rest days up to
+ * yesterday as `before` had them (its own earlier pins included). A plan read day after day before and after is
+ * returned unchanged. @param {PlanRun} before @param {PlanRun} after @param {Date} now @returns {PlanRun}
+ */
+function pinRests(before, after, now) {
+  if (after === before || (!hasEmptyDays(before) && !before.rested && !hasEmptyDays(after))) return after;
+  const today = /** @type {number} */ (dayNum(todayKey(now)));
+  const startN = dayNum(before.start);
+  if (startN == null || today <= startN) return after;
+  const memo = rests(before), spread = hasEmptyDays(before);
+  const nopause = { ...before, paused: undefined };
+  const dates = [];
+  for (let n = startN; n < today; n++) if ((spread || memo.pinned) && isReadingDay(nopause, n) && restedOn(before, n, memo)) dates.push(dateOf(n));
+  return { ...after, rested: { until: dateOf(today), dates } };
 }
 
 /**
@@ -558,12 +583,13 @@ export function streak(run, now) {
   const memo = rests(run);
   const planned = new Set();
   if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
-  const holds = (/** @type {number} */ n) => (!spread ? n >= startN && isReadingDay({ ...run, paused: undefined }, n)
+  const pins = !!memo.pinned;   // a plan that was spread out before a change keeps its past rest days (pinRests)
+  const holds = (/** @type {number} */ n) => (!spread ? n >= startN && isReadingDay({ ...run, paused: undefined }, n) && !(pins && n < today && restedOn(run, n, memo))
     : n >= today ? planned.has(dateOf(n)) : n >= startN && isReadingDay({ ...run, paused: undefined }, n) && !restedOn(run, n, memo));
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
-    if (n === today || !isReadingDay(run, n) || (spread && !holds(n))) continue;
+    if (n === today || !isReadingDay(run, n) || ((spread || pins) && !holds(n))) continue;
     break;
   }
   const sunday = today - weekdayOf(today);
@@ -580,7 +606,7 @@ export function streak(run, now) {
     const key = dateOf(n);
     const isDone = done.has(key);
     if (isDone) weekDone++;
-    const holdsReading = (spread && isDone) || holds(n);
+    const holdsReading = ((spread || pins) && isDone) || holds(n);
     if (holdsReading) weekDays++;
     const inPlan = n >= startN && (fin == null || n <= fin) && (stop == null || n < stop) && !(known != null && n < known);
     const off = inPlan && !isReadingDay(run, n);
@@ -626,7 +652,7 @@ export function monthCells(run, year, month, now) {
     else if (n === today) state = 'today';
     else if (n < today) {
       state = readOn.has(key) ? 'read'
-        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || !restedOn(run, n, memo)) ? 'missed' : 'none');
+        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!(spread || memo.pinned) || !restedOn(run, n, memo)) ? 'missed' : 'none');
     }
     else if (!st.finished && end != null && n <= end && (spread ? plannedOn.has(key) : isReadingDay(nopause, n))) {
       state = 'ahead';
@@ -719,7 +745,7 @@ function recutStart(run, now) {
 
 /** Catch me up: keep the daily amount, move the planned finish to the projected one (a finish-by date moves with it,
     FIXB: left at the old date, a later re-cut to it crammed everything left into one day). */
-export function catchUp(run, now) {
+function catchUpRaw(run, now) {
   const st = runStatus(run, now);
   const pace = run.pace && run.pace.mode === 'by' ? { ...run.pace, date: st.projected } : run.pace;
   return { ...run, ...(pace ? { pace } : {}), target: st.projected, updated: now.getTime() };
@@ -753,7 +779,7 @@ function lengthDays(run, n, day, left) {
 }
 
 /** Spread it out: keep the planned finish, share what is left over the reading days until it. */
-export function spreadOut(run, now) {
+function spreadOutRaw(run, now) {
   const st = runStatus(run, now);
   const startN = recutStart(run, now), targetN = dayNum(run.target);
   if (st.finished || targetN == null || targetN < startN) return run;
@@ -774,7 +800,7 @@ export function spreadPreview(run, now) {
  * A "Finish by" date before the first day it can re-cut from changes nothing.
  * @param {PlanRun} run @param {PlanPace} pace @param {Date} now @param {number} [keepDays] re-cut over exactly this many days
  */
-export function changePace(run, pace, now, keepDays) {
+function changePaceRaw(run, pace, now, keepDays) {
   const st = runStatus(run, now);
   if (st.finished) return run;
   const startN = recutStart(run, now);
@@ -792,7 +818,7 @@ export function changePace(run, pace, now, keepDays) {
 }
 
 /** New reading weekdays; the days left stay as many (a finish-by date is kept instead), so the finish follows. */
-export function changeWeekdays(run, weekdays, now) {
+function changeWeekdaysRaw(run, weekdays, now) {
   const next = { ...run, weekdays: weekdays.map(Boolean), updated: now.getTime() };
   if (!run.pace) return next;
   // FIXB: a finish-by date already behind the re-cut start keeps the days left instead (it gave one day).
@@ -835,7 +861,7 @@ export function readCount(/** @type {PlanTrack[]} */ tracks, /** @type {(bid: st
  * @param {PlanRun} run the plan as it is @param {{ plan: string, name?: string, tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays?: boolean[], pace: PlanPace }} spec its new contents and choices @param {Date} now @returns {PlanRun}
  */
-export function replaceContents(run, spec, now) {
+function replaceContentsRaw(run, spec, now) {
   const todayN = /** @type {number} */ (dayNum(todayKey(now)));
   const startN = dayNum(run.start);
   let next = newRun({ ...spec, startOn: startN != null && startN > todayN ? run.start : undefined }, now);
@@ -889,7 +915,7 @@ export function canCountOwnOnly(run) {
 }
 
 /** Start today instead of a later start date: the plan's days move up with it. */
-export function startToday(run, now) {
+function startTodayRaw(run, now) {
   const st = runStatus(run, now);
   if (!st.notStarted) return run;
   const key = todayKey(now);
@@ -918,7 +944,7 @@ export function pauseRun(run, now) {
 
 /** Resume: the pause becomes a closed range and the target moves later by the reading days it covered. Days before
  *  the plan's start were never reading days, so a pause made before a later start counts only from the start. */
-export function resumeRun(run, now) {
+function resumeRunRaw(run, now) {
   if (!run.paused) return run;
   const startN = dayNum(run.start);
   const pausedN = /** @type {number} */ (dayNum(run.paused));
@@ -1037,3 +1063,24 @@ export function startFrom(tracks, k) {
     return i > 0 ? { ...tr, items: tr.items.slice(i) } : tr;
   });
 }
+
+/** catchUp, keeping the past rest days as they were (pinRests). @type {typeof catchUpRaw} */
+export const catchUp = (run, now) => pinRests(run, catchUpRaw(run, now), now);
+
+/** spreadOut, keeping the past rest days as they were (pinRests). @type {typeof spreadOutRaw} */
+export const spreadOut = (run, now) => pinRests(run, spreadOutRaw(run, now), now);
+
+/** changePace, keeping the past rest days as they were (pinRests). @type {typeof changePaceRaw} */
+export const changePace = (run, pace, now, keepDays) => pinRests(run, changePaceRaw(run, pace, now, keepDays), now);
+
+/** changeWeekdays, keeping the past rest days as they were (pinRests). @type {typeof changeWeekdaysRaw} */
+export const changeWeekdays = (run, weekdays, now) => pinRests(run, changeWeekdaysRaw(run, weekdays, now), now);
+
+/** replaceContents, keeping the past rest days as they were (pinRests). @type {typeof replaceContentsRaw} */
+export const replaceContents = (run, spec, now) => pinRests(run, replaceContentsRaw(run, spec, now), now);
+
+/** startToday, keeping the past rest days as they were (pinRests). @type {typeof startTodayRaw} */
+export const startToday = (run, now) => pinRests(run, startTodayRaw(run, now), now);
+
+/** resumeRun, keeping the past rest days as they were (pinRests). @type {typeof resumeRunRaw} */
+export const resumeRun = (run, now) => pinRests(run, resumeRunRaw(run, now), now);
