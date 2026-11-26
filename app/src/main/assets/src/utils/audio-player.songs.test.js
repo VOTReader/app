@@ -782,3 +782,23 @@ describe('a thumbs-down plays less in this device\'s shuffle (sy4-3 slice 5, Cor
     expect(meanAt(keys, down)).toBeGreaterThan(meanAt(keys, ids.slice(10)) + 20);
   });
 });
+
+/* Fix list 29: inside a queue the listener made (a letter with a song added), another version of the playing song
+   closed the sheet and changed nothing. A custom queue persists as it stands, so the take swaps in its place there. */
+describe('a version switch in a mixed queue (fix list 29)', () => {
+  it('swaps the playing take in place and keeps the rest of the queue', () => {
+    AudioPlayer.playSongs({ ids: ['aaaaaaaaaaa1'], label: 'One' });
+    const song = AudioPlayer.getState().queue[0];
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.addToQueue([song])).toBe(true);
+    const at = AudioPlayer.getState().queue.findIndex((t) => t.key === 'song:aaaaaaaaaaa1');
+    AudioPlayer.playAt(at);
+    const before = AudioPlayer.getState();
+    expect(AudioPlayer.switchSongVersion('aaaaaaaaaaa2')).toBe(true);
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(before.qi);
+    expect(s.queue[s.qi].key).toBe('song:aaaaaaaaaaa2');
+    expect(s.queue.filter((_t, i) => i !== s.qi).map((t) => t.key)).toEqual(before.queue.filter((_t, i) => i !== before.qi).map((t) => t.key));
+    expect(el().src).toBe(SONG_URL(1, 'aaaaaaaaaaa2'));
+  });
+});

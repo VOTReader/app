@@ -159,7 +159,9 @@ export function switchSongVersion(id) {
   }
   const src = _source;
   const cur = _state.queue[_state.qi];
-  if (!src || src.mode !== 'songs' || !_isSong(cur)) return false;
+  // Fix list 29: a queue the listener made (custom) persists as it stands, so the take swaps in its place there too.
+  const custom = !!src && src.mode === 'custom';
+  if (!src || (src.mode !== 'songs' && !custom) || !_isSong(cur)) return false;
   const curId = songIdOfKey(cur.key);
   const from = songById(curId);
   const to = songById(id);
@@ -176,7 +178,9 @@ export function switchSongVersion(id) {
   });
   /** @type {any} */
   let desc;
-  if (src.one && !Array.isArray(src.ids)) {
+  if (custom) {
+    desc = src;
+  } else if (src.one && !Array.isArray(src.ids)) {
     // One take per song ("Shuffle all songs", 900 of them): the descriptor stays small and keeps the choice as a
     // swap, keyed by the catalog's take at this place, which its rebuild replays over the same order.
     const swaps = { ...(cleanSongSwaps(src.swaps) || {}) };
