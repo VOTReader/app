@@ -5964,6 +5964,11 @@
     .rd-menu-sheet .more-menu-item:active { background: var(--surface-3); }
     .rd-menu-sheet .more-menu-item-text { flex: 1; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
     .rd-menu-sheet .more-menu-item-sub { font-size: var(--ts-meta); text-align: right; }
+    /* visual2-7 (11-26): a value that does not fit beside its name (the site under Copy website link, from 170%) wraps
+       under it and breaks only where it must, never past the sheet's edge; the hint's "Got it" never breaks. */
+    .rd-menu-sheet .more-menu-item:not(.more-menu-hint) .more-menu-item-text { flex-wrap: wrap; }
+    .rd-menu-sheet .more-menu-item-sub { max-width: 100%; overflow-wrap: anywhere; }
+    .rd-menu-sheet .more-menu-hint .more-menu-item-sub { flex: none; white-space: nowrap; }
     .rd-menu-sheet .more-menu-item > svg:first-child { box-sizing: content-box; flex: none; width: 20px; height: 20px; padding: 9px; border-radius: 10px; background: var(--surface-3); }
     .rd-menu-sheet .more-menu-item > svg:last-child:not(:first-child) { width: 18px; height: 18px; margin-left: auto; color: var(--text-3); }
     .rd-menu-sheet .more-menu-seg { padding: 2px; border-radius: var(--r-field); background: var(--surface-1); }
