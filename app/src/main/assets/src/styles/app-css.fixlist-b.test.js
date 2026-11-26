@@ -76,3 +76,11 @@ describe('#50 a tab picture starts below its ⋯ button', () => {
     expect(b).toMatch(/top:\s*44px/);
   });
 });
+
+describe("#53 'Couldn't copy' is drawn with the app's sheet parts", () => {
+  it('no Cinzel title or buttons, no pure-black box', () => {
+    expect(rule('.copy-fallback-title')).not.toMatch(/font-cinzel|font-family/);
+    expect(rule('.copy-fallback-btn') || '').not.toMatch(/font-cinzel|font-family/);
+    expect(rule('.copy-fallback-text')).toMatch(/background:\s*var\(--surface-2\)/);
+  });
+});

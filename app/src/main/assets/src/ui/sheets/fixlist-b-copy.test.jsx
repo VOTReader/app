@@ -43,3 +43,12 @@ describe('#32 a link whose place is gone says why', () => {
     expect(s).toMatch(/if \(!lnk\.target\) \{ sayPlaceGone\(\); return; \}/);
   });
 });
+describe("#53 'Couldn't copy' uses the shared title, body and button classes", () => {
+  it('ui-sheet-title, ui-sheet-body, ui-btn', () => {
+    const s = src('CopyFallbackSheet.jsx');
+    expect(s).toMatch(/className="ui-sheet-title copy-fallback-title"/);
+    expect(s).toMatch(/className="ui-sheet-body copy-fallback-help"/);
+    expect(s).toMatch(/className="ui-btn is-primary copy-fallback-btn primary"/);
+    expect(s).toMatch(/className="ui-btn copy-fallback-btn"/);
+  });
+});

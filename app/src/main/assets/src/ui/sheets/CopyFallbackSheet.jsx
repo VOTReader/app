@@ -59,10 +59,10 @@ export function CopyFallbackSheet({ text, verb, what = 'passage', onClose, onCop
         onClick={(e) => e.stopPropagation()}
       >
         <div className="copy-fallback-handle" aria-hidden="true" />
-        <h2 id="copy-fallback-title" className="copy-fallback-title">
+        <h2 id="copy-fallback-title" className="ui-sheet-title copy-fallback-title">
           {verb === 'share' ? 'Couldn’t share' : 'Couldn’t copy'}
         </h2>
-        <p id="copy-fallback-help" className="copy-fallback-help">
+        <p id="copy-fallback-help" className="ui-sheet-body copy-fallback-help">
           {stillBlocked
             ? 'Still blocked. Press and hold the ' + what + ', choose Select all, then Copy.'
             : 'Copy the selected ' + what + ' below, or try again.'}
@@ -76,8 +76,8 @@ export function CopyFallbackSheet({ text, verb, what = 'passage', onClose, onCop
           aria-label={'The ' + what}
         />
         <div className="copy-fallback-actions">
-          <button type="button" className="copy-fallback-btn primary" onClick={retry}>Try again</button>
-          <button type="button" className="copy-fallback-btn" onClick={() => onClose()}>Close</button>
+          <button type="button" className="ui-btn is-primary copy-fallback-btn primary" onClick={retry}>Try again</button>
+          <button type="button" className="ui-btn copy-fallback-btn" onClick={() => onClose()}>Close</button>
         </div>
       </div>
     </div>
