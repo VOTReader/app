@@ -2860,7 +2860,8 @@ async function nearest(query, options) {
     if (out.length >= limit) break;
     const f = msIndex.getStoredFields(s.id);
     if (!f || (corpusFilter && f.corpus !== corpusFilter) || (bookId && f.bookId !== bookId) || (volumeId && f.volumeId !== volumeId)) continue;
-    const key = String(f.text || '').slice(0, 60);
+    // The whole text: letters that only open alike ("This question was asked of The Lord, ...") are not reprints.
+    const key = String(f.text || '');
     if (seen.has(key)) continue;
     seen.add(key);
     const e = { score: 0, meaning: s.score, doc: reshapeDoc(f), terms: /** @type {string[]} */ ([]) };
