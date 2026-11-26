@@ -90,6 +90,12 @@ README.md has the table. What follows is what you do with it.
 and cost a shipped bug, two mixed-build races and an 8 s stylesheet stall. Do not split code again without a phone A/B
 that shows more than that. New DATA (a corpus, a translation, a model) stays lazy, through the loaders below.
 
+**A module two bundles import is bundled twice**, so each bundle gets its own copy of its module-scope variables.
+A module that holds state and is shared across b/c/d keeps that state in `sharedState` (`src/utils/shared-state.js`),
+or the other bundle calls bundle-b's window global instead of importing it. `npm run check:bundle-state` (and
+`tools/check-bundle-state.test.js` in the suite) refuses anything else; a harmless memo goes in its `ALLOWED` list
+with the reason.
+
 **The corpora** load through `__loadBibleCorpus()`, `__loadMatthewCorpus()` and `__loadVotCorpus()`. Screens wait
 on them through the same corpus objects. The contract and its one race class are in ARCHITECTURE.md, "Lazy corpora".
 
