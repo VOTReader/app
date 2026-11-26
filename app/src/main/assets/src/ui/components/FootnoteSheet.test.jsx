@@ -337,3 +337,61 @@ describe('the footnote counter', () => {
     expect(num()).toBe('Footnote 2 of 3');
   });
 });
+
+/* reader-behaviour-n1: a footnote that names one part of a Bible study ("See: PART 2 - Q & A ...",
+   its web link ending #PART_2_-_Q_.26_A...) opened the study at its first chapter, and the door said
+   "A letter" for every destination. The registry keys a study by its first chapter only. */
+describe('a footnote naming one part of a study lands on that part, and the door names a study', () => {
+  const g = /** @type {any} */ (globalThis);
+  const STUDY = 'The State of the Dead';
+  const URL_P2 = 'https://www.thevolumesoftruth.com/The_State_of_the_Dead#PART_2_-_Q_.26_A:_What_is_the_Fate_of_the_Wicked.3F';
+  beforeEach(() => {
+    g.InAppLinkButton = InAppLinkButton;
+    g.VOT_LETTER_REGISTRY = new Map([
+      [STUDY + '::' + STUDY, { id: 'sotd-1', screen: 'bible-study-chapter', studyId: 'sotd', studyChapterId: 'sotd-1', isStudy: true }],
+      ['Answers Only God Can Give::Regarding True Repentance', {}],
+    ]);
+    g.BIBLE_STUDIES = [{ id: 'sotd', slug: 'sotd', title: STUDY, chapters: [
+      { id: 'sotd-1', title: 'Introduction', blocks: [] },
+      { id: 'sotd-2', title: 'Q & A: What is the State of the Dead?', blocks: [] },
+      { id: 'sotd-3', title: 'Q & A: What is the Fate of the Wicked?', blocks: [] },
+    ] }];
+  });
+  afterEach(() => { delete g.VOT_LETTER_REGISTRY; delete g.BIBLE_STUDIES; delete g.InAppLinkButton; });
+
+  it('a footnote with its own in-app link opens the part its web link names', () => {
+    const onInAppLink = vi.fn();
+    const fn = { type: 'note', text: 'See: "PART 2 - Q & A: What is the Fate of the Wicked?"', url: URL_P2, link: { collection: STUDY, letterTitle: STUDY } };
+    render(<Sheet num="1" fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} onInAppLink={onInAppLink} />);
+    const btn = document.querySelector('.fn-sheet-link-btn');
+    expect(btn.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('A study · opens at “Q & A: What is the Fate of the Wicked?”');
+    fireEvent.click(btn);
+    expect(onInAppLink).toHaveBeenCalledWith(expect.objectContaining({ collection: STUDY, letterTitle: STUDY, studyChapterId: 'sotd-3' }));
+    expect(fn.link).toEqual({ collection: STUDY, letterTitle: STUDY });   // the corpus object is not touched
+  });
+
+  it('a web link alone does the same; with no section it opens the study as before', () => {
+    const onInAppLink = vi.fn();
+    const web = { type: 'note', text: 'See the study', url: URL_P2 };
+    render(<Sheet num="1" fn={web} nkjv={{}} footnotes={{ '1': web }} onClose={() => {}} onInAppLink={onInAppLink} />);
+    fireEvent.click(document.querySelector('.fn-sheet-link-btn'));
+    expect(onInAppLink).toHaveBeenCalledWith(expect.objectContaining({ studyChapterId: 'sotd-3' }));
+    cleanup(); onInAppLink.mockClear();
+    const bare = { type: 'note', text: 'See the study', url: 'https://www.thevolumesoftruth.com/The_State_of_the_Dead' };
+    render(<Sheet num="1" fn={bare} nkjv={{}} footnotes={{ '1': bare }} onClose={() => {}} onInAppLink={onInAppLink} />);
+    expect(document.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('A study · opens here in the app');
+    fireEvent.click(document.querySelector('.fn-sheet-link-btn'));
+    expect(onInAppLink.mock.calls[0][0].studyChapterId).toBeUndefined();
+  });
+
+  it('an Answers topic says "A topic", a letter "A letter"', () => {
+    const web = { type: 'note', text: 'See: "Regarding True Repentance"', url: 'https://answersonlygodcangive.com/Regarding_True_Repentance' };
+    render(<Sheet num="1" fn={web} nkjv={{}} footnotes={{ '1': web }} onClose={() => {}} onInAppLink={vi.fn()} />);
+    expect(document.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('A topic · opens here in the app');
+    cleanup();
+    g.VOT_LETTER_REGISTRY.set('Volume Three::Death and Deliverance', {});
+    const letter = { type: 'note', text: 'See it', url: 'https://www.thevolumesoftruth.com/Death_and_Deliverance' };
+    render(<Sheet num="1" fn={letter} nkjv={{}} footnotes={{ '1': letter }} onClose={() => {}} onInAppLink={vi.fn()} />);
+    expect(document.querySelector('.fn-sheet-link-eyebrow').textContent).toBe('A letter · opens here in the app');
+  });
+});

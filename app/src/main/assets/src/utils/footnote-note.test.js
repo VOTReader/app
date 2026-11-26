@@ -9,7 +9,7 @@ import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-import { parseFootnoteNote, joinFootnoteNote, hasFollowable, inAppTitleForUrl, findTitleIn, titleKey } from './footnote-note.js';
+import { parseFootnoteNote, joinFootnoteNote, hasFollowable, inAppTitleForUrl, findTitleIn, titleKey, studyPartFor } from './footnote-note.js';
 import { COLLECTIONS } from '../data/scripture-resolution.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +59,28 @@ describe('inAppTitleForUrl / findTitleIn', () => {
     expect(inAppTitleForUrl('https://www.thevolumesoftruth.com/Main_Page#The_Volumes_of_Truth_Online_Edition')).toBeNull();
     expect(inAppTitleForUrl('https://www.biblegateway.com/passage/?search=Matthew+3')).toBeNull();
     expect(inAppTitleForUrl('not a url')).toBeNull();
+  });
+  it('names the section a #fragment points at, in words, and never a text fragment (reader-behaviour-n1)', () => {
+    const SOTD = 'https://www.thevolumesoftruth.com/The_State_of_the_Dead_and_The_Fate_of_the_Wicked:_The_False_Doctrine_of_Hell_and_Eternal_Torment_Exposed';
+    expect(inAppTitleForUrl(SOTD + '#PART_2_-_Q_.26_A:_What_is_the_Fate_of_the_Wicked.3F')).toEqual({
+      title: 'The State of the Dead and The Fate of the Wicked: The False Doctrine of Hell and Eternal Torment Exposed', answers: false,
+      part: 'PART 2 - Q & A: What is the Fate of the Wicked?' });
+    expect(inAppTitleForUrl(SOTD + '#.28.2AVerses_Often_Stumbled_Over.29').part).toBe('(*Verses Often Stumbled Over)');
+    expect(inAppTitleForUrl('https://www.thevolumesoftruth.com/Trust_in_God_Alone#:~:text=And%20do%20not,from%20a%20tree.')).toEqual({ title: 'Trust in God Alone', answers: false });
+    expect(inAppTitleForUrl('https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Who_You_Choose:~:text=Who%20you').part).toBe('Who You Choose');
+  });
+  it('finds the study chapter a section names: by title, by the title it holds, or by a heading', () => {
+    const study = { chapters: [
+      { id: 's-1', title: 'Introduction', blocks: [] },
+      { id: 's-2', title: 'Q & A: What is the State of the Dead?', blocks: [{ type: 'heading', text: '(State of the dead)' }] },
+      { id: 's-3', title: 'Fourth Commandment:', blocks: [] },
+    ] };
+    expect(studyPartFor(study, 'Fourth Commandment')).toBe(study.chapters[2]);
+    expect(studyPartFor(study, 'PART 1 - Q & A: What is the State of the Dead?')).toBe(study.chapters[1]);
+    expect(studyPartFor(study, '(State of the dead)')).toBe(study.chapters[1]);
+    expect(studyPartFor(study, 'Nowhere in this study')).toBeNull();
+    expect(studyPartFor(study, '')).toBeNull();
+    expect(studyPartFor(null, 'Introduction')).toBeNull();
   });
   it('finds a title whatever its quotes and case, preferring the site the link named', () => {
     const keys = ['Volume Seven::The One Who Stays, Lets', 'Answers Only God Can Give::The One Who Stays, Lets', 'null::x'];
@@ -130,5 +152,25 @@ describe('footnote-note over every note footnote in the corpus', () => {
       if (!hit || (page.answers && hit.collection !== 'Answers Only God Can Give')) missing.push(fn.url);
     }
     expect(missing).toEqual([]);
+  });
+
+  it('every link to one part of a Bible study lands on that part (reader-behaviour-n1)', () => {
+    const studies = globalsOf('bible-studies.js').BIBLE_STUDIES;
+    const landed = [];
+    for (const fn of notes) {
+      const page = inAppTitleForUrl(fn.url);   // with or without its own in-app link (fn.link): the #section is in the url
+      if (!page || !page.part) continue;
+      const study = studies.find((s) => titleKey(s.title) === titleKey(fn.link ? fn.link.letterTitle : page.title));
+      if (!study) continue;
+      const ch = studyPartFor(study, page.part);
+      landed.push(page.part + ' -> ' + (ch ? ch.id : 'NOTHING'));
+    }
+    expect([...new Set(landed)].sort()).toEqual([
+      '(*Verses Often Stumbled Over) -> state-of-the-dead-ch3',
+      '(State of the dead) -> state-of-the-dead-ch2',
+      'PART 1 - Q & A: What is the State of the Dead? -> state-of-the-dead-ch2',
+      'PART 2 - Q & A: What is the Fate of the Wicked? -> state-of-the-dead-ch3',
+      'You Shall Not Add to nor Take Away -> trinity-exposed-ch5',
+    ]);
   });
 });

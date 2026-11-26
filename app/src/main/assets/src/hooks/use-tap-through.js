@@ -180,8 +180,13 @@ export function useTapThrough({
      next mount/letter-change, wraps the excerpt with <mark.letter-highlight>. */
   const openInAppLetter = (target, meta) => {
     if (!target || !target.letterTitle) return;
-    const dest = resolveVotLetter(target.collection, target.letterTitle);
+    let dest = resolveVotLetter(target.collection, target.letterTitle);
     if (!dest) return;
+    // reader-behaviour-n1: a link that names one part of a Bible study (inAppLinkForTitle's
+    // studyChapterId, from the url's #section) lands on that part, not the study's first chapter.
+    if (dest.isStudy && typeof target.studyChapterId === 'string' && target.studyChapterId && target.studyChapterId !== dest.studyChapterId) {
+      dest = { ...dest, id: target.studyChapterId, studyChapterId: target.studyChapterId };
+    }
     // Push source onto the back-nav stack so multi-level tap-throughs
     // unwind correctly (A → B → C → back → B → back → A). Source title +
     // volume label (from meta) populate the back-hint pill on the dest.

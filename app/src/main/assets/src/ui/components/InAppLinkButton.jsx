@@ -7,7 +7,11 @@ import { UiIcon } from './UiIcon.jsx';
 export function InAppLinkButton({ link, onActivate, compact, label }) {
   if (!link || !onActivate) return null;
   // r-foot (the UI pass): the door says what it is and where it opens, in place of the old "Open in App" eyebrow.
-  const where = (link.answers ? 'A topic' : 'A letter') + ' \u00B7 opens here in the app';
+  // It names where it goes: a topic (findTitleIn's hit has no `answers` flag, so by its collection), a Bible study
+  // at the part the link names, or a letter. Every door used to say "A letter" (reader-behaviour-n1).
+  const where = (link.answers || link.collection === 'Answers Only God Can Give') ? 'A topic \u00B7 opens here in the app'
+    : link.study ? (link.partTitle ? 'A study \u00B7 opens at \u201C' + link.partTitle + '\u201D' : 'A study \u00B7 opens here in the app')
+    : 'A letter \u00B7 opens here in the app';
   const title = link.letterTitle || label || "Open in App";
   if (compact) {
     return (

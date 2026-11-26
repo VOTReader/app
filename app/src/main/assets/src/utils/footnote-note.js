@@ -186,8 +186,10 @@ const SITE_HOSTS = /^(?:www\.)?(thevolumesoftruth\.com|answersonlygodcangive\.co
 
 /**
  * The in-app page a footnote's link names, as a title to look up, or null.
+ * A #fragment naming a section of the page (MediaWiki's anchor: "PART_2_-_Q_.26_A")
+ * comes back as `part`, in words; a text fragment (#:~:text=) names no section.
  * @param {string | null | undefined} url
- * @returns {{ title: string, answers: boolean } | null}
+ * @returns {{ title: string, answers: boolean, part?: string } | null}
  */
 export function inAppTitleForUrl(url) {
   let u;
@@ -198,7 +200,42 @@ export function inAppTitleForUrl(url) {
   try { path = decodeURIComponent(u.pathname.replace(/^\//, '')); } catch (_e) { return null; }
   const title = path.replace(/_/g, ' ').trim();
   if (!title || /^Main Page$/i.test(title) || title.includes('/')) return null;
-  return { title, answers: /answers/i.test(host[1]) };
+  const part = anchorWords(u.hash.replace(/^#/, '').split(':~:')[0]);
+  return part ? { title, answers: /answers/i.test(host[1]), part } : { title, answers: /answers/i.test(host[1]) };
+}
+
+/** A MediaWiki section anchor in words (".28" is "(", "_" a space), or '' when it names nothing. @param {string} anchor */
+function anchorWords(anchor) {
+  if (!anchor) return '';
+  let s = anchor;
+  try { s = decodeURIComponent(s); } catch (_e) { /* keep it as written */ }
+  try { s = decodeURIComponent(s.replace(/%/g, '%25').replace(/\.([0-9A-Fa-f]{2})/g, '%$1')); } catch (_e) { /* keep it as written */ }
+  return s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The chapter of a Bible study that a section anchor names (inAppTitleForUrl's `part`), or null:
+ * a chapter of that title, else the longest chapter title the section's name holds ("PART 1 - Q & A:
+ * What is the State of the Dead?" holds "Q & A: What is the State of the Dead?"), else the chapter
+ * with a heading of that name.
+ * @param {{ chapters?: Array<{ id: string, title?: string, blocks?: Array<{ type?: string, text?: string }> }> } | null | undefined} study
+ * @param {string | null | undefined} part
+ * @returns {{ id: string, title?: string } | null}
+ */
+export function studyPartFor(study, part) {
+  const want = titleKey(part);
+  const chs = study && Array.isArray(study.chapters) ? study.chapters.filter(Boolean) : [];
+  if (!want || !chs.length) return null;
+  const same = chs.find((c) => titleKey(c.title) === want);
+  if (same) return same;
+  let best = null;
+  let bestLen = 0;
+  for (const c of chs) {
+    const k = titleKey(c.title);
+    if (k.length >= 8 && k.length > bestLen && want.includes(k)) { best = c; bestLen = k.length; }
+  }
+  if (best) return best;
+  return chs.find((c) => Array.isArray(c.blocks) && c.blocks.some((b) => b && b.type === 'heading' && titleKey(b.text) === want)) || null;
 }
 
 /** A title as compared: case, quotes, punctuation and spacing aside.

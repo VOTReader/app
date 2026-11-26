@@ -9,32 +9,66 @@ import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 import { WebDoorButton } from './footnote-web-door.jsx';
 import { EditionCompare } from './EditionCompare.jsx';
 import { FootnoteNoteText } from './FootnoteNoteText.jsx';
-import { inAppTitleForUrl, findTitleIn } from '../../utils/footnote-note.js';
+import { inAppTitleForUrl, findTitleIn, studyPartFor } from '../../utils/footnote-note.js';
 
 /** The registry's "<collection>::<title>" keys (index.html builds it from the corpora on the page). */
 function registryKeys() {
   return typeof VOT_LETTER_REGISTRY !== 'undefined' && VOT_LETTER_REGISTRY ? VOT_LETTER_REGISTRY.keys() : [];
 }
 
-/** A letter, entry or topic by its title, as an in-app link, or null. @param {string} title @param {boolean} [answers] */
-export function inAppLinkForTitle(title, answers = false) {
-  return findTitleIn(registryKeys(), title, answers);
+/** The registry's destination for a found title (index.html's entry: isStudy, studyId...), or null.
+    @param {{ collection: string, letterTitle: string }} hit @returns {any} */
+function registryDest(hit) {
+  return typeof VOT_LETTER_REGISTRY !== 'undefined' && VOT_LETTER_REGISTRY && typeof VOT_LETTER_REGISTRY.get === 'function'
+    ? VOT_LETTER_REGISTRY.get(hit.collection + '::' + hit.letterTitle) || null : null;
+}
+
+/**
+ * A letter, entry or topic by its title, as an in-app link, or null. A Bible study comes back marked
+ * `study`, and when the link names one of its parts (`part`, the url's #section) it carries that
+ * chapter: the study opens there, not on its first chapter (reader-behaviour-n1).
+ * @param {string} title @param {boolean} [answers] @param {string} [part]
+ */
+export function inAppLinkForTitle(title, answers = false, part = undefined) {
+  const hit = findTitleIn(registryKeys(), title, answers);
+  return hit ? withStudyPart(hit, part) : null;
+}
+
+/**
+ * A footnote's own in-app link (fn.link), carrying the part of a Bible study its web link's
+ * #section names: most study footnotes have both, and fn.link alone opened the first chapter.
+ * @param {any} fn
+ */
+export function footnoteInAppLink(fn) {
+  if (!fn || !fn.link) return null;
+  const page = fn.url ? inAppTitleForUrl(fn.url) : null;
+  return withStudyPart(fn.link, page ? page.part : undefined);
+}
+
+/** @param {{ collection: string, letterTitle: string }} hit @param {string} [part] */
+function withStudyPart(hit, part) {
+  const dest = registryDest(hit);
+  if (!dest || !dest.isStudy) return hit;
+  const all = typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [];
+  const study = all.find((s) => s && (s.slug === dest.studyId || s.id === dest.studyId)) || null;
+  const ch = part ? studyPartFor(study, part) : null;
+  return ch ? { ...hit, study: true, studyChapterId: ch.id, partTitle: ch.title || '' } : { ...hit, study: true };
 }
 
 /**
  * Open the in-app page a footnote's web link names (share-fn): an Answers topic
  * may not be on the page yet, so it is fetched first; a page still not found
  * opens on the web, as the link always did.
- * @param {{ title: string, answers: boolean }} page @param {string} url @param {(link: any) => void} onInAppLink
+ * @param {{ title: string, answers: boolean, part?: string }} page @param {string} url @param {(link: any) => void} onInAppLink
  */
 export function openInAppPage(page, url, onInAppLink) {
-  const hit = inAppLinkForTitle(page.title, page.answers);
+  const hit = inAppLinkForTitle(page.title, page.answers, page.part);
   if (hit) { onInAppLink(hit); return; }
   const web = () => { try { window.open(url, '_blank', 'noopener'); } catch (_e) { /* nothing more to try */ } };
   const load = page.answers && typeof window.__loadAnswersCorpus === 'function' ? window.__loadAnswersCorpus() : null;
   if (!load) { web(); return; }
   Promise.resolve(load).then(() => {
-    const found = inAppLinkForTitle(page.title, page.answers);
+    const found = inAppLinkForTitle(page.title, page.answers, page.part);
     if (found) onInAppLink(found); else web();
   }, web);
 }
@@ -83,7 +117,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   useModalRegistry({ id: 'fn-sheet-inner-ref:' + innerId, dismiss: () => setInner(null), active: !!inner });
   const innerVerse = inner ? (nkjv?.[inner] || lookupVersesFromBooks(inner) || null) : null;
   const page = fn && fn.type !== 'scripture' && fn.url && !fn.link ? inAppTitleForUrl(fn.url) : null;
-  const pageLink = page && onInAppLink ? (inAppLinkForTitle(page.title, page.answers) || (page.answers ? { letterTitle: page.title } : null)) : null;
+  const pageLink = page && onInAppLink ? (inAppLinkForTitle(page.title, page.answers, page.part) || (page.answers ? { letterTitle: page.title, answers: true } : null)) : null;
   // Build ordered key list once we know the footnotes dict; keys are
   // typically numeric strings ("1", "2", "10"), so sort numerically when
   // possible and fall back to lexical order for unusual keys.
@@ -175,7 +209,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                     />
                   </div>
                 )}
-                {fn.link && <InAppLinkButton link={fn.link} onActivate={onInAppLink} />}
+                {fn.link && <InAppLinkButton link={footnoteInAppLink(fn)} onActivate={onInAppLink} />}
                 {pageLink && page && <InAppLinkButton link={pageLink} onActivate={() => openInAppPage(page, fn.url, onInAppLink)} />}
                 {fn.url && (
                   <div className={(fn.link || fn.text) ? "fn-sheet-url-extra" : "fn-sheet-note"}>

@@ -7,7 +7,7 @@ import { sheetReference } from '../../utils/passage-copy.js';
 import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 import { WebDoorButton } from './footnote-web-door.jsx';
 import { FootnoteNoteText } from './FootnoteNoteText.jsx';
-import { inAppLinkForTitle, openInAppPage } from './FootnoteSheet.jsx';
+import { inAppLinkForTitle, openInAppPage, footnoteInAppLink } from './FootnoteSheet.jsx';
 import { inAppTitleForUrl } from '../../utils/footnote-note.js';
 
 export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, onRef = null }) {
@@ -96,11 +96,11 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, o
                     {fn.link && " "}
                   </span>
                 )}
-                {fn.link && <InAppLinkButton compact={true} link={fn.link} onActivate={onInAppLink} />}
+                {fn.link && <InAppLinkButton compact={true} link={footnoteInAppLink(fn)} onActivate={onInAppLink} />}
                 {(() => {
                   // share-fn: a web link to a page the app has (an Answers topic, a letter) opens it here.
                   const page = !fn.link && fn.url && onInAppLink ? inAppTitleForUrl(fn.url) : null;
-                  const link = page ? (inAppLinkForTitle(page.title, page.answers) || (page.answers ? { letterTitle: page.title } : null)) : null;
+                  const link = page ? (inAppLinkForTitle(page.title, page.answers, page.part) || (page.answers ? { letterTitle: page.title, answers: true } : null)) : null;
                   return page && link ? <InAppLinkButton compact={true} link={link} onActivate={() => openInAppPage(page, fn.url, onInAppLink)} /> : null;
                 })()}
                 {fn.url && !(fn.link && inAppTitleForUrl(fn.url)) && <span className={(fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text"}><a href={fn.url} target="_blank" rel="noopener noreferrer" className="fn-link" onClick={(e) => e.stopPropagation()}>{(fn.link || fn.text) ? "Open external link" : fn.url}</a></span>}

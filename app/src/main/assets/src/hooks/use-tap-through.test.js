@@ -293,3 +293,25 @@ describe('useTapThrough — openInAppLetter', () => {
     expect(props.setScreen).not.toHaveBeenCalled();
   });
 });
+
+// reader-behaviour-n1: a footnote whose link names one part of a study (#PART_2 ...) lands on
+// that part. The registry keys a study by its first chapter, so the link carries the part.
+describe('useTapThrough — openInAppLetter on a named part of a study', () => {
+  it('lands on the chapter the link names, and the back pill watches that chapter', () => {
+    const props = baseProps();
+    const { result } = renderHook(() => useTapThrough(props));
+    act(() => { result.current.openInAppLetter({ collection: 'study-bundle', letterTitle: 'The Lamb of God', studyChapterId: 'lamb-3' }, null); });
+    expect(props.setStudyId).toHaveBeenCalledWith('lamb-of-god');
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('lamb-3');
+    expect(props.pushFromLetter.mock.calls[0][0].destSnapshot).toEqual({ screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: 'lamb-of-god', studyChapterId: 'lamb-3' });
+  });
+  it('a link with no part still opens the study at its first chapter, and a letter ignores a stray part', () => {
+    const props = baseProps();
+    const { result } = renderHook(() => useTapThrough(props));
+    act(() => { result.current.openInAppLetter({ collection: 'study-bundle', letterTitle: 'The Lamb of God' }, null); });
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('lamb-1');
+    act(() => { result.current.openInAppLetter({ collection: 'two', letterTitle: 'The Wide Path', studyChapterId: 'lamb-3' }, null); });
+    expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
+    expect(props.setStudyChapterId).toHaveBeenCalledTimes(1);
+  });
+});
