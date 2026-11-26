@@ -8121,10 +8121,13 @@
     .sw-filter-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 0 calc(16px + var(--sw-safe-right)) calc(14px + var(--sw-safe-bottom)) 16px; }
     .sw-filter-name { display: block; margin: 10px 0 5px; font-size: var(--fsc-12); font-weight: 600; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sw-gold); }
     /* the filters' rows and My Web's Yours | Timothy's notes: a tray with the chosen part lifted and ringed */
-    .sw-root :is(.sw-filter-seg, .sw-list-tabs) { display: flex; width: 100%; box-sizing: border-box; padding: 2px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+    /* Fix list #35: the unpicked choices were bare words on the tray ('Old to Old  Old to New  New to New' read as one
+       line of text); each now has a faint fill and edge, with a gap, so the row reads as separate buttons. */
+    .sw-root :is(.sw-filter-seg, .sw-list-tabs) { display: flex; gap: 2px; width: 100%; box-sizing: border-box; padding: 2px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
     .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn {
       flex: 1 1 0; min-width: 0; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 0 6px; border: 0; border-radius: 8px; background: none; color: var(--sw-text-meta); font: 500 var(--fsc-14) var(--font-ui); white-space: nowrap;
+      padding: 0 6px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+      color: var(--sw-text-meta); font: 500 var(--fsc-14) var(--font-ui); white-space: nowrap;
     }
     .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn.is-on { background: rgba(255, 255, 255, 0.1); color: var(--sw-title); box-shadow: inset 0 0 0 1px rgba(214, 179, 95, 0.45); }
     .sw-filter-dot { flex: none; width: 8px; height: 8px; border-radius: 4px; }

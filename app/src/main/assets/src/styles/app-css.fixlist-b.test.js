@@ -60,3 +60,12 @@ describe('#20 follow-up: a cut/keep meta line flows as text at large text', () =
     expect(rule('.vot-large-text .ui-meta-keep')).toMatch(/white-space:\s*normal/);
   });
 });
+
+describe('#35 Scripture Web filter choices read as buttons', () => {
+  it('unpicked choices have a resting fill and edge, with a gap between them', () => {
+    const b = rule('.sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn');
+    expect(b).not.toMatch(/background:\s*none/);
+    expect(b).toMatch(/box-shadow:\s*inset 0 0 0 1px/);
+    expect(rule('.sw-root :is(.sw-filter-seg, .sw-list-tabs)')).toMatch(/gap:\s*2px/);
+  });
+});
