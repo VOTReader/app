@@ -26,3 +26,12 @@ describe('#26 Pin tab names the button the Tabs bar has', () => {
     expect(s).toMatch(/Close other tabs and Close all/);
   });
 });
+
+describe('#23 empty Bookmarks: Start reading opens Letter 1 like Notes, Links, History and Highlights', () => {
+  it('the bookmarks route hands the screen onStartReading', () => {
+    const s = src('../screen-routes.jsx');
+    const at = s.indexOf("'bookmarks-index': () => _kickVot(");
+    const block = s.slice(at, s.indexOf('/>', at));
+    expect(block).toMatch(/onStartReading=\{\(\) => _openFirstLetter\('Bookmarks'\)\}/);
+  });
+});

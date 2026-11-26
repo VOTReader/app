@@ -1569,6 +1569,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         onBack={goNavOrigin}
         onHome={goHome}
+        onStartReading={() => _openFirstLetter('Bookmarks')}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
