@@ -34,6 +34,19 @@
       @keyframes hydrationBreathe { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
       @keyframes hydrationLate { to { opacity: 1; } }
       body.light .hydration-loading { background: #f7f2e8; }
+      /* platform-3: the app did not arrive (index.html's mount script). It says why, so the slow-connection line goes. */
+      .hydration-loading.boot-failed::after { content: none; }
+      .boot-failed .hydration-loading-text { animation: none; }
+      .boot-failed-text {
+        max-width: 20rem; margin: 0; padding: 0 1.5rem; text-align: center;
+        font-family: var(--font-body, Georgia, serif); font-size: var(--fs-16, 1rem); line-height: 1.45;
+        color: var(--cream, #e8e0cf);
+      }
+      body.light .boot-failed-text { color: #3a3226; }
+      .boot-failed-retry {
+        min-height: 44px; padding: 0 1.25rem; border-radius: 22px; border: 1px solid var(--gold, #c9a24a);
+        background: transparent; color: var(--gold, #c9a24a); font: inherit; font-size: var(--fs-16, 1rem);
+      }
 
       /* Generic .vot-toast — bottom-of-screen transient notification.
          Used by the showToast utility (src/utils/toast.js) for the

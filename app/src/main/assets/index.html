@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-jzS7uGxa3/DUiU2OT3vhq86781wqd4NsRiihvEjmTFE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-jzS7uGxa3/DUiU2OT3vhq86781wqd4NsRiihvEjmTFE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-krJg4PRGUrd8KWA/ZM2r5tvAdcufgh1Sg/3qV67DaYY=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -777,9 +777,42 @@ const SRCH_QUICK_PICKS = [
     window.HydrationGate = HydrationGate;
     window.StaticSubtree = StaticSubtree;
   </script>
+  <!-- THE APP DID NOT ARRIVE (platform-3, audit 2026-11-23). bundle-d holds regex lookbehinds, which Safari/iOS
+       before 16.4 cannot parse (the floor beside Rule 6 in CLAUDE.md): App was never defined, this script threw, and
+       the splash stayed for good under "The first open can take a minute on a slow connection.". With no App, #root
+       says what happened: a browser too old for the app, or (one that knows lookbehind) scripts that did not all
+       load, with a Try again. tools/boot-too-old.test.js. -->
   <script>
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(HydrationGate, null, /*#__PURE__*/React.createElement(App, null))));
+const root = typeof App === "undefined" ? null : ReactDOM.createRoot(document.getElementById("root"));
+if (root) root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(HydrationGate, null, /*#__PURE__*/React.createElement(App, null))));
+else (function () {
+  var old = false;
+  try { new RegExp("(?<=a)b"); } catch (e) { old = true; }
+  var box = document.createElement("div");
+  box.className = "hydration-loading boot-failed";
+  box.setAttribute("role", "alert");
+  var name = document.createElement("div");
+  name.className = "hydration-loading-text";
+  name.textContent = "VOTReader";
+  var say = document.createElement("p");
+  say.className = "boot-failed-text";
+  say.textContent = old
+    ? "This browser is too old to open VOTReader. On an iPhone or iPad, update to iOS 16.4 or later; on anything else, update the browser or open the site in another one."
+    : "VOTReader did not finish loading. Check the connection and try again.";
+  box.appendChild(name);
+  box.appendChild(say);
+  if (!old) {
+    var again = document.createElement("button");
+    again.type = "button";
+    again.className = "boot-failed-retry";
+    again.textContent = "Try again";
+    again.addEventListener("click", function () { location.reload(); });
+    box.appendChild(again);
+  }
+  var host = document.getElementById("root");
+  host.textContent = "";
+  host.appendChild(box);
+})();
 </script>
   <!-- Cloudflare Web Analytics (cfa1): one page view per open of the WEBSITE, spa off; nothing about it is shown.
        bc1 (Corbin via hub 2026-10-05): the website only. The phone app (appassets.androidplatform.net), the
