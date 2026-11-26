@@ -366,8 +366,10 @@ export function runStatus(run, now) {
   if (!finished && !notStarted && gap > 0) {
     // A day done only by credit (read before the start) counts as read on the start date, so the empty days after it
     // still come first: Ruth 1 credited, the start day is Day 1 and Ruth 2 falls on day 3, never on the start day.
-    const doneOn = dayDoneOn(run, last);
-    const lastOn = doneOn === '' ? startN : dayNum(doneOn || '');
+    // Only a real day with readings can be credited: a plan that opens with empty days (2 Peter over 7 days) has no
+    // day read yet, and its empty days count from the start date as the layout lays them out.
+    const doneOn = last >= 0 ? dayDoneOn(run, last) : null;
+    const lastOn = last < 0 ? (startN == null ? null : startN - 1) : doneOn === '' ? startN : dayNum(doneOn || '');
     const due = lastOn == null ? null : nthReadingDay(run, lastOn + 1, gap);
     if (lastOn != null && due != null && due > today + (doneToday ? 1 : 0)) {
       // A paused plan keeps no date ahead (its finish waits) but still counts its day as the card did.
