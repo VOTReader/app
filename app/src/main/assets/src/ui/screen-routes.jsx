@@ -1789,6 +1789,9 @@ export function buildScreenRoutes({
           // component over books that carry no votNotes at all.
           noteWeights={MATTHEW_NOTE_RATIO}
           markAsReadEnabled={settings.markAsRead}
+          // Fix list 25: the reader's Chapter Titles and Restored Names reach this index as they reach bible-idx.
+          restoredNames={settings.restoredNames}
+          showChapterTitle={settings.showChapterTitle !== false}
           bookmarkKeyFor={(num) => 'bible:matthew:' + num}
           theme={theme} onThemeChange={setTheme}
         />
