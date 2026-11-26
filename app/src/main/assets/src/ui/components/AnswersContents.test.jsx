@@ -74,8 +74,9 @@ describe('AnswersContents — "On this page" (f10)', () => {
     expect(onSection).toHaveBeenCalledWith(2);
     fireEvent.click(document.querySelectorAll('.ans-toc-ex')[1]);
     expect(onExcerpt).toHaveBeenCalledWith(rows[0].ex[1].at);
-    expect(typeof window.__closeSheet).toBe('function');
-    act(() => window.__closeSheet());
+    // Back reaches the sheet through the modal registry (hooks-1), not window.__closeSheet.
+    expect(modalRegistry.peek().id).toMatch(/^ans-sheet:/);
+    act(() => { modalRegistry.peek().dismiss('back'); });
     expect(onClose).toHaveBeenCalled();
   });
 

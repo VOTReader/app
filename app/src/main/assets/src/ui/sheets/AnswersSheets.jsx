@@ -13,8 +13,8 @@
      ChartViewer         a chart, pinch and double-tap to zoom (offline: the
                          images are precached)
 
-   Each is the kit sheet (.select-sheet, SheetHandle, useFocusTrap,
-   window.__closeSheet for Escape and Android Back), one at a time: the
+   Each is the kit sheet (.select-sheet, SheetHandle, useFocusTrap, the
+   modal registry for Escape and Android Back), one at a time: the
    landing holds which one is open in its module memory, so Back from a
    topic opened here comes back to the sheet (U5).
    ═══════════════════════════════════════════════════════════════════════ */
@@ -34,11 +34,9 @@ const ansSheetOf = (/** @type {HTMLElement} */ t) => /** @type {HTMLElement | nu
  * @param {{ label: string, head?: any, tall?: boolean, viewer?: boolean, onClose: () => void, children?: any }} props
  */
 export function AnsSheet({ label, head, tall, viewer, onClose, children }) {
-  React.useEffect(() => {
-    const prev = window.__closeSheet;
-    window.__closeSheet = onClose;
-    return () => { window.__closeSheet = prev || null; };
-  }, [onClose]);
+  // hooks-1: Escape and Android Back reach the sheet through the modal registry (topmost first), not the
+  // legacy window.__closeSheet slot.
+  useModalRegistry({ id: 'ans-sheet:' + React.useId(), dismiss: onClose });
   const trapRef = useFocusTrap(true);
   return ReactDOM.createPortal(
     <>

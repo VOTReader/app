@@ -297,7 +297,9 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     // WA2 (a-cmd): step to the next commandment without closing
     fireEvent.click(screen.getByRole('button', { name: /^Next commandment: III/ }));
     expect(screen.getByRole('dialog').querySelector('.ans-k').textContent).toBe('The Third Commandment');
-    act(() => { window.__closeSheet(); });
+    expect(window.__closeSheet, 'hooks-1: the sheet is on the modal registry, not the legacy slot').toBeUndefined();
+    expect(modalRegistry.peek().id).toMatch(/^ans-sheet:/);
+    act(() => { modalRegistry.peek().dismiss('back'); });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -309,7 +311,7 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     act(() => { fireEvent.click(tablet); });
     const sheet = screen.getByRole('dialog');
     expect(document.activeElement).toBe(within(sheet).getByLabelText('Close'));
-    act(() => { window.__closeSheet(); });
+    act(() => { modalRegistry.peek().dismiss('back'); });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(tablet);
   });
