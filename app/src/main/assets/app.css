@@ -3144,9 +3144,11 @@
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
     :is(.ui-btn.is-text):active { background-color: transparent; color: var(--text-1); }
     @media (hover:hover) { :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn):hover { background-color: var(--surface-2); } }
-    .root-explore { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--grid-gap); }
+    /* Fix list #12: two equal columns cut 'Scripture Web' onto two lines at text 1; each pill now takes its words' width
+       and grows, and when both no longer fit (large text) each takes a full row. */
+    .root-explore { display: flex; flex-wrap: wrap; gap: var(--grid-gap); }
     /* Explore's two buttons are the secondary button: surface fill, primary text, gold icon */
-    .root-explore-btn { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: var(--btn-h); padding: 0 18px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; cursor: pointer; transition: background-color var(--press) ease; }
+    .root-explore-btn { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: var(--btn-h); padding: 0 18px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; cursor: pointer; transition: background-color var(--press) ease; }
     .root-explore-btn svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); color: var(--accent); }
     .root-explore-btn:disabled { opacity: 0.6; cursor: default; }
     .root-screen .home-status { max-width: none; }
