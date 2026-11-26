@@ -712,7 +712,7 @@
          grey over cream); --scrim is the warm one the reader menu already uses. */
       body.light :is(.sh-modal-backdrop, .audio-manager-backdrop, .fn-sheet-backdrop, .select-sheet-backdrop, .disable-tabs-overlay,
         .link-picker-overlay, .note-sheet-overlay, .nb-picker-overlay, .multinote-overlay, .install-steps-backdrop) { background: var(--scrim); }
-      body.light :is(.home-eyebrow, .coverage-badge-no-recording, .idx-min-chip) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
+      body.light :is(.coverage-badge-no-recording, .idx-min-chip) { opacity: 1; }   /* the dark gold faded read 3.2-3.7:1 */
       /* words drawn in the tertiary ink: --text-3 (#8a8070) is the chevrons' 3:1 ink, 3.5:1 on parchment; text takes --text-2 */
       body.light :is(.plan-ribbon-why, .ws3-about-build, .tour-never) { color: var(--text-2); }
       body.light .song-lyrics-follow.is-on { color: var(--text-1); }
@@ -1053,17 +1053,6 @@
          13 reading screens. LetterView now renders the standard
          `nav-home nav-back-icon` through LibraryNav. Do not reintroduce. */
       .nav-arrows { flex-shrink: 0; }
-      .nav-btn {
-        font-family: 'Cinzel', serif; letter-spacing: 0.1em;
-        color: var(--cream-muted); background: transparent;
-        border: 1px solid var(--gold-border); border-radius: 4px;
-        cursor: pointer; transition: all var(--transition);
-        white-space: nowrap; text-transform: uppercase;
-        max-width: 32vw; overflow: hidden; text-overflow: ellipsis;
-        min-height: 40px; display: flex; align-items: center; flex-shrink: 1; min-width: 0;
-      }
-      @media (hover: hover) { .nav-btn:hover:not(:disabled) { color: var(--gold); border-color: var(--gold); background: var(--gold-faint); } }
-      .nav-btn:disabled { opacity: 0.22; cursor: default; }
       /* ── Minimal arrow-only prev/next — clean circular chrome for chapter/letter nav ── */
       .nav-arrow-btn {
         position: relative; display: inline-flex; align-items: center; justify-content: center;
@@ -1452,7 +1441,6 @@
       .np-tool-box { position: relative; width: 100%; max-width: 72px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--gold-border); border-radius: 8px; }
       .np-tool-box svg { width: 24px; height: 24px; }
       .np-tool.is-on .np-tool-box { border-color: var(--gold); background: var(--gold-faint); }
-      .np-tool-rate { color: var(--cream); font-family: var(--font-body); font-size: clamp(14px, var(--fs-16), 22px); font-variant-numeric: tabular-nums; }
       .np-tool-badge {
         position: absolute; top: -9px; right: -9px; min-width: 22px; height: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
         border-radius: 11px; background: var(--gold); color: var(--bg); font-size: var(--fs-12); font-weight: 600; font-variant-numeric: tabular-nums;
@@ -1592,11 +1580,7 @@
       /* ── LISTENING LIBRARY — one calm, tactile shelf language shared by the
          hub, the saved shelf, and a source's recordings screen. ── */
       .audio-library-screen { width:100%; max-width:860px; margin:0 auto; padding:1.4rem min(1.45rem,5vw) 3rem; background:var(--bg); }
-      .audio-library-hero { position:relative; padding:.55rem 0 1.35rem; overflow:hidden; }
-      .audio-library-hero::after { content:""; position:absolute; width:20rem; height:20rem; right:-11rem; top:-13rem; border:1px solid rgba(200,164,86,.16); border-radius:50%; box-shadow:0 0 0 1.2rem rgba(200,164,86,.025),0 0 0 3.1rem rgba(200,164,86,.018); pointer-events:none; }
-      .audio-library-eyebrow { position:relative; z-index:1; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; }
       .audio-library-screen h1 { position:relative; z-index:1; margin:.27rem 0 0; color:var(--cream); font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4.6vw,var(--fs-30)); font-weight:400; line-height:1.16; }
-      .audio-library-intro { position:relative; z-index:1; margin:.58rem 0 0; max-width:38rem; color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; line-height:1.55; }
       /* Studies (Codex critique 2 + 4, 2026-09-23): the head's listen/read split, and a partly recorded study's text-only chapters. */
       .audio-collection-text-only { position:relative; z-index:1; margin:var(--sp-2) 2px var(--sp-3); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
       .audio-collection-text-only-link { background:none; border:0; padding:.2rem 0; min-height:24px; color:var(--accent); font:inherit; text-decoration:underline; text-decoration-color:var(--gold-border); text-underline-offset:.18em; cursor:pointer; }
@@ -1766,9 +1750,6 @@
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
       .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-      .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
-      .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }
-      .audio-library-search label { flex:1; min-width:0; }.audio-library-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-13); }.audio-library-search input::placeholder { color:var(--cream-dim); opacity:.75; }.audio-library-search button { min-width:44px; min-height:44px; padding:.2rem .35rem; border:0; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-10); }.audio-library-search:focus-within { border-color:var(--gold); background:rgba(200,164,86,.055); }
       @keyframes audio-library-wave { from { transform:scaleY(.55); opacity:.52; } to { transform:scaleY(1.35); opacity:1; } }
       /* wrap: the card gained prev/next (2026-08-09), so five controls can sit
          here — at 360px they wrap onto a second line instead of overflowing. */
@@ -1777,24 +1758,17 @@
          painted-div progressbar it replaces could be read but never moved.
          Same --seek-pct fill contract as the bar's and the desk's. */
       /* Prev/next beside Resume — same conditional rules as the mini-player. */
-      .audio-library-section { margin-top:1.8rem; }
-      .audio-library-disclosure { width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:7px; background:transparent; color:var(--gold-dim); cursor:pointer; }.audio-library-disclosure svg { width:18px; height:18px; transition:transform .18s ease; }.audio-library-disclosure.is-open svg { transform:rotate(180deg); }
-      .audio-library-more { display:block; width:100%; min-height:44px; margin-top:.1rem; padding:.4rem; border:1px solid rgba(200,164,86,.16); border-top:0; border-radius:0 0 10px 10px; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-11); }
-      .audio-library-list { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-top:0; border-radius:0 0 10px 10px; background:rgba(0,0,0,.045); }.audio-library-row { position:relative; display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:.56rem; padding:.42rem .5rem; border-top:1px solid rgba(200,164,86,.13); transition:background .16s ease; }.audio-library-row:first-child { border-top:0; }.audio-library-row.is-current { background:rgba(200,164,86,.085); }.audio-library-row.is-current::before { content:""; position:absolute; left:0; top:.5rem; bottom:.5rem; width:2px; background:var(--gold); border-radius:0 2px 2px 0; }
+      .audio-library-row { position:relative; display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:.56rem; padding:.42rem .5rem; border-top:1px solid rgba(200,164,86,.13); transition:background .16s ease; }.audio-library-row:first-child { border-top:0; }.audio-library-row.is-current { background:rgba(200,164,86,.085); }.audio-library-row.is-current::before { content:""; position:absolute; left:0; top:.5rem; bottom:.5rem; width:2px; background:var(--gold); border-radius:0 2px 2px 0; }
       .audio-library-row-play { width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid rgba(200,164,86,.26); border-radius:50%; background:rgba(200,164,86,.045); color:var(--gold); cursor:pointer; }.audio-library-row-play svg { width:17px; height:17px; }.audio-library-row-play.is-playing { border-color:var(--gold); background:var(--gold); color:#17130a; }
       .audio-library-row-copy { min-width:0; min-height:47px; padding:.1rem 0; display:flex; flex-direction:column; justify-content:center; gap:.12rem; }.audio-library-row-copy strong { overflow:hidden; color:var(--cream); font-size:var(--fs-13); font-weight:500; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
       .audio-library-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:.1rem; }.audio-library-row-actions > span { max-width:5.4rem; overflow:hidden; padding:0 .12rem; color:var(--cream-dim); font-size:var(--fs-10); text-align:right; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-actions > span.audio-library-remaining { color:var(--gold-dim); font-variant-numeric:tabular-nums; }
-      .audio-library-empty { margin:0; padding:1rem .85rem .1rem; color:var(--cream-dim); font-size:var(--fs-12); font-style:italic; line-height:1.5; }.audio-library-empty b { color:var(--cream); font-style:normal; font-weight:500; }.audio-library-retry { margin:.5rem 0 0; min-height:44px; padding:0 1.2rem; border-radius:999px; border:1px solid var(--ink-gold-border, currentColor); background:transparent; color:var(--cream); font:inherit; font-style:normal; cursor:pointer; }
-      .audio-library-search button:focus-visible, .audio-library-icon-button:focus-visible, .audio-library-row-play:focus-visible, .audio-library-disclosure:focus-visible, .audio-library-more:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      .audio-library-icon-button:focus-visible, .audio-library-row-play:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       /* On parchment the primary action is a dark-gold button, so its text is the page ground, not the
          near-black meant for the bright gold of the dark theme: #17130a read 2.97:1 on light --gold and
          2.54:1 on the hover ground; var(--bg) reads 5.59:1 and 6.54:1. */
-      @media (hover:hover) {.audio-library-icon-button:hover,.audio-library-disclosure:hover,.audio-library-more:hover { background:var(--gold-faint); color:var(--gold); }.audio-library-row:hover { background:rgba(200,164,86,.06); }.audio-library-row-play:hover { border-color:var(--gold); background:var(--gold-faint); }.audio-library-shelf-row:hover { background:rgba(200,164,86,.06); }.audio-library-shelf-row:hover .audio-library-shelf-copy strong,.audio-library-shelf-row:hover .audio-library-shelf-tail { color:var(--gold-bright); } }
-      body.light .audio-library-search { border-color:rgba(122,92,16,.3); background:rgba(255,255,255,.66); }
-      body.light .audio-library-search:focus-within { border-color:var(--gold); background:rgba(255,255,255,.94); }
-      body.light .audio-library-list { background:rgba(255,255,255,.4); }
-      @media (prefers-reduced-motion:reduce) { .audio-library-search,.audio-library-row,.audio-library-shelf-row,.audio-library-disclosure svg { transition:none; } }
-      @media (max-width:560px) { .audio-library-screen { padding-left:1rem; padding-right:1rem; }.audio-library-row { grid-template-columns:44px minmax(0,1fr); gap:.54rem; padding:.46rem .45rem; }.audio-library-row-actions { grid-column:2; justify-content:flex-start; margin-top:-.22rem; }.audio-library-row-actions > span { max-width:none; padding-left:0; text-align:left; }.audio-library-section-head { align-items:flex-start; }.audio-library-section-head > strong { padding-top:.35rem; } }
+      @media (hover:hover) {.audio-library-icon-button:hover { background:var(--gold-faint); color:var(--gold); }.audio-library-row:hover { background:rgba(200,164,86,.06); }.audio-library-row-play:hover { border-color:var(--gold); background:var(--gold-faint); } }
+      @media (prefers-reduced-motion:reduce) { .audio-library-row { transition:none; } }
+      @media (max-width:560px) { .audio-library-screen { padding-left:1rem; padding-right:1rem; }.audio-library-row { grid-template-columns:44px minmax(0,1fr); gap:.54rem; padding:.46rem .45rem; }.audio-library-row-actions { grid-column:2; justify-content:flex-start; margin-top:-.22rem; }.audio-library-row-actions > span { max-width:none; padding-left:0; text-align:left; } }
       /* ── SONGS OF THE LETTERS: the hub and its lists (L2, 2026-09-25). The approved pictures final-01/02/07 and their
          build rules: primary actions FILLED gold, secondary OUTLINED, 56 px covers, one 44 px round play per row that
          fills gold while its song plays, navigation rows with a plain chevron (never circled). Tokens only. ── */
@@ -1806,10 +1780,9 @@
       /* W3d listen: the hub's line, Find (.ui-field), the chips (.ui-chip) with More styles in gold (au-songs) */
       .songs-intro { margin:4px 2px 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
       .songs-controls { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
-      .songs-shuffle, .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
-      .songs-shuffle { width:100%; background:var(--gold); color:var(--bg); }
+      .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
       .songs-outline-action { background:transparent; color:var(--gold); }
-      .songs-shuffle svg, .songs-outline-action svg { width:22px; height:22px; flex:none; }
+      .songs-outline-action svg { width:22px; height:22px; flex:none; }
       .songs-find input { flex:1; min-width:0; }
       .songs-find input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
       .songs-find-clear { width:44px; height:44px; margin-right:-10px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--text-2); cursor:pointer; }
@@ -1843,7 +1816,7 @@
          gutters, row covers and lengths hidden (the title needs the width; the bar hides its type mark the same way,
          player brief 3a), a shelf's count under its title, the versions link free to wrap. At 300% the hub ran to 458-663 px on a 412 px screen. */
       .vot-large-text .songs-screen { padding-left:16px; padding-right:16px; }
-      .vot-large-text .songs-shuffle, .vot-large-text .songs-outline-action { padding-left:16px; padding-right:16px; letter-spacing:0; }
+      .vot-large-text .songs-outline-action { padding-left:16px; padding-right:16px; letter-spacing:0; }
       .vot-large-text .songs-find { padding-left:12px; }
       .vot-large-text .songs-row .song-cover, .vot-large-text .songs-row-len { display:none; }
       .vot-large-text .songs-card .songs-row { padding:8px 10px 8px 8px; }
@@ -1859,8 +1832,8 @@
       .songs-skeleton-row i { display:block; height:.8rem; border-radius:4px; background:var(--gold-faint); }
       .songs-skeleton-row i + i { width:55%; }
       .coverage-badge.coverage-badge-songs { border-color:var(--gold); color:var(--gold); }
-      .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-      @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
+      .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      @media (hover:hover) {.songs-outline-action:hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
       @media (max-width:360px) { .songs-row-len { display:none; } }
       /* task-1720 (vot-eye later pass, 360): names that were cut wrap. A collection's name on Songs of the Letters wraps
          beside its count ('Words To Live By: Part ...' twice read alike); a song's title takes two lines at most, its
@@ -2063,17 +2036,6 @@
         font-family: var(--font-body); font-size: var(--fs-16); font-style: italic;
         color: var(--cream-muted); max-width: 31.25rem;
         margin: 0.35rem auto 1.4rem; line-height: 1.5;
-      }
-      /* Tappable variant — preserves the original .hero-subtitle look entirely; adds only cursor + press/hover feedback */
-      .hero-subtitle-tappable {
-        display: block; padding: 0; background: none; border: 0;
-        cursor: pointer; border-radius: 4px;
-        transition: background 0.18s ease, color 0.18s ease;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .hero-subtitle-tappable:active { background: var(--gold-faint); color: var(--gold); }
-      @media (hover: hover) {
-        .hero-subtitle-tappable:hover { background: rgba(200,164,86,0.06); color: var(--cream); }
       }
       /* Ghost restore pill — tiny, tasteful, tap to bring summary back */
       /* A02.2: plain Matthew's way into the Matthew Study Bible, under the hero (BibleChapterView) */
@@ -2529,7 +2491,6 @@
     .whats-new-day { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); margin:0.9rem 0 0.35rem; font-weight:400; }
     .whats-new-list { margin:0; padding-left:1.15rem; color:var(--cream); font-size:var(--fs-16); line-height:1.55; }
     .whats-new-list li { margin:0.3rem 0; }
-    .whats-new-none { color:var(--cream-dim); font-style:italic; margin:0.6rem 0 0; }
     .fn-sheet-verse { font-size:var(--fs-16); line-height:1.75; color:var(--cream-dim); font-style:italic; }
     .fn-sheet-note { font-size:var(--fs-16); color:var(--cream-dim); line-height:1.6; font-style:italic; }
     /* share-fn (Corbin 2026-10-25): a note's own markers [A], the lines they point at, its
@@ -2886,28 +2847,11 @@
     a[target="_blank"]::after { content:" \2197"; font-size:0.8em; opacity:0.65; }
     /* ── HOME SCREEN ── */
     .home-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem min(1.5rem, 6.7vw); }
-    /* SacredUI hero — pull the brand mark up toward the top of the viewport
-       and give the three section tiles more breathing room */
-    .home-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; text-align:center; }
-    .home-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-30); font-size:min(var(--fs-30), 9vw); color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
-    .home-sub { font-size:var(--fs-16); color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
-    .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:25rem; }
-    /* ── Volumes landing: fill screen, no scroll ── */
-    .volumes-landing { padding:1.2rem min(1.2rem, 5.4vw) 0.8rem; justify-content:flex-start; }
-    .volumes-landing .home-eyebrow { margin-bottom:0.3rem; }
-    .volumes-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.15rem; }
-    .volumes-landing .home-sub { margin-bottom:0.6rem; font-size:var(--fs-15); }
-    .volumes-landing .home-ornament { margin-bottom:0.8rem; }
     /* ── Scriptures landing: fill screen, no scroll ── */
     .scriptures-landing { padding:1.2rem 1.3rem 0.8rem; justify-content:flex-start; }
     /* large-text-n2: rem gutters grow with Text Size (62 px a side at 300%: "All books" met the edge, the translation
        name was cut); at large text the Bible index and the Listen screens take the page gutter in px. */
     .vot-large-text .scriptures-landing, .vot-large-text .audio-library-screen { padding-left:var(--gutter); padding-right:var(--gutter); }
-    .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
-    /* mw17 A02.1: the eyebrow opens the translation picker; it keeps the eyebrow's look. */
-
-    .scriptures-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.2rem; }
-    .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
 
     /* ── HOME SCREEN — AMBIENT MINIMAL ── */
     /* Primary hero title — elegant Cinzel Decorative, lighter weight for less blockiness */
@@ -3068,10 +3012,10 @@
     .root-link::after, .ui-link::after { content: ''; position: absolute; inset: -6px -4px; }
     .root-eyebrow { color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
     /* tiles: two columns, 12 apart; label on top, the title in the serif, the meta pinned to the foot; all one height */
-    .root-tiles, .ui-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); }
-    .root-tile, .ui-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-height: 118px; padding: 14px var(--card-pad); border: 0; border-radius: var(--r-card); background: var(--surface-1); color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }
+    .root-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); }
+    .root-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-height: 118px; padding: 14px var(--card-pad); border: 0; border-radius: var(--r-card); background: var(--surface-1); color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }
     .root-tile-eyebrow { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
-    .root-tile-title, .ui-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .root-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .root-tile-detail { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
     /* Large text (the root class vot-large-text, 1.8 and up; POL2): the Read tab's tiles go one to a row, and the search
        field and the Today card's titles wrap instead of cutting off. */
@@ -3109,10 +3053,10 @@
     .vot-large-text .note-row-anchor { line-height: 1.35; }
     .vot-large-text .ans-media-page .ans-gallery { grid-template-columns: minmax(0, 1fr); }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
-    :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool, .bottom-nav-card):active { background-color: var(--surface-2); }
-    :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
+    :is(.root-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool, .bottom-nav-card):active { background-color: var(--surface-2); }
+    :is(.ui-btn.is-primary, .listen-play):active { background-color: var(--gold-bright); }
     :is(.ui-btn.is-text):active { background-color: transparent; color: var(--text-1); }
-    @media (hover:hover) { :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn):hover { background-color: var(--surface-2); } }
+    @media (hover:hover) { :is(.root-tile, .root-row, .ui-row-press, .root-explore-btn):hover { background-color: var(--surface-2); } }
     /* Fix list #12: two equal columns cut 'Scripture Web' onto two lines at text 1; each pill now takes its words' width
        and grows, and when both no longer fit (large text) each takes a full row. */
     .root-explore { display: flex; flex-wrap: wrap; gap: var(--grid-gap); }
@@ -3130,9 +3074,9 @@
     :is(.root-row, .ui-row, .root-sublist) + :is(.root-row, .ui-row, .root-sublist)::before {
       content: ''; position: absolute; top: 0; left: 66px; right: 0; height: 1px; background: var(--hairline); pointer-events: none; }
     .root-sublist { position: relative; }
-    .ui-row.no-lead, .root-row-plain { padding-left: var(--card-pad); }
-    :is(.root-row, .ui-row) + :is(.ui-row.no-lead, .root-row-plain)::before, :is(.ui-row.no-lead, .root-row-plain) + :is(.root-row, .ui-row)::before { left: var(--card-pad); }
-    .root-row-plain, .ui-row.is-one { min-height: var(--row-h-1); }
+    .ui-row.no-lead { padding-left: var(--card-pad); }
+    :is(.root-row, .ui-row) + :is(.ui-row.no-lead)::before, :is(.ui-row.no-lead) + :is(.root-row, .ui-row)::before { left: var(--card-pad); }
+    .ui-row.is-one { min-height: var(--row-h-1); }
     .root-row-icon, .ui-row-lead { flex: none; display: flex; align-items: center; justify-content: center; width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--r-chip); background: var(--surface-2); color: var(--accent); }
     .ui-group.is-inset .ui-row-lead { background: var(--surface-3); }
     .root-row-icon svg, .ui-row-lead svg { width: 20px; height: 20px; }
@@ -3182,8 +3126,8 @@
     .listen-continue-meta.is-failed { color: var(--accent); }
     .listen-continue-title { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .listen-continue-meta { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .listen-play, .ui-play { flex: none; display: flex; align-items: center; justify-content: center; width: var(--btn-h); height: var(--btn-h); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-    .listen-play svg, .ui-play svg { width: 18px; height: 18px; }
+    .listen-play { flex: none; display: flex; align-items: center; justify-content: center; width: var(--btn-h); height: var(--btn-h); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+    .listen-play svg { width: 18px; height: 18px; }
     .listen-progress, .ui-progress { height: 3px; margin: 0 var(--card-pad) 14px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
     .ui-progress { margin: var(--sp-3) 0 0; }
     .listen-progress > span, .ui-progress > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
@@ -3341,22 +3285,11 @@
       .upnext-pill-solid:hover { background:var(--gold-bright); }
       .upnext-go:hover .upnext-title, .upnext-x:hover { color:var(--accent); }
     }
-    .today-eyebrow { color:var(--gold); font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; }
     .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
-    .today-actions { display:flex; gap:0.5rem; }
-    .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
-    @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
-    .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
-    .today-percent { color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
-    .today-check { flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1.5px solid var(--gold); border-radius:50%; color:var(--bg, #000); }
-    .today-check[data-done="1"] { background:var(--gold); }
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
-    .today-btn:disabled { opacity:0.5; cursor:default; }
     .plans-note:empty { display:none; }
     /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
-    .plans-build .study-head .today-eyebrow { display:block; margin-bottom:0.3rem; }
     .build-tabs { margin:var(--sp-1) 0 var(--sp-3); }
     .build-list, .build-letters, .build-chips { list-style:none; margin:0; padding:0; }
     .build-list { border-radius:var(--r-card); background:var(--surface-1); overflow:hidden; }
@@ -3384,7 +3317,6 @@
     .build-chip { display:inline-flex; align-items:center; gap:2px; max-width:100%; padding-left:12px; overflow-wrap:anywhere; border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-value); font-weight:500; }
     .build-chip button { min-width:36px; min-height:36px; border:0; background:transparent; color:var(--text-2); font:inherit; font-size:var(--fs-18); cursor:pointer; }
     .build-bar-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 0.75rem; }
-    .build-bar-row .today-btn { margin-left:auto; max-width:100%; }
     .build-summary { color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
     /* mw-pb1: at large text the bar keeps to about half the screen - fewer chip rows show, the word count goes (Next keeps it) */
     .vot-large-text .build-chips { max-height:15vh; }
@@ -3529,9 +3461,6 @@
     .plan-progress-line { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
     .vot-large-text .plan-progress { flex-direction: column; align-items: flex-start; gap: 12px; }   /* 11-18: at 2.0 the ring beside it left the words a few wide */
     .vot-large-text .plan-progress-text { align-self: stretch; }
-    .plan-late { color: var(--cream-muted); }
-    .plan-late.is-gold { color: var(--gold); }
-    .plan-late .plan-link { min-height: 32px; padding: 0 2px; font-size: var(--fs-15); }
     .plan-today { margin-top: 14px; }
     .plan-today-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
     .plan-today-head .root-eyebrow { flex: 1; min-width: 0; color: var(--gold); }
@@ -3692,7 +3621,6 @@
     /* ══ end READING PLANS ══ */
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
-    .surprise-fab:disabled { opacity:0.6; cursor:wait; }
     /* homeOrnIn — removed (unused) */
     /* (Home's old nav cards, .home-nav-* / .hni-*, were removed with the UI pass (W1, 2026-11-11): the Read tab draws .root-tile.) */
     /* ── TWO-COLUMN GENRE GRID ── */
@@ -3704,12 +3632,6 @@
     /* A column label heads HALF a phone's width (176 px at 360): at 12 px and
        0.18em "THE SEVEN VOLUMES" took two lines beside a one-line "COLLECTIONS"
        and set the columns out of step (the 09-25 walk). 0.1em fits it. */
-    /* The browse tiles (Volumes, Scriptures, Answers subjects) keep their gold
-       titles but sit on the hairline, not a gold outline, with their counts in
-       upright muted type (the redesign, 2026-09-25): a grid of gold boxes was
-       the busiest thing on those screens, and 12 px italics the hardest to read.
-       Hover still lights the edge gold. */
-    .studies-empty { font-family:var(--font-body); font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
     /* Studies home — stacked full-width tiles */
 
     /* ═══ WS6 garden (mock settings.html g-page, g-jump, g-fail, g-gate) ═══
@@ -3765,25 +3687,6 @@
       @keyframes surprise-breathe {
         0%, 100% { transform:scale(1);    opacity:0.7; }
         50%      { transform:scale(1.08); opacity:1;   }
-      }
-      .surprise-fab {
-        margin:1.2rem 0 calc(var(--inset-bottom, 0px) + 1.5rem);
-        min-width:52px; min-height:52px; padding:0;
-        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.4rem;
-        background:transparent; border:none;
-        color:var(--gold); cursor:pointer;
-        transition:transform 0.2s ease;
-      }
-      .surprise-fab svg {
-        width:34px; height:34px;
-        animation:surprise-breathe 2.8s ease-in-out infinite;
-        transform-origin:center;
-        filter:drop-shadow(0 0 5px rgba(200,164,86,0.4));  /* n216: static glow; transform + opacity breathe */
-      }
-      @media (hover: hover) { .surprise-fab:hover svg { animation-play-state:paused; opacity:1; filter:drop-shadow(0 0 10px rgba(200,164,86,0.6)); } }
-      .surprise-fab:active { transform:scale(0.92); }
-      body.light .surprise-fab svg {
-        filter:drop-shadow(0 0 2px rgba(162,122,34,0.3));
       }
     /* ── SETTINGS SCREEN ── */
     .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(1.25rem,3vw,2rem) clamp(1rem,4vw,3rem) 5rem; }
@@ -3869,16 +3772,6 @@
        button rule, so mouse taps still show no ring. */
     .settings-toggle input:focus-visible ~ .settings-toggle-track { outline: 2px solid var(--gold); outline-offset: 2px; }
     /* ── CUSTOM SELECT FIELD + BOTTOM SHEET ── */
-    .select-field {
-      display:flex; align-items:center; gap:0.6rem;
-      width:100%; padding:0.7rem 0.85rem;
-      background:var(--bg2); border:1px solid var(--gold-border);
-      border-radius:8px; cursor:pointer; text-align:left;
-      transition:all 0.15s ease;
-      -webkit-tap-highlight-color:transparent;
-    }
-    .select-field:active { background:var(--gold-faint); border-color:var(--gold-dim); }
-    @media (hover: hover) { .select-field:hover { border-color:var(--gold-dim); } }
 
     .select-sheet-backdrop { display:none; position:fixed; inset:0; z-index:250; animation:selectSheetBackdropIn 0.22s ease; }
     .select-sheet-backdrop.open { display:block; }
@@ -3921,9 +3814,6 @@
     .vot-large-text .select-sheet-option { padding:10px 12px; }
     .vot-large-text :is(.select-sheet-option-label, .select-sheet-group, .select-sheet-title) { overflow-wrap:anywhere; min-width:0; }
     .vot-large-text .select-sheet-group { letter-spacing:0.04em; }
-    /* ── COMPACT LIST LAYOUT ── */
-    .compact-list { width:100%; max-width:32.5rem; }
-    .compact-list-group { margin-bottom:1rem; }
     /* ── FLAT GRID LAYOUT ── */
 
     /* ── CANONICAL SCROLL LAYOUT ── */
@@ -3931,7 +3821,6 @@
        It is now a static shadow on a ::after layer whose opacity breathes; the card's inline
        animation-delay staggers it as before (animation-delay: inherit). */
     @keyframes canonBreathe { 0%, 100% { opacity:0; } 50% { opacity:1; } }
-    .canon-card-body { flex:1; min-width:0; }
     /* ── Scriptures layout cycle (in-content, top-right corner) ───────────
        Cycles scriptureLayout without digging through Settings. ABSOLUTE on
        purpose: the genre branch (.scriptures-landing) is an explicit
@@ -3979,8 +3868,6 @@
     .settings-clear-btn.danger { color:var(--danger); border-color:var(--danger); font-size:var(--fs-10); }
     @media (hover: hover) { .settings-clear-btn.danger:hover { background:rgba(192,57,43,0.08); } }
     /* (Mark Complete button styles removed 2026-08-02 — the component was retired; zero source refs.) */
-    /* ── Progress table ── */
-    .progress-table { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; margin-top:-0.6rem; }
     /* flex-wrap + tally nowrap dropped at the extreme: same 300%-cap spill
        fix as .settings-row-head — the tally + Clear button wrap under the
        label instead of running off a 375px screen. Inert at normal sizes. */
@@ -3996,7 +3883,6 @@
     /* Per-row Clear buttons sit in a 60+-row table — lighter than the
        standalone action buttons so the table reads as a table. */
     .progress-row .settings-clear-btn { padding:0.3rem 0.6rem; font-size:var(--fs-10); flex-shrink:0; }
-    .progress-divider { height:1px; background:var(--gold-border); margin:0; }
     /* ── SECTION HEADINGS (Bible reader) ── */
     /* PERF4: skip layout/paint of off-screen verse sections on long chapters
        (Psalm 119 = 176 verses). content-visibility:auto is DOM-PRESERVING — the
@@ -4348,7 +4234,6 @@
     .tabs-nav-btn:active { background:var(--gold-faint); border-color:var(--gold); }
     .tabs-nav-btn.active { background:var(--gold-faint); border-color:var(--gold); color:var(--gold-bright); }
     @media (hover:hover) { .tabs-nav-btn:hover { color:var(--gold-bright); border-color:var(--gold-dim); } }
-    .tabs-nav-btn-glyph { line-height:1; display:inline-block; transform:translateY(-1px); }
     .tabs-nav-btn-count { font-family:'Cinzel',serif; letter-spacing:0.05em; min-width:0.9em; text-align:center; }
 
     /* UX5 — first-use coachmark pointing at the tab switcher glyph. */
@@ -5164,15 +5049,6 @@
       flex: 1; font-family: 'Cinzel', serif; font-size: var(--fs-16);
       color: var(--cream); letter-spacing: 0.02em;
     }
-    .picker-confirm {
-      background: none; border: none; padding: 6px 10px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      color: var(--gold);
-      transition: opacity 0.15s, color 0.15s;
-    }
-    .picker-confirm svg { width: 22px; height: 22px; }
-    .picker-confirm:active { color: var(--gold-bright); }
-    .picker-confirm.is-disabled { opacity: 0.32; cursor: default; }
     .picker-body {
       flex: 1; overflow-y: auto;
       padding: 18px 22px 60px;
@@ -5375,51 +5251,6 @@
     .prg-row .ui-row-meta { margin-top: 6px; }
     .prg-note { padding: 14px var(--card-pad); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }
     .prg-retry { min-height: var(--tap); padding: 0 var(--sp-2); border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
-
-
-    /* ══════════════════════════════════════════════════════════════
-       NOTES INDEX SCREEN — list of every note with search, filter,
-       sort. Each row leads with its source label and shows a body
-       preview, anchored quote, and any notebook chips.
-       ════════════════════════════════════════════════════════════ */
-
-    .notes-index-search {
-      width: 100%; padding: 11px 16px;
-      background: rgba(70,62,48,0.55);
-      border: 1px solid transparent; border-radius: 999px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-15);
-      outline: none; transition: border-color 0.15s, background 0.15s;
-      box-sizing: border-box;
-      margin-bottom: 0.85rem;
-    }
-    body.light .notes-index-search { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
-    .notes-index-search::placeholder { color: var(--cream-muted); }
-    .notes-index-search:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
-    body.light .notes-index-search:focus { background: var(--white); }
-
-    .notes-index-controls {
-      display: flex; flex-wrap: wrap; gap: 0.45rem;
-      margin-bottom: 1rem;
-      align-items: center;
-    }
-    .notes-index-sort {
-      margin-left: auto;
-      display: flex; align-items: center; gap: 0.4rem;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-    }
-    .notes-index-sort-btn {
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      padding: 6px 11px; border-radius: 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      display: inline-flex; align-items: center; gap: 0.35rem;
-    }
-    .notes-index-sort-btn:active { background: var(--gold-faint); }
     /* ── W2 LIBRARY FAMILY: the lists (mock v2 library.html; LibraryList.jsx, NoteRow.jsx) ─────────────────────
        Every Library list: title in the bar, a search pill, one quiet line "N things · Newest first", rows with a
        menu. Notes are cards (dot, place, when, menu; the note; the words it holds). */
@@ -5489,23 +5320,7 @@
     .link-arrow { color: var(--accent); }
     .links-broken { margin-top: var(--sp-3); }
     .links-empty-web { display: flex; justify-content: center; margin-top: var(--sp-2); }   /* POL4: the mock's air under Start reading (it sat on the button) */
-    /* ── end W2 LIBRARY FAMILY: the lists ── */
-    .notes-empty {
-      padding: 3rem 1rem; text-align: center;
-      font-family: var(--font-body);
-      color: var(--cream-muted);
-    }
     /* n116: the how-to on the Notebooks tab sits above the notebook rows, so it is shorter. */
-    /* n118: the one primary button an empty list screen carries (Bookmarks, Links, History). */
-    .empty-cta {
-      display: inline-block; min-height: 44px; margin-top: 1.2rem; padding: 0.6rem 1.6rem;
-      border-radius: 999px; border: 1px solid var(--gold); background: var(--gold);
-      color: var(--bg); font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      letter-spacing: 0.14em; text-transform: uppercase; font-style: normal; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .empty-cta:active { background: var(--gold-bright); }
-    .empty-cta:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
     /* ── Sort menu popover (anchored under the sort button) ── */
 
@@ -5591,46 +5406,6 @@
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-muted);
     }
-
-    /* Link action sheet (long-press) */
-    .link-action-overlay {
-      position: fixed; inset: 0; z-index: 8550;
-      display: flex; align-items: flex-end; justify-content: center;
-      /* Safe-area insets — also reused by BookmarkRowActionSheet. */
-      padding-top: var(--inset-top, 0px);
-      padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
-      transition: padding-bottom 0.18s ease;
-      animation: selectSheetBackdropIn 0.2s ease;
-    }
-    .link-action-sheet {
-      width: 100%; max-width: 480px;
-      
-      
-      animation: sheetRiseIn 0.25s cubic-bezier(0.32,0.72,0,1);
-      max-height: 100%; overflow-y: auto;
-    }
-    /* (.link-action-handle RETIRED — see the SheetHandle block by .fn-sheet.
-       The action sheets' 0-side-padding body relies on the row's own inline
-       margins; the shared handle row gets side padding here instead.) */
-    .link-action-btn {
-      display: flex; align-items: center; 
-      width: 100%; 
-      background: transparent; border: none;
-      text-align: left; cursor: pointer;
-      
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    
-    @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
-    .link-action-btn svg { flex-shrink: 0; }
-    /* Destructive Delete row in the action sheets sits behind a gap + rule
-       so it reads as its own zone below Open/Edit/Share. (Doubled class for
-       specificity — the base .link-action-btn { border:none } is declared
-       later in this file and would otherwise clobber the border-top.) */
-    
-    
-    @media (hover: hover) { .link-action-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); } }
     /* ── THE SHEETS (W1, the UI pass; mock/v2 base.css .sheet, U rule 13). surface-1, 20 px top corners, a grab handle,
        the title in the serif (an optional gold label above it), actions as worded rows in an inset group, and a confirm
        sheet's foot as two words: Cancel | the action. Dim behind at 60%, no blur. SelectSheet, ActionSheet
@@ -5651,7 +5426,6 @@
     .sheet-handle-row > * { pointer-events: auto; }
     .sheet-handle-grab { align-items: flex-start; padding-top: 8px; }
     .sheet-handle-back { position: absolute; top: calc(100% - 26px); right: -10px; margin: 0; color: var(--text-2); }
-    .link-action-sheet .sheet-handle-back { right: calc(var(--gutter) - 10px); }
     /* what follows the grabber (the title, or a head with its own words at the right) leaves the x its room */
     .sheet-handle-row + :not(:is(.plan-sheet, .ui-sheet:has(> .ui-sheet-foot), .jrn-insert-sheet, .fn-sheet, .audio-manager-sheet, .ans-sheet, .ui-row-sheet) *) { padding-right: 34px; }
     .sheet-handle-back:active { color: var(--text-1); }
@@ -5721,20 +5495,6 @@
     /* a destroying confirm: red words on the plain inset button (mock .btn.in.red), not a red fill */
     .ui-sheet-foot .ui-btn.is-danger.is-primary { background: var(--surface-2); color: var(--tone-danger); font-weight: 500; }
     .ui-sheet-foot .ui-btn.is-danger.is-primary svg { color: var(--tone-danger); }
-    /* the row-action sheets (Bookmarks, Links, the Journal): the same sheet, worded rows, a gold icon per row */
-    .link-action-overlay { background: var(--scrim); }
-    .link-action-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; padding: var(--sp-2) 0 var(--sp-6); }
-    .link-action-sheet .sheet-handle-row { padding: 0 var(--gutter); }
-    .link-action-btn { position: relative; gap: 14px; min-height: var(--row-h-1); padding: 12px var(--gutter); font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-1); }
-    .link-action-btn + .link-action-btn { border-top: 0; }
-    .link-action-btn + .link-action-btn::before { content: ''; position: absolute; top: 0; left: calc(var(--gutter) + 32px); right: 0; height: 1px; background: var(--hairline); }
-    .link-action-btn:active { background: var(--surface-2); color: var(--text-1); }
-    @media (hover: hover) { .link-action-btn:hover { background: var(--surface-2); color: var(--text-1); } }
-    .link-action-btn svg { width: 20px; height: 20px; color: var(--accent); }
-    .link-action-btn.link-action-btn-danger { margin-top: 0; border-top: 0; }
-    .link-action-btn-danger, .link-action-btn-danger svg { color: var(--tone-danger); }
-    .link-action-btn-danger:active { background: var(--surface-2); color: var(--tone-danger); }
-    @media (hover: hover) { .link-action-btn-danger:hover { background: var(--surface-2); color: var(--tone-danger); } }
     /* the ⋯ dropdown (MoreMenu.jsx) on the tokens: a surface card with no outline, worded rows in the UI
        face with a gold icon, inset hairlines; its steppers and segments are surface pills, the chosen one soft gold */
     .more-menu { padding: 6px 0; background: var(--surface-1); color: var(--text-1); border: 0; border-radius: var(--r-card); box-shadow: var(--shadow-float); font-family: var(--font-ui); }
@@ -6309,7 +6069,6 @@
     .bkm-popover-btn:active, .bkm-popover-btn:hover { background: var(--gold-faint); color: var(--gold); }
     .bkm-popover-btn-danger { color: var(--danger); }
     .bkm-popover-btn-danger:active, .bkm-popover-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
-    .bkm-popover-btn-primary { color: var(--gold); }
     /* Relative date below the bookmark label, subtle Cinzel caps. */
     .bkm-popover-date {
       font-family: 'Cinzel', serif; font-size: var(--fs-10);
@@ -6326,8 +6085,6 @@
       border-left: 2px solid var(--gold-faint);
       line-height: 1.35;
     }
-    /* Inline thought-edit mode inside the popover. */
-    .bkm-popover-thought-edit { padding: 6px 0 8px; }
 
     /* Invisible word-joiner injected at mark boundaries that fall MID-WORD
        so the browser cannot break a word across the mark/text seam. The
@@ -6611,7 +6368,6 @@
     .tabs-nav-btn { font-size: var(--fsc-11); gap: 4px; }
     .top-nav .tabs-nav-btn-count { font-size: var(--fsc-12); }
     .nav-arrows { gap: 4.8px; }
-    .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; }
     .sel-style-btn { font-size: var(--fsc-16); }
     .ascroll-step { font-size: var(--fsc-20); }
@@ -7633,16 +7389,10 @@
     }
     /* the credit is the legend's tail and flows with it: no place of its own (round 3) */
     .sw-legend .sw-credit { white-space: nowrap; }
-    .sw-key-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
     /* My Web's two families in the key (design-myweb-colour.md, 5): a bar in the
        source colour for Timothy's threads; for yours the pin the canvas draws at a
        link's ends, by shape (ring, dot, ring-and-dot) in the link colour. */
     .sw-key-line { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
-    .sw-key-pin {
-      width: 9px; height: 9px; border-radius: 50%; display: inline-block; box-sizing: border-box;
-      border: 2px solid currentColor;
-    }
-    .sw-key-pin.is-dot { border: 0; background: currentColor; }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
       width: 120px; height: 4px; border-radius: 2px; display: inline-block; margin: 0 4px;
@@ -7879,8 +7629,6 @@
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
     }
-
-    .sw-fallback-row { display: flex; gap: 10px; }
     /* ── WA4 web: the Scripture Web's chrome to the v2 pictures (mock web.html w-main, w-guide, w-menu, w-focus).
        The drawing is untouched; these are the bars around it. The title is the Scripture Web | My Web switch
        beside a round Back; the ⋯ holds the rare things; the bottom bar holds Go to, Filters, List, the key, and
@@ -8550,7 +8298,6 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
 /* Large text: Text Size 2 and up (class on the Answers .screen-layout at fontScale >= 2) */
 .ans-ts2 .ans-reading :is(.is-center,.letter-poetry){text-align:left}
 .ans-ts2 .ans-reading .letter-poetry{display:block;margin-left:0}
-.ans-ts2 .ans-contents-line .ans-names{display:none}
 .ans-ts2 .ans-reading{-webkit-hyphens:auto;hyphens:auto} /* heads inherit it, but Blink hyphenates only lowercase English words
    (5+ letters, 2+2), so this serves the body; heads keep words whole by size (the 10vw stop above) */
 .ans-ts2 .ans-display:not(.is-long){font-size:min(var(--fs-36),10vw)} /* r2: the title meets the heads' 10vw stop at Text Size 2+
@@ -8627,7 +8374,6 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
 body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offline-strip-h,0px))}
 
 /* A11. Kit pin from spec §9 item 7 (app.css 4217-4218): the tab count painted at 11px and grew with Text Size */
-.tabs-nav-btn-glyph{font-size:var(--fsc-14)}
 .tabs-nav-btn-count{font-size:var(--fsc-12)}
 
 /* A12. Link rows (Main Page :2, :78, :80): the paragraph's own link fills the whole row (one tap target)
@@ -8843,9 +8589,7 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-landing .ans-chip.is-surprise{display:inline-flex;align-items:center;gap:6px}
 .ans-chip.is-surprise .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
 .ans-landing .ans-chip.is-surprise:disabled{opacity:.55}
-.ans-start,.ans-box{border-radius:var(--r-card);background:var(--surface-1)}
-.ans-start{display:flex;align-items:center;gap:12px;width:100%;margin-top:var(--sp-4);padding:14px 12px 14px 16px;color:var(--text-1)}
-.ans-start .ans-row-title{margin-top:2px;font-size:var(--ts-headline)}
+.ans-box{border-radius:var(--r-card);background:var(--surface-1)}
 .ans-landing .ans-row-sub{font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);font-style:normal;color:var(--text-2)}
 .ans-landing .ans-chev{color:var(--text-3)}
 .ans-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
@@ -8923,9 +8667,6 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-res .ans-hit-src{margin-top:6px;font-family:var(--font-ui);font-size:var(--ts-label);font-style:normal;color:var(--text-2)}
 .ans-more-btn{width:100%;margin-top:12px}
 /* WA1 answers, the topic (AnswersTopic.jsx: a-topic, a-topic2): the sections strip, the hero on the tokens, the running head in the bar */
-.ans-sec-strip{position:static;gap:var(--sp-2);margin:14px -24px 0;padding:0 24px;border:0;background:none}
-.ans-sec-strip .ans-az-key{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.ans-sec-strip .ans-ico{width:var(--icon-sm);height:var(--icon-sm)}
 .ans-hero .ans-label{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);color:var(--accent)}
 .ans-hero .ans-display{font-weight:600}
 .ans-hero .ans-meta{font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
@@ -8934,7 +8675,6 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-runhead :is(.ans-runhead-num,.ans-runhead-t){display:none}
 .ans-runhead .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
 .ans-runhead .ans-runhead-text{flex:0 1 auto}
-.ans-sec-strip .ans-az-key.ans-contents-line{flex:none;width:auto;margin:0}
 /* ANS1: one above the bar (100), under every sheet, menu, the tour and the Tabs screen; its sides come from the bar's own
    buttons (AnswersTopic measures them into --rh-left / --rh-right). The section name is cut by letters on one line, so
    its chevron follows the words; the bar titles keep the bar's capped 18 px at every text size, as bar titles do. */

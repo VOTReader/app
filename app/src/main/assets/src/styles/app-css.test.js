@@ -644,13 +644,12 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
    the 12 px step or more, with their tracking capped at 0.18em. */
 describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
-    '.audio-library-eyebrow',
     '.select-sheet-eyebrow',
     '.footnote-list-header', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.ans-label',
     '.section-heading',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
-    '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
+    '.back-hint-pill', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
     '.hero-play-pill',
     // The kit's eyebrow (contents-page heroes, the Next card; replaced .vol-index-eyebrow and .chapter-card-label).
@@ -970,5 +969,35 @@ describe('app.css — the plan end card\'s button wraps a long reading name', ()
   });
   it('the shared button stays one line everywhere else', () => {
     expect(ruleBlock(CSS, '\n    .ui-btn {')).toMatch(/white-space:\s*nowrap/);
+  });
+});
+
+/* arch-9 (the audit, 2026-11-23): 64 classes no screen, component, page or test-rendered markup draws any more.
+   Their rules went; this keeps them gone. A class built at run time ('pc-' + type, 'coverage-badge-' + state,
+   `pager-peek-${side}`, 'plan-ring-' + size, 'sel-color-' + style, 'dl-level-' + n) was left alone. */
+describe('app.css — the dead classes stay deleted (arch-9)', () => {
+  const DEAD = [
+    'ans-names', 'ans-sec-strip', 'ans-start', 'audio-library-disclosure', 'audio-library-empty',
+    'audio-library-eyebrow', 'audio-library-hero', 'audio-library-intro', 'audio-library-list',
+    'audio-library-more', 'audio-library-retry', 'audio-library-search', 'audio-library-section',
+    'audio-library-section-head', 'audio-library-shelf-copy', 'audio-library-shelf-row',
+    'audio-library-shelf-tail', 'bkm-popover-btn-primary', 'bkm-popover-thought-edit', 'canon-card-body',
+    'compact-list', 'compact-list-group', 'empty-cta', 'hero-subtitle-tappable', 'home-eyebrow',
+    'home-ornament', 'home-sub', 'home-title', 'link-action-btn', 'link-action-btn-danger',
+    'link-action-overlay', 'link-action-sheet', 'nav-btn', 'notes-empty', 'notes-index-controls',
+    'notes-index-search', 'notes-index-sort', 'notes-index-sort-btn', 'np-tool-rate', 'picker-confirm',
+    'plan-late', 'progress-divider', 'progress-table', 'root-row-plain', 'select-field', 'songs-shuffle',
+    'studies-empty', 'surprise-fab', 'sw-fallback-row', 'sw-key-dot', 'sw-key-pin', 'tabs-nav-btn-glyph',
+    'today-actions', 'today-btn', 'today-check', 'today-eyebrow', 'today-percent', 'today-progress',
+    'ui-play', 'ui-tile', 'ui-tile-title', 'ui-tiles', 'volumes-landing', 'whats-new-none'
+  ];
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  it.each(DEAD)('.%s has no rule', (c) => {
+    expect(new RegExp('\\.' + c.replace(/-/g, '\\-') + '(?![\\w-])').test(bare)).toBe(false);
+  });
+  it('only the dead member left a shared list: the live ones keep their rules', () => {
+    expect(bare).toMatch(/body\.light :is\(\.coverage-badge-no-recording, \.idx-min-chip\) \{ opacity: 1; \}/);
+    expect(bare).toMatch(/:is\(\.ui-btn\.is-primary, \.listen-play\):active/);
+    expect(bare).toMatch(/\.ans-az-strip:not\(\.ans-jump-strip\) \.ans-az-key\{padding:0\}/);
   });
 });
