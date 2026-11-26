@@ -249,3 +249,30 @@ describe('refute plans-1126-r2: the plan page\'s "Not read yet" (markDay) is an 
     for (const caught of ['2026-12-15', '2026-12-17', '2026-12-23']) expect(live(caught)).toEqual(plain);
   });
 });
+
+describe('refute d4aa70cb9: a day off pinned by a change of days stays off after "Not read yet" or "I read it on…"', () => {
+  // Jude over Tue–Sat from Tue Dec 1, Jude 1 read Dec 2; a Finish by date Dec 4; every day a reading day from Dec 10.
+  const jude = (/** @type {boolean} */ changeDays) => {
+    let run = newRun({ plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    run = tickItem(run, 'jude:1', '2026-12-02', 1);
+    run = changePace(run, { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    if (changeDays) run = changeWeekdays(run, [true, true, true, true, true, true, true], at('2026-12-10'));
+    return run;
+  };
+  const offDays = (/** @type {any} */ r) => monthCells(r, 2026, 11, at('2026-12-11')).filter((c) => c.date === 6 || c.date === 7).map((c) => c.state);
+  it('Not read yet on Jude 1 (read Dec 2), pressed Dec 11: Sun and Mon Dec 6 and 7 are not missed', () => {
+    expect(offDays(untickItem(jude(false), 'jude:1', at('2026-12-11')))).toEqual(['none', 'none']);
+    expect(offDays(untickItem(jude(true), 'jude:1', at('2026-12-11')))).toEqual(['none', 'none']);
+    expect(offDays(markDay(jude(true), dayOfItem(jude(true), 'jude:1'), false, at('2026-12-11')))).toEqual(['none', 'none']);
+  });
+  it('"I read it on Dec 3" for Jude 2, told Dec 11: Sun and Mon Dec 6 and 7 are not missed', () => {
+    expect(offDays(markOn(jude(true), '2026-12-03', at('2026-12-11')))).toEqual(['none', 'none']);
+  });
+  it('the week strip agrees: Dec 6 and 7 not missed after the untick', () => {
+    const week = streak(untickItem(jude(true), 'jude:1', at('2026-12-11')), at('2026-12-11')).week.filter((d) => d.date === '2026-12-06' || d.date === '2026-12-07');
+    expect(week.map((d) => d.missed)).toEqual([false, false]);
+  });
+});
+
+/** The plan day holding item k. @param {any} r @param {string} k */
+function dayOfItem(r, k) { for (let d = 0; d < totalDays(r); d++) if (dayItems(r, d).some((it) => it.k === k)) return d; return -1; }

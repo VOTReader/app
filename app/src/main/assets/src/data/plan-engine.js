@@ -53,7 +53,7 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
- *   rested?: { until: string, ranges?: string[][], dates?: string[] },
+ *   rested?: { until: string, ranges?: string[][], dates?: string[], off?: string[][] },
  *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean, credited?: number,
  *   seen?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
@@ -129,6 +129,9 @@ function nthReadingDay(run, from, k) {
 function restedOn(run, n, memo = rests(run)) {
   const key = dateOf(n);
   // Before a change to the target or the layout (pinRests): what the card said then, kept.
+  // A day the plan did not read on then (a day off, a pause), pinned by a change of days, stays off for good: no
+  // untick or later read moves it (unpinFrom keeps `off`), whatever the reading days are now.
+  if (memo.pinned && memo.pinned.off.has(key)) return true;
   if (memo.pinned && key < memo.pinned.until) return memo.pinned.dates.has(key);
   // The latest read date before n: the stretch n belongs to (none: from the start).
   const { dates, next } = memo;
@@ -150,7 +153,7 @@ function restedOn(run, n, memo = rests(run)) {
   return due > key;
 }
 
-/** @typedef {{ dates: string[], next: Map<string, string>, of: unknown[], pinned: { until: string, dates: Set<string> } | null }} RestMemo */
+/** @typedef {{ dates: string[], next: Map<string, string>, of: unknown[], pinned: { until: string, dates: Set<string>, off: Set<string> } | null }} RestMemo */
 const _restMemo = new WeakMap();
 /**
  * The memo restedOn uses for one run: its read dates in order, and each stretch's next reading date. Kept per ticks
@@ -163,7 +166,7 @@ function rests(run) {
   const hit = run.ticks ? _restMemo.get(run.ticks) : null;
   if (hit && hit.of.every((v, i) => v === of[i])) return hit;
   const r = run.rested;
-  const pinned = r && typeof r.until === 'string' && (Array.isArray(r.ranges) || Array.isArray(r.dates)) ? { until: r.until, dates: pinnedDates(r) } : null;
+  const pinned = r && typeof r.until === 'string' && (Array.isArray(r.ranges) || Array.isArray(r.dates)) ? { until: r.until, dates: pinnedDates(r), off: pinnedDates({ ranges: r.off }) } : null;
   const memo = { dates: [...new Set(Object.values(ticks).filter(Boolean))].sort(), next: new Map(), of, pinned };
   if (run.ticks) _restMemo.set(run.ticks, memo);
   return memo;
@@ -210,11 +213,18 @@ function pinRests(before, after, now) {
   const nopause = { ...before, paused: undefined };
   // The days an earlier change pinned are kept as they were, whatever the reading days are now (a rest day under the
   // old weekdays stays one after a second change of days); only the days since are judged, against `before`. A day
-  // the plan did not read on then (a day off, a pause) is kept with them: a later change of days never makes it missed.
-  const dates = was ? [...was.dates].filter((k) => k < was.until).sort() : [];
+  // the plan did not read on then (a day off, a pause) is kept apart, in `off`: a later change of days never makes it
+  // missed, and an untick or a read dated before it (unpinFrom), which re-judges the rest days, never touches it.
+  const off = was ? [...was.off] : [];
+  const dates = was ? [...was.dates].filter((k) => k < was.until && !was.off.has(k)).sort() : [];
   const from = was ? Math.max(startN, /** @type {number} */ (dayNum(was.until))) : startN;
-  for (let n = from; n < today; n++) if ((spread || was) && (!isReadingDay(nopause, n) || restedOn(before, n, memo))) dates.push(dateOf(n));
-  return { ...after, rested: { until: dateOf(Math.max(today, was ? /** @type {number} */ (dayNum(was.until)) : today)), ranges: toRanges(dates) } };
+  for (let n = from; n < today; n++) {
+    const key = dateOf(n);
+    if (!(spread || was) || (was && was.off.has(key))) continue;
+    if (!isReadingDay(nopause, n)) off.push(key); else if (restedOn(before, n, memo)) dates.push(key);
+  }
+  const offRanges = toRanges([...new Set(off)].sort());
+  return { ...after, rested: { until: dateOf(Math.max(today, was ? /** @type {number} */ (dayNum(was.until)) : today)), ranges: toRanges(dates), ...(offRanges.length ? { off: offRanges } : {}) } };
 }
 
 /**
@@ -980,7 +990,8 @@ export function untickItem(run, k, now) {
 function unpinFrom(run, dates) {
   const r = run.rested, from = dates.filter(Boolean).sort()[0];
   if (!r || !from || from >= r.until) return run;
-  return { ...run, rested: { until: from, ranges: toRanges([...pinnedDates(r)].filter((d) => d < from).sort()) } };
+  // The days off and paused days a change of days pinned (`off`) do not depend on any read: kept whole.
+  return { ...run, rested: { until: from, ranges: toRanges([...pinnedDates(r)].filter((d) => d < from).sort()), ...(r.off ? { off: r.off } : {}) } };
 }
 
 /** Pause from today. */
