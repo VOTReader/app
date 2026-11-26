@@ -962,8 +962,7 @@ export function createBackupFlow(ctx) {
           await _importV3Container(file);
         } else {
           // Legacy JSON whole-file text read. BAK4: cap at 50 MB to match Android
-          // (StorageManager.MAX_IMPORT_SIZE) + the other web path
-          // (WEB_MAX_IMPORT_BYTES) — v3 is the GB-scale streaming path, a legacy
+          // (StorageManager.MAX_IMPORT_SIZE) — v3 is the GB-scale streaming path, a legacy
           // v1/v2 backup is always well under this, so a larger pick is a
           // pathological non-backup that a 300 MB .text() read would OOM on a
           // budget device.

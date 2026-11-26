@@ -109,7 +109,7 @@ gate also fires on disallowed fn names.
    ```
 3. Exercise:
    - Open a letter (triggers `injectInsets` → `setCssProperties`).
-   - Import a file (triggers `__onImportFile` callback).
+   - Import a backup (triggers the `__onV3ImportReady` callback).
    - Tap a notebook icon (triggers `__onMicPermissionResult` flow
      only if voice memo is invoked; skip if no recording planned).
 4. Capture Logcat for the run:

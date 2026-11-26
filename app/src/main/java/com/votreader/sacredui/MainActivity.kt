@@ -107,10 +107,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // reliably acquire the mic on Android 8+ (Pixel/Samsung); endAudioSession()
     // restores the prior mode so normal playback isn't routed to the earpiece.
     private var audioManager: AudioManager? = null
-    // Launcher for the import file picker; registered in onCreate before the
-    // WebView is created so it is ready before any JS calls openFilePicker().
-    private lateinit var filePickerLauncher: ActivityResultLauncher<String>
-
     // Launcher for the SAF "create document" export picker (Settings → Your
     // Data → Export). Lets the user choose the destination folder + filename,
     // and — unlike the old MediaStore.Downloads path — works on every
@@ -298,14 +294,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // (some kiosk / work-profile / stripped builds) launch() throws
     // ActivityNotFoundException out of the UI-thread post and crashes the app; each
     // launch answers JS with the same result its own failure path already sends.
-    override fun launchFilePicker() {
-        try {
-            filePickerLauncher.launch("application/json")
-        } catch (e: Exception) {
-            Timber.w(e, "Import picker launch failed")
-            bridge.callOptional(JsEvent.ImportFile, null)
-        }
-    }
     override fun launchExportPicker(suggestedName: String, content: String) {
         // Double-launch guard: pendingExportContent doubles as the in-flight
         // flag (set just before launch, cleared FIRST in the result callback
@@ -442,51 +430,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         val splash = installSplashScreen()
         splash.setKeepOnScreenCondition { vm.splashHolding }
         super.onCreate(savedInstanceState)
-
-        // Register the file-picker launcher before the WebView is attached.
-        // The callback fires when the user picks a file (after returning from
-        // the system file chooser). It reads the file content in Kotlin and
-        // delivers it to JS as base64 via window.__onImportFile so that
-        // allowContentAccess=false on the WebView is never a factor.
-        filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri == null) {
-                // User cancelled the picker
-                bridge.callOptional(JsEvent.ImportFile, null)
-                return@registerForActivityResult
-            }
-            // #1: the read + base64 encode (up to MAX_IMPORT_SIZE) is synchronous
-            // I/O + CPU work — run it OFF the Main thread so a large legacy pick
-            // can't jank the UI. (This is the legacy v2 import path; the primary
-            // v3 path already streams off the binder thread.) Result handling
-            // resumes on Main (lifecycleScope default); bridge.callOptional
-            // marshals onto the WebView thread itself, so its dispatch is
-            // thread-agnostic regardless.
-            //
-            // Size cap + read + base64 all live in StorageManager; Failure here
-            // covers oversize, unknown-size, and read-error alike. All flow back
-            // to JS as the same null callback the cancel path uses -- JS has one
-            // generic error toast for the whole class of failures, so keeping
-            // them indistinguishable matches the existing UX contract.
-            lifecycleScope.launch {
-                val r = withContext(Dispatchers.IO) { vm.storage.readUriAsBase64(uri) }
-                when (r) {
-                    is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
-                    // Pass the oversize case through as a controlled "too_large" code
-                    // so JS can show a specific "that file is too large" message. Every
-                    // other failure stays a bare null (one arg) -- byte-identical to the
-                    // cancel path above, so a generic read error remains silent as
-                    // before. The raw reason (which may carry an exception message)
-                    // never crosses the bridge; it is already in logcat via
-                    // StorageManager's Timber.w.
-                    is StorageManager.Result.Failure ->
-                        if (r.reason == "too_large") {
-                            bridge.callOptional(JsEvent.ImportFile, null, "too_large")
-                        } else {
-                            bridge.callOptional(JsEvent.ImportFile, null)
-                        }
-                }
-            }
-        }
 
         // SAF export picker — fires when the user chooses (or cancels) the
         // export destination. On success writes the stashed JSON to the
@@ -1287,7 +1230,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 if (dyDp > 4f && dyDp > dxDp) return false
                 // #3: divide out the WebView scale too (vm.currentScale; 1.0 when
                 // unzoomed) so the tap maps to the correct CSS coordinate even if
-                // zoom is ever re-enabled via the setZoomEnabled bridge.
+                // zoom is ever re-enabled (the setZoomEnabled bridge itself is retired).
                 MainActivityLogic.deviceToCssPx(e.x, e.y, density, vm.currentScale)?.let { (cx, cy) ->
                     bridge.callOptional(JsEvent.AnnotationTap, cx, cy)
                 }

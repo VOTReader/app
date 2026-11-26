@@ -419,41 +419,6 @@ class AppInterface(
     @JavascriptInterface
     fun nativeClearRecordings() { vm.audioRecorder.clearRecordings() }
 
-    @JavascriptInterface
-    fun setZoomEnabled(enabled: Boolean) {
-        host.postToUi {
-            val wv = host.activeWebView
-            if (!enabled) {
-                val current = vm.currentScale
-                if (current > 0f && (current != 1f)) wv.zoomBy(1f / current)
-            }
-            wv.settings.setSupportZoom(enabled)
-            wv.settings.builtInZoomControls = enabled
-            wv.settings.displayZoomControls = false
-        }
-    }
-
-    @JavascriptInterface
-    fun resetZoom() {
-        host.postToUi {
-            val current = vm.currentScale
-            if (current > 0f && (current != 1f)) host.activeWebView.zoomBy(1f / current)
-        }
-    }
-
-    @JavascriptInterface
-    fun getZoomScale(): Float = vm.currentScale
-
-    /** Open the system JSON file picker. When the user picks a file (or
-     *  cancels), the file content is base64-encoded and delivered back to
-     *  JS as window.__onImportFile(b64) — or null on cancel/error. */
-    @JavascriptInterface
-    fun openFilePicker() {
-        host.postToUi {
-            host.launchFilePicker()
-        }
-    }
-
     /** Export [content] (UTF-8 text) to a user-chosen location via the
      *  system "create document" picker (SAF). Asynchronous: returns
      *  immediately after launching the picker; the outcome is delivered to

@@ -12,7 +12,7 @@
    SettingsScreen owns only the UI ORCHESTRATION around these:
    the "Preparing…/Importing…" toasts, the confirm dialog + summary,
    the degraded-store precondition guard, the completion toast, the
-   reload timer, and the PlatformBridge.saveToFile / openFilePicker
+   reload timer, and the PlatformBridge.saveToFile / pickImportFile
    wiring. Everything that touches user DATA lives here.
 
    Nothing in this module reaches a global: every store, adapter,

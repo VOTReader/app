@@ -159,7 +159,7 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
       summarizeBackupManifest, formatVerifyReport,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         pickImportFile: () => Promise.resolve(votbak),
       },

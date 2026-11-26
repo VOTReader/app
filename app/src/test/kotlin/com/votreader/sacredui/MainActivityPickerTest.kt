@@ -137,14 +137,6 @@ class MainActivityPickerTest {
         assertTrue(js.contains("__onV3ImportReady") && js.contains("error:launch_failed"), js)
     }
 
-    @Test
-    fun `v2 import with no picker app answers like a cancel instead of crashing`() {
-        val activity = started().get()
-        shadowOf(RuntimeEnvironment.getApplication()).checkActivities(true)
-        activity.launchFilePicker()
-        assertEquals("window.__onImportFile && window.__onImportFile(null)", lastJs(activity))
-    }
-
     // ── the notes export keeps its .md name ──
 
     @Test

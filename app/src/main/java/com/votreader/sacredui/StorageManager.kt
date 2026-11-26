@@ -703,7 +703,7 @@ class StorageManager(private val context: Context) {
         // stops an accidental or hostile GB-scale pick from OOM-ing the
         // app even before we get to readBytes.
         // CROSS-LANGUAGE PAIR: the web import path enforces the same 50 MB in
-        // platform-bridge.js (WEB_MAX_IMPORT_BYTES). Keep the two values in sync.
+        // backup-flow.js (IMPORT_MAX_BYTES). Keep the two values in sync.
         // (v3 STREAMING import is NOT bounded by this — see beginV3Import; the
         // cap only guards the legacy whole-file JSON read.)
         const val MAX_IMPORT_SIZE = 50L * 1024 * 1024

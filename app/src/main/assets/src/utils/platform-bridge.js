@@ -18,10 +18,10 @@
    W1.1: interface + Android passthrough + web placeholders.
    W1.2: call sites in use-settings, use-thumbnails, GardenView,
      JournalRecordingSheet and SettingsScreen migrated here, plus the real
-     web impls (webImpl, Category 3): Tier B.1 wake lock, Tier B.2 file I/O (openFilePicker + saveToFile via
+     web impls (webImpl, Category 3): Tier B.1 wake lock, Tier B.2 file I/O (saveToFile via
      <input type="file"> / Blob URL; call them from a user-gesture callstack,
      since browsers block programmatic .click() outside one), Tier B.3
-     fullscreen and zoom, Tier C recording (MediaRecorder + AnalyserNode,
+     fullscreen (the zoom trio and the base64 import picker are retired, dead-code-docs-n1), Tier C recording (MediaRecorder + AnalyserNode,
      the JournalRecordingSheet code consolidated here; mime webm/opus →
      ogg/opus → "error:unsupported-codec", no wav fallback).
    Web back-nav (planned as W1.5) lives in use-android-back.js and the
@@ -46,9 +46,6 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(enabled: boolean) => void} setKeepScreenOn
  * @property {() => void} onAppReady
  * @property {(immersive: boolean) => void} setImmersiveMode
- * @property {(enabled: boolean) => void} setZoomEnabled
- * @property {() => void} resetZoom
- * @property {() => number} getZoomScale
  * @property {(style: number) => void} haptic
  * @property {() => void} startAudioSession
  * @property {() => void} endAudioSession
@@ -63,7 +60,6 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(name: string) => string | null} nativeReadRecording
  * @property {(name: string) => boolean} nativeDeleteRecording
  * @property {() => void} nativeClearRecordings
- * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string | Blob) => void} saveToFile
  * @property {(suggestedName: string, opts?: { onSlow?: (escape: () => void) => void }) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
@@ -124,9 +120,6 @@ const androidImpl = {
   setKeepScreenOn: (enabled) => /** @type {any} */ (window).AndroidBridge.setKeepScreenOn(enabled),
   onAppReady: () => /** @type {any} */ (window).AndroidBridge.onAppReady(),
   setImmersiveMode: (immersive) => /** @type {any} */ (window).AndroidBridge.setImmersiveMode(immersive),
-  setZoomEnabled: (enabled) => /** @type {any} */ (window).AndroidBridge.setZoomEnabled(enabled),
-  resetZoom: () => /** @type {any} */ (window).AndroidBridge.resetZoom(),
-  getZoomScale: () => /** @type {any} */ (window).AndroidBridge.getZoomScale(),
   haptic: (style) => /** @type {any} */ (window).AndroidBridge.haptic(style),
   startAudioSession: () => /** @type {any} */ (window).AndroidBridge.startAudioSession(),
   endAudioSession: () => /** @type {any} */ (window).AndroidBridge.endAudioSession(),
@@ -147,7 +140,6 @@ const androidImpl = {
   nativeDeleteRecording: (name) => /** @type {any} */ (window).AndroidBridge.nativeDeleteRecording(name),
   // Clear All My Data: every served memo on disk goes (NativeAudioRecorder.clearRecordings).
   nativeClearRecordings: () => /** @type {any} */ (window).AndroidBridge.nativeClearRecordings(),
-  openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
   // / sliceable Blob). They are NOT the Android path: a SAF import can't expose a
@@ -194,8 +186,8 @@ const androidImpl = {
 //   1. Genuine no-ops — Android-specific UI knobs where the browser
 //      handles the concern natively (theme via CSS, audio session via
 //      browser).
-//   2. Safe defaults — getters with sensible web answers (getZoomScale
-//      returns 1.0, getCrashLog returns "[]" matching the Android
+//   2. Safe defaults — getters with sensible web answers (getCrashLog
+//      returns "[]" matching the Android
 //      debug-build path).
 //   3. Real web impls (screenshots, wake lock, file I/O, recording).
 //      Recording methods use the "error:<reason>" string contract matching
@@ -370,67 +362,6 @@ function webSetImmersiveMode(immersive) {
       console.warn('[PlatformBridge] setImmersiveMode unexpected error:', /** @type {any} */ (e).message || e);
     }
   }
-}
-
-// Web zoom — DELIBERATE NO-OPS (W1.2 Tier B.3). Per
-// [[verify-inertness-not-equivalence]]: the Android methods exist to
-// override WebView's default (zoom DISABLED), enabling pinch-zoom on the
-// Garden image specifically. Browsers default to zoom ENABLED — there's
-// nothing for the bridge to do. CSS touch-action: none would actively
-// BREAK the natural pinch behavior the user expects. resetZoom has no
-// web equivalent at all (no JS API can undo a user's pinch-zoom). These
-// are no-ops, NOT CSS hacks.
-const webSetZoomEnabled = () => {};
-const webResetZoom = () => {};
-
-// Web file picker — openFilePicker impl (W1.2 Tier B.2). Per
-// [[file-input-user-gesture]], the input.click() MUST be invoked synchronously
-// from the caller's user-gesture handler (no await/setTimeout between).
-// Per [[preserve-callback-contracts]], we fire `window.__onImportFile(base64)`
-// with the same shape Android's AppInterface fires — the caller (SettingsScreen)
-// installs that global handler BEFORE calling openFilePicker; web fires it
-// from FileReader.onload exactly like Android fires it from the picker activity.
-//
-// FileReader.readAsDataURL gives us a "data:<mime>;base64,XXX" string; we
-// strip the prefix so the callback receives pure base64 matching the
-// Android contract (atob-decodable directly).
-// Matches Android's StorageManager.MAX_IMPORT_SIZE (50 MB) so the oversize
-// import guard is symmetric across both platforms.
-const WEB_MAX_IMPORT_BYTES = 50 * 1024 * 1024;
-
-function webOpenFilePicker() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json,.json';
-  input.onchange = (/** @type {any} */ ev) => {
-    const cb = /** @type {any} */ (window).__onImportFile;
-    const file = ev.target.files && ev.target.files[0];
-    if (!file) {
-      if (typeof cb === 'function') cb(null);
-      return;
-    }
-    // Mirror the Android 50 MB import cap: a huge accidental pick would
-    // otherwise OOM / hang FileReader on a low-end device. Report it as the
-    // 'too_large' code so SettingsScreen shows the specific oversize message;
-    // every other null stays a silent cancel/error exactly as before.
-    if (file.size > WEB_MAX_IMPORT_BYTES) {
-      if (typeof cb === 'function') cb(null, 'too_large');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (/** @type {any} */ re) => {
-      // "data:application/json;base64,XXX" → strip prefix to "XXX"
-      const result = String(re.target.result || '');
-      const idx = result.indexOf(',');
-      const base64 = idx >= 0 ? result.substring(idx + 1) : result;
-      if (typeof cb === 'function') cb(base64);
-    };
-    reader.onerror = () => {
-      if (typeof cb === 'function') cb(null);
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
 }
 
 // Web save-to-downloads — Blob + URL.createObjectURL + anchor click (W1.2
@@ -949,7 +880,6 @@ const webImpl = {
   endAudioSession: () => {},
 
   // Category 2 — safe defaults
-  getZoomScale: () => 1.0,
   // W7.4: the JS DiagnosticLog IS the web crash log (no native log to merge).
   getCrashLog: () => DiagnosticLog.toJSON(),
   // NTV3: web has no app-managed Garden cache (Garden <img>s are browser
@@ -963,7 +893,6 @@ const webImpl = {
 
   // Category 3 — real web impls
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
-  openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
   openExportSink: webOpenExportSink,         // P2 (FS Access API writable / Blob-download fallback)
   pickImportFile: webPickImportFile,         // P2 (FS Access API open / DOM input → File)
@@ -980,8 +909,6 @@ const webImpl = {
   v3ImportVerify: v3AndroidOnly('v3ImportVerify'),
   v3ImportClose: v3AndroidOnly('v3ImportClose'),
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
-  setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
-  resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
   // Tier C (W1.4): MediaRecorder + AnalyserNode recording flow
   requestMicPermission: webRequestMicPermission,
   nativeRecordStart: webNativeRecordStart,

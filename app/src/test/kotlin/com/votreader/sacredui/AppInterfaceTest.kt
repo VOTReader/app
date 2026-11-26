@@ -722,28 +722,7 @@ class AppInterfaceTest {
         verify { vm.pendingV3ImportUri = null }
     }
 
-    // ─── Zoom ────────────────────────────────────────────
-
-    @Test
-    fun `getZoomScale reads from vm`() {
-        val vm = mockk<MainViewModel>(relaxed = true)
-        every { vm.currentScale } returns 1.75f
-        val (app, _, _) = newSubject(vm = vm)
-        assertEquals(1.75f, app.getZoomScale())
-    }
-
-    // ─── File picker + crash log ──────────────────────────────────────
-
-    @Test
-    fun `openFilePicker posts to UI thread and launches picker`() {
-        val host = FakeBridgeHost()
-        val (app, _, _) = newSubject(host = host)
-
-        app.openFilePicker()
-
-        assertEquals(1, host.postedActions.size, "should hop through postToUi")
-        assertEquals(1, host.filePickerLaunchCount)
-    }
+    // ─── Crash log ──────────────────────────────────────
 
     @Test
     fun `getCrashLog returns empty array when releaseTree is null`() {

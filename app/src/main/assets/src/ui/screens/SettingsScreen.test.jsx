@@ -833,7 +833,7 @@ describe('v3 export manifest limit', () => {
       showToast: toast,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        openExportSink, pickImportFile: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -862,7 +862,7 @@ describe('v3 export manifest limit', () => {
       showToast: toast,
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: vi.fn(async () => ({ write: vi.fn(), close: vi.fn() })),
+        openExportSink: vi.fn(async () => ({ write: vi.fn(), close: vi.fn() })),
         pickImportFile: () => null, clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -1038,7 +1038,7 @@ describe('wipe dialog — Back up first (PL-SEARCH 6)', () => {
       showToast: vi.fn(),
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink,
+        openExportSink,
         pickImportFile: () => null, clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -1098,7 +1098,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         pickImportFile,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
@@ -1285,7 +1285,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         pickImportFile: async () => containerFile(),
       },
@@ -1310,7 +1310,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         pickImportFile: async () => containerFile(),
       },
@@ -1333,7 +1333,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
         v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
@@ -1387,7 +1387,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink: () => null,
+        openExportSink: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
         v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
         v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
@@ -1648,7 +1648,7 @@ describe('export escape — the save picker that never settles', () => {
       writeContainer: vi.fn(async () => {}),
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        openExportSink, pickImportFile: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });
@@ -1673,7 +1673,7 @@ describe('export escape — the save picker that never settles', () => {
       writeContainer: vi.fn(async () => {}),
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
-        openFilePicker: () => {}, openExportSink, pickImportFile: () => null,
+        openExportSink, pickImportFile: () => null,
         clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
     });

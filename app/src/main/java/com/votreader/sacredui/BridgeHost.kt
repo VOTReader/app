@@ -23,7 +23,7 @@ import android.webkit.WebView
  *     onCreate; a binder-thread call that lands before that cache is set
  *     should no-op gracefully rather than NPE.
  *
- *   - launchFilePicker / launchMicPermissionRequest are explicit verbs
+ *   - the launch* pickers / launchMicPermissionRequest are explicit verbs
  *     instead of exposing the raw ActivityResultLauncher fields, because
  *     a launcher only fires safely if the Activity owns it -- routing
  *     through methods keeps that contract enforceable at the host.
@@ -60,9 +60,6 @@ interface BridgeHost {
      * called on the UI thread.
      */
     fun applyImmersiveMode(immersive: Boolean)
-
-    /** Launch the system JSON file picker (Settings import flow). */
-    fun launchFilePicker()
 
     /**
      * Launch the SAF "create document" picker so the user chooses the

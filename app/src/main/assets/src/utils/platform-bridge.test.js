@@ -36,10 +36,6 @@ const METHODS = [
   'nativeReadRecording',
   'nativeDeleteRecording',
   'nativeClearRecordings',
-  'setZoomEnabled',
-  'resetZoom',
-  'getZoomScale',
-  'openFilePicker',
   'saveToFile',
   'openExportSink',
   'pickImportFile',
@@ -86,10 +82,6 @@ function mockAndroidBridge() {
     nativeListRecordings: vi.fn(() => '[]'),
     nativeReadRecording: vi.fn(() => 'YWJj'),
     nativeDeleteRecording: vi.fn(() => true),
-    setZoomEnabled: vi.fn(),
-    resetZoom: vi.fn(),
-    getZoomScale: vi.fn(() => 1.5),
-    openFilePicker: vi.fn(),
     saveToFile: vi.fn(),
     // v3 chunked bridge — defaults match the native return contracts.
     v3ExportOpen: vi.fn(),
@@ -163,8 +155,6 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['setKeepScreenOn', [false]],
     ['onAppReady', []],
     ['setImmersiveMode', [true]],
-    ['setZoomEnabled', [false]],
-    ['resetZoom', []],
     ['haptic', [2]],
     ['startAudioSession', []],
     ['endAudioSession', []],
@@ -172,7 +162,6 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['requestMicPermission', []],
     ['nativeRecordStop', []],
     ['nativeRecordCancel', []],
-    ['openFilePicker', []],
     // saveToFile is now fire-and-forget (async SAF picker on Android);
     // the result arrives via window.__onExportComplete, so the bridge
     // method itself returns void and just delegates.
@@ -202,7 +191,6 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeListRecordings', [], '[]'],
     ['nativeReadRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], 'YWJj'],
     ['nativeDeleteRecording', ['b1b0e3a2-0000-4000-8000-000000000000.m4a'], true],
-    ['getZoomScale', [], 1.5],
     // getCrashLog is NO LONGER a pure passthrough — W7.4 merges the native
     // BoundedLogTree with the JS DiagnosticLog. See its own describe below.
     // v3 chunked bridge — synchronous value passthroughs (forward args, return native result).
@@ -290,9 +278,6 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
 
   // Category 2 — safe defaults
-  it('getZoomScale returns 1.0 on web', () => {
-    expect(bridge.getZoomScale()).toBe(1.0);
-  });
   it('getCrashLog returns valid empty JSON array string on web', () => {
     const out = bridge.getCrashLog();
     expect(out).toBe('[]');
@@ -316,8 +301,8 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
   // Category 3 — notYetImplemented warns but doesn't throw
   // (Most methods now have real impls in their own describe blocks below:
-  //   setKeepScreenOn (Tier B.1), openFilePicker + saveToFile (Tier B.2),
-  //   setImmersiveMode + setZoomEnabled + resetZoom
+  //   setKeepScreenOn (Tier B.1), saveToFile (Tier B.2),
+  //   setImmersiveMode
   //   (Tier B.3), recording methods (Tier C). Only haptic remains — its JS
   //   wiring is post-W1; see [[haptic-bridge-ready]].)
   it.each([
@@ -343,17 +328,12 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     expect(() => bridge[name]()).toThrow(/Android-only/);
   });
 
-  // Tier B.3: zoom methods are DELIBERATE no-ops on web (verify inertness
-  // per [[verify-inertness-not-equivalence]]). Browsers handle zoom
-  // natively; CSS hacks would interfere with the Garden image's pinch.
-  it('setZoomEnabled is silent no-op on web (no warn, no throw)', () => {
-    bridge.setZoomEnabled(true);
-    bridge.setZoomEnabled(false);
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-  it('resetZoom is silent no-op on web', () => {
-    bridge.resetZoom();
-    expect(warnSpy).not.toHaveBeenCalled();
+  // dead-code-docs-n1 (audit 11-23): the base64 import picker and the WebView zoom trio are gone from both
+  // impls (dead since 06-02 and 05-31; the v3 picker and GardenView's own pinch replaced them).
+  it('neither impl carries the retired import picker or zoom bridges', () => {
+    for (const name of ['openFilePicker', 'setZoomEnabled', 'resetZoom', 'getZoomScale']) {
+      expect(bridge[name]).toBeUndefined();
+    }
   });
 });
 
@@ -446,137 +426,6 @@ describe('PlatformBridge — Web setImmersiveMode (Fullscreen API)', () => {
     expect(() => bridge.setImmersiveMode(true)).not.toThrow();
     expect(() => bridge.setImmersiveMode(false)).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────
-// Web openFilePicker — DOM input + FileReader (W1.2 Tier B.2)
-// ─────────────────────────────────────────────────────────────────────
-
-describe('PlatformBridge — Web openFilePicker (DOM input + FileReader)', () => {
-  /** @type {any} */ let bridge;
-  /** @type {any} */ let inputEl;
-  /** @type {any} */ let inputClickSpy;
-  /** @type {any} */ let createElementSpy;
-
-  beforeEach(async () => {
-    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
-    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
-    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
-    // Stub document.createElement('input') so we can intercept .click() + simulate file selection
-    inputEl = /** @type {any} */ ({
-      type: '',
-      accept: '',
-      onchange: null,
-      click: vi.fn(),
-    });
-    inputClickSpy = inputEl.click;
-    const realCreate = document.createElement.bind(document);
-    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'input') return /** @type {any} */ (inputEl);
-      return realCreate(tag);
-    });
-    bridge = await importBridge();
-  });
-
-  afterEach(() => {
-    createElementSpy.mockRestore();
-    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
-  });
-
-  it('synchronously creates a file input and calls .click() in the same callstack', () => {
-    bridge.openFilePicker();
-    expect(inputEl.type).toBe('file');
-    expect(inputEl.accept).toBe('application/json,.json');
-    expect(inputClickSpy).toHaveBeenCalledTimes(1);
-    // click() fires sync — must not be wrapped in a Promise / setTimeout per
-    // [[file-input-user-gesture]] (browsers block programmatic click outside user gesture).
-  });
-
-  it('fires window.__onImportFile(base64) when a file is picked (preserves Android contract)', async () => {
-    const cb = vi.fn();
-    /** @type {any} */ (globalThis.window).__onImportFile = cb;
-    bridge.openFilePicker();
-
-    // Stub FileReader so onload fires immediately with a data URL
-    const origFileReader = globalThis.FileReader;
-    /** @this {any} */
-    function MockFileReader() {
-      /** @type {any} */ const self = this;
-      self.readAsDataURL = (/** @type {any} */ _file) => {
-        // Immediately simulate onload with a data URL — base64 of '{"a":1}'
-        setTimeout(() => {
-          if (self.onload) self.onload({ target: { result: 'data:application/json;base64,eyJhIjoxfQ==' } });
-        }, 0);
-      };
-    }
-    /** @type {any} */ (globalThis).FileReader = MockFileReader;
-
-    // Simulate user picking a file
-    /** @type {any} */ (inputEl).onchange({ target: { files: [/** @type {any} */ ({ name: 'backup.json' })] } });
-    await new Promise((r) => setTimeout(r, 5));
-
-    expect(cb).toHaveBeenCalledTimes(1);
-    expect(cb).toHaveBeenCalledWith('eyJhIjoxfQ==');  // pure base64, prefix stripped
-
-    /** @type {any} */ (globalThis).FileReader = origFileReader;
-  });
-
-  it('fires window.__onImportFile(null) when user cancels (no file selected)', () => {
-    const cb = vi.fn();
-    /** @type {any} */ (globalThis.window).__onImportFile = cb;
-    bridge.openFilePicker();
-    // No file selected — onchange fires with empty files
-    /** @type {any} */ (inputEl).onchange({ target: { files: null } });
-    expect(cb).toHaveBeenCalledWith(null);
-  });
-
-  it('fires window.__onImportFile(null) when FileReader errors', async () => {
-    const cb = vi.fn();
-    /** @type {any} */ (globalThis.window).__onImportFile = cb;
-    bridge.openFilePicker();
-
-    const origFileReader = globalThis.FileReader;
-    /** @this {any} */
-    function MockFileReaderErr() {
-      /** @type {any} */ const self = this;
-      self.readAsDataURL = () => {
-        setTimeout(() => { if (self.onerror) self.onerror(); }, 0);
-      };
-    }
-    /** @type {any} */ (globalThis).FileReader = MockFileReaderErr;
-
-    /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x' }] } });
-    await new Promise((r) => setTimeout(r, 5));
-    expect(cb).toHaveBeenCalledWith(null);
-
-    /** @type {any} */ (globalThis).FileReader = origFileReader;
-  });
-
-  it('fires window.__onImportFile(null, "too_large") when the file exceeds the 50 MB cap', () => {
-    const cb = vi.fn();
-    /** @type {any} */ (globalThis.window).__onImportFile = cb;
-    // FileReader must never run on the oversize path — fail loudly if it does.
-    const origFileReader = globalThis.FileReader;
-    /** @this {any} */
-    function MockFileReaderUnused() {
-      /** @type {any} */ const self = this;
-      self.readAsDataURL = () => { throw new Error('FileReader should not run for an oversize file'); };
-    }
-    /** @type {any} */ (globalThis).FileReader = MockFileReaderUnused;
-
-    bridge.openFilePicker();
-    // 51 MB — one MB over the 50 MB cap (matches Android MAX_IMPORT_SIZE).
-    /** @type {any} */ (inputEl).onchange({ target: { files: [/** @type {any} */ ({ name: 'huge.json', size: 51 * 1024 * 1024 })] } });
-    expect(cb).toHaveBeenCalledWith(null, 'too_large');
-
-    /** @type {any} */ (globalThis).FileReader = origFileReader;
-  });
-
-  it('does not throw when window.__onImportFile is not installed', () => {
-    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
-    bridge.openFilePicker();
-    expect(() => /** @type {any} */ (inputEl).onchange({ target: { files: null } })).not.toThrow();
   });
 });
 
@@ -1264,16 +1113,16 @@ describe('PlatformBridge — detection edge cases', () => {
     /** @type {any} */ (globalThis.window).AndroidBridge = null;
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const bridge = await importBridge();
-    // Web impl returns 1.0; Android impl would crash trying to call null.getZoomScale()
-    expect(bridge.getZoomScale()).toBe(1.0);
+    // Web impl returns 0; Android impl would crash trying to call null.nativeRecordAmplitude()
+    expect(bridge.nativeRecordAmplitude()).toBe(0);
     warnSpy.mockRestore();
   });
 
   it('truthy AndroidBridge value selects Android impl', async () => {
     /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
-    /** @type {any} */ (globalThis.window).AndroidBridge = { getZoomScale: () => 2.5 };
+    /** @type {any} */ (globalThis.window).AndroidBridge = { nativeRecordAmplitude: () => 2500 };
     const bridge = await importBridge();
-    expect(bridge.getZoomScale()).toBe(2.5);
+    expect(bridge.nativeRecordAmplitude()).toBe(2500);
   });
 });
 

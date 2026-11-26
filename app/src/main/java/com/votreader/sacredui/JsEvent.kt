@@ -8,7 +8,6 @@ package com.votreader.sacredui
  * surface.
  *
  * JS-side receivers:
- *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull, errCode?)
  *   ExportComplete        -> SettingsScreen.__onExportComplete("ok"|"error:<reason>"|"cancelled")
  *   V3ExportReady         -> SettingsScreen.__onV3ExportReady("ok"|"cancelled"|"error:<reason>")
  *   V3ImportReady         -> SettingsScreen.__onV3ImportReady("ok"|"cancelled"|"error:<reason>")
@@ -24,12 +23,10 @@ package com.votreader.sacredui
  *   TrimMemory            -> _entry-b.__onTrimMemory()
  */
 sealed class JsEvent(val fn: String) {
-    data object ImportFile : JsEvent("__onImportFile")
-
     // Result of the SAF export-document picker (Settings → Your Data →
     // Export). "ok" when the JSON was written to the user-chosen URI,
     // "error:<reason>" on a write failure, "cancelled" when the user
-    // dismissed the picker. Mirrors ImportFile's async-callback shape.
+    // dismissed the picker.
     data object ExportComplete : JsEvent("__onExportComplete")
 
     // v3 streaming backup (BACKUP-STREAMING-PLAN P3). The SAF picker is async,

@@ -231,11 +231,6 @@ share it. (`__pendingLinkExcerpt` was removed in D2 — write-only dead code.)
 Set by the JS side BEFORE invoking a Kotlin bridge that fires a
 callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")`.
 
-### `__onImportFile`
-- **Setter:** none since 2026-06-02: the legacy base64 import picker was replaced by the v3 streaming import, and nothing in the page sets it. Kotlin still dispatches it (`tools/kt-events-check.mjs` KNOWN_UNWIRED); audit dead-code-docs-n1 removes both ends.
-- **Cleanup:** n/a
-- **Consumer:** `MainActivity.kt`'s `filePickerLauncher` result handler
-
 ### `__onNativeRecordingComplete`
 - **Setter:** `src/ui/sheets/JournalRecordingSheet.jsx` — set on recording-sheet mount
 - **Cleanup:** `delete window.__onNativeRecordingComplete` on save/cancel

@@ -34,9 +34,6 @@ class BridgeContractTest {
         "setAudioActive" to 1,
         "onAppReady" to 0,
         "setImmersiveMode" to 1,
-        "setZoomEnabled" to 1,
-        "resetZoom" to 0,
-        "getZoomScale" to 0,
         "requestMicPermission" to 0,
         "startAudioSession" to 0,
         "endAudioSession" to 0,
@@ -91,7 +88,6 @@ class BridgeContractTest {
         // Clear All My Data: every served memo goes (NativeAudioRecorder.clearRecordings). PlatformBridge mirrors it;
         // the web impl is a no-op, since the web keeps no memos on the device.
         "nativeClearRecordings" to 0,
-        "openFilePicker" to 0,
         "saveToFile" to 2,
         // v3 streaming backup — native chunked bridge (BACKUP-STREAMING-PLAN P3).
         "v3ExportOpen" to 1,
