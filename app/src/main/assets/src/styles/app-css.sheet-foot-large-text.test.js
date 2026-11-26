@@ -20,8 +20,15 @@ function rule(sel) {
 }
 
 describe('a sheet foot at large text keeps its buttons on the screen', () => {
-  it('standard text: two equal columns, as before', () => {
-    expect(rule('.ui-sheet-foot')).toMatch(/grid-template-columns:\s*1fr 1fr/);
+  it('below large text: two equal columns that may shrink below a label\'s one-line width', () => {
+    expect(rule('.ui-sheet-foot')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/);
+  });
+
+  it('below large text: a button wraps its words inside its half, keeping its standard height', () => {
+    const b = rule('.ui-sheet-foot > .ui-btn');
+    expect(b).toMatch(/min-width:\s*0/);
+    expect(b).toMatch(/white-space:\s*normal/);
+    expect(b).not.toMatch(/(^|[;\s])height:/);   // .ui-btn's min-height stays the floor
   });
 
   it('large text: one column that may shrink below a label\'s one-line width', () => {

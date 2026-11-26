@@ -5490,7 +5490,12 @@
     .ui-sheet-action.is-danger .ui-row-title, .ui-sheet-action.is-danger .ui-row-lead { color: var(--tone-danger); }
     .ui-sheet-body { margin-bottom: 14px; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.5; }
     .ui-sheet-body:empty { display: none; }
-    .ui-sheet-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .ui-sheet-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 14px; }
+    /* Below the large-text class (180 %) a nowrap label could still set its column's minimum: from 130 % "Download
+       1.24 GB", from 160 % "Restore and overwrite" ran past the 372 px foot and off the screen (shots 11-26,
+       restore-skip/foot-q/below-threshold). The columns may shrink and a label wraps at its spaces inside its
+       half; while a label fits, nothing moves (min-height keeps the button's height, the padding sits inside it). */
+    .ui-sheet-foot > .ui-btn { min-width: 0; white-space: normal; text-align: center; text-wrap: balance; padding-block: 6px; }
     .ui-sheet-foot .ui-btn:not(.is-primary) { background: var(--surface-2); }
     /* a destroying confirm: red words on the plain inset button (mock .btn.in.red), not a red fill */
     .ui-sheet-foot .ui-btn.is-danger.is-primary { background: var(--surface-2); color: var(--tone-danger); font-weight: 500; }
