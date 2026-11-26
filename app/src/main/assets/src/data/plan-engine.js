@@ -47,7 +47,7 @@ export const WORDS_PER_MIN = 200;
  *   k '<bid>:<cid>' (the read-key tail), w its words, t/s a letter's title and collection short name, p 1 on a
  *   collection's preface (plans2: counted apart, "29 letters and a preface"; older runs have no p)
  * @typedef {{ kind: string, by: 'count' | 'words', items: PlanItem[] }} PlanTrack
- * @typedef {{ day0: number, from: number[], to: number[], days: number }} PlanSeg
+ * @typedef {{ day0: number, from: number[], to: number[], days: number, even?: boolean }} PlanSeg
  * @typedef {{ mode: 'days' | 'minutes' | 'items' | 'by', n?: number, date?: string }} PlanPace
  * @typedef {{ id: string, plan: string, name?: string, created?: number, updated?: number, start: string,
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
@@ -127,12 +127,23 @@ function readingDaysBetween(run, a, b) {
  * Cut items [from, to) into `days` runs: by count, run d is [from + round(d*N/days), ...); by words, each item
  * goes to the day its words' midpoint falls in, so every day carries about the same words. Returns the start
  * index of each day plus the end (days + 1 numbers).
+ * With `opts.fit` a words cut still starts a new day early when the items left only just cover the days left, so no
+ * day goes empty while there are items; with `opts.spread` fewer items than days are spread out, the first on the
+ * first day and the last on the last.
  * @param {PlanItem[]} items @param {number} from @param {number} to @param {number} days @param {'count' | 'words'} by
+ * @param {{ fit?: boolean, spread?: boolean }} [opts]
  * @returns {number[]}
  */
-export function cutPoints(items, from, to, days, by) {
+export function cutPoints(items, from, to, days, by, opts = {}) {
   const n = Math.max(0, to - from), D = Math.max(1, Math.floor(days) || 1);
   const out = [from];
+  if (opts.spread && by === 'words' && n > 0 && n < D) {
+    // Fewer readings than days: the first on the first day, the last on the last, the rest evenly between.
+    const dayOf = (i) => (n === 1 ? 0 : Math.round(i * (D - 1) / (n - 1)));
+    for (let d = 1; d < D; d++) { let c = 0; while (c < n && dayOf(c) < d) c++; out.push(from + c); }
+    out.push(to);
+    return out;
+  }
   if (by !== 'words') {
     for (let d = 1; d < D; d++) out.push(from + Math.round(d * n / D));
     out.push(to);
@@ -145,7 +156,7 @@ export function cutPoints(items, from, to, days, by) {
     const w = Math.max(1, Number(items[i] && items[i].w) || 1);
     // Item i starts day d when its midpoint passes d/D of the words (and every day keeps at least one item while
     // there are enough to go round).
-    while (d < D && acc + w / 2 >= d * total / D && i > out[out.length - 1]) { out.push(i); d++; }
+    while (d < D && i > out[out.length - 1] && (acc + w / 2 >= d * total / D || (opts.fit && to - i <= D - d))) { out.push(i); d++; }
     acc += w;
   }
   while (out.length < D) out.push(to);
@@ -164,7 +175,10 @@ export function planDays(run) {
   for (let s = 0; s < segs.length; s++) {
     const seg = segs[s];
     const end = s + 1 < segs.length ? segs[s + 1].day0 : seg.day0 + seg.days;
-    const cuts = run.tracks.map((tr, t) => cutPoints(tr.items, seg.from[t], seg.to[t], seg.days, tr.by));
+    // A segment cut since 2026-11-26 (`even`) keeps an item on every day while there are enough, and a one-track plan
+    // shorter than its days spreads them out; older segments keep the cut their readers already have.
+    const opts = seg.even ? { fit: true, spread: run.tracks.length === 1 } : {};
+    const cuts = run.tracks.map((tr, t) => cutPoints(tr.items, seg.from[t], seg.to[t], seg.days, tr.by, opts));
     for (let d = seg.day0; d < end && d - seg.day0 < seg.days; d++) {
       const j = d - seg.day0;
       const parts = [];
@@ -541,7 +555,7 @@ export function newRun(spec, now) {
   const all = tracks.flatMap((t) => t.items);
   // Side by side: every track spread over the same days; a track with fewer items than days just ends sooner.
   const days = daysForPace(run, spec.pace, startN, all);
-  run.segs = [{ day0: 0, from: tracks.map(() => 0), to: tracks.map((t) => t.items.length), days }];
+  run.segs = [{ day0: 0, from: tracks.map(() => 0), to: tracks.map((t) => t.items.length), days, even: true }];
   const firstDay = isReadingDay(run, startN) ? startN : nthReadingDay(run, startN, 0);
   run.target = dateOf(nthReadingDay(run, firstDay, days - 1));
   return run;
@@ -553,7 +567,7 @@ function recut(run, days, now) {
   if (st.finished) return run;
   const from = remainingFrom(run, st.day);
   const segs = run.segs.filter((s) => s.day0 < st.day);
-  segs.push({ day0: st.day, from, to: run.tracks.map((t) => t.items.length), days: Math.max(1, days) });
+  segs.push({ day0: st.day, from, to: run.tracks.map((t) => t.items.length), days: Math.max(1, days), even: true });
   return { ...run, segs, updated: now.getTime() };
 }
 

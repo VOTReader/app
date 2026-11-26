@@ -43,6 +43,25 @@ describe('cutting into days', () => {
     expect(pts[pts.length - 1]).toBe(items.length);
     for (let d = 0; d < 4; d++) expect(pts[d + 1]).toBeGreaterThan(pts[d]);   // no empty day
   });
+  it('a new words cut leaves no day empty, and spreads a short one-track plan over its days', () => {
+    const five = [100, 200, 300, 400, 500].map((w, i) => ({ k: 'v:' + i, w, t: 'L' + i }));
+    expect(cutPoints(five, 0, 5, 5, 'words')).toEqual([0, 2, 3, 4, 5, 5]);   // the old cut: the last day went empty
+    expect(cutPoints(five, 0, 5, 5, 'words', { fit: true })).toEqual([0, 1, 2, 3, 4, 5]);
+    const three = [500, 3000, 800].map((w, i) => ({ k: 'v:' + i, w, t: 'L' + i }));
+    expect(cutPoints(three, 0, 3, 7, 'words')).toEqual([0, 1, 2, 3, 3, 3, 3, 3]);   // old: bunched at the front
+    expect(cutPoints(three, 0, 3, 7, 'words', { fit: true, spread: true })).toEqual([0, 1, 1, 1, 2, 2, 2, 3]);   // days 1, 4 and 7
+    expect(cutPoints(three, 0, 3, 7, 'words', { fit: true })).toEqual([0, 1, 2, 3, 3, 3, 3, 3]);   // side by side: ends sooner
+  });
+  it('only a run made now gets the new cut; a stored run keeps the days its reader has', () => {
+    const items = [500, 3000, 800].map((w, i) => ({ k: 'v:' + i, w, t: 'L' + i }));
+    const run = newRun({ id: 'short', plan: 'custom', tracks: [{ kind: 'vot', by: 'words', items }], pace: { mode: 'days', n: 6 } }, at('2026-11-02'));
+    expect(run.segs[0].even).toBe(true);
+    const spread = [0, 1, 2, 3, 4, 5].map((d) => dayItems(run, d).length);
+    expect(spread.filter((n) => n === 1).length).toBe(3);
+    expect(spread.slice(3).some((n) => n === 1)).toBe(true);   // not all on the first three days
+    const stored = { ...run, segs: run.segs.map(({ even, ...seg }) => seg) };
+    expect([0, 1, 2, 3, 4, 5].map((d) => dayItems(stored, d).length)).toEqual([1, 1, 1, 0, 0, 0]);
+  });
   it('labels a portion as a reader says it, and counts it', () => {
     const run = bibleYear(at('2026-01-01'));
     expect(itemsLabel(dayItems(run, 0), title)).toBe('Genesis 1-3');

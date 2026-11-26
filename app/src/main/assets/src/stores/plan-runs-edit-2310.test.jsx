@@ -109,6 +109,9 @@ describe('the plan keeps its pace, pause, start and reminder', () => {
     // John, 30 days, 10 read one a day: 20 days left, finishing on the old target
     const john = (pace) => builderSpec({ picks: [{ t: 'b', bid: 'john', ch: null }], order: 'picked', share: 'side', goal: pace, weekdays: Array(7).fill(true) }, null);
     let run = newRun(john({ mode: 'days', n: 30 }), daysAgo(10));
+    // A run stored before 11-26 (its cut put a chapter on each of the first days); a new one spreads its 21 chapters
+    // over the 30 days, so ten read one a day would be days ahead and finish sooner.
+    run = { ...run, segs: run.segs.map(({ even, ...seg }) => seg) };
     for (let i = 0; i < 10; i++) run = tickItem(run, 'john:' + (i + 1), todayKey(daysAgo(10 - i)), 1);
     const target = run.target;
     const first = builderSpec({ picks: [{ t: 'b', bid: 'john', ch: null }, { t: 'b', bid: 'genesis', ch: [1, 2, 3] }], order: 'canonical', share: 'side', goal: { mode: 'days', n: 30 }, weekdays: Array(7).fill(true) }, null);
