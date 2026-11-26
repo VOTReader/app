@@ -1699,7 +1699,8 @@ export function buildScreenRoutes({
           // returning to the Studies screen (same wiring as _openAudioText: a
           // silent entry, Back returns there with no pill, Corbin 2026-10-05).
           const s = getStudyById(studyId);
-          if (!s || !Array.isArray(s.chapters) || !s.chapters.length) return;
+          // Fix list 42: a locked study is one selectStudy will not open; push no silent Back step for it.
+          if (!s || s.locked || !Array.isArray(s.chapters) || !s.chapters.length) return;
           const single = s.chapters.length === 1 || s.singlePage;
           pushFromLetter({
             sourceScreen: 'audio-library-studies',
