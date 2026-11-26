@@ -371,13 +371,16 @@ export function runStatus(run, now) {
     const doneOn = last >= 0 ? dayDoneOn(run, last) : null;
     const lastOn = last < 0 ? (startN == null ? null : startN - 1) : doneOn === '' ? startN : dayNum(doneOn || '');
     const due = lastOn == null ? null : nthReadingDay(run, lastOn + 1, gap);
-    if (lastOn != null && due != null && due > today + (doneToday ? 1 : 0)) {
+    // A paused or stopped plan's day stays where it was on the pause or stop date.
+    const held = dayNum((paused ? run.paused : run.status === 'stopped' ? run.stopped : '') || '');
+    const t = held != null && held < today ? held : today;
+    if (lastOn != null && due != null && due > t + (doneToday ? 1 : 0)) {
       // A paused plan keeps no date ahead (its finish waits) but still counts its day as the card did.
-      if (!paused) { from = due; spreadOn = dateOf(due); }
+      if (!paused && t === today) { from = due; spreadOn = dateOf(due); }
       // On or before the day just read: that day. After it: the empty day the next reading day is, counted one reading
       // day each from the day after it (a day off, the weekend after a Friday read, takes the next one, as on a plan
       // read day after day), never past the portion.
-      if (!doneToday) todayDay = today <= lastOn ? last : Math.min(day, last + 1 + readingDaysBetween(run, lastOn + 1, today - 1));
+      if (!doneToday) todayDay = t <= lastOn ? last : Math.min(day, last + 1 + readingDaysBetween(run, lastOn + 1, t - 1));
     }
   }
   const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);

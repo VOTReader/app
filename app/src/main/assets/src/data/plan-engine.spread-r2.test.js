@@ -2,7 +2,7 @@
    that holds the day, and a late reader who gets the next reading today instead of a rest day. */
 
 import { describe, it, expect } from 'vitest';
-import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, hasEmptyDays } from './plan-engine.js';
+import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays } from './plan-engine.js';
 import { planStateLine } from '../ui/screens/ReadingPlansScreen.jsx';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
@@ -38,5 +38,23 @@ describe('a plan that opens with empty days', () => {
     const run = book('2pet', 3, 7);
     expect(runStatus(run, at('2026-11-26')).todayDay + 1).toBe(1);
     expect(runStatus(run, at('2026-11-27')).todayDay + 1).toBe(2);
+  });
+});
+
+describe('a paused or stopped spread-out plan keeps its day', () => {
+  it('Ruth 1 read Thursday, paused Friday: Day 2 on Friday, Saturday, Sunday and after resuming on Monday', () => {
+    let run = tickItem(book('ruth', 4, 7), 'ruth:1', '2026-11-26', 1);
+    run = pauseRun(run, at('2026-11-27'));
+    const days = ['2026-11-27', '2026-11-28', '2026-11-29'].map((d) => runStatus(run, at(d)).todayDay + 1);
+    const mon = at('2026-11-30');
+    const resumed = resumeRun(run, mon);
+    expect([...days, runStatus(resumed, mon).todayDay + 1]).toEqual([2, 2, 2, 2]);
+    expect(planStateLine(run, at('2026-11-29'))).toMatchObject({ lead: 'Paused', rest: 'Day 2 of 7' });
+  });
+
+  it('Ruth 1 read Thursday, stopped Friday: the stopped day stays Day 2 a week later', () => {
+    const run = { ...tickItem(book('ruth', 4, 7), 'ruth:1', '2026-11-26', 1), status: /** @type {'stopped'} */ ('stopped'), stopped: '2026-11-27' };
+    expect(runStatus(run, at('2026-11-27')).todayDay + 1).toBe(2);
+    expect(runStatus(run, at('2026-12-04')).todayDay + 1).toBe(2);
   });
 });
