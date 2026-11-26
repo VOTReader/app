@@ -4434,6 +4434,9 @@
     .tab-card:active { background:var(--surface-2); }
     .tab-card.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
     .tab-card-thumb-wrap { position:relative; height:150px; flex:none; overflow:hidden; background:var(--surface-2); }
+    /* Fix list #50: the card's ⋯ (top 6px, 32px) sat on the picture's search field and cut its words; the picture now
+       starts under a band the ⋯ owns, its top still the page's top. */
+    .tab-card-thumb-wrap > .tab-snap { top:44px; }
     .tab-card-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--surface-2); }
     .tab-card-thumb-sigil { color:var(--text-3); font-size:var(--fs-24); }
     /* TABS1: a card's picture is the tab's own page (SnapBox, utils/tab-snap.js): the copy laid out at the live

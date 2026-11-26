@@ -69,3 +69,10 @@ describe('#35 Scripture Web filter choices read as buttons', () => {
     expect(rule('.sw-root :is(.sw-filter-seg, .sw-list-tabs)')).toMatch(/gap:\s*2px/);
   });
 });
+
+describe('#50 a tab picture starts below its ⋯ button', () => {
+  it('the snapshot in a tab card is inset from the top by the menu band', () => {
+    const b = rule('.tab-card-thumb-wrap > .tab-snap');
+    expect(b).toMatch(/top:\s*44px/);
+  });
+});
