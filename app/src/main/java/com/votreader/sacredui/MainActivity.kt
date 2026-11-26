@@ -223,9 +223,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         NativeAudioController(applicationContext) { json -> bridge.callOptional(JsEvent.NativeAudio, json) }
     }
     override val nativeAudio: NativeAudioPort get() = nativeAudioLazy.value
-    // Streaming audio: anchor the process in a mediaPlayback foreground service
-    // for as long as JS reports playback. Never throws (see setActive's KDoc).
-    override fun setAudioKeepAlive(active: Boolean): Boolean = AudioKeepAliveService.setActive(this, active)
     // Contextual POST_NOTIFICATIONS ask (API 33+, once per process) so the
     // media card can show. Launcher registration happens in onCreate; the
     // binder-thread caller (setAudioActive) is hopped to UI here.
@@ -278,7 +275,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      */
     private fun stopStreamingAudio() {
         vm.streamAudioActive = false
-        AudioKeepAliveService.setActive(this, false)
         // m3: the native player too - the page that owns its queue is gone (a renderer crash rebuilds it fresh).
         if (nativeAudioLazy.isInitialized()) nativeAudioLazy.value.release()
     }
@@ -633,7 +629,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
         commandSink = sink
-        AudioKeepAliveService.commandSink = sink
         // m3: the native player's session sends next/previous to the same receiver (the page owns the queue).
         PlaybackService.commandSink = sink
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1647,7 +1642,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // System-transport sink is bound to THIS Activity's bridge/WebView. Cleared only while it is still ours: a quick
         // relaunch's new Activity may already have set its own, and Next on the lock screen went nowhere (sweep n1-08).
         commandSink?.let { mine ->
-            if (AudioKeepAliveService.commandSink === mine) AudioKeepAliveService.commandSink = null
             if (PlaybackService.commandSink === mine) PlaybackService.commandSink = null
         }
         // m3: the page that owns the queue is going, so native playback stops with it (as the <audio> did).

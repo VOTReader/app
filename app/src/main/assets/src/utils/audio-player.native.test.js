@@ -517,14 +517,14 @@ describe('audio-player on the native player (m3)', () => {
     expect(Math.round(AudioPlayer.getState().time)).toBe(100);
   });
 
-  it('with the way back chosen (html), it is the WebView <audio>, keep-alive and all', async () => {
+  // audio2-2 + audio2-3: the way back (html) is retired; an old key left on a phone changes nothing.
+  it('an old way-back key (html) still plays through the native player, with no keep-alive', async () => {
     localStorage.setItem('vot.audioEngine', 'html');
     vi.resetModules();
     AudioPlayer = (await import('./audio-player.js')).AudioPlayer;
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
-    expect(FakeAudio.last).not.toBeNull();
-    expect(bridge.audioLoad).not.toHaveBeenCalled();
-    expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
+    expect(bridge.audioLoad).toHaveBeenCalled();
+    expect(bridge.setAudioActive).not.toHaveBeenCalled();
   });
 });
 

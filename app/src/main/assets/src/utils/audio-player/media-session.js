@@ -248,9 +248,11 @@ export function _clearMediaSession() {
 /* ── native media card (Android system UI) ────────────────────────────── */
 // The web MediaSession above is INERT inside the Android WebView — it never
 // reaches the Quick Settings media card / lock screen. These mirrors feed the
-// SAME metadata + state to the native MediaSessionCompat that
-// AudioKeepAliveService renders (AndroidBridge.setAudioNowPlaying), and
-// receive the system's transport taps back as window.__votMediaCommand.
+// SAME metadata + state to the native MediaSessionCompat that an APK from
+// before 2026-11-26 rendered in its keep-alive service (AndroidBridge.
+// setAudioNowPlaying; retired with it, audio2-2: today's APK plays natively and
+// _syncNative returns early), and receive the system's transport taps back as
+// window.__votMediaCommand.
 // Best-effort like every bridge touch: the PWA has no bridge, older APKs may
 // predate the method, and a native throw must never disturb playback.
 

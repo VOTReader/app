@@ -49,10 +49,12 @@ afterEach(() => {
 });
 
 describe('native-audio - which engine', () => {
-  it('is native in an APK whose bridge carries the player, unless the way back (html) is chosen', () => {
+  /* audio2-2 + audio2-3 (audit 2026-11-23): the way back to the WebView <audio> ('vot.audioEngine' = 'html') was
+     kept for one release after m3 (2026-09-24); it is retired, and with it the APK's keep-alive service. */
+  it('is native in an APK whose bridge carries the player, whatever an old way-back key says', () => {
     expect(nativeAudioAvailable()).toBe(true);
     localStorage.setItem('vot.audioEngine', 'html');
-    expect(nativeAudioAvailable()).toBe(false);
+    expect(nativeAudioAvailable()).toBe(true);
     localStorage.removeItem('vot.audioEngine');
     expect(nativeAudioAvailable()).toBe(true);
     localStorage.setItem('vot.audioEngine', 'native');

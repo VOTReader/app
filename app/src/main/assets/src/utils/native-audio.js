@@ -74,15 +74,13 @@ function metaOf(meta) {
 }
 
 /**
- * Does this page play through the native player? In an APK whose bridge carries it, yes, unless `vot.audioEngine`
- * is 'html': the WebView's <audio> kept for one release as the way back (m3 step e).
+ * Does this page play through the native player? In an APK whose bridge carries it, yes. The way back to the
+ * WebView's <audio> (`vot.audioEngine` = 'html', m3 step e) was kept for one release after 2026-09-24 and is retired
+ * with the APK's keep-alive service (audio2-2 + audio2-3, audit 2026-11-23): an old key left on a phone is ignored.
  * @returns {boolean}
  */
 function nativeAudioAvailable() {
-  if (!nativeBridge()) return false;
-  let choice = null;
-  try { choice = typeof localStorage !== 'undefined' ? localStorage.getItem('vot.audioEngine') : null; } catch (_e) { /* storage off */ }
-  return choice !== 'html';
+  return !!nativeBridge();
 }
 
 /**

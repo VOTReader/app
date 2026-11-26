@@ -156,22 +156,6 @@ interface BridgeHost {
     fun askNotificationsPermission() = ensureNotificationsPermission()
 
     /**
-     * Start/stop [AudioKeepAliveService] — the mediaPlayback foreground service
-     * that anchors the process while an audio letter streams. Mirrors the
-     * setAudioActive bridge edge exactly.
-     *
-     * A host verb (like [clearGardenCache]) rather than a direct
-     * `context.startForegroundService` inside AppInterface, so the Activity stays
-     * the single owner of the service's lifecycle (it also stops it in onDestroy)
-     * and AppInterface's binder-thread path keeps zero framework calls — the
-     * FakeBridgeHost records the edge and the unit test asserts on it.
-     *
-     * Called inline on the binder thread: starting a service is not UI work, and
-     * the implementation never throws.
-     */
-    fun setAudioKeepAlive(active: Boolean): Boolean
-
-    /**
      * The process's downloaded-recordings store (listening item 8), or null on a host without one (tests, an older
      * shell): AppInterface's offlineAudio* methods then answer empty and do nothing.
      */

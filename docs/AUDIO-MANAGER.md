@@ -328,10 +328,12 @@ action must not skip the rest. Previous/next are registered ONLY while the
 queue holds more than one recording, and are re-decided on every queue-shape
 change — track starts and queue edits alike — so a lone saved recording never
 shows dead skip buttons. In practice this reaches desktop Chrome only: the web
-MediaSession is inert inside the Android WebView, where the system card is fed
-by `AudioKeepAliveService` through `setAudioNowPlaying` instead. The Android
-bridge's `setAudioActive()` remains best-effort lifecycle support; this module
-does not claim to provide a native foreground media service.
+MediaSession is inert inside the Android WebView, where every recording plays
+through the native player (`PlaybackService`, m3), whose own session feeds the
+system card. The WebView keep-alive (`AudioKeepAliveService`,
+`setAudioNowPlaying`) and the `vot.audioEngine='html'` way back were retired
+together (audio2-2 + audio2-3, 2026-11-26); `setAudioActive()` stays on the
+bridge, only setting the ViewModel flag and asking for notifications.
 
 ## Extension rules
 

@@ -1480,7 +1480,7 @@ class OfflineAudioStore(
     companion object {
         /**
          * Where [shared]'s events go: MainActivity sets it to the JsBridge (JsEvent.OfflineAudio) and clears it in
-         * onDestroy (the AudioKeepAliveService.commandSink pattern). Null: the event drops, the download goes on.
+         * onDestroy (the PlaybackService.commandSink pattern). Null: the event drops, the download goes on.
          */
         @Volatile
         var eventSink: ((String) -> Unit)? = null

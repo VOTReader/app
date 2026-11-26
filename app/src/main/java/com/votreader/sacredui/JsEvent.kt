@@ -56,12 +56,10 @@ sealed class JsEvent(val fn: String) {
     data object AnnotationTap : JsEvent("__nativeTapAnnotation")
 
     // A transport command from the SYSTEM media surface (QS media card, lock
-    // screen, headset buttons) routed through AudioKeepAliveService's
-    // MediaSessionCompat callbacks / notification actions. cmd is one of
-    // "toggle" | "play" | "pause" | "next" | "prev" | "seekTo" | "refused"; posMs
-    // is the seek target in ms (0 for everything else). "refused" is no button:
-    // AudioKeepAliveService sends it (CMD_REFUSED) when Android refuses its
-    // foreground start from the background, and the page pauses honestly (sf1).
+    // screen, headset buttons) routed through PlaybackService's session (m3; the
+    // WebView keep-alive service that also sent them is retired, audio2-2). cmd is one of
+    // "toggle" | "play" | "pause" | "next" | "prev" | "seekTo"; posMs
+    // is the seek target in ms (0 for everything else).
     // audio-player.js installs the receiver and drives its own
     // toggle()/next()/prev()/seek().
     data object MediaCommand : JsEvent("__votMediaCommand")

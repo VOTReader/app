@@ -43,7 +43,7 @@ The phone app sends nothing since bc1 (992bf257): the Cloudflare visit count loa
 
 ## App content answers (draft)
 
-- Foreground service: "Media playback the user started" for `AudioKeepAliveService` and `PlaybackService`. Play asks for a short screen recording: start a letter's audio, lock the phone, show the lock-screen controls.
+- Foreground service: "Media playback the user started" for `PlaybackService` (the WebView keep-alive service was retired 2026-11-26). Play asks for a short screen recording: start a letter's audio, lock the phone, show the lock-screen controls.
 - Content rating (IARC): no violence, sex, gambling, user interaction, location or purchases. Expect Everyone / PEGI 3.
 - Target audience: 13 and over (keeps out of the Families policy).
 - Advertising ID: not declared. Answer **No**.

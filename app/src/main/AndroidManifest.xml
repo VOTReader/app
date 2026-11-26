@@ -29,14 +29,14 @@
          recording complete, etc.) to make the WebView UI feel native. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- FOREGROUND_SERVICE (+ the API 34 per-type twin) — "normal" (non-runtime)
-         permissions, granted at install. AudioKeepAliveService anchors the
-         PROCESS while an audio letter streams, so a backgrounded reader isn't an
+         permissions, granted at install. PlaybackService (the native player, m3)
+         anchors the PROCESS while a recording plays, so a backgrounded reader isn't an
          ordinary kill candidate under memory pressure. FOREGROUND_SERVICE_MEDIA_-
          PLAYBACK is required from targetSdk 34 for a mediaPlayback-typed service
          and is ignored below it.
          POST_NOTIFICATIONS (declared 2026-08-09, reversing the earlier no-nag
          omission — owner call): the system MEDIA CARD (QS carousel / lock
-         screen, AudioKeepAliveService's MediaStyle notification) is invisible
+         screen, PlaybackService's media notification) is invisible
          on Android 13+ without it. Still no boot nag: the runtime prompt fires
          CONTEXTUALLY, on the first audio playback of a session, from
          AppInterface.setAudioActive → BridgeHost.ensureNotificationsPermission.
@@ -135,13 +135,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/share_paths" />
         </provider>
-
-        <!-- Started (never bound) service, launched only from our own process by
-             AudioKeepAliveService.setActive — exported="false". -->
-        <service
-            android:name=".AudioKeepAliveService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
 
         <!-- m3: the native player (ExoPlayer in a Media3 MediaSessionService). Exported with the session
              intent-filter so the system media surfaces, Bluetooth and cars can find and control the session; only

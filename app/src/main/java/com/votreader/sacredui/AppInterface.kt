@@ -128,53 +128,20 @@ class AppInterface(
      * [MainViewModel.streamAudioActive] to keep the WebView's media alive
      * while a letter is playing. No UI work — safe inline on the binder thread.
      *
-     * The same edge also drives [AudioKeepAliveService] through the host: the
-     * onPause skip keeps the media ELEMENT alive, the foreground service keeps
-     * the PROCESS alive (a backgrounded activity is an ordinary kill candidate
-     * under memory pressure). The host call never throws, so a service that
-     * refuses to start costs nothing but a WARN — the WebView path is unchanged.
+     * audio2-2 + audio2-3 (audit 2026-11-23): the WebView keep-alive service this edge also drove is retired with
+     * the page's way back to its own <audio>; every recording plays through the native player (PlaybackService),
+     * which is its own media foreground service. The page no longer calls this on the native player; an answer of
+     * true keeps the contract for any caller that does.
      */
     @JavascriptInterface
     fun setAudioActive(active: Boolean): Boolean {
         vm.streamAudioActive = active
-        val held = host.setAudioKeepAlive(active)
         // First playback of a session is the contextual moment to ask for
         // POST_NOTIFICATIONS (API 33+ media card). One-shot per process,
         // no-op when already granted — see BridgeHost's KDoc.
         if (active) host.ensureNotificationsPermission()
-        // The page's answer (sf1, 2026-09-24): false = Android refused the
-        // service, so a hidden page pauses rather than play on muted.
-        return held
-    }
-
-    /**
-     * Mirror of the web MediaSession metadata the player already maintains —
-     * the WebView's navigator.mediaSession never reaches the system media
-     * card, so audio-player.js calls this at the same sync points (track
-     * start, play/pause, seek, rate change) and AudioKeepAliveService renders
-     * it into its MediaSessionCompat + MediaStyle notification. Seconds
-     * (JS-native units) in, milliseconds (session-native) out. No UI work —
-     * startService is safe from the binder thread; a not-running service
-     * drops the update (see updateNowPlaying's KDoc).
-     */
-    @JavascriptInterface
-    fun setAudioNowPlaying(
-        title: String?,
-        artist: String?,
-        playing: Boolean,
-        positionSec: Double,
-        durationSec: Double,
-        rate: Double,
-    ) {
-        AudioKeepAliveService.updateNowPlaying(
-            host.activityContext,
-            title,
-            artist,
-            playing,
-            (positionSec.coerceAtLeast(0.0) * 1000).toLong(),
-            (durationSec.coerceAtLeast(0.0) * 1000).toLong(),
-            rate.toFloat().takeIf { it.isFinite() && it > 0f } ?: 1f,
-        )
+        // sf1's answer (false = the keep-alive was refused) went with the service: there is nothing to refuse.
+        return true
     }
 
     @JavascriptInterface

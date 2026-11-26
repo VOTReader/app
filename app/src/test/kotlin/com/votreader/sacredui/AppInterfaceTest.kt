@@ -954,31 +954,12 @@ class AppInterfaceTest {
     }
 
     @Test
-    fun `setAudioActive drives the foreground keep-alive service on the same edge`() {
-        // The vm flag alone only keeps the WebView's media element alive across
-        // onPause; the process still needed anchoring (AudioKeepAliveService).
-        // Both must move together — a start with no matching stop strands an
-        // ongoing notification, a stop with no start loses the anchor.
+    fun `setAudioActive starts no keep-alive and always answers held (audio2-2)`() {
+        // The WebView keep-alive service is retired: the native player is its own media service.
         val host = FakeBridgeHost()
         val (app, _, _) = newSubject(host = host, vm = mockk(relaxed = true))
-
-        app.setAudioActive(true)
-        app.setAudioActive(false)
-        app.setAudioActive(true)
-
-        assertEquals(listOf(true, false, true), host.audioKeepAliveCalls)
-    }
-
-    @Test
-    fun `setAudioActive hands the page the host's answer, so a refused keep-alive can pause instead of play muted`() {
-        // sf1 (2026-09-24): with the screen off Android refuses the foreground service, and Android 17 then mutes the
-        // WebView's audio while its clock runs. The page can only pause honestly if it hears the refusal.
-        val host = FakeBridgeHost()
-        val (app, _, _) = newSubject(host = host, vm = mockk(relaxed = true))
-        host.keepAliveAnswer = false
-        assertFalse(app.setAudioActive(true))
-        host.keepAliveAnswer = true
         assertTrue(app.setAudioActive(true))
+        assertTrue(app.setAudioActive(false))
     }
 
     // ─── Mic permission flow ──────────────────────────────────────────
