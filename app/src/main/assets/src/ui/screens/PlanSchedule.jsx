@@ -133,7 +133,8 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
   const todayN = /** @type {number} */ (dayNum(todayKey(now)));
   const yesterday = dateOf(todayN - 1);
   const ahead = days.filter((d) => (d.done ? (d.doneOn || '') >= yesterday : true));
-  const readDays = days.filter((d) => d.done).sort((a, b) => ((b.doneOn || '') < (a.doneOn || '') ? -1 : (b.doneOn || '') > (a.doneOn || '') ? 1 : b.day - a.day));
+  // A spread-out plan's empty days count as done (nothing to read) but were never read: they are not listed.
+  const readDays = days.filter((d) => d.done && d.items.length).sort((a, b) => ((b.doneOn || '') < (a.doneOn || '') ? -1 : (b.doneOn || '') > (a.doneOn || '') ? 1 : b.day - a.day));
   const doneOn = new Set(days.map((d) => d.doneOn).filter(Boolean));
   const listRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   React.useEffect(() => {
