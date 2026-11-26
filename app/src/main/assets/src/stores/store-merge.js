@@ -290,8 +290,13 @@ export function mergePlanStore(base, ours, theirs) {
     /** @type {Record<string, string>} */
     const ticks = {};
     for (const k of new Set([...Object.keys(ot), ...Object.keys(tt)])) {
-      // In the base and missing from either side: that side un-marked it.
-      if (k in b && (!(k in ot) || !(k in tt))) continue;
+      // In the base and missing from either side: that side un-marked it, and it stays un-marked (C4) unless the
+      // other side changed it too: read it again on a new day (taken back, then read). A read is never lost to that.
+      if (k in b && (!(k in ot) || !(k in tt))) {
+        const kept = k in ot ? ot[k] : tt[k];
+        if (kept !== b[k]) ticks[k] = kept;
+        continue;
+      }
       if (!(k in ot) || !(k in tt) || ot[k] === tt[k]) ticks[k] = k in ot ? ot[k] : tt[k];
       // Both hold it, dated apart: the side that dated it anew since the base (a read taken back and read again),
       // else (both did, or no base) the copy the merge keeps, as for the record. Never the argument position: which

@@ -119,3 +119,57 @@ describe('merge order: a read both copies hold, dated apart, takes no date from 
     }
   });
 });
+
+describe('C4: a read one copy took back and the other read again on a new day is kept, in either order (review 11-26)', () => {
+  // The header says a chapter un-marked in one tab stays un-marked "unless the other tab changed it too"; the merge
+  // dropped it whenever one copy lacked it, so the other tab's new read was lost (in both orders). Losing a read is the
+  // worse error: the new read stays, and the pins are cut from the earliest date that differs, as on the copy that
+  // made the read.
+  const before = tickItem(ruth('p-c4', 20), 'ruth:1', '2026-12-03', at('2026-12-03').getTime());
+  const pinned = catchUp(before, at('2026-12-10'));
+  const variants = [
+    // Both tabs had the pins (caught up Dec 10); A takes Ruth 1 back on Dec 11, B takes it back and reads it again Dec 12.
+    { name: 'both pinned', base: pinned, a: untickItem(pinned, 'ruth:1', at('2026-12-11')),
+      b: tickItem(untickItem(pinned, 'ruth:1', at('2026-12-11')), 'ruth:1', '2026-12-12', at('2026-12-12').getTime()) },
+    // Only A caught up (and then took Ruth 1 back); B, from before the pins, took it back and read it again Dec 12.
+    { name: 'only the untick copy pinned', base: before, a: untickItem(pinned, 'ruth:1', at('2026-12-11')),
+      b: tickItem(untickItem(before, 'ruth:1', at('2026-12-11')), 'ruth:1', '2026-12-12', at('2026-12-12').getTime()) },
+  ];
+  for (const v of variants) {
+    for (const [label, a, b] of [['A newer', newerThan(v.a, v.b), v.b], ['B newer', v.a, newerThan(v.b, v.a)]]) {
+      it(v.name + ', ' + label, () => {
+        const ab = one(mergePlanStore([v.base], [a], [b]), v.base.id), ba = one(mergePlanStore([v.base], [b], [a]), v.base.id);
+        expect(ba).toEqual(ab);
+        expect(calendar(ba, '2026-12-13')).toEqual(calendar(ab, '2026-12-13'));
+        expect(ab.ticks).toEqual({ 'ruth:1': '2026-12-12' });
+        // The pins as the untick cut them (from Dec 3): the read of Dec 12 is after they end, so it cuts nothing more.
+        expect(ab.rested).toEqual(v.a.rested);
+        expect(ab.rested.until).toBe('2026-12-03');
+      });
+    }
+  }
+
+  it('the Jude days off: Jude 1 taken back on the pinned copy, read again Dec 12 on the copy from before the change of days', () => {
+    const base = jude();
+    const pinnedJ = changeWeekdays(base, [true, true, true, true, true, true, true], at('2026-12-10'));
+    const a = untickItem(pinnedJ, 'jude:1', at('2026-12-11'));
+    const b = tickItem(untickItem(base, 'jude:1', at('2026-12-11')), 'jude:1', '2026-12-12', at('2026-12-12').getTime());
+    for (const [x, y] of [[newerThan(a, b), b], [a, newerThan(b, a)]]) {
+      const ab = one(mergePlanStore([base], [x], [y]), base.id), ba = one(mergePlanStore([base], [y], [x]), base.id);
+      expect(ba).toEqual(ab);
+      expect(ab.ticks).toEqual({ 'jude:1': '2026-12-12' });
+      // The newer copy's rested: the pinned copy's (days off kept) when it is the newer; else the older plan's, whose
+      // Tue-Sat days (the record is the newer copy's) make Dec 6 and 7 days off on their own.
+      const newer = x.updated > y.updated ? x : y;
+      expect(ab.rested).toEqual(newer.rested);
+      if (newer === x) expect(ab.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+      expect(monthCells(ab, 2026, 11, at('2026-12-13')).filter((c) => c.date === 6 || c.date === 7).map((c) => c.state)).toEqual(['none', 'none']);
+    }
+  });
+
+  it('a chapter one copy took back while the other left it as it was stays taken back (C4 unchanged)', () => {
+    const a = untickItem(pinned, 'ruth:1', at('2026-12-11'));
+    const b = { ...pinned, notes: { 1: 'a note' }, updated: at('2026-12-12').getTime() };
+    for (const [x, y] of [[a, b], [b, a]]) expect(one(mergePlanStore([pinned], [x], [y]), pinned.id).ticks).toEqual({});
+  });
+});
