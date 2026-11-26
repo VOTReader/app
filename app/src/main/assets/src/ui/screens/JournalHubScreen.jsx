@@ -187,6 +187,8 @@ export function JournalHubScreen(props) {
   function renderCard(entry) {
     var title = JournalHelpers.entryDisplayTitle(entry);
     var preview = JournalHelpers.previewText(entry, 160);
+    // An untitled entry takes its title from this same preview: say it once ("[Voice recording]", a short note).
+    if (preview && preview === title) preview = '';
     // id-datasafe 121: in a search the card shows the words around the hit, marked.
     var snip = searchQ && typeof JournalHelpers.searchSnippet === 'function' ? JournalHelpers.searchSnippet(entry, searchQ, 120) : null;
     var attachments = JournalHelpers.attachmentSummary(entry);
