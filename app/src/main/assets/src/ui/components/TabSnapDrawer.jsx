@@ -57,9 +57,17 @@ const TAB_FIELDS = ['screen', 'bookId', 'chapterNum', 'letterId', 'studyId', 'st
   'fromStudies', 'genreId', 'audioColKey', 'mode', 'showStudy', 'surpriseAnchor', 'titleFocusHidden',
   'headingsFocusHidden', 'fromWtlb', 'fromSearch', 'fromSurprise', 'fromSearchIndex', 'searchLanding', 'searchQuery',
   'searchScope', 'searchContext', 'navOrigin', 'gardenPage'];
-/** Route deps that DO something (navigate, write, open a sheet): none may run from a drawing. */
-const ACTION = /^(set|go|handle|select|mark|unmark|clear|toggle|update|open|navigate|push|retarget|tapThrough|create|save|retry|bcvOn)/;
+/**
+ * The function deps a drawing keeps: the ones that only READ (look something up and return it). Every other function
+ * dep is a no-op, so a dep added to App's route deps later draws inert until it is named here. (heart-5, audit
+ * 2026-11-23: this was a regex of action verbs, and every function it did not match, whatever it did, ran from the
+ * drawing.) TabSnapDrawer.test.js holds this list against the real deps in app.jsx.
+ */
+export const BG_READERS = new Set(['isRead', 'getReadKey', 'getStudyById', 'getStudyChapter', 'studyReadKey',
+  'prevChainEntry', 'nextChainEntry', 'boundaryConfig']);
 const NOOP = () => {};
+/** No tap-through back pill on a drawn neighbour either (backAt reads the active tab's stack). */
+const NO_BACK = () => ({ backHint: null, backActive: false });
 
 /**
  * The app's route deps, turned to another tab: its fields, its resolved letter/book/chapter, every action a no-op, no
@@ -71,13 +79,13 @@ const NOOP = () => {};
 export function bgRouteDeps(deps, tab) {
   /** @type {Record<string, any>} */
   const out = {};
-  for (const k of Object.keys(deps)) out[k] = typeof deps[k] === 'function' && ACTION.test(k) ? NOOP : deps[k];
+  for (const k of Object.keys(deps)) out[k] = typeof deps[k] === 'function' && !BG_READERS.has(k) ? NOOP : deps[k];
   for (const k of TAB_FIELDS) if (k in deps) out[k] = tab[k] === undefined ? null : tab[k];
   if (!out.screen) out.screen = 'home';
   if (typeof out.fromSearch !== 'boolean') out.fromSearch = !!out.fromSearch;
   const c = resolveActiveContent({ screen: out.screen, bookId: tab.bookId || null, chapterNum: tab.chapterNum ?? null, letterId: tab.letterId || null });
   out.book = c.book; out.chapter = c.chapter; out.activeLetter = c.activeLetter; out.activeVolKey = c.activeVolKey;
-  out.backHint = null; out.backActive = false;
+  out.backHint = null; out.backActive = false; out.backAt = NO_BACK;
   // The route build skips what it would tell the app about the screen on show (screen-routes: the plan session's
   // place and host, the plan pages' kept place).
   out.bgDraw = true;
