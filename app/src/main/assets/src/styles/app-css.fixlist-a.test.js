@@ -25,6 +25,12 @@ describe('fix list 10: Search\'s two-line rows keep their title whole', () => {
     expect(block).toMatch(/white-space:\s*normal/);
     expect(block).toMatch(/-webkit-line-clamp:\s*2/);
   });
+
+  it('its second line wraps too, so "What does The Lord say about…" is not cut at large text', () => {
+    const block = ruleBlock(CSS, '.srch-row.is-two .srch-row-m {');
+    expect(block).not.toBeNull();
+    expect(block).toMatch(/white-space:\s*normal/);
+  });
 });
 
 describe('fix list 43: the Speed sheet\'s fine-tune row puts its label above the stepper at large text', () => {
