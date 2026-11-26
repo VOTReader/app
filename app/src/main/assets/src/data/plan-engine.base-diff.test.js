@@ -38,6 +38,9 @@ function expectSameAsBase(run, now) {
   const a = streak(run, now), b = base.streak(run, now);
   expect(a).toEqual(b);
   const st = runStatus(run, now);
+  // "Day N of M" (runRow's day): 03d0ea090 said the day just read once today's was done, else the portion's.
+  const was = base.runStatus(run, now);
+  expect(st.todayDay).toBe(was.doneToday ? was.day - 1 : was.day);
   const todayN = /** @type {number} */ (dayNum(todayKey(now)));
   // 03d0ea090 numbered every day ahead one too high when today's portion was not due today (today a day off).
   const shift = !st.doneToday && !st.finished && !isReadingDay({ ...run, paused: undefined }, todayN) ? 1 : 0;

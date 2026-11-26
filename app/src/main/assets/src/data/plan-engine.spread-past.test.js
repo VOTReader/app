@@ -3,7 +3,9 @@
    Nov 26 2026, hold readings on days 1, 3, 5 and 7; the next reading follows the date the last one was finished. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, todayKey, dayItems, newRun, tickItem, streak, monthCells, runStatus, hasEmptyDays } from './plan-engine.js';
+import { dayNum, dateOf, todayKey, dayItems, newRun, tickItem, streak, monthCells, runStatus, hasEmptyDays, creditRead, pauseRun } from './plan-engine.js';
+import { runRow } from '../utils/plan-runs-view.js';
+import { planStateLine } from '../ui/screens/ReadingPlansScreen.jsx';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 const ruth = () => newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 7 } }, at('2026-11-26'));
@@ -67,5 +69,37 @@ describe('a spread-out plan\'s past follows what the reader was told', () => {
       const readThen = Object.values(run.ticks).includes(key);
       expect([key, cell.state]).toEqual([key, readThen ? 'read' : spreadOn > key ? 'none' : 'missed']);
     }
+  });
+});
+
+describe('"Day N of M" on a spread-out plan', () => {
+  const dayLine = (run, now) => 'Day ' + (runRow(run, now).day + 1);   // the Today card's words
+  it('Ruth 1 credited (read before the start): the start day is Day 1 with nothing to read, Ruth 2 on day 3', () => {
+    const run = creditRead(ruth(), (bid, cid) => bid === 'ruth' && Number(cid) === 1);
+    expect(run.ticks['ruth:1']).toBe('');
+    const thu = runStatus(run, at('2026-11-26'));
+    expect(thu.spreadOn).toBe('2026-11-28');
+    expect(dayLine(run, at('2026-11-26'))).toBe('Day 1');
+    expect(dayLine(run, at('2026-11-27'))).toBe('Day 2');
+    expect(runStatus(run, at('2026-11-28')).spreadOn).toBe('');
+    expect(dayLine(run, at('2026-11-28'))).toBe('Day 3');
+    // The start day is a rest day once past, never missed.
+    expect(monthCells(run, 2026, 10, at('2026-11-29')).find((c) => c.date === 26).state).toBe('none');
+  });
+
+  it('paused on the empty day: still Day 2, as the card said before the pause', () => {
+    const run = read(ruth(), 1, '2026-11-26');
+    expect(dayLine(run, at('2026-11-27'))).toBe('Day 2');
+    const paused = pauseRun(run, at('2026-11-27'));
+    expect(runStatus(paused, at('2026-11-27')).todayDay).toBe(1);
+    expect(planStateLine(paused, at('2026-11-27'))).toMatchObject({ lead: 'Paused', rest: 'Day 2 of 7' });
+  });
+
+  it('weekdays only, Ruth 1 read on a Friday: the weekend says Day 2 (Monday\'s empty day), never Day 1', () => {
+    const weekdays = [false, true, true, true, true, true, false];
+    let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 7 }, weekdays }, at('2026-11-27'));
+    run = read(run, 1, '2026-11-27');
+    expect(runStatus(run, at('2026-11-28')).spreadOn).toBe('2026-12-01');
+    expect(['2026-11-28', '2026-11-29', '2026-11-30', '2026-12-01'].map((d) => dayLine(run, at(d)))).toEqual(['Day 2', 'Day 2', 'Day 2', 'Day 3']);
   });
 });

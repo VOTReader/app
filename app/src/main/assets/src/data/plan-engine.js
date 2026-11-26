@@ -363,14 +363,19 @@ export function runStatus(run, now) {
   // The plan's own day today, counted from its start ("Day N of M"): the day just read once today's is done, else the
   // portion's; on a spread-out plan's empty day, that empty day's own number.
   let todayDay = doneToday ? last : day;
-  if (!finished && !notStarted && !paused && gap > 0) {
-    const lastOn = dayNum(dayDoneOn(run, last) || '');
-    if (lastOn != null) {
-      const due = nthReadingDay(run, lastOn + 1, gap);
-      if (due > from) {
-        from = due; spreadOn = dateOf(due);
-        if (!doneToday) todayDay = Math.min(day - 1, last + readingDaysBetween(run, lastOn + 1, today));
-      }
+  if (!finished && !notStarted && gap > 0) {
+    // A day done only by credit (read before the start) counts as read on the start date, so the empty days after it
+    // still come first: Ruth 1 credited, the start day is Day 1 and Ruth 2 falls on day 3, never on the start day.
+    const doneOn = dayDoneOn(run, last);
+    const lastOn = doneOn === '' ? startN : dayNum(doneOn || '');
+    const due = lastOn == null ? null : nthReadingDay(run, lastOn + 1, gap);
+    if (lastOn != null && due != null && due > today + (doneToday ? 1 : 0)) {
+      // A paused plan keeps no date ahead (its finish waits) but still counts its day as the card did.
+      if (!paused) { from = due; spreadOn = dateOf(due); }
+      // On or before the day just read: that day. After it: the empty day the next reading day is, counted one reading
+      // day each from the day after it (a day off, the weekend after a Friday read, takes the next one, as on a plan
+      // read day after day), never past the portion.
+      if (!doneToday) todayDay = today <= lastOn ? last : Math.min(day, last + 1 + readingDaysBetween(run, lastOn + 1, today - 1));
     }
   }
   const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);

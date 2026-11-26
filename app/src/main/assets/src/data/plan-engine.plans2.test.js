@@ -204,10 +204,7 @@ describe('days in a row and this week', () => {
     const fri = readDay(run, 2, '2026-11-27');
     expect(runStatus(fri, at('2026-11-27')).todayDay).toBe(2);
     expect(runRow(fri, at('2026-11-27')).day).toBe(2);
-    // A plan with no empty days is unchanged: Bible in a Year, day 1 read, the next day reads "Day 2".
-    const year = readDay(bibleYear(at('2026-11-10')), 0, '2026-11-10');
-    expect(runStatus(year, at('2026-11-11')).todayDay).toBe(1);
-    expect(runStatus(year, at('2026-11-10')).todayDay).toBe(0);
+    // A plan with no empty days keeps 03d0ea090's day line: plan-engine.base-diff.test.js checks it on 120 histories.
   });
   it('a spread-out plan in the month calendar: a past empty day is never missed, as in the week strip', () => {
     const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
