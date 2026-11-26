@@ -20,8 +20,8 @@
    Free globals: React.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runRow, letterSource, planStatus, finishDate } from '../../utils/plan-runs-view.js';
-import { runStatus, itemsLabel, itemsCount, dayNum } from '../../data/plan-engine.js';
+import { runRow, letterSource, planStatus, finishDate, readSpan } from '../../utils/plan-runs-view.js';
+import { runStatus, itemsLabel, itemsCount } from '../../data/plan-engine.js';
 import { PLAN_CATALOG, PLAN_GROUPS, catalogFacts, runName, bookTitle } from '../../data/plan-catalog.js';
 import { PlanRing, PlanSec, CHEVRON, countOf } from '../components/PlanBits.jsx';
 
@@ -53,9 +53,8 @@ export function stoppedLine(r, now) {
 
 /** "8 days · finished Oct 30" for a finished run. @param {any} r */
 export function finishedLine(r) {
-  const a = dayNum(r.start), b = dayNum(r.finished);
-  // A plan read through before its start date was finished in under a day, never in fewer.
-  const n = a != null && b != null ? Math.max(1, b - a + 1) : 0;
+  // From the first read (a plan read through before its start date began then), never fewer than a day.
+  const n = readSpan(r).days;
   return (n ? countOf(n, 'day') + ' · ' : '') + 'finished ' + finishDate(r.finished, new Date());
 }
 

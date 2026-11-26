@@ -10,7 +10,7 @@
    this file is bundle-d), so it is read at call time, never imported.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace, replaceContents, freshFromDated } from '../data/plan-engine.js';
+import { runStatus, dayNum, dayItems, itemsLabel, itemsWords, minutesFor, todayKey, resumeRun, newRun, againPace, replaceContents, freshFromDated } from '../data/plan-engine.js';
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
@@ -59,6 +59,21 @@ export function unitOf(run) {
 
 /** "1 day", "4 days". @param {number} n */
 export const daysWord = (n) => n.toLocaleString('en-US') + (n === 1 ? ' day' : ' days');
+
+/**
+ * A finished plan's reading as its reader lived it: from its first dated read (or its start, when that came first)
+ * to the finish, at least one day. A plan read through before a later start date began on its first read, never on a
+ * start it did not reach (My Progress read "Started Nov 29 · finished Nov 26"). Stored dates are left as they are.
+ * @param {{ start?: string, finished?: string, ticks?: Record<string, string> }} r
+ * @returns {{ from: string, days: number }}
+ */
+export function readSpan(r) {
+  let from = r.start || '';
+  for (const v of Object.values(r.ticks || {})) if (typeof v === 'string' && dayNum(v) != null && (!from || v < from)) from = v;
+  if (r.finished && from > r.finished) from = r.finished;
+  const a = dayNum(from), b = dayNum(r.finished || '');
+  return { from, days: a != null && b != null ? Math.max(1, b - a + 1) : 0 };
+}
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** 'YYYY-MM-DD' as "Nov 14", with the year when it is not `now`'s ("Nov 10, 2027"). @param {string} key @param {Date} now */

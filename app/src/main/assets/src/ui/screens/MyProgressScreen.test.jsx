@@ -543,4 +543,30 @@ describe('MyProgressScreen — reading plans', () => {
     // Proverbs 1-31 sit in both plans: 1,189 chapters in all, proverbs:1 read once.
     expect(sec.querySelector('.ui-label-aside').textContent).toBe('1 of 1,189 read');
   });
+
+  it('a plan read through before its start date: started on its first read, never after it finished', async () => {
+    const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
+    const { startCatalogPlan } = await import('../../data/plan-catalog.js');
+    const { tickItem, todayKey } = await import('../../data/plan-engine.js');
+    const { finishDate } = await import('../../utils/plan-runs-view.js');
+    const { finishedLine } = await import('./ReadingPlansScreen.jsx');
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    globalThis.ReadingPlanStore = ReadingPlanStore;
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(12, 0, 0, 0); return d; };
+    // Made two days ago to start in three days; read on each of the last three days and finished today.
+    let run = startCatalogPlan('proverbs', null, day(-2), { startOn: todayKey(day(3)) });
+    expect(run.start).toBe(todayKey(day(3)));
+    [-2, -1, 0].forEach((n, i) => { run = tickItem(run, 'proverbs:' + (i + 1), todayKey(day(n)), day(n).getTime()); });
+    run = { ...run, status: 'finished', finished: todayKey(day(0)) };
+    ReadingPlanStore.put(run);
+    setupGlobals();
+    const { container } = renderScreen({ historyEnabled: false });
+    const row = container.querySelector('[aria-labelledby="prg-h-plans"] .prg-history-row').textContent;
+    const now = new Date();
+    expect(row).not.toContain('Started ' + finishDate(todayKey(day(3)), now));
+    expect(row).toContain('Started ' + finishDate(todayKey(day(-2)), now) + ' · finished ' + finishDate(todayKey(day(0)), now) + ' · 3 days');
+    // Past plans says the same length.
+    expect(finishedLine(run)).toBe('3 days · finished ' + finishDate(todayKey(day(0)), now));
+  });
 });
