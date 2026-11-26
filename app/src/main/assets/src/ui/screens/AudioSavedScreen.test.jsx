@@ -185,4 +185,28 @@ describe('AudioSavedScreen (listen.html au-saved, au-saved0)', () => {
       delete player.playSongs;
     }
   });
+
+  /* Fix list 30: songs always followed every recording under one 'Newest first', so a song saved a minute ago sat
+     under recordings saved weeks back. Songs carry no saved time to merge by, so each kind is its own group, each
+     newest first, and the headings say which is which. */
+  it("songs and recordings are labelled groups, each newest first (fix list 30)", () => {
+    globalThis.SongCatalog = {
+      loaded: true, subscribe: () => () => {}, getVersion: () => 0, load: vi.fn(),
+      songById: (id) => (id === 's1' ? { id: 's1', t: 'A Test Song', cr: 'The flock', d: 125 } : null),
+      songAlbumLabel: () => '',
+    };
+    globalThis.AudioLibraryStore.songSaved = () => ['s1'];
+    try {
+      renderScreen();
+      const groups = [...document.querySelectorAll('.ui-group')];      expect(groups).toHaveLength(2);
+      expect(groups[1].getAttribute('aria-labelledby')).toBeTruthy();
+      expect(document.getElementById(groups[1].getAttribute('aria-labelledby')).textContent).toMatch(/^Songs/);
+      expect(groups[1].textContent).toContain('A Test Song');
+      expect(groups[0].textContent).not.toContain('A Test Song');
+      expect(screen.getByText('Recordings, newest first')).toBeTruthy();
+      expect(screen.getByText('Newest first')).toBeTruthy();
+    } finally {
+      delete globalThis.SongCatalog;
+    }
+  });
 });

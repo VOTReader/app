@@ -135,6 +135,16 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
     );
   }
 
+  const songRows = shownSongs.map((song) => {
+    const playing = songNow === song.id && active;
+    const line = song.cr || (cat && typeof cat.songAlbumLabel === 'function' ? cat.songAlbumLabel(song) : '');
+    return (
+      <ListRow key={'song:' + song.id} current={songNow === song.id}
+        lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + song.t} playing={playing} onClick={() => playSong(song)} />}
+        title={song.t} meta={['Song', line, song.d ? songClock(song.d) : ''].filter(Boolean).join(' · ')}
+        star={{ on: true, label: 'Remove ' + song.t + ' from Saved', onClick: () => library.toggleSongSaved(song.id) }} />
+    );
+  });
   return (
     <ScreenLayout utility={utility}>
       <div className="root-screen listen-saved">
@@ -145,7 +155,9 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
           {query ? <button type="button" className="ui-link" onClick={() => setQuery('')} aria-label="Clear the search">Clear</button> : null}
         </label>
 
-        <ListGroup label={savedLabel(shown, total)} aside="Newest first">
+        {/* Fix list 30: songs carry no saved time, so they cannot merge into the recordings' order; each kind is its own
+            group, newest first, and with both the songs have their own heading. */}
+        <ListGroup label={savedLabel(shown, total)} aside={shownTracks.length && shownSongs.length ? 'Recordings, newest first' : 'Newest first'}>
           {shownTracks.map((track) => {
             const name = trackName(track);
             const playing = !!(current && current.url === track.url && active);
@@ -163,17 +175,9 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
                 menu={{ label: 'More for ' + name, onClick: () => setMenuFor(track.url) }} />
             );
           })}
-          {shownSongs.map((song) => {
-            const playing = songNow === song.id && active;
-            const line = song.cr || (cat && typeof cat.songAlbumLabel === 'function' ? cat.songAlbumLabel(song) : '');
-            return (
-              <ListRow key={'song:' + song.id} current={songNow === song.id}
-                lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + song.t} playing={playing} onClick={() => playSong(song)} />}
-                title={song.t} meta={['Song', line, song.d ? songClock(song.d) : ''].filter(Boolean).join(' · ')}
-                star={{ on: true, label: 'Remove ' + song.t + ' from Saved', onClick: () => library.toggleSongSaved(song.id) }} />
-            );
-          })}
+          {shownTracks.length ? null : songRows}
         </ListGroup>
+        {shownTracks.length && shownSongs.length ? <ListGroup label="Songs" aside="Newest first">{songRows}</ListGroup> : null}
         {!shown ? <p className="listen-saved-note">Nothing you saved matches “{query.trim()}”.</p> : null}
         <p className="listen-saved-note">What you save travels with your VOTReader backup. Tap the star again to take one off the list.</p>
       </div>
