@@ -28,6 +28,12 @@ import { countStoreRecords } from './backup.js';
  * before they need them. `counts` stands in only when there is no `stores`
  * block.
  *
+ * A v1 backup carries neither: its stores sit in `data` as the JSON strings
+ * localStorage held, and the restore reads them from there (applyImportPayload's
+ * V1 fallback). With no `stores` and no `counts`, the summary reads them from
+ * `data` the same way, so a v1 file no longer verifies as 0 records across 0
+ * data stores while its restore overwrites the library.
+ *
  * Annotations are the one store whose record count is not the reader's unit.
  * vot-annotations persists hlKey → [marks], so the store rule counts annotated
  * passages, and five highlights in two verses are 2 records. With `stores` in
@@ -50,8 +56,21 @@ import { countStoreRecords } from './backup.js';
 export function summarizeBackupManifest(manifest) {
   const counts = (manifest && manifest.counts && typeof manifest.counts === 'object')
     ? manifest.counts : {};
-  const stores = (manifest && manifest.stores && typeof manifest.stores === 'object' && !Array.isArray(manifest.stores))
-    ? manifest.stores : null;
+  const isMap = (/** @type {any} */ v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  /** @type {Record<string, any> | null} */
+  let stores = (manifest && isMap(manifest.stores)) ? manifest.stores : null;
+  const declares = Object.keys(counts).some((k) => k !== '_media' && typeof counts[k] === 'number' && Number.isFinite(counts[k]));
+  if (!stores && !declares && manifest && isMap(manifest.data)) {
+    // v1: each store's localStorage JSON. Only objects and arrays are stores; a flag ('1') or any other
+    // scalar is not a reader's record, and a string that does not parse is skipped, never thrown.
+    /** @type {Record<string, any>} */ const fromData = {};
+    for (const k of Object.keys(manifest.data)) {
+      const raw = manifest.data[k];
+      if (k.indexOf('vot-') !== 0 || typeof raw !== 'string') continue;
+      try { const v = JSON.parse(raw); if (v && typeof v === 'object') fromData[k] = v; } catch (_e) { /* not a store */ }
+    }
+    if (Object.keys(fromData).length) stores = fromData;
+  }
   let records = 0;
   let storeCount = 0;
   /** @type {Map<string, number>} */

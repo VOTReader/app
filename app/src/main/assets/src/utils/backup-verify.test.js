@@ -468,3 +468,44 @@ describe('summarizeBackupManifest: the kinds past the first four (data-7)', () =
     expect(r.message).toContain(': 1 link, 97 places marked read — ');
   });
 });
+
+/* A v1 backup keeps its stores in `data` as localStorage JSON strings and the restore reads them from there
+   (applyImportPayload's V1 fallback), but the summary read only `stores` and `counts`: Verify said 0 records
+   across 0 data stores and the restore sheet showed zeros for a file about to overwrite the library. */
+describe('summarizeBackupManifest: a v1 backup counted from its data block', () => {
+  const v1 = {
+    app: 'VOTReader',
+    exportDate: '2025-03-01T12:00:00.000Z',
+    data: {
+      'vot-notes': JSON.stringify({ g1: { groupId: 'g1' }, g2: { groupId: 'g2' } }),
+      'vot-bookmarks': JSON.stringify([{ id: 'b1' }]),
+      'vot-links': JSON.stringify([{ id: 'l1' }, { id: 'l2' }, { id: 'l3' }]),
+      'vot-state': JSON.stringify({ readItems: { 'v1:genesis:1': 1, 'v1:john:3': 1 }, settings: {} }),
+      'vot-welcomed': '1',
+      'vot-broken': '{not json',
+      'other-key': JSON.stringify([1, 2]),
+    },
+  };
+
+  it('REPRO: counts what the restore would write, not 0 records across 0 stores', () => {
+    const s = summarizeBackupManifest(v1);
+    expect([s.notes, s.bookmarks, s.links, s.readMarks]).toEqual([2, 1, 3, 2]);
+    expect(s.storeCount).toBe(4);   // notes, bookmarks, links, state; the flag, the broken string and the other key are not stores
+    expect(s.records).toBe(2 + 1 + 3 + 2);
+    expect(formatVerifyReport(s, 'absent', 'legacy').message).toContain(': 2 notes, 1 bookmark, 3 links, 2 places marked read — 8 records across 4 data stores.');
+  });
+
+  it('a file with stores or declared counts is read from those, never also from data', () => {
+    const v2 = { ...v1, exportVersion: 2, stores: { 'vot-notes': { g9: {} } } };
+    const s2 = summarizeBackupManifest(v2);
+    expect([s2.notes, s2.links, s2.readMarks, s2.storeCount]).toEqual([1, 0, 0, 1]);
+    const counted = summarizeBackupManifest({ ...v1, counts: { 'vot-notes': 5 } });
+    expect([counted.notes, counted.links, counted.storeCount]).toEqual([5, 0, 1]);
+  });
+
+  it('an empty or odd data block still reads zeros', () => {
+    expect(summarizeBackupManifest({ data: {} }).records).toBe(0);
+    expect(summarizeBackupManifest({ data: [] }).records).toBe(0);
+    expect(summarizeBackupManifest({ data: { 'vot-notes': 'null' } }).records).toBe(0);
+  });
+});
