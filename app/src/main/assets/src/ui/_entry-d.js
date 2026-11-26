@@ -40,9 +40,8 @@
    GARDEN_CRAWL_DELAY) was moved into its owning module as part of this
    conversion — esbuild ES modules are strict-mode, so assignments like
    `_thumbDbPromise = new Promise(…)` need an explicit module-scope
-   binding, not a free-variable. The index.html declarations remain in
-   place for now as harmless dupes; they can be removed in a follow-up
-   once G.2.3 is verified.
+   binding, not a free-variable. The old index.html declarations are gone
+   (none of those names appears in index.html as of 2026-11-26).
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ── Utilities ───────────────────────────────────────────────────────────

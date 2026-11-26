@@ -9,10 +9,9 @@ by scanning all sources of window-attached globals.
 
 Runs as part of `npm run lint` (chained before eslint) and is diff-checked
 by `npm run smoke-lite` (checkGlobalsMirror regenerates + `git diff
---exit-code`). NOTE: the pre-commit hook does NOT run this — its Step 2
-runs eslint per-file via lint-staged, not `npm run lint`. So after adding a
-window-globalized export, run `npm run lint:globals` and stage the
-regenerated files yourself; CI's smoke-lite gate fails on a stale copy.
+--exit-code`). The pre-commit hook also runs `npm run lint:globals` and
+stages both generated files before lint-staged, and fails the commit if the
+regeneration fails, so a commit cannot leave a stale mirror behind.
 
 Sources scanned:
   1. Every file in ENTRY_FILES below (_entry-b.js, _entry.js, _entry-d.js;
