@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText, fetchSemanticFile } from './semantic.js';
+import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText, fetchSemanticFile, semanticReady } from './semantic.js';
 import { searchWorker } from './worker-client.js';
 
 const ASSETS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -160,6 +160,13 @@ describe('semanticDocs over a pack', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it('a failed start answers the searches waiting on it with false, and a later wait is not held', async () => {
+    tinyPack({ noSession: true }); // a device that cannot run the model: never tried again
+    const waiting = semanticReady();
+    expect(await startSemantic()).toBe(false);
+    expect(await waiting).toBe(false);
+    expect(await semanticReady()).toBe(false);
   });
   it('the runtime’s glue file failing to arrive is a load, tried again (W35 refuter r1)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });

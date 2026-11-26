@@ -129,16 +129,23 @@ const QUERY_WAIT_MS = 10 * 1000;
 /* A SEARCH CAN COME BEFORE THE MODEL (sr11 S22 look, 2026-10-15). The model starts when the page is idle, so a search
    in a session's first seconds runs on the words alone; the screen waits here to search again, starting nothing. */
 /** @type {Array<(ok: boolean) => void>} */ let readyWaits = [];
-/** Resolves true once meaning search is ready; never starts it. */
+/** Resolves true once meaning search is ready, false when its start failed; never starts it. A failed model is
+ *  only tried again behind a later search, which asks again, so nothing is held waiting on a start nobody made (on a
+ *  device that cannot run the model, every text search used to leave a wait here that never ended). */
 export function semanticReady() {
   if (status === 'ready') return Promise.resolve(true);
+  if (status === 'failed') return Promise.resolve(false);
   return new Promise((res) => { readyWaits.push(res); });
+}
+/** @param {boolean} ok */
+function releaseWaits(ok) {
+  const waits = readyWaits;
+  readyWaits = [];
+  for (const res of waits) res(ok);
 }
 function nowReady() {
   status = 'ready';
-  const waits = readyWaits;
-  readyWaits = [];
-  for (const res of waits) res(true);
+  releaseWaits(true);
 }
 
 /** Load the model and the passage vectors, once. Resolves true when meaning search is ready. */
@@ -205,6 +212,7 @@ export function startSemantic() {
       session = null;
       retryMs = Math.min(RETRY_MAX_MS, retryMs ? retryMs * 2 : RETRY_FIRST_MS);
       retryAt = arrived ? Infinity : Date.now() + retryMs;
+      releaseWaits(false);
       return false;
     }
   })();
