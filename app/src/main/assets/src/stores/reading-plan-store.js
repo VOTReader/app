@@ -31,7 +31,8 @@ import { tickItem, todayKey } from '../data/plan-engine.js';
 function _valid(r) {
   return !!(r && typeof r === 'object' && typeof r.id === 'string' && r.id && typeof r.plan === 'string'
     && typeof r.start === 'string' && Array.isArray(r.segs) && Array.isArray(r.tracks)
-    && r.tracks.every((/** @type {any} */ t) => t && Array.isArray(t.items)));
+    && r.tracks.every((/** @type {any} */ t) => t && Array.isArray(t.items)
+      && t.items.every((/** @type {any} */ it) => it && typeof it.k === 'string')));
 }
 
 /** The read keys a read of (bid, cid) ticks: 'matthew' reads count for 'matthew-plain' too. */

@@ -24,6 +24,17 @@ describe('ReadingPlanStore', () => {
     expect(ReadingPlanStore.active().length).toBe(1);
   });
 
+  it('a run with a null or keyless item never gets in, so reading and Home never trip on it (review 11-26)', () => {
+    const good = run(['genesis:1']);
+    const bad = run(['genesis:1', 'genesis:2']);
+    bad.tracks[0].items[1] = /** @type {any} */ (null);
+    const keyless = run(['exodus:1']);
+    keyless.tracks[0].items[0] = /** @type {any} */ ({ w: 600 });
+    ReadingPlanStore.put(good); ReadingPlanStore.put(bad); ReadingPlanStore.put(keyless);
+    expect(ReadingPlanStore.all().map((x) => x.id)).toEqual([good.id]);
+    expect(() => ReadingPlanStore.noteRead('genesis', 1, at('2026-10-23'))).not.toThrow();
+  });
+
   it('noteRead ticks every running run that holds the chapter, dated today, and nothing else', () => {
     const a = run(['genesis:1', 'genesis:2']), b = run(['genesis:1', 'exodus:1']);
     ReadingPlanStore.put(a); ReadingPlanStore.put(b);
