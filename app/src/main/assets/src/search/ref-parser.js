@@ -257,6 +257,24 @@ export function refShape(lower) {
 }
 
 /**
+ * A book named with its saint (reading2-3, audit 2026-11-23): "St. John 3:16" opened 1 John 3:16,
+ * because the slip-tolerant match read "st john" as "1st john" with its digit lost, and "Saint
+ * John 3:16" found nothing. When the words after the saint name a book exactly and a chapter
+ * follows, the saint is dropped. Otherwise the tokens stay as typed, so "St Peter 1:3" (no book
+ * is plain "Peter") still opens 1 Peter, and "St. John" alone stays a text search.
+ * @param {string[]} toks  the reference's tokens after refShape
+ * @returns {string[]}
+ */
+export function saintless(toks) {
+  if (toks.length < 3 || !/^(?:st|saint|san)$/.test(toks[0])) return toks;
+  const bare = toks.slice(1);
+  for (let tk = Math.min(bare.length - 1, 4); tk >= 1; tk--) {
+    if (/^\d/.test(bare[tk]) && resolveBookToken(bare.slice(0, tk).join(' '))) return bare;
+  }
+  return toks;
+}
+
+/**
  * Suggest the closest book id for a likely-mistyped book name (≤2 edits).
  * @param {string} raw
  * @returns {string|null}
@@ -446,7 +464,7 @@ export function parseReference(query, parseOpts) {
   // Bible ref — "Rom 8:28", "Romans 8", "John 14:1-16:33", "Gen 1-3", "Rom8:28", …
   const qNorm = refShape(foldAccents(lower)).replace(/[.,\s]+/g, ' ').replace(/\s*:\s*/g, ':').replace(/\s*-\s*/g, '-').trim();
   const qExp = qNorm.replace(/^([0-3]?[a-z]+)(\d)/i, '$1 $2');
-  const toks = qExp.split(/\s+/);
+  const toks = saintless(qExp.split(/\s+/));
   // The book as typed first; then, before a chapter only, a book name a slip off.
   for (let pass = 0; pass < 2; pass++) for (let tk = Math.min(toks.length, 4); tk >= 1; tk--) {
     const attempt = toks.slice(0, tk).join(' ').toLowerCase();

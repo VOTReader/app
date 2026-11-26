@@ -203,3 +203,19 @@ describe('Spanish book names (Reina-Valera 1960, es1)', () => {
     expect(at('deuter 3')).toBe('deuteronomy 3'); // two from "ester"
   });
 });
+
+describe('a book named with its saint (reading2-3)', () => {
+  it('St. John is John, not 1 John', () => {
+    expect(at('St. John 3:16')).toBe('john 3:16');
+    expect(at('st john 3:16')).toBe('john 3:16');
+    expect(at('Saint John 3:16')).toBe('john 3:16');
+    expect(at('St. Matthew 5:3')).toBe('matthew 5:3');
+    expect(at('St Mark 1:1')).toBe('mark 1:1');
+  });
+  it('a saint that names no book keeps its old reading, and the numbered books are untouched', () => {
+    expect(at('St Peter 1:3')).toBe('1peter 1:3');
+    expect(at('1 John 3:16')).toBe('1john 3:16');
+    expect(at('1st John 3:16')).toBe('1john 3:16');
+    expect(at('St. John')).toBe('text');
+  });
+});
