@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { registerServiceWorker } from './sw-register.js';
+import { registerServiceWorker, warmMeaningSearch, warmMeaningFiles } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { _resetToasts } from './toast.js';
 import { UPDATE_RELOAD_FLAG } from './update-toast.js';
@@ -687,5 +687,420 @@ describe('registerServiceWorker — INSTALL_REFUSED diagnostic + toast (service-
     messageHandler({ data: { type: 'SOMETHING_ELSE' } });
     expect(DiagnosticLog.entries()).toEqual([]);
     expect(document.getElementById('vot-toast-sw-refused')).toBeFalsy();
+  });
+});
+
+describe('registerServiceWorker — the platform gates', () => {
+  let origSW;
+  beforeEach(() => {
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    delete window.AndroidBridge;
+    vi.resetModules();
+  });
+
+  it('does nothing on Android (the APK bundles its assets; a SW would double-cache)', async () => {
+    const register = vi.fn(() => Promise.resolve({}));
+    const addEventListener = vi.fn();
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: {}, register, addEventListener } });
+    window.AndroidBridge = {};
+    vi.resetModules();
+    const { registerServiceWorker: reg } = await import('./sw-register.js');
+    reg();
+    expect(register).not.toHaveBeenCalled();
+    expect(addEventListener).not.toHaveBeenCalled();
+  });
+
+  it('does nothing where service workers do not exist', () => {
+    delete navigator.serviceWorker;
+    expect('serviceWorker' in navigator).toBe(false);
+    expect(() => registerServiceWorker()).not.toThrow();
+  });
+});
+
+describe('registerServiceWorker — a refused registration is recorded', () => {
+  let origSW, origLocation, warnSpy;
+  beforeEach(() => {
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: vi.fn() } });
+    DiagnosticLog.clear();
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+    DiagnosticLog.clear();
+    vi.restoreAllMocks();
+  });
+  const stubRegister = (impl) => Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: { controller: {}, addEventListener: () => {}, register: impl },
+  });
+  const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+  it('an Error rejection names its message', async () => {
+    stubRegister(() => Promise.reject(new Error('nope')));
+    registerServiceWorker();
+    await flush();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(DiagnosticLog.entries().some((e) => e.msg.includes('registration failed: nope'))).toBe(true);
+  });
+
+  it('a non-Error rejection is recorded as itself', async () => {
+    stubRegister(() => Promise.reject('plain string'));
+    registerServiceWorker();
+    await flush();
+    expect(DiagnosticLog.entries().some((e) => e.msg.includes('registration failed: plain string'))).toBe(true);
+  });
+});
+
+describe('registerServiceWorker — message fallbacks (BUSY / precache / refused)', () => {
+  let messageHandler;
+  let origSW;
+  beforeEach(() => {
+    messageHandler = null;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') messageHandler = cb; },
+        register: () => Promise.resolve({ waiting: null, installing: null, addEventListener: () => {}, update: () => {} }),
+      },
+    });
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    DiagnosticLog.clear();
+    _resetToasts();
+  });
+
+  it('BUSY with no port, and with a port that has given up, answers nothing and throws nothing', () => {
+    registerServiceWorker();
+    expect(() => messageHandler({ data: { type: 'BUSY' } })).not.toThrow();
+    expect(() => messageHandler({ data: { type: 'BUSY' }, ports: [] })).not.toThrow();
+    expect(() => messageHandler({ data: { type: 'BUSY' }, ports: [{ postMessage: () => { throw new Error('gone'); } }] })).not.toThrow();
+    expect(() => messageHandler({})).not.toThrow();
+    expect(() => messageHandler(null)).not.toThrow();
+  });
+
+  it('PRECACHE_INCOMPLETE without a url list still records the count', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'PRECACHE_INCOMPLETE', count: 1, urls: 'not-a-list' } });
+    const entry = DiagnosticLog.entries().find((e) => e.msg.includes('corpus precache incomplete'));
+    expect(entry).toBeTruthy();
+    expect(entry.msg).toContain('1 file(s)');
+  });
+
+  it('INSTALL_REFUSED with only a url builds its own message and names the asset', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'INSTALL_REFUSED', url: './dist/bundle-b.js' } });
+    const entry = DiagnosticLog.entries().find((e) => e.msg.includes('install refused'));
+    expect(entry).toBeTruthy();
+    expect(entry.msg).toContain('integrity check failed for ./dist/bundle-b.js');
+    expect(entry.msg).not.toContain('expected');
+    expect(document.getElementById('vot-toast-sw-refused').textContent).toContain('./dist/bundle-b.js');
+  });
+
+  it('INSTALL_REFUSED with nothing at all still toasts, naming no asset', () => {
+    registerServiceWorker();
+    messageHandler({ data: { type: 'INSTALL_REFUSED' } });
+    const entry = DiagnosticLog.entries().find((e) => e.msg.includes('install refused'));
+    expect(entry).toBeTruthy();
+    expect(document.getElementById('vot-toast-sw-refused').textContent).toContain('unknown asset');
+  });
+});
+
+describe('registerServiceWorker — ANOTHER_BUILD before the registration lands', () => {
+  let origSW, origLocation;
+  beforeEach(() => {
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: vi.fn() } });
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+  });
+
+  it('a waiting build is asked the moment the registration resolves', async () => {
+    let deliver = () => {};
+    const waiting = { postMessage: vi.fn() };
+    const reg = { waiting, installing: null, addEventListener: () => {}, update: () => {} };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        addEventListener: (type, cb) => { if (type === 'message') deliver = cb; },
+        register: () => Promise.resolve(reg),
+      },
+    });
+    registerServiceWorker();
+    deliver({ data: { type: 'ANOTHER_BUILD' } }); // before register() resolves
+    expect(waiting.postMessage).not.toHaveBeenCalled();
+    await Promise.resolve(); await Promise.resolve();
+    expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+  });
+});
+
+describe('registerServiceWorker — holds taken while the closing writes land (ds2)', () => {
+  let controllerChangeHandler, reloadSpy, origSW, origLocation;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    _resetHolds();
+    mockStores.list = [];
+    controllerChangeHandler = null;
+    reloadSpy = vi.fn();
+    delete window.__votSwTookOver;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
+      controller: {},
+      addEventListener: (type, cb) => { if (type === 'controllerchange') controllerChangeHandler = cb; },
+      register: () => Promise.resolve({ waiting: null, installing: null, addEventListener: () => {}, update: () => {} }),
+    } });
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: reloadSpy } });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    _resetHolds();
+    mockStores.list = [];
+    delete window.__votSwTookOver;
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+    vi.restoreAllMocks();
+  });
+
+  it('a hold taken while the closing writes land waits again', async () => {
+    let landed;
+    let calls = 0;
+    mockStores.list = [{ whenSaved: () => (++calls === 1
+      ? new Promise((r) => { landed = () => r(true); })
+      : Promise.resolve(true)) }];
+    registerServiceWorker();
+    const release = holdUpdateReload('note');
+    controllerChangeHandler();
+    release();
+    await vi.advanceTimersByTimeAsync(400); // settle beat done; the write is still landing
+    const again = holdUpdateReload('note');
+    landed();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reloadSpy, 'the new note holds it').not.toHaveBeenCalled();
+    again();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a store write that fails does not stop the reload', async () => {
+    mockStores.list = [{ whenSaved: () => Promise.reject(new Error('disk')) }];
+    registerServiceWorker();
+    const release = holdUpdateReload('note');
+    controllerChangeHandler();
+    release();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('registerServiceWorker — the hourly poke survives a throwing update()', () => {
+  let origSW, origLocation;
+  beforeEach(() => {
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: vi.fn() } });
+  });
+  afterEach(() => {
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+    delete document.visibilityState;
+  });
+  const open = (update) => {
+    const reg = { waiting: null, installing: null, addEventListener: () => {}, update };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { controller: {}, addEventListener: () => {}, register: () => Promise.resolve(reg) },
+    });
+    registerServiceWorker();
+    return reg;
+  };
+  const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+  it('update() throwing synchronously is swallowed', async () => {
+    open(() => { throw new Error('offline'); });
+    await flush();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    expect(() => document.dispatchEvent(new Event('visibilitychange'))).not.toThrow();
+  });
+
+  it('a rejected update() promise is caught, not left unhandled', async () => {
+    open(() => Promise.reject(new Error('offline')));
+    await flush();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+  });
+
+  it('update() returning nothing is fine too', async () => {
+    open(() => undefined);
+    await flush();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    expect(() => document.dispatchEvent(new Event('visibilitychange'))).not.toThrow();
+  });
+});
+
+describe('warmMeaningSearch / warmMeaningFiles', () => {
+  let origSW, origFetch, origCaches, origOnLine, origConn, origRic;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    origFetch = globalThis.fetch;
+    origCaches = globalThis.caches;
+    origOnLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+    origConn = Object.getOwnPropertyDescriptor(navigator, 'connection');
+    origRic = globalThis.requestIdleCallback;
+    globalThis.requestIdleCallback = undefined; // the WebKit path: onIdle falls back to a timer
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    else delete navigator.serviceWorker;
+    globalThis.fetch = origFetch;
+    globalThis.caches = origCaches;
+    if (origOnLine) Object.defineProperty(navigator, 'onLine', origOnLine);
+    else delete navigator.onLine;
+    if (origConn) Object.defineProperty(navigator, 'connection', origConn);
+    else delete navigator.connection;
+    globalThis.requestIdleCallback = origRic;
+    vi.restoreAllMocks();
+  });
+  const setSW = (sw) => Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: sw });
+  const manifestFetch = (files) => vi.fn(async (url) => (String(url).includes('manifest.json')
+    ? { ok: true, json: async () => ({ files }) }
+    : { ok: true, blob: async () => new Blob(['x']) }));
+
+  it('Data Saver on: the files wait until Search needs them', async () => {
+    Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: true } });
+    setSW({ controller: {}, addEventListener: () => {} });
+    globalThis.fetch = manifestFetch([]);
+    warmMeaningSearch();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('a controlled page warms a minute after boot, at an idle moment', async () => {
+    Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: false } });
+    setSW({ controller: {}, addEventListener: () => {} });
+    globalThis.fetch = manifestFetch([]);
+    warmMeaningSearch();
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_000); // the minute, plus the idle fallback beat
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(String(globalThis.fetch.mock.calls[0][0])).toContain('semantic/manifest.json');
+  });
+
+  it('an uncontrolled page warms when the worker takes it over, not before', async () => {
+    let claim = () => {};
+    const sw = { controller: null, addEventListener: (type, cb) => { if (type === 'controllerchange') claim = () => { sw.controller = {}; cb(); }; } };
+    setSW(sw);
+    globalThis.fetch = manifestFetch([]);
+    warmMeaningSearch();
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    claim();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('no service worker at the minute mark: nothing happens', async () => {
+    setSW({ controller: {}, addEventListener: () => {} });
+    globalThis.fetch = manifestFetch([]);
+    warmMeaningSearch();
+    setSW(undefined);
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('offline, or uncontrolled: warmMeaningFiles fetches nothing', async () => {
+    globalThis.fetch = manifestFetch(['a.bin']);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    setSW({ controller: {} });
+    await warmMeaningFiles();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    setSW({ controller: null });
+    await warmMeaningFiles();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('a manifest that does not answer ends the warm', async () => {
+    setSW({ controller: {} });
+    globalThis.fetch = vi.fn(async () => ({ ok: false }));
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manifest with no files (or no manifest at all) fetches nothing more', async () => {
+    setSW({ controller: {} });
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => null }));
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stored files are skipped; the rest are read through, failures passed over', async () => {
+    setSW({ controller: {} });
+    const blob = vi.fn(async () => new Blob(['x']));
+    globalThis.fetch = vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('manifest.json')) return { ok: true, json: async () => ({ files: ['a.bin', 'b.bin', 'c.bin'] }) };
+      if (u.includes('c.bin')) return { ok: false };
+      return { ok: true, blob };
+    });
+    globalThis.caches = {
+      open: async () => ({ match: async (u) => (String(u).includes('a.bin') ? {} : undefined) }),
+    };
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3); // manifest + b + c; a was already stored
+    expect(blob).toHaveBeenCalledTimes(1);
+  });
+
+  it('no cache store to ask: every file is read through', async () => {
+    setSW({ controller: {} });
+    globalThis.caches = undefined;
+    globalThis.fetch = manifestFetch(['a.bin']);
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('a cache store that refuses to open, or a match that fails, still warms', async () => {
+    setSW({ controller: {} });
+    globalThis.fetch = manifestFetch(['a.bin']);
+    globalThis.caches = { open: async () => { throw new Error('denied'); } };
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    globalThis.fetch = manifestFetch(['a.bin']);
+    globalThis.caches = { open: async () => ({ match: async () => { throw new Error('gone'); } }) };
+    await warmMeaningFiles();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('a fetch that throws is swallowed: Search fetches them when it needs them', async () => {
+    setSW({ controller: {} });
+    globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+    await expect(warmMeaningFiles()).resolves.toBeUndefined();
   });
 });
