@@ -126,17 +126,39 @@ export default [
       /* hooks-2 (audit 2026-11-23). React.useSyncExternalStore(X.subscribe, ...) hands React the bare function:
          a store whose subscribe uses `this` then subscribes nothing (in the sloppy-mode bundles `this` is window)
          and the screen silently stops updating. Pass useStoreVersion(X) from hooks/use-store-version.js, or a
-         wrapper: React.useCallback((cb) => X.subscribe(cb), []). */
-      'no-restricted-syntax': ['error', ...[
-        '[arguments.0.type=\'MemberExpression\']',
-        // the same bare member behind a guard: `s ? s.subscribe : noop`, `s && s.subscribe`
-        '[arguments.0.type=\'ConditionalExpression\'][arguments.0.consequent.type=\'MemberExpression\']',
-        '[arguments.0.type=\'ConditionalExpression\'][arguments.0.alternate.type=\'MemberExpression\']',
-        '[arguments.0.type=\'LogicalExpression\'][arguments.0.right.type=\'MemberExpression\']',
-      ].map((arg) => ({
-        selector: "CallExpression:matches([callee.property.name='useSyncExternalStore'], [callee.name='useSyncExternalStore'])" + arg,
-        message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js; inert for a null store) or React.useCallback((cb) => X.subscribe(cb), []).',
-      }))],
+         wrapper: React.useCallback((cb) => X.subscribe(cb), []).
+         The subscribe argument is refused when it can evaluate to a bare member: X.subscribe or s?.subscribe,
+         reached directly or through up to three expressions that hand back one of their parts unchanged (either
+         branch of a ternary, either side of && || ??, the last of a comma list, the right of an assignment), so
+         `s ? s.subscribe : noop`, `S.subscribe || noop`, `s?.subscribe ?? noop`, `(0, S.subscribe)`.
+         One :matches, so a call reports once. Known gaps, by design of a syntax rule: an alias
+         (const sub = s.subscribe), a destructure (const { subscribe } = s) and a renamed import reach React as
+         a plain identifier and pass. getSnapshot is not checked: 9 sites pass a bare one (X.getVersion and the like)
+         that the review of 2026-11-26 found safe, and refusing the shape would trip them. */
+      'no-restricted-syntax': ['error', (() => {
+        const steps = [
+          ['ConditionalExpression', 'consequent'], ['ConditionalExpression', 'alternate'],
+          ['LogicalExpression', 'left'], ['LogicalExpression', 'right'],
+          ['SequenceExpression', 'expressions.1'], ['SequenceExpression', 'expressions.2'],
+          ['AssignmentExpression', 'right'],
+        ];
+        /** @type {Array<Array<[string, string]>>} */
+        const paths = [[]];
+        for (let depth = 0; depth < 3; depth++) {
+          for (const p of paths.filter((q) => q.length === depth)) for (const s of steps) paths.push([...p, /** @type {[string, string]} */ (s)]);
+        }
+        const alts = [];
+        for (const p of paths) {
+          let at = 'arguments.0';
+          let guard = '';
+          for (const [type, key] of p) { guard += `[${at}.type='${type}']`; at += '.' + key; }
+          alts.push(`${guard}[${at}.type='MemberExpression']`, `${guard}[${at}.type='ChainExpression'][${at}.expression.type='MemberExpression']`);
+        }
+        return {
+          selector: "CallExpression:matches([callee.property.name='useSyncExternalStore'], [callee.name='useSyncExternalStore']):matches(" + alts.join(', ') + ')',
+          message: 'Pass the subscribe wrapped, not as X.subscribe (or s?.subscribe, or one behind a ternary, && || ??, a comma or an assignment): a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js; inert for a null store) or React.useCallback((cb) => X.subscribe(cb), []). Not caught: an alias, a destructure or a renamed import of subscribe; getSnapshot is not checked.',
+        };
+      })()],
 
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of
