@@ -42,7 +42,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
 import { showToast } from './toast.js';
 import { markUpdateReload } from './update-toast.js';
 import { onIdle } from './on-idle.js';
-import { bulkDownloadsOk } from './download-gate.js';
+import { bulkDownloadsOk } from './metered-link.js';
 import { updateHolds, whenUpdateUnheld } from './update-hold.js';
 import { registeredStores } from '../stores/cached-store.js';
 

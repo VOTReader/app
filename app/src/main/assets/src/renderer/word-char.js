@@ -3,7 +3,7 @@
    niqqud), decimal digits, both apostrophes, underscore and the hyphen (so "self-control" stays whole). ASCII \w
    trimmed the accents off 6.6% of RVR words. \p{Nd}, not \p{N}: \p{N} would pull superscript verse numbers
    ("¹⁶For") into marks. */
-var WORD_RX = /[\p{L}\p{M}\p{Nd}’'_-]/u;
+const WORD_RX = /[\p{L}\p{M}\p{Nd}’'_-]/u;
 var LETTER_OR_DIGIT_RX = /[\p{L}\p{M}\p{Nd}]/u;
 
 /** @param {string | undefined | null} c one character @returns {boolean} */
