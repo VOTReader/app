@@ -435,10 +435,21 @@ export function streak(run, now) {
   for (let d = 0; d < total; d++) { const on = dayDoneOn(run, d); if (on) done.add(on); }
   const today = /** @type {number} */ (dayNum(todayKey(now)));
   const startN = dayNum(run.start) ?? today;
+  // A plan spread over more days than it has readings (d682e8ed7) has empty days, and an old short cut left its last
+  // days empty: a date holds a reading only when the plan's day for it has items. From today on that is the day the
+  // schedule plans for the date; before today, one reading day each from the start, as the plan was laid out.
+  const planned = new Set();
+  for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
+  const holds = (/** @type {number} */ n) => {
+    if (n >= today) return planned.has(dateOf(n));
+    if (n < startN || !isReadingDay({ ...run, paused: undefined }, n)) return false;
+    const k = readingDaysBetween(run, startN, n - 1);
+    return k < total && dayItems(run, k).length > 0;
+  };
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
-    if (n === today || !isReadingDay(run, n)) continue;
+    if (n === today || !isReadingDay(run, n) || !holds(n)) continue;
     break;
   }
   const sunday = today - weekdayOf(today);
@@ -455,10 +466,11 @@ export function streak(run, now) {
     const key = dateOf(n);
     const isDone = done.has(key);
     if (isDone) weekDone++;
-    if (n >= startN && isReadingDay({ ...run, paused: undefined }, n)) weekDays++;
+    const holdsReading = isDone || holds(n);
+    if (holdsReading) weekDays++;
     const inPlan = n >= startN && (fin == null || n <= fin) && (stop == null || n < stop) && !(known != null && n < known);
     const off = inPlan && !isReadingDay(run, n);
-    const missed = inPlan && !off && n < today && !isDone && !readOn.has(key);
+    const missed = inPlan && !off && n < today && !isDone && !readOn.has(key) && holdsReading;
     week.push({ date: key, n: Number(key.slice(8)), done: isDone, today: n === today, missed, off });
   }
   return { inRow, weekDone, weekDays: Math.max(weekDays, weekDone), week };

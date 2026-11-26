@@ -137,6 +137,22 @@ describe('days in a row and this week', () => {
     r2 = readDay(r2, 1, '2026-11-16');       // Monday: the weekend passes over
     expect(streak(r2, at('2026-11-16')).inRow).toBe(2);
   });
+  it('a spread-out plan: "of N this week" counts the days that hold a reading, and an empty day is never missed', () => {
+    // Four readings over seven days, made on a Thursday: they fall on days 1, 3, 5 and 7 (Thu, Sat, Mon, Wed).
+    const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
+    const run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-26'));
+    expect([0, 1, 2, 3, 4, 5, 6].map((d) => dayItems(run, d).length)).toEqual([1, 0, 1, 0, 1, 0, 1]);
+    const s = streak(run, at('2026-11-26'));
+    expect(s.weekDone).toBe(0);
+    expect(s.weekDays).toBe(2);   // Thu 26 and Sat 28; Friday holds nothing
+    // Thursday read, Friday passes: Friday held no reading, so it is not missed.
+    const read = readDay(run, 0, '2026-11-26');
+    const sat = streak(read, at('2026-11-28'));
+    expect(sat.week.find((w) => w.n === 27)).toMatchObject({ missed: false });
+    expect(sat.weekDays).toBe(2);
+    // Saturday read too: the empty Friday between does not end the days in a row.
+    expect(streak(readDay(read, 2, '2026-11-28'), at('2026-11-28')).inRow).toBe(2);
+  });
 });
 
 describe('late, in days, and never while paused', () => {
