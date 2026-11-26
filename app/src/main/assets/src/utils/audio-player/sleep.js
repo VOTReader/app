@@ -7,6 +7,7 @@ import {
   late,
   _notify,
   _state,
+  _toast,
   _toastAction,
 } from './core.js';
 
@@ -17,6 +18,8 @@ let _sleepTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
  *  @returns {void} */
 export function _clearSleepTimer(notify = true) {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _sleepEndedAt = 0;   // a Clear or a stop: no quiet re-arm on the next Play
+  _sleepToastOwed = false;
   const heldRun = _state.sleepAtQueueEnd;
   if (_state.sleepEndsAt || _state.sleepAtTrackEnd || _state.sleepAtQueueEnd) {
     _state.sleepEndsAt = 0;
@@ -102,8 +105,65 @@ export function _sleepAtTrackEndFire() {
   if (wasLive) _sleepEndedToast();
 }
 
-/** Every sleep end says so, with one tap to play on for another quarter hour (brief 3b, pl-l2). */
+/* ── AFTER A SLEEP END (audio-1, audit 2026-11-23) ─────────────────────────
+   The end usually comes with the screen off. The "+15 min" offer used to be raised then, so its 8 s ran out unseen,
+   and a Play from the lock screen or a headset then ran uncapped all night. Two rules: the offer waits until the
+   page is visible again (and is shown only if playback is still paused), and a Play within SLEEP_REARM_MS of the
+   end arms another SLEEP_REARM_MIN minutes by itself, once. A Clear, a stop or any sleep mode chosen in between
+   cancels both. The stop itself is never late (the clock backstop above). */
+
+/** How long after a sleep end a Play still counts as "a few more minutes, then sleep". */
+export const SLEEP_REARM_MS = 10 * 60000;
+/** What such a Play arms: the toast's own quarter hour. */
+const SLEEP_REARM_MIN = 15;
+/** When the last sleep end paused live playback (0: none pending). */
+let _sleepEndedAt = 0;
+/** The end came while hidden: the offer is shown on the return. */
+let _sleepToastOwed = false;
+/** When the offer was last put on screen: a Play while it is still up leaves it there (its button adds the same 15). */
+let _offerShownAt = 0;
+/** core.js _toastAction's duration. */
+const OFFER_SHOWN_MS = 8000;
+
+/** @returns {boolean} true while the page is hidden (the screen off, another app in front). */
+function _pageHidden() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/** Every sleep end says so, with one tap to play on for another quarter hour (brief 3b, pl-l2). Hidden, it waits. */
 function _sleepEndedToast() {
+  _sleepEndedAt = Date.now();
+  if (_pageHidden()) { _sleepToastOwed = true; return; }
+  _sleepToastOwed = false;
+  _showSleepEnded();
+}
+
+/** Back on screen (audio-player.js visibilitychange): raise the offer the hidden end held back, if still paused. */
+export function _sleepOnVisible() {
+  if (!_sleepToastOwed) return;
+  _sleepToastOwed = false;
+  if (_state.status === 'paused') _showSleepEnded();
+}
+
+/**
+ * Playback started (engine.js _setStatus 'playing'). Within SLEEP_REARM_MS of a sleep end that left nothing armed,
+ * arm another SLEEP_REARM_MIN minutes, once, so a lock-screen Play at bedtime does not run all night.
+ * @returns {void}
+ */
+export function _sleepOnPlay() {
+  const at = _sleepEndedAt;
+  if (!at) return;
+  _sleepEndedAt = 0;
+  _sleepToastOwed = false;   // playing again: the paused offer is moot
+  if (Date.now() - at > SLEEP_REARM_MS) return;
+  if (_state.sleepEndsAt || _state.sleepAtTrackEnd || _state.sleepAtQueueEnd) return;
+  if (!setSleepTimer(SLEEP_REARM_MIN)) return;
+  if (!_pageHidden() && Date.now() - _offerShownAt > OFFER_SHOWN_MS) _toast('Sleep timer on again: ' + SLEEP_REARM_MIN + ' more minutes.');
+}
+
+/** The offer itself. @returns {void} */
+function _showSleepEnded() {
+  _offerShownAt = Date.now();
   _toastAction('Sleep timer ended. Playback paused.', 'Keep listening +15 min', () => {
     // Play only if still paused: the toast stays up 8 s, and a listener who already pressed Play (the bar, a headset)
     // must not be paused by a tap that says "keep listening".
@@ -157,6 +217,7 @@ export function setSleepTimer(minutes) {
   const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
   if (_state.status === 'idle' || !_state.queue.length) return false;
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _sleepEndedAt = 0;   // a mode chosen by hand replaces the quiet re-arm
   const heldRun = _state.sleepAtQueueEnd;
   _state.sleepAtTrackEnd = false;   // one sleep arming at a time
   _state.sleepAtQueueEnd = false;
@@ -186,6 +247,7 @@ export function setSleepAtTrackEnd() {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   _state.sleepEndsAt = 0;
   _state.sleepMinutes = 0;
+  _sleepEndedAt = 0;
   const heldRun = _state.sleepAtQueueEnd;
   _state.sleepAtTrackEnd = true;
   _state.sleepAtQueueEnd = false;
@@ -209,6 +271,7 @@ export function setSleepAtQueueEnd() {
   _state.sleepMinutes = 0;
   _state.sleepAtTrackEnd = false;
   _state.sleepAtQueueEnd = true;
+  _sleepEndedAt = 0;
   _syncSleepVolume();
   _notify();
   return true;

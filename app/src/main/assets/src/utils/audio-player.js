@@ -91,7 +91,7 @@ import {
 } from './audio-player/queue.js';
 import { _flushOnHide, _onBeforeUpdateReload, _resumeAfterUpdate } from './audio-player/restore.js';
 import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey } from './audio-player/sections.js';
-import { clearSleepTimer, getSleepRemainingSeconds, setSleepAtQueueEnd, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
+import { _sleepOnVisible, clearSleepTimer, getSleepRemainingSeconds, setSleepAtQueueEnd, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
 import { playSongs, setRepeat, setShuffle, switchSongVersion } from './audio-player/songs.js';
 import {
   dismissFinished,
@@ -170,7 +170,7 @@ _restoreFromSaved();
 if (typeof window !== 'undefined') {
   const g = _g();
   if (typeof g.__votAudioPlayerRetire === 'function') g.__votAudioPlayerRetire();
-  const onVisibility = () => { if (document.visibilityState === 'hidden') _flushOnHide(); else _onVisible(); };
+  const onVisibility = () => { if (document.visibilityState === 'hidden') _flushOnHide(); else { _onVisible(); _sleepOnVisible(); } };
   window.addEventListener('vot:before-update-reload', _onBeforeUpdateReload);
   window.addEventListener('pagehide', _flushOnHide);
   document.addEventListener('visibilitychange', onVisibility);

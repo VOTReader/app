@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   state: /** @type {any} */ ({ status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, loop: null, failed: null }),
   late: /** @type {any} */ ({}),
   notify: vi.fn(),
+  toast: vi.fn(),
   toastAction: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock('./core.js', () => ({
   late: h.late,
   _notify: h.notify,
   get _state() { return h.state; },
+  _toast: h.toast,
   _toastAction: h.toastAction,
 }));
 
@@ -315,5 +317,89 @@ describe('audio-player sleep', () => {
     expect(S.setSleepTimer(15)).toBe(true);
     expect(h.state.sleepAtQueueEnd).toBe(false);
     expect(h.late._extendQueue).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* audio-1 (audit 2026-11-23): the end usually comes with the screen off. The "+15 min" offer waits for the
+   return, and a Play soon after the end (the lock screen, a headset) arms another quarter hour by itself. */
+describe('after a sleep end', () => {
+  const hidden = (v) => vi.stubGlobal('document', { visibilityState: v ? 'hidden' : 'visible' });
+  const end = () => { S.setSleepTimer(15); vi.advanceTimersByTime(15 * 60000); h.state.status = 'paused'; };
+
+  it('holds the offer while the screen is off and shows it on the return, if still paused', () => {
+    hidden(true);
+    end();
+    expect(h.toastAction).not.toHaveBeenCalled();
+    hidden(false);
+    S._sleepOnVisible();
+    expect(h.toastAction).toHaveBeenCalledTimes(1);
+    expect(h.toastAction.mock.calls[0][1]).toBe('Keep listening +15 min');
+    S._sleepOnVisible();
+    expect(h.toastAction).toHaveBeenCalledTimes(1);   // once
+  });
+
+  it('shows no held offer once playback is going again', () => {
+    hidden(true);
+    end();
+    h.state.status = 'playing';
+    hidden(false);
+    S._sleepOnVisible();
+    expect(h.toastAction).not.toHaveBeenCalled();
+  });
+
+  it('a Play within ten minutes of the end arms another 15 minutes, once', () => {
+    hidden(true);
+    end();
+    vi.advanceTimersByTime(9 * 60000);
+    h.state.status = 'playing';
+    S._sleepOnPlay();
+    expect(h.state.sleepMinutes).toBe(15);
+    expect(S.getSleepRemainingSeconds()).toBe(900);
+    expect(h.toast).not.toHaveBeenCalled();   // hidden: no notice nobody sees
+    vi.advanceTimersByTime(15 * 60000);
+    expect(h.el.pause).toHaveBeenCalledTimes(2);   // the re-armed timer stopped it again
+  });
+
+  it('says so when the re-arm happens with the screen on, once the offer has gone', () => {
+    hidden(false);
+    end();
+    h.state.status = 'playing';
+    S._sleepOnPlay();
+    expect(h.toast).not.toHaveBeenCalled();   // the offer is still up: its button would add the same 15
+    expect(h.state.sleepMinutes).toBe(15);
+    S.clearSleepTimer();
+    end();
+    vi.advanceTimersByTime(9000);
+    h.state.status = 'playing';
+    S._sleepOnPlay();
+    expect(h.toast).toHaveBeenCalledWith('Sleep timer on again: 15 more minutes.');
+  });
+
+  it('a Play after the window runs on uncapped, as before', () => {
+    hidden(true);
+    end();
+    vi.advanceTimersByTime(S.SLEEP_REARM_MS + 1000);
+    h.state.status = 'playing';
+    S._sleepOnPlay();
+    expect(h.state.sleepEndsAt).toBe(0);
+  });
+
+  it('a Clear after the end cancels the quiet re-arm', () => {
+    hidden(true);
+    end();
+    S.clearSleepTimer();
+    h.state.status = 'playing';
+    S._sleepOnPlay();
+    expect(h.state.sleepEndsAt).toBe(0);
+  });
+
+  it('a mode chosen by hand in between is kept, not replaced', () => {
+    hidden(true);
+    end();
+    h.state.status = 'playing';
+    S.setSleepAtTrackEnd();
+    S._sleepOnPlay();
+    expect(h.state.sleepAtTrackEnd).toBe(true);
+    expect(h.state.sleepEndsAt).toBe(0);
   });
 });

@@ -62,7 +62,7 @@ import {
 import { _maybePrefetchNext } from './prefetch.js';
 import { _seamStop, _seamTick } from './seam.js';
 import { _followSectionLetter, _resetSectionFollow, _setSecLastT } from './sections.js';
-import { _sleepAtTrackEndFire, _sleepTimerFire, _sleepsAtThisEnd, _syncSleepVolume } from './sleep.js';
+import { _sleepAtTrackEndFire, _sleepOnPlay, _sleepTimerFire, _sleepsAtThisEnd, _syncSleepVolume } from './sleep.js';
 
 /* ── module state (singleton) ─────────────────────────────────────────── */
 
@@ -140,7 +140,7 @@ function _setStatus(next) {
   // (emulator-5554, 2026-09-04). The app is in the foreground for the whole tour and the tour
   // stops what it started, so the keep-alive buys nothing there; the reader's next Listen after
   // the tour raises the ask as before. TourController is a bundle-b global; absent on a bare host.
-  if (next === 'playing') _raiseKeepAlive();
+  if (next === 'playing') { _raiseKeepAlive(); _sleepOnPlay(); }   // audio-1: a Play soon after a sleep end re-arms
   else if (next === 'idle') _setAudioActive(false);
   if (next === 'paused' || next === 'idle') _seamStop();   // nothing to bridge into (rv4)
   _syncMediaSessionState(next);
