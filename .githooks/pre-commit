@@ -49,7 +49,7 @@
 #
 #   5. npm run build          when any bundle-source file changes
 #      Rebuilds every dist/ bundle, the CSP hashes and the SW version
-#      BEFORE step 2 (step 1z, so the tests read fresh bundles), and
+#      BEFORE step 2 (step 1z, so the gates that read dist/ see fresh bundles), and
 #      stages the regenerated output after the gates (step 5) so the
 #      commit lands with bundles in sync with source. Runs ONLY on
 #      commits that touch bundle sources; docs/gradle/plan commits skip it.
@@ -570,7 +570,7 @@ fi
 bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|index\.html|manifest\.json|offline\.html|service-worker\.js)$' || true)
 
 if [ -n "$bundle_source_changed" ]; then
-  echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js before the tests..."
+  echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js before the gates..."
   # `npm run build` chains both bundlers in one command:
   #   1. python tools/build.py  → bundle-a.js (classic-script concat)
   #   2. esbuild                → bundle-b.js (G.2.2), bundle-c.js (G.2.1), bundle-d.js (G.2.3)
@@ -622,9 +622,13 @@ fi
 # staged files. Sub-second on typical commits; fails fast at the commit
 # prompt instead of after push.
 src_changed=$(echo "$staged" | grep -E '^app/src/main/assets/src/.*\.(js|jsx)$' || true)
+# tools/gen-eslint-globals.py also reads index.html's inline scripts (and its own
+# VENDOR list), so a commit that stages only index.html or the generator can shift
+# the globals mirror too: either arms the regeneration below, though not
+# lint-staged, whose eslint covers src/ only.
+globals_src_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/(src/.*\.(js|jsx)|index\.html)|tools/gen-eslint-globals\.py)$' || true)
 
-if [ -n "$src_changed" ]; then
-  echo "[pre-commit] Source files staged — running lint-staged..."
+if [ -n "$globals_src_changed" ]; then
   # Probe for npm on the path (winget-installed Node may not be on the
   # inherited PATH — mirrors the bundle-rebuild step's fallback).
   if ! command -v npm >/dev/null 2>&1; then
@@ -654,7 +658,13 @@ if [ -n "$src_changed" ]; then
     echo "  Run it by hand to see why: npm run lint:globals"
     exit 1
   fi
-  git add tools/eslint-globals.generated.js tools/globals.generated.d.ts
+  # All four files the generator writes (OUT_* in tools/gen-eslint-globals.py).
+  git add tools/eslint-globals.generated.js tools/globals.generated.d.ts \
+    tools/hook-globals.generated.d.ts tools/hook-globals.any.generated.d.ts
+fi
+
+if [ -n "$src_changed" ]; then
+  echo "[pre-commit] Source files staged — running lint-staged..."
   npx lint-staged
   status=$?
   if [ $status -ne 0 ]; then
@@ -728,7 +738,7 @@ fi
 # change) ran no build, no map regeneration, no re-stage, and not even lint or the
 # tests. The one file whose staleness can stop every client from updating was the one
 # file the hook ignored. Now any edit to it runs the whole battery.
-# (The trigger is computed in Step 1z, which also ran the build before the tests.)
+# (The trigger is computed in Step 1z, which also ran the build before the gates.)
 if [ -n "$bundle_source_changed" ]; then
   # Stage the regenerated bundles + the re-versioned SW so the commit
   # lands with everything in sync.

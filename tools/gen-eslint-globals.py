@@ -9,9 +9,10 @@ by scanning all sources of window-attached globals.
 
 Runs as part of `npm run lint` (chained before eslint) and is diff-checked
 by `npm run smoke-lite` (checkGlobalsMirror regenerates + `git diff
---exit-code`). The pre-commit hook also runs `npm run lint:globals` and
-stages both generated files before lint-staged, and fails the commit if the
-regeneration fails, so a commit cannot leave a stale mirror behind.
+--exit-code`). The pre-commit hook also runs `npm run lint:globals` when the
+commit stages a .js/.jsx file under src/, index.html or this generator, then
+stages all four generated files before lint-staged; it fails the commit if the
+regeneration fails.
 
 Sources scanned:
   1. Every file in ENTRY_FILES below (_entry-b.js, _entry.js, _entry-d.js;
@@ -33,6 +34,9 @@ Outputs:
                                        + Window index signature for __X
                                        runtime bridges (cross-bundle boundary
                                        is untyped by design; per Q4 scope).
+  tools/hook-globals.generated.d.ts + hook-globals.any.generated.d.ts
+                                     — the hook globals, typed and as `any`
+                                       (see OUT_HOOKS_DTS below).
 """
 import re
 import sys

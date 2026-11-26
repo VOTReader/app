@@ -126,6 +126,37 @@ describe('pre-commit: the commit is the index (v12-04, improvement sweep 2026-09
   });
 });
 
+describe('pre-commit: the globals mirror is regenerated from every input the generator reads', () => {
+  const gen = readFileSync(resolve(root, 'tools/gen-eslint-globals.py'), 'utf8');
+  const paths = (re) => [...gen.matchAll(re)].map((m) => m[1]);
+
+  it('arms on every file and directory tools/gen-eslint-globals.py reads, index.html included', () => {
+    const trigger = triggerFor('globals_src_changed');
+    const inputs = paths(/^(?:ENTRY|INDEX|DATA|HOOKS)\w* = ROOT \/ '([^']+)'/gm)
+      .concat(paths(/^ {4}ROOT \/ '([^']+)',/gm));
+    expect(inputs).toContain('app/src/main/assets/index.html');
+    expect(inputs.length, 'the generator names its entry files, index.html and its data/hooks dirs').toBeGreaterThanOrEqual(6);
+    for (const p of inputs) {
+      const staged = /\.\w+$/.test(p) ? p : p + '/x.js';
+      expect(trigger.test(staged), `${staged} feeds the mirror and must arm its regeneration`).toBe(true);
+    }
+    expect(trigger.test('tools/gen-eslint-globals.py'), 'the generator itself').toBe(true);
+    for (const p of ['app/src/main/assets/app.css', 'app/src/main/assets/manifest.json', 'CONTRIBUTING.md']) {
+      expect(trigger.test(p), `${p} is no input to the generator`).toBe(false);
+    }
+  });
+
+  it('stages exactly the files the generator writes', () => {
+    const outs = paths(/^OUT_\w+ = ROOT \/ '([^']+)'/gm).sort();
+    expect(outs.length).toBe(4);
+    const at = hook.indexOf('npm run lint:globals >/dev/null');
+    expect(at, 'the hook regenerates the mirror').toBeGreaterThan(0);
+    const add = hook.slice(at).match(/\n\s*git add ((?:[^\n]*\\\n)*[^\n]*)/);
+    expect(add, 'a git add follows the regeneration').toBeTruthy();
+    expect(add[1].replace(/\\\n/g, ' ').trim().split(/\s+/).sort()).toEqual(outs);
+  });
+});
+
 describe('pre-commit: CRLF copies are rewritten before the build reads them (2026-10-05)', () => {
   it('turns a CRLF copy of an LF file under the build inputs into LF, and leaves the rest alone', () => {
     // the step's exact lines, run in a throwaway repo (never this one: hooks share one .git across worktrees)
