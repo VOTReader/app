@@ -4115,7 +4115,8 @@
     .srch-row-ic { flex:none; display:inline-flex; align-items:center; justify-content:center; width:var(--icon-chip); height:var(--icon-chip); border-radius:var(--r-chip); background:var(--surface-2); color:var(--accent); }
     .srch-row-t, .srch-suggest-label, .srch-songs-row-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-row-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; }
+    /* Fix list 10: a two-line row's title wraps to a second line ('Answers Only God Can Give' was cut at phone width). */
+    .srch-row.is-two .srch-row-t { font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
     .srch-row-m { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:var(--ts-meta); }
     .srch-row > svg:last-child, .srch-songs-row > svg:last-child { flex:none; color:var(--text-3); }
     .srch-kbd, .srch-suggest-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
