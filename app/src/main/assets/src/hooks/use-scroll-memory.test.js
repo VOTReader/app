@@ -764,3 +764,213 @@ describe('useScrollMemory — the Songs screens scroll per frame (W2-01)', () =>
     expect(el.scrollTop).toBe(300);
   });
 });
+
+// ── item 12 branches: key derivation, Songs places, anchor/flush edges ──
+
+describe('useScrollMemory — every screen keys its own place (item 12)', () => {
+  it('index screens with no item id key the bare slot', () => {
+    tab.scrollPositions['bible-idx-'] = { y: 311 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'bible-idx', bookId: null, letterId: null }) });
+    expect(el.scrollTop).toBe(311);
+    tab.scrollPositions['bible-study-index-'] = { y: 312 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'bible-study-index', studyId: null, letterId: null }) });
+    expect(el.scrollTop).toBe(312);
+    tab.scrollPositions['scripture-genre-'] = { y: 313 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'scripture-genre', genreId: null, letterId: null }) });
+    expect(el.scrollTop).toBe(313);
+  });
+
+  it('a study chapter keys per study+chapter, nulls included', () => {
+    tab.scrollPositions['study-s1-c2'] = { y: 321 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'bible-study-chapter', studyId: 's1', studyChapterId: 'c2', letterId: null }) });
+    expect(el.scrollTop).toBe(321);
+    tab.scrollPositions['study--'] = { y: 322 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'bible-study-chapter', studyId: null, studyChapterId: null, letterId: null }) });
+    expect(el.scrollTop).toBe(322);
+  });
+
+  it('Hidden Manna, journal and Answers screens key per entry/shelf, nulls included', () => {
+    tab.scrollPositions['entry-m1'] = { y: 331 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'hm-letter', letterId: 'm1' }) });
+    expect(el.scrollTop).toBe(331);
+    tab.scrollPositions['journal-viewer-'] = { y: 332 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'journal-viewer', journalEntryId: null, letterId: null }) });
+    expect(el.scrollTop).toBe(332);
+    tab.scrollPositions['answers-group-g5'] = { y: 333 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'answers-group', letterId: 'g5' }) });
+    expect(el.scrollTop).toBe(333);
+    tab.scrollPositions['answers-group-'] = { y: 334 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'answers-group', letterId: null }) });
+    expect(el.scrollTop).toBe(334);
+  });
+
+  it('collection kinds prefix the key: holy-days and the rest keep their kind', () => {
+    const cols = /** @type {any} */ (globalThis).COL_BY_LETTER_SC;
+    cols.set('test-holy', { kind: 'holy-days' });
+    cols.set('test-wtlb', { kind: 'wtlb' });
+    tab.scrollPositions['holyday-h1'] = { y: 341 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'test-holy', letterId: 'h1' }) });
+    expect(el.scrollTop).toBe(341);
+    tab.scrollPositions['wtlb-w1'] = { y: 342 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'test-wtlb', letterId: 'w1' }) });
+    expect(el.scrollTop).toBe(342);
+  });
+});
+
+describe('useScrollMemory — unreadable Songs stacks read as the hub (item 12)', () => {
+  const SONGS = 'audio-library-songs';
+
+  it('a non-string, malformed, empty or non-array stack all land on the hub place', () => {
+    tab.scrollPositions['audio-library-songs|hub'] = { y: 432 };
+    tab.audioColKey = 42;
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    expect(el.scrollTop).toBe(432);
+    tab.audioColKey = 'songs:{not json';
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    expect(el.scrollTop).toBe(432);
+    tab.audioColKey = 'songs:[]';
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    expect(el.scrollTop).toBe(432);
+    tab.audioColKey = 'songs:{}';
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    expect(el.scrollTop).toBe(432);
+  });
+
+  it('frames without a kind read as "?" in the place path', () => {
+    tab.scrollPositions['audio-library-songs|?:x>?>song'] = { y: 433 };
+    tab.audioColKey = 'songs:[{"v":"x"},null,{"k":"song"}]';
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: SONGS, letterId: null }) });
+    expect(el.scrollTop).toBe(433);
+  });
+});
+
+describe('useScrollMemory — flush and restore edges (item 12)', () => {
+  it('a tab with no scrollPositions map yet gets one on first flush', () => {
+    tabsArr[1] = {};
+    activeIdxForUpdater = 1;
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ activeTab: tabsArr[1], activeTabIdx: 1 }) });
+    expect(/** @type {any} */ (window).__scrollPositions).toEqual({});
+    settleRestoreRaf();
+    act(() => { scrollTo(900); vi.advanceTimersByTime(150); });
+    expect(tabsArr[1].scrollPositions['letter-alpha']).toMatchObject({ y: 900 });
+  });
+
+  it('no active tab publishes an empty position map for the pager peek', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ activeTab: null }) });
+    expect(/** @type {any} */ (window).__scrollPositions).toEqual({});
+  });
+
+  it('a laid-out screen with no anchor elements saves pixels only', () => {
+    /** @type {any} */ (el).getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON: () => ({}) });
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(800); vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 800, anchorKey: null });
+  });
+
+  it('flushing with no scroller mounted writes nothing', () => {
+    const { result } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(500); });
+    /** @type {any} */ (globalThis).__scrollEl = null;
+    act(() => { result.current.flushScrollToActiveTab(); });
+    expect(tab.scrollPositions['letter-alpha']).toBeUndefined();
+  });
+
+  it('a saved record whose y is not a number restores to the top', () => {
+    tab.scrollPositions['letter-beta'] = { y: 'later', pct: 0.5 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(640); vi.advanceTimersByTime(150); });
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(0);
+  });
+
+  it('the settle frame tolerates the scroller unmounting first', () => {
+    tab.scrollPositions['letter-beta'] = { y: 1234, pct: 0.5 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(1234);   // landed synchronously
+    /** @type {any} */ (globalThis).__scrollEl = null;
+    settleRestoreRaf();                // settle frame: no scroller, no throw
+    settleRestoreRaf();                // release frame
+    expect(document.body.classList.contains('scroll-restoring')).toBe(false);
+    expect(el.scrollTop).toBe(1234);
+  });
+
+  it('a restore that never gets a scroller gives up at the deadline and releases the force', () => {
+    tab.scrollPositions['letter-beta'] = { y: 500, pct: 0.3, anchorKey: 'v1', anchorOff: 0 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    /** @type {any} */ (globalThis).__scrollEl = null;
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(document.body.classList.contains('scroll-restoring')).toBe(true);
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(document.body.classList.contains('scroll-restoring')).toBe(false);
+  });
+
+  it('the scroll listener follows the scroller when it is swapped, and detaches on null', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const el2 = makeScrollEl();
+    /** @type {any} */ (globalThis).__scrollEl = el2;
+    act(() => { vi.advanceTimersByTime(300); });   // the re-poll re-attaches
+    el.scrollTop = 111;
+    el.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha']).toBeUndefined();   // old scroller is deaf
+    el2.scrollTop = 222;
+    el2.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 222 });
+    /** @type {any} */ (globalThis).__scrollEl = null;
+    act(() => { vi.advanceTimersByTime(300); });   // detach: nothing to attach to
+    el2.scrollTop = 333;
+    el2.dispatchEvent(new Event('scroll'));
+    act(() => { vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 222 });
+  });
+
+  it('hiding the page flushes at once; showing it does not', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(900); });   // stash only — debounce still pending
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(tab.scrollPositions['letter-alpha']).toBeUndefined();
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 900 });
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  });
+
+  it('the reload flush defaults to tab 0 when the union names no active tab', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const flush = vi.fn();
+    /** @type {any} */ (window).__flushPersistState = flush;
+    try {
+      scrollTo(450);
+      act(() => { window.dispatchEvent(new Event('vot:before-update-reload')); });
+      const call = flush.mock.calls[flush.mock.calls.length - 1];
+      const out = call[0]({ tabs: [{ id: 'a', scrollPositions: {} }, { id: 'b', scrollPositions: {} }] });
+      expect(out.tabs[0].scrollPositions['letter-alpha'].y).toBe(450);
+      expect(out.tabs[1].scrollPositions['letter-alpha']).toBeUndefined();
+    } finally {
+      delete /** @type {any} */ (window).__flushPersistState;
+    }
+  });
+
+  it('a surprise anchor suppresses restore only on the chapter screens that consume it', () => {
+    tab.scrollPositions['genesis-3'] = { y: 700 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 3, letterId: null, surpriseAnchor: { type: 'verse' } }) });
+    expect(el.scrollTop).toBe(0);   // the anchor positions the verse instead
+    tab.scrollPositions['matthew-9'] = { y: 701 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 9, letterId: null, surpriseAnchor: { type: 'verse' } }) });
+    expect(el.scrollTop).toBe(0);
+    tab.scrollPositions['letter-alpha'] = { y: 702 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps({ surpriseAnchor: { type: 'verse' } }) });
+    expect(el.scrollTop).toBe(702);   // stale anchor off-chapter: restore still runs
+  });
+});

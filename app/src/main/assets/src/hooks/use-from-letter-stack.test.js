@@ -441,3 +441,111 @@ describe('useFromLetterStack — retargetTop', () => {
     expect(result.current.fromLetterStack).toEqual([legacy]);
   });
 });
+
+// ── G) item 12 branches: uncaptured fields, per-field dest mismatches, backAt ──
+
+describe('useFromLetterStack — tapThroughBack skips fields never captured (item 12)', () => {
+  it('an entry with no sourceLetterId restores the screen but never touches the letter', () => {
+    const { result, setters } = setup();
+    act(() => { result.current.pushFromLetter({ sourceScreen: 'vot-letter' }); });
+    act(() => { result.current.tapThroughBack(); });
+    expect(setters.setLetterId).not.toHaveBeenCalled();
+    expect(setters.setScreen).toHaveBeenCalledWith('vot-letter');
+  });
+
+  it('an entry with no sourceScreen restores the letter but never touches the screen', () => {
+    const { result, setters } = setup();
+    act(() => { result.current.pushFromLetter({ sourceLetterId: 'wide-path' }); });
+    act(() => { result.current.tapThroughBack(); });
+    expect(setters.setLetterId).toHaveBeenCalledWith('wide-path');
+    expect(setters.setScreen).not.toHaveBeenCalled();
+  });
+});
+
+describe('useFromLetterStack — every recorded dest field must match (item 12)', () => {
+  it('a different letterId prunes the entry', () => {
+    const { result, rerender } = setup({ screen: 'vot-letter', letterId: 'a' });
+    act(() => {
+      result.current.pushFromLetter(entry({
+        destSnapshot: { screen: 'vot-letter', bookId: null, chapterNum: null, letterId: 'a', studyId: null, studyChapterId: null },
+      }));
+    });
+    expect(result.current.fromLetterStack).toHaveLength(1);
+    rerender({ screen: 'vot-letter', letterId: 'b' });
+    expect(result.current.fromLetterStack).toHaveLength(0);
+    expect(result.current.backActive).toBe(false);
+  });
+
+  it('a different studyId prunes the entry', () => {
+    const { result, rerender } = setup({ screen: 'bible-study-chapter', studyId: 's1', studyChapterId: 'c1' });
+    act(() => {
+      result.current.pushFromLetter(entry({
+        destSnapshot: { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: 's1', studyChapterId: 'c1' },
+      }));
+    });
+    expect(result.current.fromLetterStack).toHaveLength(1);
+    rerender({ screen: 'bible-study-chapter', studyId: 's2', studyChapterId: 'c1' });
+    expect(result.current.fromLetterStack).toHaveLength(0);
+  });
+
+  it('a different studyChapterId prunes the entry', () => {
+    const { result, rerender } = setup({ screen: 'bible-study-chapter', studyId: 's1', studyChapterId: 'c1' });
+    act(() => {
+      result.current.pushFromLetter(entry({
+        destSnapshot: { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: 's1', studyChapterId: 'c1' },
+      }));
+    });
+    expect(result.current.fromLetterStack).toHaveLength(1);
+    rerender({ screen: 'bible-study-chapter', studyId: 's1', studyChapterId: 'c2' });
+    expect(result.current.fromLetterStack).toHaveLength(0);
+  });
+});
+
+describe('useFromLetterStack — backAt: the pill for another place (TABS3, item 12)', () => {
+  it('an empty stack has no pill anywhere', () => {
+    const { result } = setup({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    expect(result.current.backAt({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 })).toEqual({ backHint: null, backActive: false });
+  });
+
+  it('a legacy top (no destSnapshot) is live at any place', () => {
+    const { result } = setup({ screen: 'home' });
+    act(() => { result.current.pushFromLetter(entry({ destSnapshot: null })); });
+    const at = result.current.backAt({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    expect(at.backHint).toEqual({ title: 'My Notes', volumeLabel: null });
+    expect(at.backActive).toBe(true);
+  });
+
+  it('a recorded top is live only at its own place — the place overrides where we are', () => {
+    const { result } = setup({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    act(() => {
+      result.current.pushFromLetter(entry({
+        destSnapshot: { screen: 'bible-ch', bookId: 'john', chapterNum: 3, letterId: null, studyId: null, studyChapterId: null },
+      }));
+    });
+    // The swipe neighbour one chapter over does not carry the pill…
+    expect(result.current.backAt({ chapterNum: 4 })).toEqual({ backHint: null, backActive: false });
+    // …and turning back to the destination brings it again.
+    const here = result.current.backAt({});
+    expect(here.backHint).toEqual({ title: 'My Notes', volumeLabel: null });
+    expect(here.backActive).toBe(true);
+  });
+
+  it('a silent top at its place is a live back target with no pill', () => {
+    const { result } = setup({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    act(() => {
+      result.current.pushFromLetter(entry({
+        sourceScreen: 'history', sourceLetterTitle: 'History', silent: true,
+        destSnapshot: { screen: 'bible-ch', bookId: 'john', chapterNum: 3, letterId: null, studyId: null, studyChapterId: null },
+      }));
+    });
+    expect(result.current.backAt({})).toEqual({ backHint: null, backActive: true });
+  });
+
+  it('the hint carries the captured title and volume, with the "previous" fallback', () => {
+    const { result } = setup({ screen: 'vot-letter' });
+    act(() => { result.current.pushFromLetter(entry({ sourceLetterTitle: 'Faith', sourceVolumeLabel: 'Volume Two' })); });
+    expect(result.current.backAt({}).backHint).toEqual({ title: 'Faith', volumeLabel: 'Volume Two' });
+    act(() => { result.current.pushFromLetter(entry({ sourceLetterTitle: null, sourceVolumeLabel: null })); });
+    expect(result.current.backAt({}).backHint).toEqual({ title: 'previous', volumeLabel: null });
+  });
+});
