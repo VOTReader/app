@@ -1049,3 +1049,86 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
     });
   });
 });
+describe('mergeForRestore: the stores no restore test reached yet (votreader-tests-7 item 6)', () => {
+  it('a missing side is the other side, whole', () => {
+    const snap = { a1: { body: 'from the snapshot' } };
+    const live = { a2: { body: 'made since' } };
+    expect(mergeForRestore('vot-notes', null, snap)).toBe(snap);
+    expect(mergeForRestore('vot-notes', undefined, snap)).toBe(snap);
+    expect(mergeForRestore('vot-notes', live, null)).toBe(live);
+    expect(mergeForRestore('vot-notes', live, undefined)).toBe(live);
+  });
+
+  it('reading plans: runs from both sides survive and their ticks union', () => {
+    const merged = mergeForRestore('vot-reading-plans',
+      [{ id: 'p1', updated: 5, ticks: { 'gen:1': '2026-10-01' } }],
+      [{ id: 'p1', updated: 3, ticks: { 'gen:2': '2026-10-02' } }, { id: 'p2', updated: 1, ticks: {} }]);
+    expect(merged.map((r) => r.id)).toEqual(['p1', 'p2']);
+    expect(merged[0].ticks).toEqual({ 'gen:1': '2026-10-01', 'gen:2': '2026-10-02' });
+  });
+
+  it('notebooks, journal and journal-notebooks: list entries from both sides survive, the newer edit wins', () => {
+    for (const name of ['vot-notebooks', 'vot-journal', 'vot-journal-notebooks']) {
+      const merged = mergeForRestore(name,
+        { list: [{ id: 'e1', updated: 5, title: 'live' }] },
+        { list: [{ id: 'e2', updated: 1, title: 'snap only' }, { id: 'e1', updated: 9, title: 'snap newer' }] });
+      expect(merged.list.map((r) => r.id).sort()).toEqual(['e1', 'e2']);
+      expect(merged.list.find((r) => r.id === 'e1').title).toBe('snap newer');
+    }
+  });
+
+  it('journal index: the entry lists union per reference', () => {
+    expect(mergeForRestore('vot-journal-index',
+      { 'bible:john:3:16': ['e1'] },
+      { 'bible:john:3:16': ['e2', 'e1'], 'bible:gen:1:1': ['e3'] }))
+      .toEqual({ 'bible:john:3:16': ['e1', 'e2'], 'bible:gen:1:1': ['e3'] });
+  });
+
+  it('streak: the snapshot wins when the live side has no day or an older day; the same day keeps the higher count', () => {
+    expect(mergeForRestore('vot-reading-streak', {},
+      { currentStreak: 7, longestStreak: 9, lastReadDate: '2026-10-01', totalDays: 20 }))
+      .toMatchObject({ currentStreak: 7, longestStreak: 9, lastReadDate: '2026-10-01', totalDays: 20 });
+    expect(mergeForRestore('vot-reading-streak',
+      { currentStreak: 2, longestStreak: 2, lastReadDate: '2026-09-01', totalDays: 3 },
+      { currentStreak: 5, longestStreak: 5, lastReadDate: '2026-10-01', totalDays: 9 }))
+      .toMatchObject({ currentStreak: 5, longestStreak: 5, lastReadDate: '2026-10-01', totalDays: 9 });
+    expect(mergeForRestore('vot-reading-streak',
+      { currentStreak: 3, longestStreak: 3, lastReadDate: '2026-10-05', totalDays: 4 },
+      { currentStreak: 8, longestStreak: 8, lastReadDate: '2026-10-05', totalDays: 10 }))
+      .toMatchObject({ currentStreak: 8, longestStreak: 8, lastReadDate: '2026-10-05', totalDays: 10 });
+  });
+
+  it('streak: a run the wipe cut joins back up, and a wiped day count adds', () => {
+    const live = { currentStreak: 3, longestStreak: 3, lastReadDate: '2026-10-04', totalDays: 3 };
+    const snap = { currentStreak: 10, longestStreak: 10, lastReadDate: '2026-10-01', totalDays: 30 };
+    expect(mergeForRestore('vot-reading-streak', live, snap))
+      .toMatchObject({ currentStreak: 13, longestStreak: 13, lastReadDate: '2026-10-04', totalDays: 30 });
+    expect(mergeForRestore('vot-reading-streak', live, snap, { wiped: true }).totalDays).toBe(33);
+  });
+
+  it('audio library: the song lists union by key or id, and keyless entries are not collapsed into one', () => {
+    const lib = mergeForRestore('vot-audio-library',
+      { recent: [{ key: 'k1' }], saved: [{ url: 'u1' }], songSaved: [{ id: 's1' }, { note: 'keyless live' }], songRecent: [{ key: 'r1' }], plays: 1 },
+      { recent: [{ key: 'k2' }], saved: [{ url: 'u2' }], songSaved: [{ id: 's2' }, { note: 'keyless snap' }, { note: 'keyless live' }], songRecent: [{ key: 'r2' }], plays: 9, completions: 4 });
+    expect(lib.recent.map((e) => e.key)).toEqual(['k1', 'k2']);
+    expect(lib.saved.map((e) => e.url)).toEqual(['u1', 'u2']);
+    expect(lib.songSaved).toHaveLength(4);
+    expect(lib.songRecent.map((e) => e.key)).toEqual(['r1', 'r2']);
+    expect(lib).toMatchObject({ plays: 9, completions: 4 });
+  });
+
+  it('an unknown store: a flag either side set, an emptied list, plain values, and counters', () => {
+    expect(mergeForRestore('vot-unknown-store', true, false)).toBe(true);
+    expect(mergeForRestore('vot-unknown-store', [], [1, 2])).toEqual([1, 2]);
+    expect(mergeForRestore('vot-unknown-store', [3], [1, 2])).toEqual([3]);
+    expect(mergeForRestore('vot-unknown-store', 'live text', 'snap text')).toBe('live text');
+    expect(mergeForRestore('vot-unknown-store', { n: 3, deep: { x: 1 } }, { n: 9, deep: { y: 2 } }))
+      .toEqual({ n: 9, deep: { x: 1, y: 2 } });
+  });
+
+  it('history: an entry with no time sorts as the oldest and still dedupes by key and time', () => {
+    const h = mergeForRestore('vot-history', [{ key: 'a', ts: 5 }], [{ key: 'b' }, { key: 'a', ts: 5 }]);
+    expect(h.map((e) => e.key)).toEqual(['a', 'b']);
+  });
+});
+
