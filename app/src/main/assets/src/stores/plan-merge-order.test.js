@@ -89,3 +89,33 @@ describe('merge order: A into B and B into A give the same plan and calendar (re
     }
   }
 });
+
+describe('merge order: a read both copies hold, dated apart, takes no date from the argument position (review 11-26)', () => {
+  // Ruth over 20 days, read Dec 3, caught up Dec 10 (pins up to Dec 10). Before the fix the date of a chapter both copies
+  // held was always ours', so which tab saved second picked it: the calendar and the pins' cut changed with the order.
+  const base = catchUp(tickItem(ruth('p-d', 20), 'ruth:1', '2026-12-03', at('2026-12-03').getTime()), at('2026-12-10'));
+  const both = (/** @type {any} */ a, /** @type {any} */ b, /** @type {any} */ bs) => {
+    const ab = one(mergePlanStore(bs, [a], [b]), base.id), ba = one(mergePlanStore(bs, [b], [a]), base.id);
+    expect(ba).toEqual(ab);
+    expect(calendar(ba, '2026-12-12')).toEqual(calendar(ab, '2026-12-12'));
+    return ab;
+  };
+
+  it('one tab took Dec 3\'s read back and read it again Dec 11, the other only added a note: the new date, either order, either newer', () => {
+    const reread = tickItem(untickItem(base, 'ruth:1', at('2026-12-11')), 'ruth:1', '2026-12-11', at('2026-12-11').getTime() + 1000);
+    const noted = { ...base, notes: { 1: 'a note' }, updated: at('2026-12-11').getTime() };
+    for (const [a, b] of [[newerThan(reread, noted), noted], [reread, newerThan(noted, reread)]]) {
+      const m = both(a, b, [base]);
+      expect(m.ticks).toEqual({ 'ruth:1': '2026-12-11' });
+      expect(m.rested).toEqual(reread.rested);      // cut from Dec 3, as the untick cut the copy that made it
+    }
+  });
+
+  it('both tabs marked Ruth 2, one by a read on Dec 11, one by "I read it on Dec 5": the newer copy\'s date, either order', () => {
+    const read = tickItem(base, 'ruth:2', '2026-12-11', at('2026-12-11').getTime());
+    const told = markOn(base, '2026-12-05', at('2026-12-11'));
+    for (const [newer, older] of [[newerThan(read, told), told], [newerThan(told, read), read]]) {
+      for (const bs of [[base], null]) expect(both(newer, older, bs).ticks['ruth:2']).toBe(newer.ticks['ruth:2']);
+    }
+  });
+});

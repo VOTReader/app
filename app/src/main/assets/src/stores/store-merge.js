@@ -286,13 +286,19 @@ export function mergePlanStore(base, ours, theirs) {
   return merged.map((/** @type {any} */ r) => {
     const o = O.get(r && r.id), t = T.get(r && r.id);
     if (!o || !t) return r;
-    const b = (B.get(r.id) || {}).ticks || {}, ot = o.ticks || {}, tt = t.ticks || {};
+    const b = (B.get(r.id) || {}).ticks || {}, ot = o.ticks || {}, tt = t.ticks || {}, rt = r.ticks || {};
     /** @type {Record<string, string>} */
     const ticks = {};
     for (const k of new Set([...Object.keys(ot), ...Object.keys(tt)])) {
       // In the base and missing from either side: that side un-marked it.
       if (k in b && (!(k in ot) || !(k in tt))) continue;
-      ticks[k] = k in ot ? ot[k] : tt[k];
+      if (!(k in ot) || !(k in tt) || ot[k] === tt[k]) ticks[k] = k in ot ? ot[k] : tt[k];
+      // Both hold it, dated apart: the side that dated it anew since the base (a read taken back and read again),
+      // else (both did, or no base) the copy the merge keeps, as for the record. Never the argument position: which
+      // tab saves second must not pick the date (merge order, review 11-26).
+      else if (k in b && ot[k] === b[k]) ticks[k] = tt[k];
+      else if (k in b && tt[k] === b[k]) ticks[k] = ot[k];
+      else ticks[k] = k in rt ? rt[k] : ot[k];
     }
     const src = r.rested ? r : o.rested ? o : t.rested ? t : null;
     if (!src) return { ...r, ticks };
