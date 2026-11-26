@@ -24,7 +24,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 /** @type {any} */ (globalThis).Blob = NodeBlob;
 
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
@@ -58,6 +58,11 @@ import {
   WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore, TourDoneFlagStore,
 } from '../stores/app-flag-stores.js';
 import { AUDIO_RELEASE_PREFIX } from './audio-track.js';
+import { newRun, tickItem, untickItem, changePace, changeWeekdays, runStatus, monthCells, streak, dayNum, dateOf } from '../data/plan-engine.js';
+import { DataSafety } from './data-safety.js';
+import { StorageHealth } from './storage-health.js';
+import { snapshotName, snapshotTime } from './snapshot-sink.js';
+import { setStoreWriteFence } from '../stores/cached-store.js';
 
 /* ── The backup's own two lists (backup-flow.js), with the real stores ── */
 const storesMap = () => ({
@@ -656,4 +661,157 @@ describe('data-3: an unreadable store does not block the backup', () => {
     expect(v2.ok).toBe(true);
     expect(v2.unreadable).toEqual(['vot-history']);
   });
+});
+
+/* Review 11-26, task 2: a spread-out plan's pinned rest days AND its past days off (rested.off, b529d9fe9) through
+   this build's own Export and Import, and through the Restore that merges a snapshot into the live library. Jude over
+   Tue-Sat from Dec 1, Jude 1 read Dec 2, a Finish by date (Dec 20) set Dec 4, every day a reading day from Dec 10:
+   Sun and Mon Dec 6 and 7 were days off, and stay off (none, never missed) only while rested.off comes back whole. */
+describe('a plan\'s pinned days off (rested.off) through Export, Import and Restore (review 11-26)', () => {
+  const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
+  const jude = () => {
+    let r = newRun({ id: 'run_jude', plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    r = changePace(tickItem(r, 'jude:1', '2026-12-02', at('2026-12-02').getTime()), { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    return changeWeekdays(r, [true, true, true, true, true, true, true], at('2026-12-10'));
+  };
+  /** runStatus, monthCells and streak as of every day from Dec 1 to Dec 12. */
+  const calendar = (r) => {
+    const days = [];
+    for (let n = dayNum('2026-12-01'); n <= dayNum('2026-12-12'); n++) {
+      const now = at(dateOf(n));
+      days.push({ date: dateOf(n), status: runStatus(r, now), cells: monthCells(r, 2026, 11, now), streak: streak(r, now) });
+    }
+    return days;
+  };
+  const offDays = (r) => monthCells(r, 2026, 11, at('2026-12-12')).filter((c) => c.date === 6 || c.date === 7).map((c) => c.state);
+  const planOnDisk = async () => (await IDBAdapter.get('vot-reading-plans', 'v')).find((x) => x.id === 'run_jude');
+  /** The plan put by the app's own writer, then the app relaunched: what a backup on this device holds. */
+  const putPlan = async (r) => { ReadingPlanStore.put(r); await relaunch(); };
+
+  it('the plan holds rested.off, and the days off read as none', () => {
+    const r = jude();
+    expect(r.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+    expect(offDays(r)).toEqual(['none', 'none']);
+    expect(offDays(untickItem(r, 'jude:1', at('2026-12-11')))).toEqual(['none', 'none']);
+  });
+
+  for (const fmt of ['v3', 'v2']) {
+    it(fmt + ': exported, the device wiped, imported: the plan deep-equals, rested.off with it, and every past day reads the same', async () => {
+      await fillLibrary();
+      const plan = jude();
+      await putPlan(plan);
+      const before = await planOnDisk();
+      expect(before).toEqual(plan);
+      const out = fmt === 'v3' ? (await exportV3()).file : await exportV2();
+      await wipeDevice();
+      expect(await IDBAdapter.get('vot-reading-plans', 'v')).toEqual([]);
+      if (fmt === 'v3') expect((await importV3(out)).res).toEqual(CLEAN);
+      else expect(await importV2(out)).toEqual(CLEAN);
+      await relaunch();
+      const after = await planOnDisk();
+      expect(after).toEqual(before);
+      expect(after.rested).toEqual(plan.rested);
+      expect(after.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+      expect(ReadingPlanStore.get('run_jude')).toEqual(before);
+      expect(calendar(after)).toEqual(calendar(before));
+      expect(offDays(after)).toEqual(['none', 'none']);
+    }, 30000);
+
+    it(fmt + ': imported onto a device that already holds the plan (a newer copy, Jude 1 unticked): the import restores the backup\'s copy as it is (n4-01)', async () => {
+      await fillLibrary();
+      const plan = jude();
+      await putPlan(plan);
+      const out = fmt === 'v3' ? (await exportV3()).file : await exportV2();
+      const newer = untickItem(plan, 'jude:1', at('2026-12-11'));
+      await putPlan(newer);
+      expect((await planOnDisk()).ticks).toEqual({});
+      if (fmt === 'v3') expect((await importV3(out)).res).toEqual(CLEAN);
+      else expect(await importV2(out)).toEqual(CLEAN);
+      await relaunch();
+      const after = await planOnDisk();
+      expect(after).toEqual(plan);
+      expect(calendar(after)).toEqual(calendar(plan));
+    }, 30000);
+  }
+
+  /* The Restore (data-safety): the newest snapshot merged into the live library through mergeForRestore, which merges
+     the plans with mergePlanStore(null, live, snapshot). The snapshot is this build's own (DataSafety.run). */
+  function memorySink() {
+    const files = new Map();
+    return {
+      kind: 'android', files,
+      save: async (json) => { files.set(snapshotName(Date.now() + files.size * 1000), json); return true; },
+      list: async () => [...files.keys()].sort().reverse().map((name) => ({ name, at: snapshotTime(name), size: files.get(name).length })),
+      read: async (name) => files.get(name) || '',
+      clear: async () => { files.clear(); return true; },
+    };
+  }
+  /** Snapshot the library holding `snapPlan`, make the live plan `livePlan`, Restore, relaunch: the plan on disk. */
+  async function restoreOver(snapPlan, livePlan) {
+    vi.spyOn(IDBAdapter, 'openInfo').mockReturnValue(null);       // an ordinary boot: the database was there
+    DataSafety._resetForTests();
+    StorageHealth.setDataMissing(null);
+    try {
+      await fillLibrary();
+      await putPlan(snapPlan);
+      const sink = memorySink();
+      expect(await DataSafety.run({ sink })).toBe('snapshotted');
+      const [name] = [...sink.files.keys()];
+      expect(JSON.parse(sink.files.get(name)).stores['vot-reading-plans'].find((x) => x.id === 'run_jude')).toEqual(snapPlan);
+      if (livePlan) await putPlan(livePlan);
+      else { ReadingPlanStore.replaceAll(ReadingPlanStore.all().filter((x) => x.id !== 'run_jude')); await relaunch(); expect(await planOnDisk()).toBeUndefined(); }
+      StorageHealth.setDataMissing({ name, at: snapshotTime(name), then: {}, now: {} });
+      const reload = vi.fn();
+      expect(await DataSafety.restoreMissing({ sink, reload })).toBe(true);
+      expect(reload).toHaveBeenCalledTimes(1);
+      setStoreWriteFence(false);                                    // the reload would lift it
+      await relaunch();
+      return planOnDisk();
+    } finally {
+      setStoreWriteFence(false);
+      StorageHealth.setDataMissing(null);
+      DataSafety._resetForTests();
+      vi.restoreAllMocks();
+    }
+  }
+
+  it('Restore over a library that lost the plan: it comes back deep-equal, rested.off with it', async () => {
+    const plan = jude();
+    const after = await restoreOver(plan, null);
+    expect(after).toEqual(plan);
+    expect(calendar(after)).toEqual(calendar(plan));
+  }, 30000);
+
+  it('Restore over a library that still holds the same plan: it merges to the same plan, every past day the same', async () => {
+    const plan = jude();
+    const after = await restoreOver(plan, plan);
+    expect(after).toEqual(plan);
+    expect(calendar(after)).toEqual(calendar(plan));
+  }, 30000);
+
+  it('Restore over a newer live copy (Jude 1 unticked Dec 11): the live copy\'s rested, days off included, and the read back', async () => {
+    const plan = jude();
+    const live = untickItem(plan, 'jude:1', at('2026-12-11'));
+    expect(live.rested.off).toEqual(plan.rested.off);
+    const after = await restoreOver(plan, live);
+    // A Restore has no base, so it never takes a read away: Jude 1 comes back from the snapshot. The pins are the newer
+    // (live) copy's, already cut from Dec 2 by the untick, and the days off ride whole.
+    expect(after).toEqual({ ...live, ticks: { 'jude:1': '2026-12-02' } });
+    expect(after.rested).toEqual(live.rested);
+    expect(after.rested.off).toEqual([['2026-12-06', '2026-12-07']]);
+    expect(offDays(after)).toEqual(['none', 'none']);
+    // What the real Restore wrote is what mergeForRestore gives, day for day.
+    expect(calendar(after)).toEqual(calendar(DataSafety.mergeForRestore('vot-reading-plans', [live], [plan])[0]));
+  }, 30000);
+
+  it('Restore over an older live copy (from before the change of days, Jude 1 still read): the snapshot\'s copy and its rested.off come back', async () => {
+    const plan = jude();
+    let older = newRun({ id: 'run_jude', plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    older = changePace(tickItem(older, 'jude:1', '2026-12-02', at('2026-12-02').getTime()), { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    expect(older.updated).toBeLessThan(plan.updated);
+    expect(older.rested.off).toBeUndefined();
+    const after = await restoreOver(plan, older);
+    expect(after).toEqual(plan);
+    expect(calendar(after)).toEqual(calendar(plan));
+  }, 30000);
 });
