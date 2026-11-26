@@ -29,6 +29,8 @@ describe('a sheet foot at large text keeps its buttons on the screen', () => {
     expect(b).toMatch(/min-width:\s*0/);
     expect(b).toMatch(/white-space:\s*normal/);
     expect(b).not.toMatch(/(^|[;\s])height:/);   // .ui-btn's min-height stays the floor
+    // A one-word label ("Downloads" at 170 % on a 360 px phone) cannot wrap, so the inline padding gives way in px.
+    expect(b).toMatch(/padding:\s*6px 12px/);
   });
 
   it('large text: one column that may shrink below a label\'s one-line width', () => {
