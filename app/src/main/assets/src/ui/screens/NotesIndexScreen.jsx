@@ -61,6 +61,16 @@ function ColourDots({ value, onPick }) {
  * @param {string} query
  * @returns {any[]}
  */
+/**
+ * The bar's share label: with a search typed only the matching notes are shared, so it says so (fix list #9).
+ * @param {boolean} drilled
+ * @param {string} query
+ */
+export function notesShareLabel(drilled, query) {
+  if ((query || '').trim()) return 'Share these as text';
+  return drilled ? 'Share as text' : 'Share all as text';
+}
+
 export function filterNotesByQuery(notes, query) {
   const q = (query || '').trim().toLowerCase();
   if (!q) return notes;
@@ -282,7 +292,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNo
   const shownList = drilledNbId ? drilledNotesShown : allNotesShown;
   const barActions = [];
   if (shownList.length > 0) {
-    barActions.push({ id: 'share', icon: 'share', label: drilledNbId ? 'Share as text' : 'Share all as text',
+    barActions.push({ id: 'share', icon: 'share', label: notesShareLabel(!!drilledNbId, searchQuery),
       onSelect: () => exportNotes(drilledNbId ? drilledTitle : 'My Notes', shownList) });
   }
   if (drilledNb) {

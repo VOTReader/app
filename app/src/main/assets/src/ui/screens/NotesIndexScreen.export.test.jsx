@@ -98,7 +98,7 @@ describe('NotesIndexScreen Share as text', () => {
     const utils = renderScreen();
     fireEvent.click(utils.getByRole('radio', { name: 'All notes' }));
     fireEvent.change(utils.getByPlaceholderText('Search notes'), { target: { value: 'thought two' } });
-    fromMenu(utils, 'Notes options', 'Share all as text');
+    fromMenu(utils, 'Notes options', 'Share these as text');
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.text).toContain('thought two');
     expect(arg.text).not.toContain('thought one');
@@ -108,7 +108,7 @@ describe('NotesIndexScreen Share as text', () => {
     const utils = renderScreen();
     drillInto(utils, 'Devotional');
     fireEvent.change(utils.getByPlaceholderText('Search this notebook'), { target: { value: 'thought one' } });
-    fromMenu(utils, 'Notebook options', 'Share as text');
+    fromMenu(utils, 'Notebook options', 'Share these as text');
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.text).toContain('thought one');
     expect(arg.text).not.toContain('thought two');
