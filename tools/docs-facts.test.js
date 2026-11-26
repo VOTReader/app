@@ -5,10 +5,11 @@
       docs/FILE-STRUCTURE.md) names only bundles that package.json builds.
       lz1 (2026-10-13) folded bundle-e..h into bundle-d and the search worker
       became bundle-w, but the shorthand kept saying b/c/d/e for six weeks.
-   2. Every sha256 and byte count in VENDORED-LIBS.md's table matches the file
+   2. Every dist/bundle-*.js that the vendored MiniSearch header names exists.
+   3. Every sha256 and byte count in VENDORED-LIBS.md's table matches the file
       on disk, so editing a vendored file without re-pinning it fails here. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,13 @@ describe('docs state the current build facts', () => {
     }
     expect(seen, 'no b/c/d/X shorthand found: the check is looking at nothing').toBeGreaterThan(1);
     expect(bad).toEqual([]);
+  });
+
+  it('the MiniSearch header names only dist bundles that exist', () => {
+    const head = read(resolve(ASSETS, 'src', 'search', 'vendor', 'minisearch.js')).slice(0, 3000);
+    const named = [...head.matchAll(/dist\/(bundle-[a-z-]+\.js)/g)].map((m) => m[1]);
+    expect(named.length, 'the header names no dist bundle').toBeGreaterThan(0);
+    expect(named.filter((f) => !existsSync(resolve(ASSETS, 'dist', f)))).toEqual([]);
   });
 
   it('VENDORED-LIBS.md pins the sha256 and size of each vendored file as it is on disk', () => {

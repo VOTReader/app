@@ -1,7 +1,7 @@
 /*! MiniSearch v7.2.0 | MIT License | Copyright (c) Luca Ongaro */
 /* MAINTENANCE NOTES. Only the one-line banner above ships: `/*!` marks it a
-   legal comment, so esbuild moves it to the end of dist/bundle-e.js and every
-   reader downloads it. This comment is stripped.
+   legal comment, so esbuild moves it to the end of dist/bundle-d.js (and of
+   dist/bundle-w.js, the search worker) and every reader downloads it. This comment is stripped.
 
    Vendored from npm. Generated, do not hand-edit.
    Regenerate:  npx esbuild node_modules/minisearch/dist/es/index.js --bundle --format=esm
