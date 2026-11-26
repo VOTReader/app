@@ -1,16 +1,11 @@
 // @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
 /* HighlightsScreen — the search box joins the other index searches (C2-C [C9]).
    ═══════════════════════════════════════════════════════════════════════
-   Notes / Bookmarks / Links / History all render
-   `<input class="notes-index-search" type="search">`. Highlights rendered
-   `<input class="hlx-search" type="text">` — no platform clear affordance, no
-   search keyboard, a private class, and its styling in a JS-INJECTED
-   stylesheet that the static sheet's tooling cannot see.
-
-   The input now carries BOTH classes and `type="search"`; the three
-   `.hlx-search` rules moved to app.css (immediately after
-   `.notes-index-search`, where they still win every property they declare),
-   so the box renders exactly as it did.
+   Highlights once rendered its own `<input class="hlx-search" type="text">`: no platform clear
+   affordance, no search keyboard, a private class, styled from a JS-injected stylesheet.
+   Every library screen (Notes, Bookmarks, Links, History, Highlights) now draws the one
+   search pill, ListSearch in LibraryList.jsx: a `.ui-field.lib-search` label around an
+   `<input type="search">`. (The old shared .notes-index-search box and its rules are gone, arch-9.)
 
    These are also this screen's first tests (BACKLOG [D6] names the gap).
 */

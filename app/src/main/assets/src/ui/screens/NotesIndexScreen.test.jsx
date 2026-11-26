@@ -4,8 +4,8 @@
    filterNotesByQuery matches a note's body, its anchor excerpt (fullText,
    display-normalized like NoteRow renders it), and its source label — the
    same surface the Bookmarks/Links/Highlights indexes already filter on.
-   The screen renders the shared .notes-index-search box on the All Notes
-   tab AND inside a drilled notebook; a query with zero hits shows the
+   The screen renders the shared search pill (ListSearch, an input type=search)
+   on the All Notes tab AND inside a drilled notebook; a query with zero hits shows the
    "No Matches" empty state. NotesIndexScreen reads bare globals
    (NoteStore/NotebookStore/ScreenLayout/LibraryNav/NoteRow/noteSourceLabel),
    so we stub them; NoteRow is the REAL component. */
