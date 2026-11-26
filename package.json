@@ -10,7 +10,7 @@
     "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --target=chrome108 --minify --outfile=app/src/main/assets/dist/bundle-c.js",
     "build:d": "esbuild app/src/main/assets/src/ui/_entry-d.js --bundle --format=iife --target=chrome108 --minify --jsx-factory=__jsx --jsx-fragment=__jsxFrag --inject:app/src/main/assets/src/ui/jsx-inject.js --outfile=app/src/main/assets/dist/bundle-d.js",
     "build:w": "esbuild app/src/main/assets/src/search/worker.js --bundle --format=esm --target=chrome108 --minify --outfile=app/src/main/assets/dist/bundle-w.js",
-    "build:css": "esbuild app/src/main/assets/app.css --minify --target=chrome108 --outfile=app/src/main/assets/dist/app.min.css",
+    "build:css": "esbuild app/src/main/assets/app.css --minify --target=chrome108,safari16.4,ios16.4 --outfile=app/src/main/assets/dist/app.min.css",
     "build:csp": "node tools/sync-csp-hashes.js",
     "build:sw": "node tools/sync-sw-version.js",
     "check:csp": "node tools/sync-csp-hashes.js --check",
