@@ -85,7 +85,7 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
             <div className="select-sheet-option-main">
               <span className="select-sheet-option-label">{tab && tab.pinned ? 'Unpin tab' : 'Pin tab'}</span>
             </div>
-            <div className="select-sheet-option-desc">{tab && tab.pinned ? 'Stops protecting this tab from Close other tabs and Clear All.' : 'Moves this tab to the front and keeps it open through Close other tabs and Clear All.'}</div>
+            <div className="select-sheet-option-desc">{tab && tab.pinned ? 'Stops protecting this tab from Close other tabs and Close all.' : 'Moves this tab to the front and keeps it open through Close other tabs and Close all.'}</div>
           </button>
           {/* n196: the keyboard and screen-reader path to reorder (drag was the only one). The sheet
               stays open on the moved tab, so a second press moves it again. */}

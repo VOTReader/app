@@ -18,3 +18,11 @@ describe('#22 Link to… hints name the chips the reader sees', () => {
     expect(s).toMatch(/Titles and references/);
   });
 });
+
+describe('#26 Pin tab names the button the Tabs bar has', () => {
+  it('says Close all, not Clear All', () => {
+    const s = src('TabActionSheet.jsx');
+    expect(s).not.toMatch(/Close other tabs and Clear All/);
+    expect(s).toMatch(/Close other tabs and Close all/);
+  });
+});

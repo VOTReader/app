@@ -106,7 +106,7 @@ describe('TabActionSheet Move earlier / Move later', () => {
 
   it('the pin description names the real buttons (n133)', () => {
     renderSheet();
-    expect(document.body.textContent).toContain('keeps it open through Close other tabs and Clear All');
+    expect(document.body.textContent).toContain('keeps it open through Close other tabs and Close all');
     expect(document.body.textContent).not.toContain('Close-others');
   });
 });
