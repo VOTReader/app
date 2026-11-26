@@ -1,9 +1,11 @@
 # window.__ Bridges — Registry
 
-Imperative escape hatches between the inline `App()` closure (still
-classic-script in `index.html`) and the ES-module clusters (B/C/D).
-A bridge is a property on `window` whose name starts with `__`, set by
-one side and consumed by the other.
+Imperative escape hatches between the esbuild bundles (b: stores and hooks,
+c: the renderer, d: the screens, sheets and `App()` from `src/app.jsx`), the
+inline scripts left in `index.html`, and the Kotlin host. The bundles are
+separate IIFEs, so module state does not cross between them; a bridge does.
+A bridge is a property on `window` whose name starts with `__` (and the
+back press's `handleAndroidBack`), set by one side and consumed by the other.
 
 **Why this file exists.** Bridges have no compiler check. A consumer
 that misspells `window.__goHome` as `window.__gohome` is a silent
@@ -14,13 +16,18 @@ that adds or removes a bridge has no way to verify both sides match.
 **Discipline.** When you add a bridge, add an entry here. When you
 remove one, delete the entry. When you rename one, update both
 ends *and* this file in the same commit. Grep this file by name
-before touching either side.
+before touching either side. `tools/check-bridges.mjs` (run by
+smoke-lite) fails when a bridge the code sets or Kotlin calls is not
+listed here, when an entry here is no longer set or called by anything,
+or when a Setter line names a file that does not exist;
+`tools/kt-events-check.mjs` fails when Kotlin calls a page function
+the page never defines.
 
 **Format.** One subsection per bridge. The **Setter** line is the
 authoritative file/line where the assignment happens; **Cleanup**
 is the restore-form (or "none" if it's a stable lifetime); **Consumers**
-lists every place that reads/calls it. Counts shown are as of `14ec520`
-(Q2.2 leaf conversion).
+lists every place that reads/calls it. Line numbers drift; the file is
+what the gate checks.
 
 ---
 
@@ -85,15 +92,15 @@ window.__closeSheet = myCloser;`) and restores on unmount (`window.__closeSheet
 top sheet on a hardware-back press.
 
 - **Stackers (push on mount, pop on unmount):**
-  - `ui/sheets/VersePickerScreen.js:46-47`
-  - `ui/sheets/TabActionSheet.js:19-20`
-  - `ui/sheets/LinkSidebar.js:25-26`
-  - `ui/sheets/LinkPicker.js:29-30`
-  - `ui/sheets/BookmarkCreateSheet.js:129-130`
-  - `ui/sheets/LetterExcerptPickerScreen.js:65-66`
-  - `ui/screens/ChapterView.js:19-20` (scripture sheet)
-  - `ui/screens/LetterView.js:106-107` (scripture sheet)
-  - `ui/screens/WtlbEntryView.js:74-75` (scripture sheet)
+  - `ui/sheets/VersePickerScreen.jsx`
+  - `ui/sheets/TabActionSheet.jsx`
+  - `ui/sheets/LinkSidebar.jsx`
+  - `ui/sheets/LinkPicker.jsx`
+  - `ui/sheets/BookmarkCreateSheet.jsx`
+  - `ui/sheets/LetterExcerptPickerScreen.jsx`
+  - `ui/screens/ChapterView.jsx` (scripture sheet)
+  - `ui/screens/LetterView.jsx` (scripture sheet)
+  - `ui/screens/WtlbEntryView.jsx` (scripture sheet)
   - `ui/components/SelectField.jsx:12-13` (dropdown sheet)
 - **Consumer:** `src/hooks/use-android-back.js:13,95,130` — invokes the topmost closer, then nulls it.
 
@@ -146,13 +153,8 @@ setup effect.
 
 ## 4. Reading-state bridges
 
-### `__bumpHlTick`
-- **Setter:** `index.html:1113` — useEffect, `delete` on cleanup
-- **Cleanup:** `delete window.__bumpHlTick`
-- **Consumers:** `ui/components/ChapterBookmarkBtn.jsx:46` (force re-render after bookmark add/delete)
-
 ### `__hlDomV`
-- **Setter:** `src/ui/screens/WtlbEntryView.jsx` — an Answers topic, when its body's keyed paragraphs
+- **Setter:** `src/ui/components/AnswersTopic.jsx` — an Answers topic, when its body's keyed paragraphs
   mount (the sidecar landed, or 300 ms passed) and again when they are replaced decorated; it bumps the
   counter, then dispatches a `vot-hl-dom` event on window.
 - **Cleanup:** none (a monotonic counter)
@@ -230,18 +232,18 @@ Set by the JS side BEFORE invoking a Kotlin bridge that fires a
 callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")`.
 
 ### `__onImportFile`
-- **Setter:** `src/ui/screens/SettingsScreen.js:270` — set BEFORE calling `AndroidBridge.openFilePicker()`
-- **Cleanup:** self-nulls inside its own body at `:271` (single-shot callback)
+- **Setter:** none since 2026-06-02: the legacy base64 import picker was replaced by the v3 streaming import, and nothing in the page sets it. Kotlin still dispatches it (`tools/kt-events-check.mjs` KNOWN_UNWIRED); audit dead-code-docs-n1 removes both ends.
+- **Cleanup:** n/a
 - **Consumer:** `MainActivity.kt`'s `filePickerLauncher` result handler
 
 ### `__onNativeRecordingComplete`
-- **Setter:** `src/ui/sheets/JournalRecordingSheet.js:399` — set on recording-sheet mount
-- **Cleanup:** `delete window.__onNativeRecordingComplete` at `:494` on save/cancel
+- **Setter:** `src/ui/sheets/JournalRecordingSheet.jsx` — set on recording-sheet mount
+- **Cleanup:** `delete window.__onNativeRecordingComplete` on save/cancel
 - **Consumer:** `MainActivity.kt`'s `postNativeComplete()` (called when native MediaRecorder finishes)
 
 ### `__onMicPermissionResult`
-- **Setter:** `src/ui/sheets/JournalRecordingSheet.js:458` — set during permission flow
-- **Cleanup:** `delete` at `:462`, `:476`, `:493` (multiple exit paths, all clear)
+- **Setter:** `src/ui/sheets/JournalRecordingSheet.jsx` — set during permission flow (`src/utils/platform-bridge.js` names it as its callback)
+- **Cleanup:** `delete` on every exit path
 - **Consumer:** `MainActivity.kt`'s `micPermissionLauncher` / `micPrepLauncher` (permission grant result)
 
 ---
@@ -249,9 +251,9 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 ## 7. Sheet-internal handlers
 
 ### `__hideSelectionToolbar`
-- **Setter:** `src/ui/sheets/SelectionToolbar.js:51` — useEffect, cleaned to `null`
-- **Cleanup:** `window.__hideSelectionToolbar = null` at :55
-- **Consumers:** `src/hooks/use-sheet-orchestration.js:81,239` — called by the auto-dismiss-on-nav-change effect
+- **Setter:** `src/ui/sheets/SelectionToolbar.jsx` — useEffect, cleaned to `null`
+- **Cleanup:** `window.__hideSelectionToolbar = null`
+- **Consumers:** `src/hooks/use-sheet-orchestration.js` — called by the auto-dismiss-on-nav-change effect
 
 ---
 
@@ -280,16 +282,11 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 - **Setter:** `tools/perf-first-paint.mjs` only (`evaluateOnNewDocument`, before the bundles load): `'off'` or `'eager'`; the app never sets it
 - **Consumer:** `src/ui/components/ScreenLayout.jsx` `PEEKS_MODE`, read once at bundle load: when the swipe neighbours are drawn (unset: after the page has painted and gone idle, or when a finger comes down first; `'eager'`: in the page's own render, as before TABS4; `'off'`: never), so first paint can be measured with and without them on one build
 
-### `__homeAnimShown`
-- **Setter:** `src/ui/screens/HomeScreen.js:281` — set to `true` on first HomeScreen mount
-- **Cleanup:** none — one-shot flag for the page lifetime
-- **Consumer:** HomeScreen's own re-mount logic (skips the entry animation on subsequent mounts)
-
 ---
 
 ## 10. Latent / dead bridges
 
-### `__openScriptureSheet` — **RESOLVED 2026-07-12 (dead-UI sweep) — bridge removed, consumer rewired**
+### Tombstone: `__openScriptureSheet` — **RESOLVED 2026-07-12 (dead-UI sweep) — bridge removed, consumer rewired**
 - **Setter:** never existed — every reference was a `typeof window.__openScriptureSheet === 'function'` guard
 - **Consumer (rewired):** `JournalViewerScreen` — the guard made the tap on an inline journal `{{ref:Book C:V}}` gold link a silent no-op
 - **Resolution (2026-07-12):** the open action item on this bridge was settled by removing the bridge path, not by wiring a setter. Journals have no per-entry scriptures dict to feed a sheet, so `onScriptureRef` (`src/ui/screens/JournalViewerScreen.jsx` ~:550) now navigates straight to the verse instead: `parseRefStr` → `findBook` → `onNavigateToLink({type:'bible', bookId, chapter, verse[, verseEnd]})`, firing `window.__loadBibleCorpus()` with a 40×250ms retry when the lazy Bible corpus isn't resolvable yet. Verified 2026-07-22: no setter and no guarded consumer remain in `src/` — the name survives only in a historical comment at that callsite and in the regression test `JournalViewerScreen.menu.test.jsx` ("inline {{ref:}} links actually navigate (dead-UI sweep 2026-07-12)"). Entry kept as a tombstone so those surviving references stay greppable; no live bridge.
@@ -353,8 +350,7 @@ catalogued yet, rather than silently incomplete:
 - `__votMediaCommand` — `audio-player.js:416` (system transport taps back in)
 - `__votUpdateToastResume` — `audio-player.js:2774`, `update-toast.js` (SW-update prompt resume ordering)
 - `__onTrimMemory` — `stores/_entry-b.js:307` (Android memory-pressure signal)
-- `__onExportComplete`, `__onV3ExportReady`, `__onV3ImportReady` — `SettingsScreen.jsx` (export/import completion callbacks)
-- `__annHintDismissed` — `AnnotationHint.jsx:118`
+- `__onExportComplete` — `copy-share.js`, `notes-export.js`; `__onV3ExportReady`, `__onV3ImportReady` — `backup-flow.js` (export/import completion callbacks; JsEvent ExportComplete / V3ExportReady / V3ImportReady)
 - `__NAV_INDEX_SIG` — `nav-index.js:217` (cache-invalidation sibling of `__NAV_INDEX`, §8)
 
 Next docs pass: give each the full Setter/Cleanup/Consumers treatment used above.
@@ -365,6 +361,142 @@ Next docs pass: give each the full Setter/Cleanup/Consumers treatment used above
 - **Setter:** `src/utils/shared-state.js` — `sharedState(name, make)` creates `window.__votShared` (a null-prototype object) on first call and `window.__votShared[name] = make()` once per name.
 - **Cleanup:** none (page lifetime; a reload starts fresh, as module state did). In tests, `vitest.setup.js` drops it on every `vi.resetModules()`, so a re-imported module starts fresh as before.
 - **Consumers:** every copy of a module that holds state and is bundled into two bundles (b and d build separate esbuild entries, so each carries its own copy): `utils/toast.js` (`toast`: timers, onHide, stacking order), `utils/answers-from-search.js` (`answers-from-search`: the words Search carried to Answers), `utils/diagnostic-log.js` (`diagnostic-log`: the buffer Export JSON reads; d's copy comes in through idb-chunks for thumb-store). `tools/check-bundle-state.js` refuses any other module-scope state in a module shared across b/c/d.
+
+---
+
+## 14. Registered 2026-11-26 (heart-7 + arch-10)
+
+`tools/check-bridges.mjs` found these live and unlisted. Line numbers are left out on purpose: they drift every commit, and the gate checks the file.
+
+### Kotlin → page entry points
+
+The Kotlin host calls these through `JsBridge.callOptional` (`window.__x && window.__x(…)`, so a name the page never defines is a silent no-op) or `callWithResult`. `tools/kt-events-check.mjs` proves each one has a receiver in the page. `handleAndroidBack` (the back press, `src/hooks/use-android-back.js`) and the section 6 callbacks are the others.
+
+### `__onNativeRecordingPaused`
+- **Setter:** `src/ui/sheets/JournalRecordingSheet.jsx` — set while a memo records; the phone paused it as the app left the screen (sweep W14), so the sheet shows Paused and Resume carries on
+- **Called by:** NativeAudioRecorder / MainActivity via JsBridge.callOptional (JsEvent.NativeRecordingPaused)
+
+### `__votOfflineAudio`
+- **Setter:** `src/utils/offline-audio.js` — `_install()`: one JSON event from OfflineAudioStore (queued, progress, done, failed, removed, sizes…), mirrored into the downloads store
+- **Called by:** OfflineAudioStore via JsBridge.callOptional; `utils/offline-audio-web.js` reuses the receiver on the web (JsEvent.OfflineAudio)
+
+### `__votNativeAudio`
+- **Setter:** `src/utils/native-audio.js` — the native player's events (m3: state, tick, transition, error), turned into the events an `<audio>` would fire
+- **Called by:** NativeAudioController via JsBridge.callOptional (JsEvent.NativeAudio)
+
+### `__votPlanReminderOpen`
+- **Setter:** `src/utils/plan-reminder.js` — a reading-plan reminder tapped while the page runs (rp-s1); a cold start reads AppInterface.planReminderOpened instead
+- **Called by:** MainActivity via JsBridge.callOptional (JsEvent.PlanReminderOpen)
+
+### `__votNotificationsResult`
+- **Setter:** `src/utils/plan-reminder.js` — the answer to the notification-permission ask, chained to the previous receiver (prev) and restored after
+- **Called by:** MainActivity via JsBridge.callOptional (JsEvent.NotificationsResult)
+
+### `__votOpenSharedPassage`
+- **Setter:** `src/hooks/use-shared-passage-link.js` — `installSharedPassageHook`: opens a shared passage link in the running page; returns false when it cannot, so Kotlin reloads instead
+- **Called by:** SharedLink.openInPageJs, evaluated by MainActivity.callWithResult (callWithResult)
+
+### Page globals
+
+### `__finishBibleInit`
+- **Setter:** `index.html` — runs after bundle-a-bible lands (the lazy loader's finish hook): rebuilds BIBLE_BOOK_LIST and OT_BOOK_IDS
+- **Consumers:** `__makeLazyLoader` (index.html); `src/utils/nav-index.js`
+
+### `__finishVotInit`
+- **Setter:** `index.html` — runs after bundle-a-vot (and the Answers corpus) lands: links WTLB entries and prefaces, rebuilds VOT_LETTER_REGISTRY
+- **Consumers:** `__makeLazyLoader`; `src/utils/sync-loaders.js`; `src/utils/answers-links.js`; `src/ui/screen-routes.jsx`
+
+### `__answersLoader`
+- **Setter:** `src/utils/sync-loaders.js` — the Answers corpus's `{corpus, load}` pair, made once by `__makeLazyLoader` and shared by every copy of the module
+- **Consumers:** `src/utils/sync-loaders.js` itself (a second copy reuses it)
+
+### `__answersCorpus`
+- **Setter:** `src/utils/sync-loaders.js` — the Answers corpus object (loaded / error / subscribe), as §12's other corpora
+- **Consumers:** `src/hooks/use-dom-annotation-sync.js`, `src/hooks/use-lazy-bundles.js`, `src/ui/screen-routes.jsx`
+
+### `__loadAnswersCorpus`
+- **Setter:** `src/utils/sync-loaders.js` — kicks the Answers corpus load, as §12's loaders
+- **Consumers:** `src/search/engine.js`, `src/ui/screen-routes.jsx`, `src/ui/components/FootnoteSheet.jsx`, `src/ui/screens/HomeScreen.jsx`, `src/ui/screens/MyProgressScreen.jsx`, `src/ui/sheets/LinkPicker.jsx`
+
+### `__answersTitles`
+- **Setter:** `src/utils/answers-links.js` — the Answers topic titles, so findEntryContext names a topic while the corpus is still unloaded
+- **Consumers:** `src/data/scripture-resolution.js` (`findEntryContext`, bundle-b)
+
+### `__freezePersistState`
+- **Setter:** `src/hooks/use-persisted-state.js` — `freeze(true)` drops any pending write before an import or Delete all replaces the stored state, `freeze(false)` lets go (contract 7; §11's sibling of `__flushPersistState`)
+- **Consumers:** `src/utils/backup-flow.js`, `src/utils/data-safety.js`
+
+### `__hydrationLatencyMs`
+- **Setter:** `src/components/HydrationGate.jsx` — how long the stores took to hydrate (a diagnostic)
+- **Consumers:** none in the app; a preview eval reads it
+
+### `__votOpenPlanItem`
+- **Setter:** `src/ui/screen-routes.jsx` — opens a plan's next item the way the Today card's Read does (mw18 S8)
+- **Consumers:** `src/ui/components/PlanRibbon.jsx`
+
+### `__openAudioText`
+- **Setter:** `src/ui/screen-routes.jsx` — reassigned every build: opens the text of a track with the current screen as the back pill
+- **Consumers:** `src/ui/components/AudioManagerSheet.jsx`, `src/ui/components/SongParts.jsx`, `src/ui/screens/ReadWithMusic.jsx`, `src/ui/screens/SongPage.jsx`, `src/hooks/use-audio-follow.js`
+
+### `__setBibleAudioEdition`
+- **Setter:** `src/ui/screen-routes.jsx` — sets the Bible recording edition, guarded on the registry and on bibleAudioOffered
+- **Consumers:** `src/ui/components/AudioManagerSheet.jsx`
+
+### `__openDownloads`
+- **Setter:** `src/ui/screen-routes.jsx` — opens the Downloads tree at a collection or edition (downloads brief D3b); Back returns to the page it came from
+- **Consumers:** `src/ui/screens/AudioCollectionScreen.jsx`, `src/ui/screens/SettingsScreen.jsx`
+
+### `__votOpenYourData`
+- **Setter:** `src/utils/your-data-link.js` — a flag: show Settings with Your Data open on the next Settings mount
+- **Consumers:** `src/utils/your-data-link.js` (`takeYourDataAsk`, read by SettingsScreen)
+
+### `__votAudioArbiter`
+- **Setter:** `src/utils/audio-player/media-session.js` — the one page-wide media arbiter (another `<audio>` playing pauses the player), installed once per page
+- **Consumers:** `src/utils/audio-player.js` (removed on retire)
+
+### `__votAudioPlayerRetire`
+- **Setter:** `src/utils/audio-player.js` — unhooks this copy of the player's window listeners, so a second copy of the module (a takeover) does not double them
+- **Consumers:** the next copy of `src/utils/audio-player.js`
+
+### `__votInstallSlot`
+- **Setter:** `src/utils/install-offer.js` — the deferred install prompt and its subscribers, one per page whatever copy of the module asks
+- **Consumers:** `src/utils/install-offer.js`
+
+### `__votInstallCapture`
+- **Setter:** `src/utils/install-offer.js` — marks that beforeinstallprompt is already captured on this window
+- **Consumers:** `src/utils/install-offer.js` (`attachInstallCapture`)
+
+### `__votLibraryPageId`
+- **Setter:** `src/utils/other-tabs.js` — this page's id for the other-tabs protocol, shared by every copy of the module
+- **Consumers:** `src/utils/other-tabs.js`
+
+### `__votPageMenu`
+- **Setter:** `src/utils/page-menu.js` — the stack of page-menu item lists the mounted screens offer
+- **Consumers:** `src/utils/page-menu.js`
+
+### `__navHandoffSlots`
+- **Setter:** `src/utils/nav-handoff.js` — the one Map behind navHandoff's one-shot slots (replaced the old `window.__x = null` hand-offs)
+- **Consumers:** `src/utils/nav-handoff.js`
+
+### `__swVerse`
+- **Setter:** `src/ui/screens/ScriptureWebScreen.jsx` — walk-only (`walkOn()`): a verse's place in the web, for the e2e walks
+- **Consumers:** the Scripture Web walks (tools/)
+
+### `__swCam`
+- **Setter:** `src/ui/screens/ScriptureWebScreen.jsx` — walk-only: the camera and view
+- **Consumers:** the Scripture Web walks (tools/)
+
+### `__swFly`
+- **Setter:** `src/ui/screens/ScriptureWebScreen.jsx` — walk-only: fly the camera to a place
+- **Consumers:** the Scripture Web walks (tools/)
+
+### `__swGraph`
+- **Setter:** `src/ui/screens/ScriptureWebScreen.jsx` — walk-only: the built graph
+- **Consumers:** the Scripture Web walks (tools/)
+
+### `__swBadgeBoxes`
+- **Setter:** `src/ui/scripture-web/use-web-renderer.js` — walk-only: the painted badges' device-pixel boxes, like `__swContextCeiling`
+- **Consumers:** the Scripture Web walks (tools/)
 
 ---
 

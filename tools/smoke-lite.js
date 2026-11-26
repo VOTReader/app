@@ -33,6 +33,11 @@
         rejects strict cycles, but reorder regressions inside an entry
         file are not always caught.
 
+     4. checkBridges() + checkKtEvents() (tools/check-bridges.mjs,
+        tools/kt-events-check.mjs, 2026-11-26): BRIDGES.md lists every
+        window.__* bridge and only live ones; every page function the Kotlin
+        host calls has a receiver.
+
    What's deliberately OUT of scope for v1:
      - .js parse check (already covered by CI syntax-check)
      - runtime initialization checks (would need jsdom or node-vm shim)
@@ -43,6 +48,8 @@ import fs from 'node:fs';
 import nodePath from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { checkBridges } from './check-bridges.mjs';
+import { checkKtEvents } from './kt-events-check.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = nodePath.resolve(nodePath.dirname(__filename), '..');
@@ -227,6 +234,9 @@ export function runSmokeChecks() {
   issues.push(...checkGlobalsMirror());
   issues.push(...checkCollectionsLinkage());
   issues.push(...checkModuleCycles());
+  // heart-7 + arch-10 (2026-11-26): BRIDGES.md in step with the code, and every Kotlin -> page call heard.
+  issues.push(...checkBridges());
+  issues.push(...checkKtEvents().issues);
   return { issues, ok: issues.length === 0 };
 }
 
@@ -240,5 +250,5 @@ if (import.meta.url === argvAsUrl) {
     for (const i of result.issues) console.error('  - ' + i);
     process.exit(1);
   }
-  console.log('smoke-lite PASS — ' + 'globals OK, collections OK, no cycles');
+  console.log('smoke-lite PASS — ' + 'globals OK, collections OK, no cycles, bridges OK, Kotlin events heard');
 }
