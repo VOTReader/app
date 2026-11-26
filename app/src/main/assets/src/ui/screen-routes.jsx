@@ -231,7 +231,32 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {boolean} [bgDraw] true when the routes are built to draw another tab off screen (TabSnapDrawer)
  */
 
-/** @param {ScreenRouteDeps} deps */
+/** heart-6 (audit 2026-11-23): the reading routes that draw LetterView and WtlbEntryView, each named once as
+    [route, volKey, label] and built by buildScreenRoutes. An explicit list, never COLLECTIONS filtered by kind:
+    hm-letter (Hidden Manna) and answers-entry are letter-like by kind and draw views of their own.
+    C2-C [C2]: vot-letter (Volume Two) once named no volume and rode LetterView's `volumeLabel || "Volume Two"`
+    fallback; every row here names its label, so that fallback stays honest. */
+export const LETTER_VIEW_ROUTES = Object.freeze([
+  ['vot-one-letter', 'one', 'Volume One'],
+  ['vot-letter', 'two', 'Volume Two'],
+  ['vot-three-letter', 'three', 'Volume Three'],
+  ['vot-four-letter', 'four', 'Volume Four'],
+  ['vot-five-letter', 'five', 'Volume Five'],
+  ['vot-six-letter', 'six', 'Volume Six'],
+  ['vot-seven-letter', 'seven', 'Volume Seven'],
+  ['vot-timothy-letter', 'timothy', 'Letters from Timothy'],
+  ['vot-flock-letter', 'flock', "Letters to The Lord's Little Flock"],
+  ['vot-rebuke-letter', 'rebuke', "The Lord's Rebuke"],
+].map((r) => Object.freeze(r)));
+/** The WtlbEntryView routes: [route, volKey, partLabel]. */
+export const ENTRY_VIEW_ROUTES = Object.freeze([
+  ['wtlb-one-entry', 'wtlb1', 'Part One'],
+  ['wtlb-two-entry', 'wtlb2', 'Part Two'],
+  ['blessed-entry', 'blessed', 'The Blessed'],
+].map((r) => Object.freeze(r)));
+
+/** @param {ScreenRouteDeps} deps
+    @returns {Record<string, () => any>} screen id → its route (thirteen of them from the lists above) */
 export function buildScreenRoutes({
   // ── State + setters (tab-field-backed) ──
   screen, setScreen,
@@ -1255,25 +1280,12 @@ export function buildScreenRoutes({
       </ScreenLayout>
     )),
 
-    // ── Letter screens (10) — data-guarded ──
-    'vot-one-letter':    () => _wrapVot(actL('one')     && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', actL('one'))}     letter={actL('one')}     volumeLabel="Volume One" />, 'one'),
-    // C2-C [C2]: this was the ONE letter route that named no volume — it rode
-    // LetterView's `volumeLabel || "Volume Two"` fallback, which is why the
-    // fallback looked harmless. Say it here so the fallback can become honest.
-    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')}     volumeLabel="Volume Two" />, 'two'),
-    'vot-three-letter':    () => _wrapVot(actL('three')   && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', actL('three'))}   letter={actL('three')}     volumeLabel="Volume Three" />, 'three'),
-    'vot-four-letter':    () => _wrapVot(actL('four')    && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', actL('four'))}    letter={actL('four')}     volumeLabel="Volume Four" />, 'four'),
-    'vot-five-letter':    () => _wrapVot(actL('five')    && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', actL('five'))}    letter={actL('five')}     volumeLabel="Volume Five" />, 'five'),
-    'vot-six-letter':    () => _wrapVot(actL('six')     && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', actL('six'))}     letter={actL('six')}     volumeLabel="Volume Six" />, 'six'),
-    'vot-seven-letter':    () => _wrapVot(actL('seven')   && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', actL('seven'))}   letter={actL('seven')}     volumeLabel="Volume Seven" />, 'seven'),
-    'vot-timothy-letter':    () => _wrapVot(actL('timothy') && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', actL('timothy'))} letter={actL('timothy')} volumeLabel="Letters from Timothy" />, 'timothy'),
-    'vot-flock-letter':    () => _wrapVot(actL('flock')   && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', actL('flock'))}   letter={actL('flock')}   volumeLabel="Letters to The Lord's Little Flock" />, 'flock'),
-    'vot-rebuke-letter':    () => _wrapVot(actL('rebuke')  && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', actL('rebuke'))} letter={actL('rebuke')}  volumeLabel="The Lord's Rebuke" />, 'rebuke'),
-
-    // ── WTLB / Blessed entry screens (3) — data-guarded ──
-    'wtlb-one-entry':    () => _wrapVot(actL('wtlb1')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', actL('wtlb1'))}   entry={actL('wtlb1')}   partLabel="Part One" onNavToChapter={_navToChapter} />, 'wtlb1'),
-    'wtlb-two-entry':    () => _wrapVot(actL('wtlb2')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', actL('wtlb2'))}   entry={actL('wtlb2')}   partLabel="Part Two" onNavToChapter={_navToChapter} />, 'wtlb2'),
-    'blessed-entry':    () => _wrapVot(actL('blessed') && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', actL('blessed'))} entry={actL('blessed')} partLabel="The Blessed" onNavToChapter={_navToChapter} />, 'blessed'),
+    // ── Letter screens (10) and WTLB / Blessed entry screens (3), data-guarded: one route each
+    //    from LETTER_VIEW_ROUTES / ENTRY_VIEW_ROUTES above (heart-6). ──
+    ...Object.fromEntries(LETTER_VIEW_ROUTES.map(([route, k, volumeLabel]) => [route,
+      () => _wrapVot(actL(k) && <LetterView {...sharedViewProps} {...colReadNavProps(k, true)} {...boundaryConfig(k, actL(k))} letter={actL(k)} volumeLabel={volumeLabel} />, k)])),
+    ...Object.fromEntries(ENTRY_VIEW_ROUTES.map(([route, k, partLabel]) => [route,
+      () => _wrapVot(actL(k) && <WtlbEntryView {...sharedViewProps} {...colReadNavProps(k)} {...boundaryConfig(k, actL(k))} entry={actL(k)} partLabel={partLabel} onNavToChapter={_navToChapter} />, k)])),
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──

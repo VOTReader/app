@@ -18,7 +18,7 @@
        landing on their own scroll or a stay (B1 review).
    These read the elements' props; nothing is mounted. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { buildScreenRoutes } from './screen-routes.jsx';
+import { buildScreenRoutes, LETTER_VIEW_ROUTES, ENTRY_VIEW_ROUTES } from './screen-routes.jsx';
 
 vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get colLetterArr() { return /** @type {any} */ (globalThis).colLetterArr; }, get colPreface() { return /** @type {any} */ (globalThis).colPreface; } }; });
 
@@ -331,5 +331,36 @@ describe('a neighbour page reads its own volume’s read record', () => {
     expect(isRead).toHaveBeenLastCalledWith('wtlb-one', 'faith-and-works');
     // a Bible chapter neighbour has its own isRead prop on its own view: nothing is overridden there
     expect('isRead' in v.props.pagePropsFor({ bookId: 'genesis', chapterNum: 2 })).toBe(false);
+  });
+});
+
+/* heart-6: the thirteen LetterView / WtlbEntryView routes come from one explicit list, never from COLLECTIONS by
+   kind (that would turn hm-letter and answers-entry, which draw views of their own, into LetterViews). */
+describe('the letter and entry routes come from an explicit list (heart-6)', () => {
+  it('names the ten letter routes and the three entry routes, and nothing letter-like by kind', () => {
+    expect(LETTER_VIEW_ROUTES.map((r) => r[0])).toEqual(['vot-one-letter', 'vot-letter', 'vot-three-letter', 'vot-four-letter',
+      'vot-five-letter', 'vot-six-letter', 'vot-seven-letter', 'vot-timothy-letter', 'vot-flock-letter', 'vot-rebuke-letter']);
+    expect(ENTRY_VIEW_ROUTES.map((r) => r[0])).toEqual(['wtlb-one-entry', 'wtlb-two-entry', 'blessed-entry']);
+    const all = [...LETTER_VIEW_ROUTES, ...ENTRY_VIEW_ROUTES].map((r) => r[0]);
+    for (const own of ['hm-letter', 'answers-entry', 'holy-days-entry']) expect(all).not.toContain(own);
+  });
+
+  it('each route draws its view with its own volume and label', () => {
+    G.COL_BY_KEY = new Map([...LETTER_VIEW_ROUTES, ...ENTRY_VIEW_ROUTES].map(([route, k, label]) => [k, { volKey: k, readKey: 'r-' + k, letterScreen: route, indexScreen: 'idx-' + k, label }]));
+    for (const [route, k, volumeLabel] of LETTER_VIEW_ROUTES) {
+      const { routes } = makeRoutes({ screen: route, activeVolKey: k, fromSearch: false, searchLanding: null });
+      const v = find(routes[route](), G.LetterView);
+      expect(v, route).toBeTruthy();
+      expect(v.props.volumeLabel, route).toBe(volumeLabel);
+      expect(v.props.letter, route).toBe(LETTER);
+    }
+    for (const [route, k, partLabel] of ENTRY_VIEW_ROUTES) {
+      const { routes } = makeRoutes({ screen: route, activeVolKey: k, activeLetter: ENTRY, letterId: ENTRY.id, fromSearch: false, searchLanding: null });
+      const v = find(routes[route](), G.WtlbEntryView);
+      expect(v, route).toBeTruthy();
+      expect(v.props.partLabel, route).toBe(partLabel);
+      expect(v.props.entry, route).toBe(ENTRY);
+      expect(typeof v.props.onNavToChapter, route).toBe('function');
+    }
   });
 });
