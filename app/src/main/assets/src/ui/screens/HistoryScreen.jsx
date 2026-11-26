@@ -263,6 +263,8 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
         <button className="history-day-header" aria-expanded={dOpen} onClick={() => toggle(dId)}>
           <span className="ui-label history-day-label">{dayLabel(year, month, dg.day)}</span>
           <span className="ui-label-aside history-day-count">{countOf(dg.entries.length, 'place') + ' \xB7 ' + countOf(visits, 'visit')}</span>
+          {/* Fix list #27: a folded day read as a day with nothing in it; the arrow the year and month headers carry says it folds. */}
+          <span className={`history-chevron${dOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
         </button>
         {dOpen && (
           <div className="ui-group">

@@ -4326,6 +4326,7 @@
     .history-day-section { margin-top:0.3rem; }
     .history-day-header { width:100%; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); margin-top:var(--sp-2); padding:0; background:none; border:0; color:inherit; cursor:pointer; text-align:left; -webkit-tap-highlight-color:transparent; }
     .history-day-header .ui-label { margin:0; }
+    .history-day-header > .history-day-count { margin-left:auto; }   /* the count sits by the arrow (fix list #27) */
     .history-chevron {
       font-size:var(--fs-24); color:var(--gold-dim); line-height:1;
       transition:transform 0.2s; flex-shrink:0;

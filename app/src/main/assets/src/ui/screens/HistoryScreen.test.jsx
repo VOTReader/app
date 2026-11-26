@@ -640,3 +640,22 @@ describe('HistoryScreen — remove one row (0610)', () => {
     expect(removeBtns().length).toBe(0);
   });
 });
+
+describe('History day headers show whether they are folded (fix list #27)', () => {
+  it('every day header carries the arrow the year and month headers have, turned when open', () => {
+    setupGlobals();
+    renderScreen([
+      chapter('psalms', 'Psalms', 23, today(5)),
+      chapter('psalms', 'Psalms', 1, Date.now() - 2 * DAY),
+      letter('the-wide-path', 'The Wide Path', 1, Date.now() - 3 * DAY),
+    ]);
+    const days = [...document.querySelectorAll('.history-day-header')];
+    expect(days.length).toBeGreaterThan(0);
+    for (const d of days) {
+      const chev = d.querySelector('.history-chevron');
+      expect(chev).not.toBeNull();
+      expect(chev.getAttribute('aria-hidden')).toBe('true');
+      expect(chev.classList.contains('is-open')).toBe(d.getAttribute('aria-expanded') === 'true');
+    }
+  });
+});
