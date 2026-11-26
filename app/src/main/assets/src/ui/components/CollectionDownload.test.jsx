@@ -56,5 +56,8 @@ describe('CollectionDownload size label', () => {
     expect(size).toBeTruthy();
     expect(size.textContent).toMatch(/^\d[\d.,]* \S+$/);
     expect(go.textContent).toBe('Download ' + size.textContent);
+    // .ui-btn is inline-flex: the label must be one flex item, or "Download" and the size sit side by side unwrapped.
+    expect(go.childNodes.length).toBe(1);
+    expect(go.firstChild.nodeName).toBe('SPAN');
   });
 });

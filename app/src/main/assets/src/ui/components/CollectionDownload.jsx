@@ -87,10 +87,11 @@ export function CollectionDownload({ label, unitsFor, readers, onOpenDownloads }
             + ' To pick single letters or several collections, open Downloads.'}
         </p>
         {/* The size's number and unit stay on one line when the label wraps ("Download 1.24 / GB" at 300 %). A
-            nowrap run, not a no-break space, so the button's accessible name and formatBytes stay unchanged. */}
+            nowrap run, not a no-break space, so the button's accessible name and formatBytes stay unchanged. The whole
+            label is one span: .ui-btn is inline-flex, and bare text beside the run would be two flex items that never wrap. */}
         <div className="ui-sheet-foot">
           <UiButton onClick={() => { setOpen(false); onOpenDownloads('choose'); }}>Open Downloads</UiButton>
-          <UiButton kind="primary" disabled={noRoom || !tracks.length} onClick={go}>Download{need ? <>{' '}<span className="ui-nowrap">{formatBytes(need)}</span></> : null}</UiButton>
+          <UiButton kind="primary" disabled={noRoom || !tracks.length} onClick={go}><span>Download{need ? <>{' '}<span className="ui-nowrap">{formatBytes(need)}</span></> : null}</span></UiButton>
         </div>
       </ActionSheet>
       <SelectSheet open={picking} onClose={() => { setPicking(false); setOpen(true); }} title="Voice to download" value={voice}
