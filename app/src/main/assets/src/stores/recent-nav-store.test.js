@@ -177,3 +177,19 @@ describe('RecentNavStore — replaceAll()', () => {
     expect(RecentNavStore.getVersion()).toBe(v0 + 1);
   });
 });
+
+describe('RecentNavStore — deferred writes while pending (votreader-tests-7 item 10)', () => {
+  it('add and replaceAll defer while the store is still loading, and the overlay shows them', () => {
+    RecentNavStore._resetForTests(); // idb-backed: "pending", writes queue + overlay
+    try {
+      expect(RecentNavStore.getState()).toBe('pending');
+      RecentNavStore.add(mkItem('letter', { letterId: 'pending-one' }));
+      expect(RecentNavStore.list().map((x) => x.letterId)).toEqual(['pending-one']);
+      RecentNavStore.replaceAll([mkItem('letter', { letterId: 'pending-two' })]);
+      expect(RecentNavStore.list().map((x) => x.letterId)).toEqual(['pending-two']);
+      expect(RecentNavStore.getState()).toBe('pending');
+    } finally {
+      RecentNavStore._resetForTests({ forceLoaded: true });
+    }
+  });
+});

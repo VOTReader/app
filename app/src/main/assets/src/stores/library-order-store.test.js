@@ -123,3 +123,26 @@ describe('LibraryOrderStore — set()', () => {
        'scripture-web', 'plans']);
   });
 });
+
+describe('LibraryOrderStore — set() edges (votreader-tests-7 item 10)', () => {
+  it('set(non-array) saves empty, and get() falls back to the default order', () => {
+    // @ts-expect-error — testing defensive non-array handling
+    LibraryOrderStore.set('not-an-array');
+    expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
+    LibraryOrderStore.set(null);
+    expect(LibraryOrderStore.get()).toEqual([...DEFAULT_LIBRARY_ORDER]);
+  });
+
+  it('set defers while the store is still loading, and the overlay shows it', () => {
+    LibraryOrderStore._resetForTests(); // idb-backed: "pending", writes queue + overlay
+    try {
+      expect(LibraryOrderStore.getState()).toBe('pending');
+      const custom = ['plans', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'scripture-web'];
+      LibraryOrderStore.set(custom);
+      expect(LibraryOrderStore.get()).toEqual(custom);
+      expect(LibraryOrderStore.getState()).toBe('pending');
+    } finally {
+      LibraryOrderStore._resetForTests({ forceLoaded: true });
+    }
+  });
+});
