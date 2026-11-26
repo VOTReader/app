@@ -31,11 +31,12 @@ what the gate checks.
 
 ---
 
-## 1. Sheet orchestration (10 — owned by `src/hooks/use-sheet-orchestration.js`)
+## 1. Sheet orchestration (10 — seven in `src/hooks/use-sheet-orchestration.js`, three in `src/hooks/use-link-picker-orchestration.js`)
 
 These are all `useEffect`-bound, all cleaned up via `delete window.__X`,
-all assigned exactly once each in that hook. The hook's header comment
-already enumerates the 10 — this section mirrors it for greppability.
+all assigned exactly once each in their hook. `useSheetOrchestration` calls
+`useLinkPickerOrchestration`, and each hook's header comment enumerates its
+own bridges — this section mirrors them for greppability.
 
 ### `__openNote`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:133` — `() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }`
@@ -53,31 +54,31 @@ already enumerates the 10 — this section mirrors it for greppability.
 - **Consumers:** `utils/journal-link-picker.js:8,12` (calls it), `ui/sheets/JournalInsertSheet.jsx:48,49` (checks it before Insert > card/excerpt link)
 
 ### `__openLinkSidebar`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:181` — `delete` on cleanup
-- **Consumers:** `renderer/dom-links.js:145` (inline link-icon tap)
+- **Setter:** `src/hooks/use-link-picker-orchestration.js:121` — `delete` on cleanup
+- **Consumers:** `renderer/dom-links.js:167` (inline link-icon tap)
 
 ### `__showAnnChip`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:182` — `delete` on cleanup
-- **Consumers:** SelectionToolbar (tap on existing highlight/underline mark)
+- **Setter:** `src/hooks/use-sheet-orchestration.js:134` — `delete` on cleanup
+- **Consumers:** `ui/sheets/SelectionToolbar.jsx:676` (tap on a highlight/underline/squiggle mark that has no note)
 
 ### `__showMultiNote`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:135` — `delete` on cleanup
 - **Consumers:** `renderer/annotation-engine.jsx:279,577` (a merged note icon over more than one group), `ui/sheets/SelectionToolbar.jsx:646,670` (a merged icon, or overlapping note marks under the tap)
 
 ### `__openBookmarkPopover`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:184` — `delete` on cleanup
-- **Consumers:** `renderer/dom-bookmarks.js:24,139,140` (multi-bookmark icon tap), `ui/components/ChapterBookmarkBtn.jsx:20,21`, `ui/components/BookmarkIcon.jsx:25,26`
+- **Setter:** `src/hooks/use-sheet-orchestration.js:136` — `delete` on cleanup
+- **Consumers:** `renderer/dom-bookmarks.js:154,155` (multi-bookmark icon tap), `ui/components/ChapterBookmarkBtn.jsx:26,27`, `ui/components/BookmarkIcon.jsx:30,31`
 
 ### `__bookmarkCreate`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:188` — `delete` on cleanup
+- **Setter:** `src/hooks/use-sheet-orchestration.js:140` — `delete` on cleanup
 - **Consumers:** `ui/components/ChapterBookmarkBtn.jsx:29,30`, SelectionToolbar (Bookmark action), `index.html:3167`
 
 ### `__openJournalInbound`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:192`
+- **Setter:** `src/hooks/use-sheet-orchestration.js:144`
 - **Consumers:** none in current src — set up for future Journal Inbox feature
 
 ### `__bookmarkEdit`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:201` — has a follow-up call at :226 on the same hook
+- **Setter:** `src/hooks/use-sheet-orchestration.js:153` — has a follow-up call at :226 on the same hook
 - **Consumers:** `renderer/dom-bookmarks.js:130` (single-bookmark inline icon tap), `ui/components/BookmarkIcon.jsx:19,20`
 
 ---
@@ -117,11 +118,11 @@ setup effect.
 
 ---
 
-## 3. Navigation glue (set in `index.html`'s App() block)
+## 3. Navigation glue (set by `App()` in `src/app.jsx`, its `useSearch` hook, and `buildScreenRoutes` in `src/ui/screen-routes.jsx`)
 
 ### `__goHome`
-- **Setter:** `index.html:1819` (inside an effect; assigns a closure that resets nav state)
-- **Cleanup:** none — set once
+- **Setter:** `src/app.jsx:552` (a mount-only effect; assigns `goHome` from useNav)
+- **Cleanup:** `delete window.__goHome` at unmount (:553)
 - **Consumers:** `ui/components/HomeBtn.jsx:9`, `ui/components/FootnoteListSection.jsx:71`
 
 ### `__goSearch`

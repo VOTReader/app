@@ -8,12 +8,12 @@
    script that runs just before it, plus cross-cluster consumers in
    A/B/C) can continue to call them by bare name.
 
-   Cluster D contents (159 imported modules, counted 2026-11-26; the
-   imports below are the live list):
-   - 38 screens (LetterView, WtlbEntryView, BibleChapterView, …)
-   - 61 components (Segments, FootnoteSheet, NavButtons, …)
-   - 15 sheets (NoteSheet, SelectionToolbar, LinkPicker, …)
-   - 36 utility modules (hl-keys, dates, garden, nav-index, …)
+   Cluster D contents (the imports below are the live list; count them
+   there rather than here):
+   - screens (LetterView, WtlbEntryView, BibleChapterView, …)
+   - components (Segments, FootnoteSheet, NavButtons, …)
+   - sheets (NoteSheet, SelectionToolbar, LinkPicker, …)
+   - utility modules (hl-keys, dates, garden, nav-index, …)
    - screen-routes.jsx, the search engine (search/engine.js,
      recent-searches.js, search-data.js) and two hooks (use-autoscroll,
      use-pager-gesture)
