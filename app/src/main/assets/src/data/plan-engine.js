@@ -119,15 +119,49 @@ function nthReadingDay(run, from, k) {
  * the date the last one was finished, so a reader who read late or early rests on the days the app told them to and
  * is never marked missed for it, while a day a reading was due and not read stays missed. The week strip (streak)
  * and the month calendar (monthCells) both ask this, for spread-out plans only (hasEmptyDays).
- * @param {PlanRun} run @param {number} n
+ *
+ * Every date between two read dates sees the same reads, and with the same reads the card's next reading date is the
+ * same whatever the date (only whether that date is still ahead changes), so one runStatus serves the whole stretch:
+ * `rests()` makes the per-call memo that streak and monthCells pass in (a long streak asked one runStatus per date).
+ * @param {PlanRun} run @param {number} n @param {RestMemo} [memo]
  */
-function restedOn(run, n) {
+function restedOn(run, n, memo = rests(run)) {
   const key = dateOf(n);
-  /** @type {Record<string, string>} */ const ticks = {};
-  for (const [k, v] of Object.entries(run.ticks || {})) if (!v || v < key) ticks[k] = v;   // credited reads ('') count
-  const d = new Date(n * 86400000);
-  const then = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12);
-  return runStatus({ ...run, ticks, status: 'running', paused: undefined }, then).spreadOn > key;
+  // The latest read date before n: the stretch n belongs to (none: from the start).
+  const { dates, next } = memo;
+  let lo = 0, hi = dates.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (dates[mid] < key) lo = mid + 1; else hi = mid; }
+  const cut = lo ? dates[lo - 1] : '';
+  let due = next.get(cut);
+  if (due === undefined) {
+    /** @type {Record<string, string>} */ const ticks = {};
+    for (const [k, v] of Object.entries(run.ticks || {})) if (!v || v <= cut) ticks[k] = v;   // credited reads ('') count
+    // The stretch's first date (never before the start, where the plan has not begun).
+    const startN = dayNum(run.start);
+    const first = Math.max(cut ? /** @type {number} */ (dayNum(cut)) + 1 : -Infinity, startN ?? n);
+    const d = new Date(first * 86400000);
+    const then = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12);
+    due = runStatus({ ...run, ticks, status: 'running', paused: undefined }, then).spreadOn;
+    next.set(cut, due);
+  }
+  return due > key;
+}
+
+/** @typedef {{ dates: string[], next: Map<string, string>, of: unknown[] }} RestMemo */
+const _restMemo = new WeakMap();
+/**
+ * The memo restedOn uses for one run: its read dates in order, and each stretch's next reading date. Kept per ticks
+ * object (a tick makes a new one) while the plan's layout, days off, pauses, start and target are the same objects,
+ * so the Today card, the list and the plan page share one set of runStatus calls. @param {PlanRun} run @returns {RestMemo}
+ */
+function rests(run) {
+  const ticks = run.ticks || {};
+  const of = [run.segs, run.tracks, run.weekdays, run.pauses, run.start, run.target, Object.keys(ticks).length];
+  const hit = run.ticks ? _restMemo.get(run.ticks) : null;
+  if (hit && hit.of.every((v, i) => v === of[i])) return hit;
+  const memo = { dates: [...new Set(Object.values(ticks).filter(Boolean))].sort(), next: new Map(), of };
+  if (run.ticks) _restMemo.set(run.ticks, memo);
+  return memo;
 }
 
 /**
@@ -515,10 +549,11 @@ export function streak(run, now) {
   // day the Today card did not say "Nothing to read today" (restedOn).
   // Every other plan counts every reading day, as it always did (03d0ea090).
   const spread = hasEmptyDays(run);
+  const memo = rests(run);
   const planned = new Set();
   if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
   const holds = (/** @type {number} */ n) => (!spread ? n >= startN && isReadingDay({ ...run, paused: undefined }, n)
-    : n >= today ? planned.has(dateOf(n)) : n >= startN && isReadingDay({ ...run, paused: undefined }, n) && !restedOn(run, n));
+    : n >= today ? planned.has(dateOf(n)) : n >= startN && isReadingDay({ ...run, paused: undefined }, n) && !restedOn(run, n, memo));
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
@@ -568,6 +603,7 @@ export function monthCells(run, year, month, now) {
   // next reading's spread day are laid out): a date is ahead only when its planned day holds a reading.
   // Every other plan keeps 03d0ea090's calendar: each reading day up to the finish holds the next day, one each.
   const spread = hasEmptyDays(run);
+  const memo = rests(run);
   const nopause = { ...run, paused: undefined };
   /** @type {Map<string, number>} */ const plannedOn = new Map();
   if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date && d.day >= st.day) plannedOn.set(d.date, d.day);
@@ -584,7 +620,7 @@ export function monthCells(run, year, month, now) {
     else if (n === today) state = 'today';
     else if (n < today) {
       state = readOn.has(key) ? 'read'
-        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || !restedOn(run, n)) ? 'missed' : 'none');
+        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || !restedOn(run, n, memo)) ? 'missed' : 'none');
     }
     else if (!st.finished && end != null && n <= end && (spread ? plannedOn.has(key) : isReadingDay(nopause, n))) {
       state = 'ahead';

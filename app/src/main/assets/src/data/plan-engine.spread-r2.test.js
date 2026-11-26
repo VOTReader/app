@@ -2,7 +2,7 @@
    that holds the day, and a late reader who gets the next reading today instead of a rest day. */
 
 import { describe, it, expect } from 'vitest';
-import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays } from './plan-engine.js';
+import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays, streak, monthCells } from './plan-engine.js';
 import { planStateLine } from '../ui/screens/ReadingPlansScreen.jsx';
 import { doneToday, restDates } from '../utils/plan-reminder.js';
 
@@ -93,5 +93,31 @@ describe('a late reader on a spread-out plan gets the next reading today', () =>
     expect(target).toBe('2026-12-02');
     // Each read day brings the finish closer (the old rule kept it two days late on every read): Thu Dec 3, then on time.
     expect(finishes).toEqual(['2026-12-03', '2026-12-02', '2026-12-02', '2026-12-02']);
+  });
+});
+
+describe('a long spread-out plan\'s past is worked out once', () => {
+  it('a second look at the week strip and the month (the card, the list, the page) does not redo each rest day', () => {
+    // 300 chapters over 500 days (empty days between most readings), read on every day the card offered one.
+    const items = Array.from({ length: 300 }, (_, i) => ({ k: 'b' + Math.floor(i / 20) + ':' + ((i % 20) + 1), w: 600 }));
+    let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items }], pace: { mode: 'days', n: 500 } }, at('2026-01-01'));
+    const startN = /** @type {number} */ (dayNum('2026-01-01'));
+    for (let n = startN; n < startN + 300; n++) {
+      const st = runStatus(run, at(dateOf(n)));
+      if (!st.spreadOn) for (const it of st.todayItems) run = tickItem(run, it.k, dateOf(n), 1);
+    }
+    // Count the passes over the plan's tracks (one per runStatus) through a counting view of the same array.
+    let passes = 0;
+    const tracks = new Proxy(run.tracks, { get: (t, p, r) => { if (p === Symbol.iterator) passes++; return Reflect.get(t, p, r); } });
+    const watched = { ...run, tracks };
+    const now = at(dateOf(startN + 300));
+    const first = streak(watched, now).inRow;
+    const once = passes;
+    passes = 0;
+    expect(streak(watched, now).inRow).toBe(first);
+    monthCells(watched, now.getFullYear(), now.getMonth(), now);
+    expect(first).toBeGreaterThan(60);
+    expect(once).toBeGreaterThan(60);
+    expect(passes).toBeLessThan(once / 4);
   });
 });
