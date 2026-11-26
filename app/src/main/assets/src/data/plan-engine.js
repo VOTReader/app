@@ -114,15 +114,20 @@ function nthReadingDay(run, from, k) {
 }
 
 /**
- * Whether a past date held a reading as the plan was laid out, one reading day each from the start: a spread-out
- * plan's empty days (and an old short cut's empty last days) held none, so they are never missed. The week strip
- * (streak) and the month calendar (monthCells) both ask this.
- * @param {PlanRun} run @param {number} n @param {number} startN @param {number} total
+ * Whether a spread-out plan gave nothing to read on past date `n`: what its Today card said that day ("Nothing to read
+ * today", runStatus().spreadOn after the date), worked out from the reads made before it. The next reading follows
+ * the date the last one was finished, so a reader who read late or early rests on the days the app told them to and
+ * is never marked missed for it, while a day a reading was due and not read stays missed. The week strip (streak)
+ * and the month calendar (monthCells) both ask this, for spread-out plans only (hasEmptyDays).
+ * @param {PlanRun} run @param {number} n
  */
-function heldReading(run, n, startN, total) {
-  if (n < startN || !isReadingDay({ ...run, paused: undefined }, n)) return false;
-  const k = readingDaysBetween(run, startN, n - 1);
-  return k < total && dayItems(run, k).length > 0;
+function restedOn(run, n) {
+  const key = dateOf(n);
+  /** @type {Record<string, string>} */ const ticks = {};
+  for (const [k, v] of Object.entries(run.ticks || {})) if (!v || v < key) ticks[k] = v;   // credited reads ('') count
+  const d = new Date(n * 86400000);
+  const then = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12);
+  return runStatus({ ...run, ticks, status: 'running', paused: undefined }, then).spreadOn > key;
 }
 
 /**
@@ -482,15 +487,15 @@ export function streak(run, now) {
   for (let d = 0; d < total; d++) { const on = dayDoneOn(run, d); if (on) done.add(on); }
   const today = /** @type {number} */ (dayNum(todayKey(now)));
   const startN = dayNum(run.start) ?? today;
-  // A plan spread over more days than it has readings (d682e8ed7) has empty days, and an old short cut left its last
-  // days empty: a date holds a reading only when the plan's day for it has items. From today on that is the day the
-  // schedule plans for the date; before today, one reading day each from the start, as the plan was laid out.
+  // A plan spread over more days than it has readings (d682e8ed7) has empty days: a date holds a reading only when
+  // the plan's day for it has items. From today on that is the day the schedule plans for the date; before today, a
+  // day the Today card did not say "Nothing to read today" (restedOn).
   // Every other plan counts every reading day, as it always did (03d0ea090).
   const spread = hasEmptyDays(run);
   const planned = new Set();
   if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
   const holds = (/** @type {number} */ n) => (!spread ? n >= startN && isReadingDay({ ...run, paused: undefined }, n)
-    : n >= today ? planned.has(dateOf(n)) : heldReading(run, n, startN, total));
+    : n >= today ? planned.has(dateOf(n)) : n >= startN && isReadingDay({ ...run, paused: undefined }, n) && !restedOn(run, n));
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
@@ -556,7 +561,7 @@ export function monthCells(run, year, month, now) {
     else if (n === today) state = 'today';
     else if (n < today) {
       state = readOn.has(key) ? 'read'
-        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || heldReading(run, n, start, st.total)) ? 'missed' : 'none');
+        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || !restedOn(run, n)) ? 'missed' : 'none');
     }
     else if (!st.finished && end != null && n <= end && (spread ? plannedOn.has(key) : isReadingDay(nopause, n))) {
       state = 'ahead';
