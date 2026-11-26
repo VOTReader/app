@@ -333,7 +333,7 @@ export function PlanRibbon({ bid, cid, inert }) {
   return (
     <aside className="plan-ribbon" aria-label="Reading plan">
       <span className="plan-ribbon-copy">
-        <span className="plan-ribbon-text">{'Counts for ' + runName(run, null) + ' · Day ' + (row.day + 1) + ' · ' + done + ' of ' + row.items.length}</span>
+        <span className="plan-ribbon-text">{'Counts for ' + runName(run, null) + ' · Day ' + ((row.itemsDay ?? row.day) + 1) + ' · ' + done + ' of ' + row.items.length}</span>
         {here && !here.done ? <span className="plan-ribbon-why">Ticks off after a little while reading here</span> : null}
       </span>
       {nextItem && typeof open === 'function' ? (

@@ -349,7 +349,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       <div className="ui-card plan-progress">
         <PlanRing percent={st.percent} size="big" />
         <div className="plan-progress-text">
-          <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, (st.doneToday ? st.lastDay + 1 : st.day + 1)) + ' of ' + st.total.toLocaleString('en-US')}</p>
+          <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, st.todayDay + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
           <p className="plan-progress-line">{st.itemsDone.toLocaleString('en-US') + ' of ' + st.itemsTotal.toLocaleString('en-US') + ' ' + unit + ' read'}</p>
           {/* 2235: the plan's one status, the same words as Home and the Plans list; behind leads to Catch up. */}
           <p className="plan-progress-line plan-status" data-status={status.key}>

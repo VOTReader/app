@@ -187,6 +187,28 @@ describe('days in a row and this week', () => {
     expect(ahead(2026, 10)).toEqual([[28, 2], [30, 4]]);
     expect(ahead(2026, 11)).toEqual([[2, 6]]);
   });
+  it('a spread-out plan counts its own days from the start: its empty day reads "Day 2 of 7", its next reading "Day 3"', () => {
+    const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
+    // Made Wednesday 25th, Ruth 1 read that day: Thursday is the plan's empty day 2, Ruth 2 falls on Friday (day 3).
+    const run = readDay(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-25')), 0, '2026-11-25');
+    const dayLine = (now) => { const r = runRow(run, now); return 'Day ' + (r.day + 1) + ' of ' + r.totalDays; };   // the Today card's words
+    const thu = runStatus(run, at('2026-11-26'));
+    expect(thu.spreadOn).toBe('2026-11-27');
+    expect(dayLine(at('2026-11-26'))).toBe('Day 2 of 7');
+    expect(thu.todayDay).toBe(1);   // the plan page's "Day 2 of 7"
+    expect(runRow(run, at('2026-11-26')).itemsDay).toBe(2);   // the reading ribbon on Ruth 2 (read ahead) says Day 3
+    // Friday, a reading day: its own day.
+    expect(runStatus(run, at('2026-11-27')).todayDay).toBe(2);
+    expect(dayLine(at('2026-11-27'))).toBe('Day 3 of 7');
+    // Read on Friday: done for today, still day 3.
+    const fri = readDay(run, 2, '2026-11-27');
+    expect(runStatus(fri, at('2026-11-27')).todayDay).toBe(2);
+    expect(runRow(fri, at('2026-11-27')).day).toBe(2);
+    // A plan with no empty days is unchanged: Bible in a Year, day 1 read, the next day reads "Day 2".
+    const year = readDay(bibleYear(at('2026-11-10')), 0, '2026-11-10');
+    expect(runStatus(year, at('2026-11-11')).todayDay).toBe(1);
+    expect(runStatus(year, at('2026-11-10')).todayDay).toBe(0);
+  });
   it('a spread-out plan in the month calendar: a past empty day is never missed, as in the week strip', () => {
     const items = [900, 800, 1000, 700].map((w, i) => ({ k: 'ruth:' + (i + 1), w }));
     const read = readDay(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'words', items }], pace: { mode: 'days', n: 7 } }, at('2026-11-26')), 0, '2026-11-26');

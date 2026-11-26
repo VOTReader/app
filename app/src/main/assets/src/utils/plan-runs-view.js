@@ -148,7 +148,9 @@ export function runRow(run, now) {
     nextWhen: st.spreadOn ? weekdayDate(st.spreadOn, now) : '',
     // An empty day of a spread-out plan, nothing read today: no reading is due until nextWhen.
     rest: !st.doneToday && !!st.spreadOn,
-    done: st.doneToday, day: st.doneToday ? Math.max(0, st.lastDay) : st.day, totalDays: st.total,
+    // day: the plan's own day today ("Day N of M"; a spread-out plan's empty day is its own day); itemsDay: the day
+    // `items` belong to (on an empty day, the next reading's), for the reading ribbon.
+    done: st.doneToday, day: st.todayDay, itemsDay: st.doneToday ? st.lastDay : st.day, totalDays: st.total,
     percent: st.percent,
     behind: st.behind, ahead: st.ahead, late: st.late, finished: st.finished, paused: st.paused, notStarted: st.notStarted, start: run.start,
     next: nextItem ? itemRef(nextItem.k) : null,

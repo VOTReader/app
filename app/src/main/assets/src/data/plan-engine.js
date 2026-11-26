@@ -303,7 +303,9 @@ export function totalDays(run) {
  * @returns {{ total: number, day: number, finished: boolean, todayItems: PlanItem[], todayTicked: number,
  *   doneToday: boolean, doneDays: number, itemsDone: number, itemsTotal: number, projected: string, target: string,
  *   behind: number, ahead: number, late: number, paused: boolean, notStarted: boolean, percent: number,
- *   perDay: { items: number, words: number }, spreadOn: string, lastDay: number }}
+ *   perDay: { items: number, words: number }, spreadOn: string, lastDay: number, todayDay: number }}
+ *   todayDay: the plan's own day today (0-based, from its start), for "Day N of M": a spread-out plan's empty day
+ *   counts as its own day, never as the next reading's.
  *   spreadOn: the date the portion falls on when a spread-out plan's empty days put it after today ('' otherwise).
  *   lastDay: the last day with readings before the portion (-1 when none); day - 1 unless empty days lie between.
  *   day: the portion's day (the first day not fully read); todayItems its items. notStarted: the start date is
@@ -341,9 +343,18 @@ export function runStatus(run, now) {
   // The empty days still take their reading days: the portion after them falls on its spread day, counted from the
   // date the last reading was finished, never sooner (reading Ruth 1 on Thursday keeps Ruth 2 on Saturday).
   let spreadOn = '';
+  // The plan's own day today, counted from its start ("Day N of M"): the day just read once today's is done, else the
+  // portion's; on a spread-out plan's empty day, that empty day's own number.
+  let todayDay = doneToday ? last : day;
   if (!finished && !notStarted && !paused && gap > 0) {
     const lastOn = dayNum(dayDoneOn(run, last) || '');
-    if (lastOn != null) { const due = nthReadingDay(run, lastOn + 1, gap); if (due > from) { from = due; spreadOn = dateOf(due); } }
+    if (lastOn != null) {
+      const due = nthReadingDay(run, lastOn + 1, gap);
+      if (due > from) {
+        from = due; spreadOn = dateOf(due);
+        if (!doneToday) todayDay = Math.min(day - 1, last + readingDaysBetween(run, lastOn + 1, today));
+      }
+    }
   }
   const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
   const targetN = dayNum(run.target);
@@ -359,7 +370,7 @@ export function runStatus(run, now) {
     total, day, finished, todayItems, todayTicked, doneToday, doneDays, itemsDone, itemsTotal,
     projected: paused && !finished ? run.target : dateOf(projectedN), target: run.target, behind, ahead, late, paused, notStarted,
     percent: finished ? 100 : itemsTotal ? Math.min(99, Math.round(itemsDone * 100 / itemsTotal)) : 0,
-    perDay: { items: leftItems / nextDays, words: leftWords / nextDays }, spreadOn, lastDay: last,
+    perDay: { items: leftItems / nextDays, words: leftWords / nextDays }, spreadOn, lastDay: last, todayDay,
   };
 }
 
