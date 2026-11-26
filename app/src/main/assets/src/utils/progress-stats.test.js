@@ -266,6 +266,44 @@ describe('mostAnnotatedSources', () => {
   });
 });
 
+/* reader-behaviour-n2 (audit 11-23): Flock and Rebuke counted their preface in the total and the others did not,
+   while a preface read counts for all of them, so My Progress said "Volume One 30 of 29" (and "735 of 732"). */
+describe('every collection counts its preface the same way', () => {
+  const PRE = ['LETTERS_V1_PREFACE', 'LETTERS_V3_PREFACE', 'LETTERS_TIMOTHY_PREFACE', 'countItemWords'];
+  afterEach(() => { PRE.forEach((k) => { delete globalThis[k]; }); });
+
+  it('a read preface never makes a collection read more than its total', () => {
+    seedCorpora();
+    globalThis.LETTERS_V1_PREFACE = { id: 'one-preface' };
+    globalThis.LETTERS_V3 = [{ id: 'v3a' }];
+    globalThis.LETTERS_V3_PREFACE = { id: 'three-preface' };
+    globalThis.LETTERS_TIMOTHY = [{ id: 't1' }];
+    globalThis.LETTERS_TIMOTHY_PREFACE = { id: 'timothy-preface' };
+    const volumes = groupBooks(buildProgressGroups()[0]);
+    const all = {
+      'v1:volume-one:one-preface': 1, 'v1:volume-one:l1': 1, 'v1:volume-one:l2': 1,
+      'v1:volume-three:three-preface': 1, 'v1:volume-three:v3a': 1,
+      'v1:letters-timothy:timothy-preface': 1, 'v1:letters-timothy:t1': 1,
+    };
+    for (const id of ['volume-one', 'volume-three', 'letters-timothy']) {
+      const b = volumes.find((x) => x.id === id);
+      expect(countReadFor(all, id), id).toBe(b.total);
+    }
+    expect(volumes.find((b) => b.id === 'volume-one').total).toBe(3);
+    // A collection with no preface keeps its letters' count.
+    expect(volumes.find((b) => b.id === 'volume-two').total).toBe(1);
+  });
+
+  it('the words count the preface too, as the total does', () => {
+    seedCorpora();
+    globalThis.countItemWords = (it) => it.w || 0;
+    globalThis.LETTERS_V1 = [{ id: 'a', w: 100 }];
+    globalThis.LETTERS_V1_PREFACE = { id: 'one-preface', w: 50 };
+    const grp = { id: 'vot', label: 'VOT', genres: [{ label: 'g', books: [{ id: 'volume-one', label: 'Volume One', total: 2 }] }] };
+    expect(groupWordStats({ 'v1:volume-one:one-preface': 1 }, grp)).toEqual({ wordsRead: 50, wordsTotal: 150 });
+  });
+});
+
 describe('groupWordStats — words-based progress (2026-08-03)', () => {
   afterEach(() => {
     delete /** @type {any} */ (globalThis).countItemWords;

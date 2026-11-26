@@ -39,6 +39,35 @@ export function progressCorporaReady() {
 }
 
 /**
+ * The prefaces the reader can mark read, one getter per collection that has one (prefaceGlobal in COLLECTIONS),
+ * each null when absent. Every collection counts its preface the same way, in its total and in its words: Flock
+ * and Rebuke did while Volume One, Three to Seven and Timothy did not, though a preface read is counted for all of
+ * them, so My Progress read "Volume One 30 of 29" and "735 of 732" (reader-behaviour-n2, audit 11-23).
+ * @type {Record<string, () => any>}
+ */
+const PREFACES = {
+  'volume-one': () => (typeof LETTERS_V1_PREFACE !== 'undefined' ? LETTERS_V1_PREFACE : null),
+  'volume-three': () => (typeof LETTERS_V3_PREFACE !== 'undefined' ? LETTERS_V3_PREFACE : null),
+  'volume-four': () => (typeof LETTERS_V4_PREFACE !== 'undefined' ? LETTERS_V4_PREFACE : null),
+  'volume-five': () => (typeof LETTERS_V5_PREFACE !== 'undefined' ? LETTERS_V5_PREFACE : null),
+  'volume-six': () => (typeof LETTERS_V6_PREFACE !== 'undefined' ? LETTERS_V6_PREFACE : null),
+  'volume-seven': () => (typeof LETTERS_V7_PREFACE !== 'undefined' ? LETTERS_V7_PREFACE : null),
+  'letters-timothy': () => (typeof LETTERS_TIMOTHY_PREFACE !== 'undefined' ? LETTERS_TIMOTHY_PREFACE : null),
+  'little-flock': () => (typeof LETTERS_FLOCK_PREFACE !== 'undefined' ? LETTERS_FLOCK_PREFACE : null),
+  'lords-rebuke': () => (typeof LETTERS_REBUKE_PREFACE !== 'undefined' ? LETTERS_REBUKE_PREFACE : null),
+};
+
+/** A collection's preface, or null. @param {string} bookId */
+function prefaceOf(bookId) {
+  const get = PREFACES[bookId];
+  const p = get ? get() : null;
+  return p && p.id ? p : null;
+}
+
+/** A collection's letters plus its preface, as the reader can mark them read. @param {string} bookId @param {any[]} letters */
+const withPreface = (bookId, letters) => letters.length + (prefaceOf(bookId) ? 1 : 0);
+
+/**
  * One tracked source (book / volume / study) inside a progress group.
  * @typedef {{ id: string, label: string, total: number }} ProgressBook
  *
@@ -62,18 +91,18 @@ export function buildProgressGroups() {
     id: "volumes", label: "The Volumes of Truth",
     genres: [
     { label: "The Seven Volumes", books: [
-      { id: "volume-one", label: "Volume One", total: LETTERS_V1.length },
+      { id: "volume-one", label: "Volume One", total: withPreface("volume-one", LETTERS_V1) },
       { id: "volume-two", label: "Volume Two", total: LETTERS.length },
-      ...(LETTERS_V3.length > 0 ? [{ id: "volume-three", label: "Volume Three", total: LETTERS_V3.length }] : []),
-      ...(LETTERS_V4.length > 0 ? [{ id: "volume-four", label: "Volume Four", total: LETTERS_V4.length }] : []),
-      ...(LETTERS_V5.length > 0 ? [{ id: "volume-five", label: "Volume Five", total: LETTERS_V5.length }] : []),
-      ...(LETTERS_V6.length > 0 ? [{ id: "volume-six", label: "Volume Six", total: LETTERS_V6.length }] : []),
-      ...(LETTERS_V7.length > 0 ? [{ id: "volume-seven", label: "Volume Seven", total: LETTERS_V7.length }] : [])]
+      ...(LETTERS_V3.length > 0 ? [{ id: "volume-three", label: "Volume Three", total: withPreface("volume-three", LETTERS_V3) }] : []),
+      ...(LETTERS_V4.length > 0 ? [{ id: "volume-four", label: "Volume Four", total: withPreface("volume-four", LETTERS_V4) }] : []),
+      ...(LETTERS_V5.length > 0 ? [{ id: "volume-five", label: "Volume Five", total: withPreface("volume-five", LETTERS_V5) }] : []),
+      ...(LETTERS_V6.length > 0 ? [{ id: "volume-six", label: "Volume Six", total: withPreface("volume-six", LETTERS_V6) }] : []),
+      ...(LETTERS_V7.length > 0 ? [{ id: "volume-seven", label: "Volume Seven", total: withPreface("volume-seven", LETTERS_V7) }] : [])]
     },
     { label: "Books & Collections", books: [
-      ...(LETTERS_TIMOTHY.length > 0 ? [{ id: "letters-timothy", label: "Letters from Timothy", total: LETTERS_TIMOTHY.length }] : []),
-      ...(LETTERS_FLOCK.length > 0 ? [{ id: "little-flock", label: "Letters to The Lord's Little Flock", total: LETTERS_FLOCK.length + (LETTERS_FLOCK_PREFACE ? 1 : 0) }] : []),
-      ...(LETTERS_REBUKE.length > 0 ? [{ id: "lords-rebuke", label: "The Lord's Rebuke", total: LETTERS_REBUKE.length + (LETTERS_REBUKE_PREFACE ? 1 : 0) }] : []),
+      ...(LETTERS_TIMOTHY.length > 0 ? [{ id: "letters-timothy", label: "Letters from Timothy", total: withPreface("letters-timothy", LETTERS_TIMOTHY) }] : []),
+      ...(LETTERS_FLOCK.length > 0 ? [{ id: "little-flock", label: "Letters to The Lord's Little Flock", total: withPreface("little-flock", LETTERS_FLOCK) }] : []),
+      ...(LETTERS_REBUKE.length > 0 ? [{ id: "lords-rebuke", label: "The Lord's Rebuke", total: withPreface("lords-rebuke", LETTERS_REBUKE) }] : []),
       ...(colLetterArr(COL_BY_KEY.get('wtlb1')).length > 0 ? [{ id: "wtlb-one", label: "Words To Live By: Part One", total: colLetterArr(COL_BY_KEY.get('wtlb1')).length }] : []),
       ...(colLetterArr(COL_BY_KEY.get('wtlb2')).length > 0 ? [{ id: "wtlb-two", label: "Words To Live By: Part Two", total: colLetterArr(COL_BY_KEY.get('wtlb2')).length }] : []),
       ...(colLetterArr(COL_BY_KEY.get('blessed')).length > 0 ? [{ id: "the-blessed", label: "The Blessed", total: colLetterArr(COL_BY_KEY.get('blessed')).length }] : []),
@@ -243,6 +272,8 @@ export function tallyGroup(readItems, group) {
  */
 export function bookItemsFor(bookId) {
   const L = (arr) => (arr || []).map((it) => ({ item: it, key: it.id }));
+  // Each collection's preface rides with its letters, as its total counts it (prefaceOf).
+  const P = (arr) => { const out = L(arr); const pre = prefaceOf(bookId); if (pre && arr) out.push({ item: pre, key: pre.id }); return out; };
   if (bookId === 'matthew') {
     const matthew = (typeof _matthew === 'function') ? _matthew() : null;
     return matthew && Array.isArray(matthew.chapters)
@@ -257,24 +288,16 @@ export function bookItemsFor(bookId) {
     return study && Array.isArray(study.chapters) ? L(study.chapters) : [];
   }
   switch (bookId) {
-    case 'volume-one':   return L(typeof LETTERS_V1 !== 'undefined' ? LETTERS_V1 : null);
+    case 'volume-one':   return P(typeof LETTERS_V1 !== 'undefined' ? LETTERS_V1 : null);
     case 'volume-two':   return L(typeof LETTERS !== 'undefined' ? LETTERS : null);
-    case 'volume-three': return L(typeof LETTERS_V3 !== 'undefined' ? LETTERS_V3 : null);
-    case 'volume-four':  return L(typeof LETTERS_V4 !== 'undefined' ? LETTERS_V4 : null);
-    case 'volume-five':  return L(typeof LETTERS_V5 !== 'undefined' ? LETTERS_V5 : null);
-    case 'volume-six':   return L(typeof LETTERS_V6 !== 'undefined' ? LETTERS_V6 : null);
-    case 'volume-seven': return L(typeof LETTERS_V7 !== 'undefined' ? LETTERS_V7 : null);
-    case 'letters-timothy': return L(typeof LETTERS_TIMOTHY !== 'undefined' ? LETTERS_TIMOTHY : null);
-    case 'little-flock': {
-      const arr = L(typeof LETTERS_FLOCK !== 'undefined' ? LETTERS_FLOCK : null);
-      if (typeof LETTERS_FLOCK_PREFACE !== 'undefined' && LETTERS_FLOCK_PREFACE) arr.push({ item: LETTERS_FLOCK_PREFACE, key: LETTERS_FLOCK_PREFACE.id });
-      return arr;
-    }
-    case 'lords-rebuke': {
-      const arr = L(typeof LETTERS_REBUKE !== 'undefined' ? LETTERS_REBUKE : null);
-      if (typeof LETTERS_REBUKE_PREFACE !== 'undefined' && LETTERS_REBUKE_PREFACE) arr.push({ item: LETTERS_REBUKE_PREFACE, key: LETTERS_REBUKE_PREFACE.id });
-      return arr;
-    }
+    case 'volume-three': return P(typeof LETTERS_V3 !== 'undefined' ? LETTERS_V3 : null);
+    case 'volume-four':  return P(typeof LETTERS_V4 !== 'undefined' ? LETTERS_V4 : null);
+    case 'volume-five':  return P(typeof LETTERS_V5 !== 'undefined' ? LETTERS_V5 : null);
+    case 'volume-six':   return P(typeof LETTERS_V6 !== 'undefined' ? LETTERS_V6 : null);
+    case 'volume-seven': return P(typeof LETTERS_V7 !== 'undefined' ? LETTERS_V7 : null);
+    case 'letters-timothy': return P(typeof LETTERS_TIMOTHY !== 'undefined' ? LETTERS_TIMOTHY : null);
+    case 'little-flock': return P(typeof LETTERS_FLOCK !== 'undefined' ? LETTERS_FLOCK : null);
+    case 'lords-rebuke': return P(typeof LETTERS_REBUKE !== 'undefined' ? LETTERS_REBUKE : null);
     case 'wtlb-one':  return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('wtlb1')) : null);
     case 'wtlb-two':  return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('wtlb2')) : null);
     case 'the-blessed': return L(typeof COL_BY_KEY !== 'undefined' ? colLetterArr(COL_BY_KEY.get('blessed')) : null);
