@@ -332,6 +332,19 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Start with a question');
   });
 
+  /* Fix list 11: Surprise me closes the sheet and opens a passage in one tap; the screen unmounted before the
+     sheet's save effect saw null, so Back from the passage brought the closed sheet back. */
+  it('Back after Surprise me does not bring the closed More questions sheet back (fix list 11)', () => {
+    let first;
+    const onOpenTopic = vi.fn(() => first.unmount());   // the route leaves Answers in the same tap
+    first = render(<AnswersHome {...base} onOpenTopic={onOpenTopic} />);
+    fireEvent.click(screen.getByText('More questions'));
+    fireEvent.click(screen.getByRole('dialog').querySelector('.ans-row'));   // Surprise me
+    expect(onOpenTopic).toHaveBeenCalledTimes(1);
+    render(<AnswersHome {...base} />);                     // Back from the passage
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('About shows the site\'s page, its nine Sister Sites word for word, and which words are ours', () => {
     render(<AnswersHome {...base} />);
     fireEvent.click(screen.getByText('About this collection'));

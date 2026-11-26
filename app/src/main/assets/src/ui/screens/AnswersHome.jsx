@@ -488,6 +488,9 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const surprise = () => {
     const all = loaded ? answersOpenablePool(list, meta) : [];
     if (!all.length) return;
+    // Fix list 11: the sheet closes in the same tap that leaves Answers, so the save effect never sees it closed;
+    // forget it here, or Back from the passage brings the closed sheet back. (A question row keeps it: U5.)
+    _landing.sheet = null;
     const at = all[Math.floor(Math.random() * all.length)];
     const t = byId.get(at.id);
     if (t) openTopic(at.id, t.paragraphs[at.index].text, 'Answers');
