@@ -190,7 +190,11 @@
       .sh-modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
       .sh-modal .sh-modal-btn { width: 100%; white-space: normal; text-align: center; padding-top: 8px; padding-bottom: 8px; }
       .sh-modal .ui-btn:not(.is-primary) { background: var(--surface-2); }
-      .vot-large-text .sh-modal .sh-modal-btn { border-radius: var(--r-card); }   /* a two-line pill crowds its words' corners */
+      .vot-large-text .sh-modal .sh-modal-btn { border-radius: var(--r-card); padding-inline: 12px; }   /* a two-line pill crowds its words' corners */
+      /* #54 at text 300 %: the backdrop's 1.5rem and the card's padding grew with the text (72 px a side), leaving a 210 px
+         button for a 216 px 'understand'. In px the words get the width back and wrap whole. */
+      .vot-large-text .sh-modal-backdrop { padding: 12px; }
+      .vot-large-text .sh-modal { padding: 18px 14px 14px; }
       .sh-welcome-card .sh-modal { max-width: 420px; }
 
       /* ── Reading Fonts — vendored, all-local (2026-07-31 owner call) ───

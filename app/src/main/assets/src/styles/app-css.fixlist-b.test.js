@@ -92,3 +92,13 @@ describe('#54 the Safari warning is drawn with the app sheet parts', () => {
     expect(rule('.sh-modal .sh-modal-btn')).toMatch(/white-space:\s*normal/);   // beats .ui-btn's nowrap at text 2
   });
 });
+
+describe('#54 at text 300 % the Safari buttons keep room for whole words', () => {
+  // the backdrop's 1.5rem and the card's padding grew with the text (72 px a side at 300 %), leaving a
+  // 210 px button for a 216 px 'understand': the word ran past the button's edges
+  it('at large text the backdrop, card and buttons pad in px, not rem', () => {
+    expect(rule('.vot-large-text .sh-modal-backdrop')).toMatch(/padding:\s*12px/);
+    expect(rule('.vot-large-text .sh-modal')).toMatch(/padding:\s*18px 14px 14px/);
+    expect(rule('.vot-large-text .sh-modal .sh-modal-btn')).toMatch(/padding-inline:\s*12px/);
+  });
+});
