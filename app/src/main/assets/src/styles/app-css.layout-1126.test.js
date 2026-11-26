@@ -82,3 +82,11 @@ describe('look-5: the Where it appears label has one gutter', () => {
     expect(decls('.srch-groups').margin).toBe('0 var(--gutter) 10px');
   });
 });
+
+/* look-7: a collection's own Listen list cut 16 letter titles at four lines. */
+describe('look-7: a collection list never cuts a recording\'s name', () => {
+  it('the collection list drops the clamp; other Listen lists keep two lines', () => {
+    expect(decls('.listen-coll .listen-rec .ui-row-title')).toMatchObject({ display: 'block', '-webkit-line-clamp': 'unset' });
+    expect(decls('.listen-rec .ui-row-title')['-webkit-line-clamp']).toBe('2');
+  });
+});

@@ -9180,8 +9180,10 @@ body.light .install-ask-go { color: #fff; }
        named nothing. The star and the menu keep their 44 px. The bar's title takes two lines too (56 px bar). */
     .listen-rec .ui-row-title { white-space: normal; overflow-wrap: break-word; text-wrap: pretty; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .vot-large-text .listen-rec .ui-row-title { display: block; -webkit-line-clamp: unset; }
-    /* Studies pass 3: in a collection's own list a name has four lines before it cuts ("I Am The Passover and The Lamb, The New Covenant With Men"). */
-    .listen-coll .listen-rec .ui-row-title { -webkit-line-clamp: 4; }
+    /* Studies pass 3 gave a name in a collection's own list four lines; look-7 (11-26): four still cut 16 letter titles
+       (the row gives a title 202 of 380 px beside its star and menu). In the collection list a name is never cut: it is
+       the one place a reader reads the whole list. Other lists keep their two lines. */
+    .listen-coll .listen-rec .ui-row-title { display: block; -webkit-line-clamp: unset; }
     /* At large text the star and the menu drop under the name, so the name has the row's width (it broke inside
        words in a column a few letters wide), and Play all and Download stack instead of running off the screen. */
     .vot-large-text .listen-coll .listen-rec { flex-wrap: wrap; }
