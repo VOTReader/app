@@ -57,7 +57,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
     <>
       <div className="multinote-overlay" aria-hidden="true" onClick={onClose} />
       <div ref={popRef} className="multinote-popover" role="dialog" aria-modal="true" aria-labelledby="multinote-title" style={style}>
-        <div className="multinote-header" id="multinote-title">{notes.length} notes here</div>
+        <div className="multinote-header" id="multinote-title">{notes.length + (notes.length === 1 ? ' note here' : ' notes here')}</div>
         {notes.map(n => {
           // 'blank' is "No color (icon only)": an empty ring, never the yellow fallback.
           const blank = n.color === 'blank';

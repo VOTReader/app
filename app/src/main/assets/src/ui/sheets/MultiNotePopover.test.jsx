@@ -39,6 +39,13 @@ describe('MultiNotePopover rendering', () => {
     expect(blank.style.background).toBe('');
   });
 
+  /* Fix list 40: when one of the passed notes was deleted, one row sat under '1 notes here'. */
+  it("one note left says '1 note here'", () => {
+    seed(1);
+    render(<MultiNotePopover payload={{ groupIds: ['g1', 'gone'], x: 180, y: 300 }} onClose={() => {}} onPick={() => {}} />);
+    expect(screen.getByText('1 note here')).toBeTruthy();
+  });
+
   it('renders every note row + the count header', () => {
     seed(5);
     const payload = { groupIds: ['g1', 'g2', 'g3', 'g4', 'g5'], x: 180, y: 300 };
