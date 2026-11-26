@@ -66,6 +66,12 @@ describe("a collection's name typed alone opens it", () => {
     expect(r.results.filter((e) => e.doc.letterId === 'put-all-your-trust').length).toBe(1);
   });
 
+  it('a front page brought in from outside a cut list keeps the list to its limit', async () => {
+    const r = await E.search('letters from timothy', { limit: 1 });
+    expect(lead(r)).toBe('put-all-your-trust');
+    expect(r.results.length).toBe(1);
+  });
+
   it('the name beside other words, or a search kept to the Scriptures, is not pinned', async () => {
     expect(lead(await E.search('letters from timothy servant'))).not.toBe('put-all-your-trust');
     const scr = await E.search('letters from timothy', { corpus: 'scriptures' });

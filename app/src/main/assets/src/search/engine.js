@@ -2818,7 +2818,10 @@ function frontPageFirst(/** @type {string} */ query, /** @type {any} */ options,
   const at = plain.results.findIndex((/** @type {any} */ e) => same(e.doc));
   if (at === 0) return plain;
   const entry = at > 0 ? plain.results[at] : { score: plain.results.length ? plain.results[0].score : 0, doc: reshapeDoc(best), terms: [] };
-  return { ...plain, results: [entry, ...plain.results.filter((/** @type {any} */ e) => !same(e.doc))] };
+  const results = [entry, ...plain.results.filter((/** @type {any} */ e) => !same(e.doc))];
+  // A front page brought in from outside the list adds one: keep the list to the size the search was cut to.
+  const cap = plain.truncated ? plain.results.length : (o.limit || 200);
+  return { ...plain, results: results.length > cap ? results.slice(0, cap) : results };
 }
 
 /** Whether the index holds a word (search200 ideas G: "Try fewer words" keeps the words some text holds). */
