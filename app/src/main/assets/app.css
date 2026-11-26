@@ -6607,6 +6607,13 @@
     .vot-large-text .txtsize-controls .txtsize-slider { flex: 1 1 100%; }
     .vot-large-text .txtsize-preview { margin-left: 12px; margin-right: 12px; }
     .vot-large-text .settings-row-desc { padding-left: 12px; padding-right: 12px; }
+    /* visual2-1: the ws1 head is nowrap and a select trigger takes flex 1 1 100%, which squeezed the name column to
+       0 px from 180% and drew values over descriptions. At large text the head wraps (a value goes under the name)
+       and the name keeps 55% of the row, so a toggle still sits beside it; a line inside the name column is
+       already inset by the head, so it drops the 12 px meant for a full-width desc. */
+    .vot-large-text .ws1-settings .settings-row-head { flex-wrap: wrap; }
+    .vot-large-text .ws1-settings .settings-row-head > .settings-row-text { min-width: 55%; }
+    .vot-large-text .settings-row-text .settings-row-desc { padding-left: 0; padding-right: 0; overflow-wrap: anywhere; }
     .vot-large-text .settings-help-body { padding: 12px; }
     .txtsize-preview {
       margin: 10px 0.95rem 0; padding: 10px 12px;
