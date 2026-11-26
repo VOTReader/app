@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-db558c325e';
+const CACHE_VERSION = 'v1.0.2-94dbd67868';
 const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video and the Related Topic "The Name of The Lord"), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -317,11 +317,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': '9eac45b02bb724199ad9fae024c0dca2fc26130f6432a0c8cf0854d86c0d1171',
-  './dist/app.min.css': '2d981357c0b238ba9b902fa093f893d41761a155581cc72c7f81ce6072ccebea',
+  './dist/app.min.css': '985c65b2f0e09ce211bb9ddc56277acc1d90babaa33e420d898ab347220f984c',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': 'd1893ef9b1bc3d6e213a348d4e1396105ebe467ceba1eeb0843dc08b33a451fc',
+  './dist/bundle-b.js': 'cebde30c4cf7ac3a9fbca7de6b26a36066596fb1d654182608e52f5ef8bee85e',
   './dist/bundle-c.js': 'b9d0869acb9c0a9645d1788d3beeb6f4b229b7ad7ee67b0eadbd610bbd726129',
-  './dist/bundle-d.js': '3a11c0a3c34590a7bdf065f698c3125cd2a39034be27bf1856e05968c24803f8',
+  './dist/bundle-d.js': 'fd58cb4d377a688f7ea1788c1d9da10cd6fea6387ed4bfad01ef833a7b99072b',
   './dist/bundle-w.js': '35daf4e3e909673184de74a77d5e25b4435492e9af21071b6d22619b70ebb8e2',
   './index.html': '9eac45b02bb724199ad9fae024c0dca2fc26130f6432a0c8cf0854d86c0d1171',
   './manifest.json': 'c3392c54bec4cbf2f296ca41f4e66b2b0b02adc72580e5c137f85c432777a242',
