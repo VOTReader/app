@@ -53,3 +53,10 @@ describe('#31 option sheets keep a Close a screen reader can reach', () => {
     expect(b).toMatch(/width:\s*1px/);
   });
 });
+
+describe('#20 follow-up: a cut/keep meta line flows as text at large text', () => {
+  it('large text drops the flex row and lets the kept part wrap', () => {
+    expect(rule('.vot-large-text .ui-row-meta:has(> .ui-meta-cut)')).toMatch(/display:\s*block/);
+    expect(rule('.vot-large-text .ui-meta-keep')).toMatch(/white-space:\s*normal/);
+  });
+});

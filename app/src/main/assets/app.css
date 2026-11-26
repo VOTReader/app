@@ -3183,7 +3183,11 @@
     /* Fix list #20: a value beside a row (a notebook's name, a count) left the words no room and cut them ('Move to a notebo…');
        the words wrap instead, as they already do at large text. */
     :is(.ui-row, .root-row):has(:is(.ui-row-value, .root-row-count)) :is(.ui-row-title, .ui-row-meta, .root-row-title, .root-row-sub) { white-space: normal; }
-    .ui-row-meta:has(> .ui-meta-cut) { display: flex; } .ui-meta-cut { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .ui-meta-keep { flex: none; white-space: pre; }
+    .ui-row-meta:has(> .ui-meta-cut) { display: flex; }
+    /* large text wraps every meta line: a cut/keep line flows as plain text there, or the cut part becomes a one-word
+       column ('P... 2... O...' in Bookmarks at text 2) */
+    .vot-large-text .ui-row-meta:has(> .ui-meta-cut) { display: block; }
+    .vot-large-text .ui-meta-keep { white-space: normal; } .ui-meta-cut { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .ui-meta-keep { flex: none; white-space: pre; }
     .root-row-count, .ui-row-value { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); }
     .ui-row-value.is-none { color: var(--text-2); }   /* "None yet" is read: muted, not tertiary (LIGHT1: --text-3 read 4.11:1 dark, 3.13 light) */
     ::placeholder { color: var(--text-2); opacity: 1; }   /* a field without its own: Chrome's grey read 3.6:1 on a sheet */
