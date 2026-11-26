@@ -101,11 +101,11 @@ Major rewrite 2026-05-09: kind-aware annotations, distinct note visuals, tap-to-
 Today the annotation layer lives in modules (extracted P1):
 
 - **Storage layer** (`src/stores/`): `AnnotationStore` on `vot-annotations` (aliased as `HighlightStore` for back-compat), `NoteStore` on `vot-notes`, `LinkStore` on `vot-links`. Migration `migrateAnnotations()` runs once on first load and rewrites old `vot-highlights` data into the new schema.
-- **HighlightableText** (`src/renderer/annotation-engine.js`): React component that renders plain-text strings with kind-aware `<mark>` wrappers based on character offsets. Computes per-group first/last segment so notes get a left ribbon and a trailing icon exactly once per group.
-- **applyDOMHighlights()** (`src/renderer/annotation-engine.js`): post-React DOM walker that wraps annotated ranges in any `[data-hl-key][data-hl-dom]` container. Same kind-aware logic as `HighlightableText` for `LetterView`/`WtlbEntryView`.
-- **SelectionToolbar** (`src/ui/sheets/SelectionToolbar.js`): floating popup; appears when user selects text inside a `[data-hl-key]` element.
-- **AnnotationActionChip** (`src/ui/sheets/AnnotationActionChip.js`, replaces old `HlRemoveMenu`): floating chip that appears when user TAPS an existing highlight or underline mark. Buttons: ✕ Remove · 🎨 Color · 📝 Note (convert). Tap ✕ → chip morphs in place to an inline confirm strip ("Remove this highlight?" · Cancel · Yes, remove). Tap 🎨 → chip swaps to a 10-color row. Tap 📝 → flips kind to 'note' + opens NoteSheet edit mode. Outside-tap dismisses entirely. **Notes do NOT use this chip** — tap on a note routes directly to NoteSheet read mode.
-- **NoteSheet** (`src/ui/sheets/NoteSheet.js`): bottom sheet for the full note experience. Two modes: `read` (default) and `edit`. Read mode shows the anchored quote, the note body (or a "tap ⋯ → Edit to add one" empty state), and a `⋯` menu with Edit · Change color · Add to notebook · Share · Delete. Delete uses the same inline-confirm pattern as the chip. Edit mode shows a textarea + Cancel/Save.
+- **HighlightableText** (`src/renderer/annotation-engine.jsx`): React component that renders plain-text strings with kind-aware `<mark>` wrappers based on character offsets. Computes per-group first/last segment so notes get a left ribbon and a trailing icon exactly once per group.
+- **applyDOMHighlights()** (`src/renderer/annotation-engine.jsx`): post-React DOM walker that wraps annotated ranges in any `[data-hl-key][data-hl-dom]` container. Same kind-aware logic as `HighlightableText` for `LetterView`/`WtlbEntryView`.
+- **SelectionToolbar** (`src/ui/sheets/SelectionToolbar.jsx`): floating popup; appears when user selects text inside a `[data-hl-key]` element.
+- **AnnotationActionChip** (`src/ui/sheets/AnnotationActionChip.jsx`, replaces old `HlRemoveMenu`): floating chip that appears when user TAPS an existing highlight or underline mark. Buttons: ✕ Remove · 🎨 Color · 📝 Note (convert). Tap ✕ → chip morphs in place to an inline confirm strip ("Remove this highlight?" · Cancel · Yes, remove). Tap 🎨 → chip swaps to a 10-color row. Tap 📝 → flips kind to 'note' + opens NoteSheet edit mode. Outside-tap dismisses entirely. **Notes do NOT use this chip** — tap on a note routes directly to NoteSheet read mode.
+- **NoteSheet** (`src/ui/sheets/NoteSheet.jsx`): bottom sheet for the full note experience. Two modes: `read` (default) and `edit`. Read mode shows the anchored quote, the note body (or a "tap ⋯ → Edit to add one" empty state), and a `⋯` menu with Edit · Change color · Add to notebook · Share · Delete. Delete uses the same inline-confirm pattern as the chip. Edit mode shows a textarea + Cancel/Save.
 - **LinkIcon, LinkSidebar, LinkPicker**: link system — scoped per `hlKey`, persisted to `vot-links`.
 
 ### 17.2 Storage models
@@ -538,7 +538,7 @@ Three rounds of feedback shaped the final note rendering:
 **Final rendering rules**:
 - **Inactive**: `.hl-note:not(.is-active)` strips background, border-left, padding-left, AND text-decoration with `!important`. Text reads completely plain.
 - **Active**: `.hl-note.is-active` applies a wavy underline.
-- **One icon per group**: `applyNoteIcons()` is a post-render DOM walker (now exported from `src/renderer/annotation-engine.js`).
+- **One icon per group**: `applyNoteIcons()` is a post-render DOM walker (now exported from `src/renderer/annotation-engine.jsx`).
 - **Sheet stacking**: NoteSheet returns a single `<div class="note-sheet-overlay">` whose CHILD is `<div class="note-sheet">`. The overlay's flex layout (align-items: flex-end) positions the sheet, and the sheet's `e.stopPropagation()` prevents the overlay's click-to-close from firing through it.
 
 ---
@@ -697,7 +697,7 @@ All 17 render blocks converted. Bug fix: the bible-study-chapter LetterView was 
 
 ### 18.10 NavButtons component
 
-Extracted presentational component (`src/ui/components/NavButtons.js`) rendering the 4-button nav cluster: settings gear, history clock, search magnifier, ThemeBtn. Used across 24 screens.
+Extracted presentational component (`src/ui/components/NavButtons.jsx`) rendering the 4-button nav cluster: settings gear, history clock, search magnifier, ThemeBtn. Used across 24 screens.
 
 **Props:**
 - `onSettings`, `onHistory`, `onSearch` — click handlers
@@ -1292,8 +1292,8 @@ So: **any effect that reads a lazy corpus (directly, or through `_findLetter` / 
 
 ### 6.1 Footnote tap behavior
 
-- `Segments` component (`src/ui/components/Segments.js`): inline `fn` segment renders gold superscript bubble (`fn-ref` class).
-- Tapping → `FootnoteSheet` (`src/ui/components/FootnoteSheet.js`) bottom sheet, three branches:
+- `Segments` component (`src/ui/components/Segments.jsx`): inline `fn` segment renders gold superscript bubble (`fn-ref` class).
+- Tapping → `FootnoteSheet` (`src/ui/components/FootnoteSheet.jsx`) bottom sheet, three branches:
   - `fn.type === "scripture"` → renders `fn.ref` + NKJV verse text (resolved from per-letter `nkjv[fn.ref]`)
   - `fn.link` → renders note text + `InAppLinkButton` (cross-volume tap-through)
   - `fn.url` → external `<a class="fn-link">`
@@ -1311,7 +1311,7 @@ So: **any effect that reads a lazy corpus (directly, or through `_findLetter` / 
 
 ### 6.3 Verse-number gold "inlay" (`<sup class="verse-sup">`)
 
-- Created in `VerseWithNumbers` (`src/ui/components/VerseWithNumbers.js`).
+- Created in `VerseWithNumbers` (`src/ui/components/VerseWithNumbers.jsx`).
 - ✅ Multi-verse path (`splitIntoVerses` succeeds): emits `<sup class="verse-sup">N</sup>` followed by text
 - ⚠️ Single-verse fallback: just emits `<span>{cleaned}</span>` — no gold inlay
 - ⚠️ Strategy 1 fallback (sentence-boundary split): never wraps superscripts in gold

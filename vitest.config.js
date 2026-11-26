@@ -7,8 +7,8 @@
    - include: any *.test.js / *.test.jsx alongside source files
 
    Coverage gates are set: aggregate floors plus per-file floors for the hot
-   files, in coverage.thresholds below. `npm run test:coverage` (the
-   pre-commit hook) enforces them; ratchet up, never down. */
+   files, in coverage.thresholds below. `npm run test:coverage` (CI; the
+   pre-push hook runs test:hook, without coverage) enforces them; ratchet up, never down. */
 
 import { defineConfig, configDefaults } from 'vitest/config';
 import { readFileSync } from 'node:fs';
@@ -303,9 +303,10 @@ const config = defineConfig({
       //
       // What actually changed in [D1] is WHERE they run: the pre-commit hook
       // called the coverage-free `npm run test`, so these floors were a
-      // post-push CI check only. It now runs `npm run test:coverage`
-      // (66s vs 47s, measured), and `npm run test` stays coverage-free for
-      // the watch loop.
+      // post-push CI check only. It then ran `npm run test:coverage`
+      // (66s vs 47s, measured). Since 2026-10-05 vitest runs in the pre-push
+      // hook (test:hook, no coverage), so the floors are CI's check again;
+      // `npm run test` stays coverage-free for the watch loop.
       thresholds: {
         statements: 60,
         branches: 51,

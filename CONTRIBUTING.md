@@ -135,12 +135,11 @@ on them through the same corpus objects. The contract and its one race class are
    checks, the audio manifest check;
 2. bundle sources, `index.html`, `app.css`, `manifest.json`, `offline.html`, `service-worker.js`: **`npm run
    build`**, before any test reads `dist/`;
-3. source files: eslint on the staged files (after regenerating the globals), `tsc --noEmit`, then **the full vitest
-   suite with coverage floors**; a staged `tools/` script runs `vitest run tools/`;
+3. source files: eslint on the staged files (after regenerating the globals) and `tsc --noEmit` (vitest runs at the
+   push, below);
 4. after those gates, **re-stage** what the build regenerated; then the type-scale, CSS-token, byte-budget,
    CORPUS_VERSION, search-index-version and runtime-asset gates;
-5. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check;
-6. `.kt` or `app/build.gradle.kts`: the Kotlin unit tests.
+5. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check.
 
 A docs-only commit runs step 5 and nothing else. There is no build-and-stage-first step before an `index.html` or
 `manifest.json` edit any more: the rebuild runs before the tests, so `service-worker.test.js` reads fresh hashes.
@@ -149,6 +148,14 @@ a backup in `git stash`, and a killed run leaves both behind (`git stash list` s
 
 `git commit --no-verify` skips all of this. CI runs the same gates on every push anyway, so skipping only moves
 the failure to after your push, on `main`.
+
+### The pre-push hook
+
+`.githooks/pre-push` runs the two heavy gates once per push, not per commit (moved there 2026-10-05): **the full
+vitest suite** (`npm run test:hook`: vmThreads, no coverage; CI's `test:coverage` keeps the floors) when the pushed
+commits change app source or the test setup, `vitest run tools/` when they change only a gate script, and **the
+Kotlin unit tests** (`gradlew :app:testDebugUnitTest :app:jacocoTestCoverageVerification`) when they change an input
+the Robolectric suite reads. It tests the working tree, so it refuses a push whose commit differs from the disk.
 
 ### CI and Deploy
 

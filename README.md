@@ -4,7 +4,7 @@ A scripture-reading app: the Volumes of Truth letters, the Bible in several tran
 included), the Matthew Study Bible, doctrine studies, a journal, highlights, notes and links, recorded audio with
 read-along highlighting, and the Scripture Web. One JavaScript codebase ships two ways:
 
-- **PWA**: live, installable and fully offline at https://votreader.github.io/app/. Every push to `main` deploys it.
+- **PWA**: live, installable and fully offline at https://votreader.github.io/app/. A push to `main` goes live at the next release window (06:00 or 21:00 Denver) once its CI is green.
 - **Android APK**: a thin Kotlin WebView shell (`app/src/main/java/com/votreader/sacredui/`) around the same web
   assets, sideloaded. The owner tests on the installed APK, so a change reaches the owner's phone only through an APK build
   (CONTRIBUTING.md, "Landing").
@@ -61,7 +61,7 @@ app/src/main/assets/          the app itself (web)
 app/src/main/java/com/votreader/sacredui/   the Android shell (MainActivity.kt; AppInterface.kt is the JS bridge)
 tools/                        build scripts, gates, smoke and e2e harnesses, alignment and audio-sync pipelines
 .githooks/pre-commit          the local gate
-.github/workflows/            ci.yml (every push), deploy-web.yml (main, to GitHub Pages, once its CI is green)
+.github/workflows/            ci.yml (every push), deploy-web.yml (to GitHub Pages at 06:00 and 21:00 Denver, the newest CI-green main)
 docs/                         subsystem docs; docs/archive/ holds finished plans
 ```
 
