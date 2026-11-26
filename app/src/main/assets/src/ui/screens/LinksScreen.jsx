@@ -12,6 +12,7 @@ import { ActionSheet } from '../components/SelectField.jsx';
 import { EmptyState, Notice, UiButton } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
 import { removeLinkWithUndo } from '../../utils/annotation-undo.js';
+import { sayPlaceGone } from '../../utils/place-gone.js';
 
 export function _linkEndpointCategory(ep) {
   if (!ep) return '';
@@ -266,7 +267,7 @@ export function LinksScreen(props) {
   // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
   var navigateToEndpoint = function(endpoint, label) {
-    if (!endpoint) return;
+    if (!endpoint) { sayPlaceGone(); return; }
     if (typeof onNavigateToSource === 'function') {
       onNavigateToSource(endpoint, { sourceLetterTitle: label || 'My Links' });
     }
@@ -277,7 +278,7 @@ export function LinksScreen(props) {
   };
 
   var onNavigateTarget = function(lnk) {
-    if (!lnk.target) return;
+    if (!lnk.target) { sayPlaceGone(); return; }
     if (typeof onNavigateToTarget === 'function') {
       onNavigateToTarget(lnk.target, { sourceLetterTitle: 'My Links' });
     } else {

@@ -35,3 +35,11 @@ describe('#23 empty Bookmarks: Start reading opens Letter 1 like Notes, Links, H
     expect(block).toMatch(/onStartReading=\{\(\) => _openFirstLetter\('Bookmarks'\)\}/);
   });
 });
+
+describe('#32 a link whose place is gone says why', () => {
+  it('both Open paths in LinksScreen call sayPlaceGone when the end is missing', () => {
+    const s = src('../screens/LinksScreen.jsx');
+    expect(s).toMatch(/if \(!endpoint\) \{ sayPlaceGone\(\); return; \}/);
+    expect(s).toMatch(/if \(!lnk\.target\) \{ sayPlaceGone\(\); return; \}/);
+  });
+});

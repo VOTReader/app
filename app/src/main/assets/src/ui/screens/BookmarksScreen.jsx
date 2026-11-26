@@ -21,6 +21,7 @@ import { _bookmarkSourcePlace, _bookmarkSourceNumber } from '../../utils/bookmar
 import { ListRow, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
 import { removeBookmarkWithUndo } from '../../utils/annotation-undo.js';
+import { sayPlaceGone } from '../../utils/place-gone.js';
 
 /* The bundle-d slots, guarded so that rendering this screen alone (a test,
    or a host without bundle-d's slots) degrades to the raw key rather
@@ -173,7 +174,7 @@ export function BookmarksScreen(props) {
 
   var navigateToBookmark = function(bkm) {
     var endpoint = srcEndpoint(bkm.hlKey);
-    if (!endpoint) return;
+    if (!endpoint) { sayPlaceGone(); return; }
     if (typeof onNavigateToSource === 'function') {
       onNavigateToSource(endpoint, { sourceLetterTitle: 'My Bookmarks' });
     }
