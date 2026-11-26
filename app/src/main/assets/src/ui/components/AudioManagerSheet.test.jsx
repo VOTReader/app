@@ -1597,3 +1597,29 @@ describe('the full player says why a recording did not start (h1104-19)', () => 
     expect(sheetFailLine('load')).toBe('Couldn’t load this recording.');
   });
 });
+
+/* Fix list 5: the head counted recordings ('1 of 4') while Up next counted queue entries, so a letter in two
+   parts read '4 left' under '1 of 4'. Both count recordings now; a part of the playing letter still to come
+   is said as a part. */
+describe('AudioManagerSheet — Up next counts recordings, as the head does (fix list 5)', () => {
+  it("'1 of 4' sits over '3 left' when a letter has two parts", () => {
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol1:letter-a': [['idA1', 'B', 'Part 1'], ['idA2', 'B', 'Part 2']] };
+    startCollection();
+    openSheet();
+    expect(kicker()).toMatch(/1 of 4$/);
+    expect(toolValue(tool('Up next'))).toBe('3 left');
+    expect(tool('Up next').getAttribute('aria-label')).toBe('Up next, 3 left');
+    openUpNext();
+    expect(upNextSub()).toBe('3 left');
+  });
+
+  it('the last recording with its second part still to come says 1 part left, not Nothing after this one', () => {
+    globalThis.AUDIO_MANIFEST = { 'vol1:letter-a': [['idA1', 'B', 'Part 1'], ['idA2', 'B', 'Part 2']] };
+    AudioPlayer.playCollection({ volKey: 'vol1', items: [{ id: 'letter-a', title: 'The Wide Path' }], collectionLabel: 'Volume One' });
+    openSheet();
+    expect(toolValue(tool('Up next'))).toBe('1 part left');
+    openUpNext();
+    expect(upNextSub()).toBe('1 part left');
+    expect(within(upNext()).getByRole('button', { name: 'Next track' }).disabled).toBe(false);
+  });
+});

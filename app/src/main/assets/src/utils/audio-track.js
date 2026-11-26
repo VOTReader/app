@@ -650,6 +650,23 @@ export function queuePlace(queue, qi) {
 }
 
 /**
+ * What is left after the playing track, in the unit the head counts (fix list 5): recordings, as queuePlace counts
+ * them, so '1 of 30' sits over '29 left', never '30 left' because a letter's Addendum is a second entry. When only
+ * the playing letter's own parts are left, they are said as parts. '' when nothing is left.
+ * @param {ReadonlyArray<{ key?: string | null, partLabel?: string | null } | null | undefined>} queue
+ * @param {number} qi
+ * @returns {string}
+ */
+export function upNextWord(queue, qi) {
+  const entries = Math.max(0, queue.length - (qi + 1));
+  if (!entries) return '';
+  const p = queuePlace(queue, qi);
+  const recordings = p.of - p.at;
+  if (recordings > 0) return recordings.toLocaleString('en-US') + ' left';
+  return entries + (entries === 1 ? ' part left' : ' parts left');
+}
+
+/**
  * queuePlace counted over what can play with no signal (downloads brief 3j, picture 17: "1 of 3 · Skipped 27 not on
  * this phone"): units grouped as queuePlace groups them (a letter's parts once, a Bible chapter each), `onPhone(unit)`
  * says whether the player would play one (it passes over the rest). `at` is 0 while the current unit is not one of them.

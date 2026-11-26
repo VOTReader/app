@@ -24,7 +24,7 @@
 
 import { UiIcon } from './UiIcon.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey, upNextWord } from '../../utils/audio-track.js';
 import { songById, familyById, versionsOf, isVerbatimSong } from '../../utils/song-catalog.js';
 import { SongCover, ChoiceSheet, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, songClock, songLetterOf } from './SongParts.jsx';
 import { SongLyricsCard } from './SongDeskParts.jsx';
@@ -379,7 +379,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
     else toggleSavedRecording(library, current);
   };
   const rateWord = (Math.round(state.rate * 100) / 100) + '×';
-  const upWord = restoring ? '' : upcoming ? upcoming.toLocaleString('en-US') + ' left' : 'None left';
+  const upWord = restoring ? '' : upcoming ? upNextWord(queue, state.qi) : 'None left';
 
   const play = (
     <button
@@ -505,7 +505,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
               <Tool label={voices ? (voices.kind === 'edition' ? 'Edition, ' : 'Voice, ') + voices.activeLabel :'Voice: ' + (reader || 'this recording has one')} word={voices && voices.kind === 'edition' ? 'Edition' : 'Voice'}
                 value={voices ? voices.activeLabel : reader || ''} disabled={!voices} onClick={() => setSheet('voice')}><UiIcon name="mic" /></Tool>
             )}
-            <Tool label={'Up next' + (upcoming ? ', ' + upcoming + ' left' : '')} word="Up next" value={upWord} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
+            <Tool label={'Up next' + (upcoming ? ', ' + upNextWord(queue, state.qi) : '')} word="Up next" value={upWord} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
             {songId ? (
               <Tool label={'Song page of ' + name} word="Song page" value="Open" haspopup={false} disabled={!canPage}
                 onClick={() => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); }}><UiIcon name="music" /></Tool>

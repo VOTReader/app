@@ -20,7 +20,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
-import { displayPartLabel, queuePlace } from '../../utils/audio-track.js';
+import { displayPartLabel, queuePlace, upNextWord } from '../../utils/audio-track.js';
 import { AudioSpeedControl, AudioSpeedReadout } from './AudioSpeedControl.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -375,7 +375,7 @@ export function UpNextSheet({ state, onClose }) {
   let left = Math.max(0, (Number(state.duration) || secondsOf(current.url) || 0) - (Number(state.time) || 0));
   for (let i = state.qi + 1; i < queue.length && left >= 0; i++) { const s = secondsOf(queue[i].url); left = s ? left + s : -1; }
   const sub = restoring ? 'Resuming…'
-    : [upcoming > 0 ? upcoming + ' left' : 'Nothing after this one', upcoming > 0 && left > 0 ? queueTime(left) : ''].filter(Boolean).join(' · ');
+    : [upcoming > 0 ? upNextWord(queue, state.qi) : 'Nothing after this one', upcoming > 0 && left > 0 ? queueTime(left) : ''].filter(Boolean).join(' · ');
   const curLeft = Math.max(0, (Number(state.duration) || 0) - (Number(state.time) || 0));
   const windowed = queue.length > QUEUE_WINDOW_MIN;
   const to = windowed ? Math.min(queue.length, state.qi + 1 + QUEUE_PAGE + laterPages * QUEUE_PAGE) : queue.length;
