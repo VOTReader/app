@@ -23,6 +23,9 @@ import {
   HighlightableText,
   applyDOMHighlights,
   applyNoteIcons,
+  findNoteIconInsertionPoint,
+  applyActiveNoteState,
+  StaticSubtree,
   noteNotebookColor,
   annDomSig,
   snapRangeToWords,
@@ -1001,5 +1004,315 @@ describe('RC.13 one highlight, one box; the note icon stays with its word', () =
     expect(c.textContent).toBe(TEXT);
     applyNoteIcons();
     expect(c.querySelectorAll('.hl-keep').length).toBe(1);
+  });
+});
+
+/* votreader-tests-7 item 11: branch edges the overlap suites never reached —
+   legacy/squiggle kinds, unplaceable anchors, multi-note badges, icon
+   insertion points, signature fallbacks. */
+describe('annotation-engine branch edges (tests-7 item 11)', () => {
+  let store;
+  beforeEach(() => {
+    store = {};
+    window.AnnotationStore = {
+      get: (k) => store[k] || [],
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+    window.NoteStore = {
+      _notes: {},
+      get: (gid) => window.NoteStore._notes[gid] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = '';
+    delete window.AnnotationStore;
+    delete window.NoteStore;
+    delete (/** @type {any} */ (window)).__openNote;
+    delete (/** @type {any} */ (window)).__showMultiNote;
+    delete (/** @type {any} */ (window)).__activeNoteGroup;
+  });
+
+  it('snapRangeToWords passes non-string/empty text through untouched', () => {
+    expect(snapRangeToWords(null, 2, 5)).toEqual({ start: 2, end: 5 });
+    expect(snapRangeToWords(undefined, 0, 3)).toEqual({ start: 0, end: 3 });
+    expect(snapRangeToWords('', 1, 2)).toEqual({ start: 1, end: 2 });
+    expect(snapRangeToWords(/** @type {any} */ (42), 1, 2)).toEqual({ start: 1, end: 2 });
+  });
+
+  it('snapRangeToWords never leaves start on a lone trailing surrogate (collapsed range)', () => {
+    // start===end===3 sits on the low surrogate of the emoji at indices 2-3.
+    expect(snapRangeToWords('ab😀', 3, 3)).toEqual({ start: 2, end: 3 });
+  });
+
+  it('blockBoundaryOffsets returns empty for a null / non-element container and skips comment nodes', () => {
+    expect(blockBoundaryOffsets(null).size).toBe(0);
+    expect(blockBoundaryOffsets(/** @type {any} */ (document.createTextNode('x'))).size).toBe(0);
+    document.body.innerHTML = '<div data-hl-key="k">a<!-- seam? -->b<br>c</div>';
+    const b = blockBoundaryOffsets(document.querySelector('[data-hl-key="k"]'));
+    expect([...b]).toEqual([2]); // only the <br> seam; the comment adds nothing
+  });
+
+  it('coveredSubRanges keeps DISJOINT newer ranges separate (no merge across a gap)', () => {
+    const base = ann({ id: 'base', color: 'blue', start: 0, end: 20, created: 1 });
+    const y1 = ann({ id: 'y1', color: 'yellow', start: 2, end: 5, created: 2 });
+    const y2 = ann({ id: 'y2', color: 'pink', start: 10, end: 14, created: 3 });
+    expect(coveredSubRanges(base, [base, y1, y2])).toEqual([[2, 5], [10, 14]]);
+  });
+
+  it('React path: legacy kind note aliases to a blank hl-note mark; squiggle paints; missing kind defaults', () => {
+    store['k'] = [
+      ann({ id: 'leg', kind: 'note', color: 'yellow', start: 0, end: 5, created: 1 }),
+      ann({ id: 'sq', kind: 'squiggle', color: 'red', start: 6, end: 11, created: 2 }),
+      { id: 'bare', groupId: 'bare', color: 'green', start: 0, end: 5, created: 3, text: '' },
+    ];
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    const leg = container.querySelector('mark[data-hl-id="leg"]');
+    expect(leg.classList.contains('hl-blank')).toBe(true);
+    expect(leg.classList.contains('hl-note')).toBe(true);
+    expect(leg.getAttribute('data-kind')).toBe('note');
+    const sq = container.querySelector('mark[data-hl-id="sq"]');
+    expect(sq.classList.contains('hl-squiggle')).toBe(true);
+    expect(sq.classList.contains('hl-red')).toBe(true);
+    expect(container.querySelector('mark[data-hl-id="bare"]').getAttribute('data-kind')).toBe('highlight');
+  });
+
+  it('React path: an unplaceable bare highlight is skipped (plain text, no marks)', () => {
+    store['k'] = [ann({ id: 'gone', color: 'yellow', start: 0, end: 5, created: 1, text: 'ZZZ nowhere' })];
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    expect(container.querySelector('mark')).toBeNull();
+    expect(container.textContent).toBe('Hello world');
+  });
+
+  it('React path: an unplaceable NOTE stays reachable as a whole-verse approx blank', () => {
+    window.NoteStore._notes['gone'] = { groupId: 'gone', text: 'memo' };
+    store['k'] = [ann({ id: 'gone', color: 'yellow', start: 0, end: 5, created: 1, text: 'ZZZ nowhere' })];
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    const m = container.querySelector('mark.hl-approx[data-hl-id="gone"]');
+    expect(m).not.toBeNull();
+    expect(m.classList.contains('hl-blank')).toBe(true);
+    // the keep wrapper splits the last word into its own piece of the same mark
+    const joined = [...container.querySelectorAll('mark.hl-approx[data-hl-id="gone"]')].map((x) => x.textContent).join('');
+    expect(joined).toBe('Hello world');
+    expect(container.querySelector('.hl-note-icon')).not.toBeNull();
+  });
+
+  it('React path: empty text renders nothing', () => {
+    const { container } = render(<HighlightableText text="" hlKey="k" />);
+    expect(container.textContent).toBe('');
+    expect(container.querySelector('[data-hl-key]')).toBeNull();
+  });
+
+  it('React path: two notes ending on one segment collapse to one badge icon that opens the multi sheet', () => {
+    window.NoteStore._notes['g1'] = { groupId: 'g1', text: 'one' };
+    window.NoteStore._notes['g2'] = { groupId: 'g2', text: 'two' };
+    store['k'] = [
+      ann({ id: 'a1', groupId: 'g1', color: 'yellow', start: 0, end: 5, created: 1 }),
+      ann({ id: 'a2', groupId: 'g2', start: 0, end: 5, created: 2 }),
+    ];
+    const multi = [];
+    (/** @type {any} */ (window)).__showMultiNote = (gids, x, y) => multi.push([gids, x, y]);
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    const icons = container.querySelectorAll('.hl-note-icon');
+    expect(icons.length).toBe(1);
+    expect(icons[0].classList.contains('hl-note-icon-badge')).toBe(true);
+    expect(icons[0].getAttribute('data-count')).toBe('2');
+    expect(icons[0].getAttribute('data-group-ids')).toBe('g1,g2');
+    expect(icons[0].getAttribute('title')).toBe('2 notes here');
+    fireEvent.click(icons[0]);
+    expect(multi.length).toBe(1);
+    expect(multi[0][0]).toEqual(['g1', 'g2']);
+  });
+
+  it('React path: a multi icon without the multi handler falls back to opening the first note', () => {
+    window.NoteStore._notes['g1'] = { groupId: 'g1', text: 'one' };
+    window.NoteStore._notes['g2'] = { groupId: 'g2', text: 'two' };
+    store['k'] = [
+      ann({ id: 'a1', groupId: 'g1', start: 0, end: 5, created: 1 }),
+      ann({ id: 'a2', groupId: 'g2', start: 0, end: 5, created: 2 }),
+    ];
+    const opened = [];
+    (/** @type {any} */ (window)).__openNote = (gid) => opened.push(gid);
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    fireEvent.click(container.querySelector('.hl-note-icon'));
+    expect(opened).toEqual(['g1']);
+  });
+
+  it('React path: a note on a whitespace-only segment still gets its icon (no last word)', () => {
+    window.NoteStore._notes['g1'] = { groupId: 'g1', text: 'memo' };
+    store['k'] = [ann({ id: 'a1', groupId: 'g1', color: 'yellow', start: 5, end: 6, created: 1 })];
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    expect(container.querySelector('.hl-note-icon')).not.toBeNull();
+    expect(container.textContent).toBe('Hello world');
+  });
+
+  it('React path: a plain segment ending mid-word carries the no-break marker', () => {
+    store['k'] = [ann({ id: 'a', color: 'yellow', start: 5, end: 10, created: 1 })];
+    const { container } = render(<HighlightableText text="Helloworld" hlKey="k" />);
+    expect(container.querySelector('span[data-no-break-after="1"]')).not.toBeNull();
+    expect(container.textContent).toBe('Helloworld');
+  });
+
+  it('React path: equal-created equal-id annotations sort stably (tie keeps both marks)', () => {
+    store['k'] = [
+      ann({ id: 'same', color: 'yellow', start: 0, end: 5, created: 1 }),
+      ann({ id: 'same', color: 'blue', start: 0, end: 5, created: 1 }),
+    ];
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    expect(container.querySelectorAll('mark[data-hl-id="same"]').length).toBe(2);
+  });
+
+  it('DOM path: legacy note + squiggle + missing kind paint like the React path', () => {
+    store['k'] = [
+      ann({ id: 'leg', kind: 'note', color: 'yellow', start: 0, end: 5, created: 1 }),
+      ann({ id: 'sq', kind: 'squiggle', color: 'red', start: 6, end: 11, created: 2 }),
+      { id: 'bare', groupId: 'bare', color: 'green', start: 0, end: 5, created: 3, text: '' },
+    ];
+    document.body.innerHTML = '<span data-hl-key="k" data-hl-dom>Hello world</span>';
+    const c = document.querySelector('[data-hl-key="k"]');
+    applyDOMHighlights();
+    const leg = c.querySelector('mark[data-hl-id="leg"]');
+    expect(leg.classList.contains('hl-blank')).toBe(true);
+    expect(leg.classList.contains('hl-note')).toBe(true);
+    expect(c.querySelector('mark[data-hl-id="sq"]').classList.contains('hl-squiggle')).toBe(true);
+    expect(c.querySelector('mark[data-hl-id="bare"]').getAttribute('data-kind')).toBe('highlight');
+    expect(c.textContent).toBe('Hello world');
+  });
+
+  it('DOM path: a stored text re-anchors the mark onto its words; unfindable text keeps clamped offsets', () => {
+    store['k'] = [
+      ann({ id: 'moved', color: 'yellow', start: 0, end: 5, created: 1, text: 'world' }),
+      ann({ id: 'stuck', color: 'blue', start: 0, end: 5, created: 2, text: 'ZZZ nowhere' }),
+    ];
+    document.body.innerHTML = '<span data-hl-key="k" data-hl-dom>Hello world</span>';
+    const c = document.querySelector('[data-hl-key="k"]');
+    applyDOMHighlights();
+    expect(c.querySelector('mark[data-hl-id="moved"]').textContent).toBe('world');
+    expect(c.querySelector('mark[data-hl-id="stuck"]').textContent).toBe('Hello');
+    expect(c.textContent).toBe('Hello world');
+  });
+
+  it('DOM path: a second annotation of one group does not steal first-segment', () => {
+    window.NoteStore._notes['g'] = { groupId: 'g', text: 'memo' };
+    store['k'] = [
+      ann({ id: 'a1', groupId: 'g', color: 'yellow', start: 0, end: 5, created: 1 }),
+      ann({ id: 'a2', groupId: 'g', color: 'yellow', start: 6, end: 11, created: 2 }),
+    ];
+    document.body.innerHTML = '<span data-hl-key="k" data-hl-dom>Hello world</span>';
+    const c = document.querySelector('[data-hl-key="k"]');
+    applyDOMHighlights();
+    expect(c.querySelectorAll('mark.first-segment').length).toBe(1);
+    expect(c.querySelector('mark.first-segment').getAttribute('data-hl-id')).toBe('a1');
+  });
+
+  it('annDomSig tolerates records missing kind/color/created', () => {
+    const bare = [{ id: 'x', start: 0, end: 1, groupId: 'g' }];
+    expect(annDomSig(bare)).toContain('x');
+    expect(annDomSig(bare)).not.toBe(annDomSig([{ id: 'x', start: 0, end: 1, groupId: 'g', kind: 'squiggle' }]));
+  });
+
+  it('findNoteIconInsertionPoint: no hl container -> afterMark; boundary at end -> afterMark; mid-word -> beforeNode', () => {
+    document.body.innerHTML = '<p><mark id="m0">noted</mark> tail</p>';
+    expect(findNoteIconInsertionPoint(document.getElementById('m0')).kind).toBe('afterMark');
+
+    document.body.innerHTML = '<div data-hl-key="k"><mark id="m1">noted</mark>word.</div>';
+    expect(findNoteIconInsertionPoint(document.getElementById('m1')).kind).toBe('afterMark');
+
+    document.body.innerHTML = '<div data-hl-key="k"><mark id="m2">noted</mark>word more</div>';
+    const ip = findNoteIconInsertionPoint(document.getElementById('m2'));
+    expect(ip.kind).toBe('beforeNode');
+    expect(ip.node.nodeValue).toBe('more'); // split lands just past the space
+  });
+
+  it('applyNoteIcons: two groups ending together badge into one icon that opens the multi sheet', () => {
+    document.body.innerHTML =
+      '<p data-hl-dom data-hl-key="letter:x:0">' +
+      // nested marks share one charEnd, so both groups land on one target
+      '<mark class="hl-mark hl-note hl-yellow" data-group-id="g1">no<mark class="hl-mark hl-note" data-group-id="g2">ted</mark></mark> tail</p>';
+    const c = document.querySelector('[data-hl-dom]');
+    const multi = [];
+    (/** @type {any} */ (window)).__showMultiNote = (gids) => multi.push(gids);
+    applyNoteIcons();
+    const icons = c.querySelectorAll('.hl-note-icon');
+    expect(icons.length).toBe(1);
+    expect(icons[0].classList.contains('hl-note-icon-badge')).toBe(true);
+    expect(icons[0].getAttribute('data-count')).toBe('2');
+    expect(icons[0].getAttribute('data-group-ids')).toBe('g1,g2');
+    expect(icons[0].getAttribute('title')).toBe('2 notes here');
+    fireEvent.click(icons[0]);
+    expect(multi).toEqual([['g1', 'g2']]);
+  });
+
+  it('applyNoteIcons: a lone icon without the multi handler opens its note; a mark at the very end still gets one', () => {
+    document.body.innerHTML =
+      '<p data-hl-dom data-hl-key="letter:x:0">' +
+      '<mark class="hl-mark hl-note hl-yellow" data-group-id="g1">noted</mark></p>';
+    const c = document.querySelector('[data-hl-dom]');
+    const opened = [];
+    (/** @type {any} */ (window)).__openNote = (gid) => opened.push(gid);
+    applyNoteIcons();
+    const icon = c.querySelector('.hl-note-icon');
+    expect(icon).not.toBeNull();
+    expect(icon.getAttribute('title')).toBe('Open note');
+    fireEvent.click(icon);
+    expect(opened).toEqual(['g1']);
+  });
+
+  it('applyNoteIcons: an icon after a trailing space gets no keep wrapper', () => {
+    document.body.innerHTML =
+      '<p data-hl-dom data-hl-key="letter:x:0">' +
+      '<mark class="hl-mark hl-note hl-yellow" data-group-id="g1">noted </mark>tail</p>';
+    const c = document.querySelector('[data-hl-dom]');
+    applyNoteIcons();
+    expect(c.querySelector('.hl-note-icon')).not.toBeNull();
+    expect(c.querySelector('.hl-keep')).toBeNull();
+  });
+
+  it('applyNoteIcons: works in a data-hl-dom container with no data-hl-key', () => {
+    document.body.innerHTML =
+      '<p data-hl-dom><mark class="hl-mark hl-note hl-yellow" data-group-id="g1">noted</mark> tail</p>';
+    const c = document.querySelector('[data-hl-dom]');
+    applyNoteIcons();
+    const icon = c.querySelector('.hl-note-icon');
+    expect(icon).not.toBeNull();
+    expect(icon.getAttribute('data-hl-key')).toBe('');
+  });
+
+  it('applyNoteIcons: a split mark without an id leaves no continuation twin behind', () => {
+    document.body.innerHTML =
+      '<p data-hl-dom data-hl-key="letter:x:0"><span>' +
+      '<mark class="hl-mark hl-note hl-yellow" data-group-id="g1">two words</mark>' +
+      '</span> tail</p>';
+    const c = document.querySelector('[data-hl-dom]');
+    applyNoteIcons();
+    expect(c.querySelector('.hl-note-icon')).not.toBeNull();
+    expect(c.textContent).toContain('two words');
+    expect(c.querySelectorAll('mark.hl-cont-r').length).toBe(0);
+  });
+
+  it('applyActiveNoteState: no active group is a no-op; a group lights its marks and icons', () => {
+    document.body.innerHTML =
+      '<mark class="hl-note is-active" data-group-id="g1">x</mark>' +
+      '<span class="hl-note-icon" data-group-id="g1"></span>';
+    applyActiveNoteState();
+    expect(document.querySelector('mark.is-active')).toBeNull(); // cleared, none re-lit
+    (/** @type {any} */ (window)).__activeNoteGroup = 'g1';
+    applyActiveNoteState();
+    expect(document.querySelector('mark.is-active')).not.toBeNull();
+    expect(document.querySelector('.hl-note-icon.is-active')).not.toBeNull();
+  });
+
+  it('StaticSubtree renders once and ignores later children', () => {
+    const { container, rerender } = render(
+      <StaticSubtree><span>first</span></StaticSubtree>
+    );
+    expect(container.textContent).toBe('first');
+    rerender(<StaticSubtree><span>second</span></StaticSubtree>);
+    expect(container.textContent).toBe('first');
   });
 });
