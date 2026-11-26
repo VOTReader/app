@@ -290,9 +290,30 @@ export function mergePlanStore(base, ours, theirs) {
       if (k in b && (!(k in ot) || !(k in tt))) continue;
       ticks[k] = k in ot ? ot[k] : tt[k];
     }
-    const rested = r.rested || o.rested || t.rested;
+    // A read one copy took back (in the base, gone from that copy) is gone from the merge, so the rest days pinned on
+    // and after its date go too, as the untick cut them (plan-engine unpinFrom): the other copy may be the newer and
+    // still hold them.
+    let from = '';
+    for (const src of [ot, tt]) for (const k of Object.keys(src)) if (!(k in ticks) && src[k] && (!from || src[k] < from)) from = src[k];
+    const rested = unpinRested(r.rested || o.rested || t.rested, from);
     return rested ? { ...r, ticks, rested } : { ...r, ticks };
   });
+}
+
+/**
+ * plan-engine's unpinFrom on a bare `rested`: the rest days pinned from `from` on are dropped (a read dated `from` was
+ * taken back); the days off and paused days (`off`) depend on no read and stay. Kept here, not imported: this module
+ * rides a bundle the plan engine does not. @param {any} rested @param {string} from @returns {any}
+ */
+function unpinRested(rested, from) {
+  if (!rested || typeof rested.until !== 'string' || !from || from >= rested.until) return rested;
+  const prev = new Date(Date.parse(from + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  /** @type {string[][]} */ const ranges = [];
+  for (const g of Array.isArray(rested.ranges) ? rested.ranges : []) {
+    if (Array.isArray(g) && typeof g[0] === 'string' && g[0] < from) ranges.push([g[0], typeof g[1] === 'string' && g[1] < from ? g[1] : prev]);
+  }
+  for (const d of Array.isArray(rested.dates) ? rested.dates : []) if (typeof d === 'string' && d < from) ranges.push([d, d]);
+  return { until: from, ranges, ...(rested.off ? { off: rested.off } : {}) };
 }
 
 /** Bare id-bearing arrays: bookmarks, links. */

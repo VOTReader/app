@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'Indexed
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
-import { newRun, runStatus, tickItem, catchUp } from '../data/plan-engine.js';
+import { newRun, runStatus, tickItem, catchUp, untickItem, monthCells } from '../data/plan-engine.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
 const run = (items, plan = 'x') => newRun({ plan, tracks: [{ kind: 'bible', by: 'count', items: items.map((k) => ({ k, w: 600 })) }], pace: { mode: 'days', n: items.length } }, at('2026-10-22'));
@@ -148,5 +148,23 @@ describe('a run\'s pinned rest days (rested) survive the store, backups and merg
     // Both have it: the newer copy's stays.
     const later = { ...newer(r), rested: { until: '2026-12-11', ranges: [['2026-12-01', '2026-12-02']] } };
     expect(mergePlanStore(null, [r], [later])[0].rested).toEqual(later.rested);
+  });
+});
+
+describe('refute 0e2c8009f: a merge that drops an unticked read drops the pins it made, as the untick did', () => {
+  it('Ruth over 20 days, caught up Dec 17; tab A: Dec 13\'s read not read (Dec 21); tab B, newer, edits its older copy: Dec 14 to 16 are missed, as in A', () => {
+    let run = newRun({ id: 'p-m', plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01'));
+    run = tickItem(run, 'ruth:1', '2026-12-03', 1); run = tickItem(run, 'ruth:2', '2026-12-08', 1); run = tickItem(run, 'ruth:3', '2026-12-13', 1);
+    const base = catchUp(run, at('2026-12-17'));
+    const a = untickItem(base, 'ruth:3', at('2026-12-21'));
+    const b = { ...base, notes: { 3: 'a note' }, updated: at('2026-12-21').getTime() + 3600000 };   // an hour later
+    const cells = (/** @type {any} */ r) => monthCells(r, 2026, 11, at('2026-12-21')).filter((c) => c.date >= 13 && c.date <= 16).map((c) => c.state);
+    expect(cells(a)).toEqual(['missed', 'missed', 'missed', 'missed']);
+    for (const [ours, theirs] of [[a, b], [b, a]]) {
+      const m = mergePlanStore([base], [ours], [theirs])[0];
+      expect('ruth:3' in m.ticks).toBe(false);
+      expect(cells(m)).toEqual(cells(a));
+      expect(m.notes).toEqual({ 3: 'a note' });
+    }
   });
 });
