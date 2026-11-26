@@ -38,7 +38,8 @@ export function spawnSync(cmd, args, opts) {
     if (o.input != null) { writeFileSync(base + '.in', o.input); stdin = open('.in', 'r'); }
     const out = open('.out', 'w');
     const err = open('.err', 'w');
-    const { input, encoding, maxBuffer, ...rest } = o;
+    // input went to the stdin file above and a file has no maxBuffer: neither is passed on.
+    const { input: _input, encoding, maxBuffer: _maxBuffer, ...rest } = o;
     const r = cp.spawnSync(cmd, /** @type {string[]} */ (args), { ...rest, stdio: [stdin, out, err] });
     for (const fd of fds.splice(0)) closeSync(fd);
     /** @param {string} name */
