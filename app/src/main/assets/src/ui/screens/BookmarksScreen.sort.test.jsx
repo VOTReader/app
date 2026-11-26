@@ -142,7 +142,7 @@ describe('BookmarksScreen — large libraries', () => {
     pick('Place A-Z');
     for (const q of ['n', 'no', 'not', 'note']) fireEvent.change(box(), { target: { value: q } });
     expect(sources().length).toBe(60);
-    expect(sources()[0]).toBe('Alpha 12');   // A-Z on the label text: 'alpha 12' < 'alpha 3'
+    expect(sources()[0]).toBe('Alpha 3');   // numbers as numbers (fix list #17): 'Alpha 3' < 'Alpha 12'
     expect(alls).toBe(1);
     expect(resolves).toBe(60);
   });
@@ -213,5 +213,43 @@ describe('BookmarksScreen — search matches thoughts', () => {
     show();
     fireEvent.change(box(), { target: { value: 'alpha' } });
     expect(labels().sort()).toEqual(['Alpha note', 'Mu note']);
+  });
+});
+
+describe('BookmarksScreen — the orders are what they say (fix list #17)', () => {
+  const withStore = (list) => { globalThis.BookmarkStore.all = () => list.slice(); };
+
+  it('Oldest first is Newest first reversed, on the same time', () => {
+    withStore([
+      { id: 'x1', hlKey: 'bible:alpha:1', label: 'One', created: 100, updated: 900 },
+      { id: 'x2', hlKey: 'bible:mu:1', label: 'Two', created: 200, updated: 200 },
+      { id: 'x3', hlKey: 'bible:zeta:1', label: 'Three', created: 300, updated: 300 },
+    ]);
+    show();
+    const newest = labels();
+    expect(newest).toEqual(['One', 'Three', 'Two']);
+    pick('Oldest first');
+    expect(labels()).toEqual(newest.slice().reverse());
+  });
+
+  it('Name A-Z sorts a bookmark with no label by the name it shows, not first', () => {
+    withStore([
+      { id: 'y1', hlKey: 'bible:zeta:1', label: '', created: 1, updated: 1 },
+      { id: 'y2', hlKey: 'bible:mu:1', label: 'Beta note', created: 2, updated: 2 },
+      { id: 'y3', hlKey: 'bible:alpha:1', label: 'Alpha note', created: 3, updated: 3 },
+    ]);
+    show();
+    pick('Name A-Z');
+    expect(labels()).toEqual(['Alpha note', 'Beta note', 'Zeta 1']);
+  });
+
+  it('Place A-Z puts chapter 2 before chapter 10', () => {
+    withStore([
+      { id: 'z1', hlKey: 'bible:mu:10', label: 'Ten', created: 1, updated: 1 },
+      { id: 'z2', hlKey: 'bible:mu:2', label: 'Two', created: 2, updated: 2 },
+    ]);
+    show();
+    pick('Place A-Z');
+    expect(labels()).toEqual(['Two', 'Ten']);
   });
 });

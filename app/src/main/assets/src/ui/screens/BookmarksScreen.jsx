@@ -152,19 +152,17 @@ export function BookmarksScreen(props) {
           return label.includes(q) || sourceOf.get(bkm).lower.includes(q) || thought.includes(q);
         })
       : allBookmarks.slice();
+    // Fix list #17: Newest and Oldest read the same time (so one is the other reversed), Name sorts by the name the
+    // row shows (a bookmark with no label shows its place's name, it is not first), and numbers sort as numbers.
+    var byWords = function(x, y) { return x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' }); };
+    var when = function(bkm) { return bkm.updated || bkm.created || 0; };
     filtered.sort(function(a, b) {
-      if (sortMode === 'oldest') return (a.created || 0) - (b.created || 0);
-      if (sortMode === 'source-az') {
-        var la = sourceOf.get(a).lower;
-        var lb = sourceOf.get(b).lower;
-        return la < lb ? -1 : la > lb ? 1 : 0;
-      }
+      if (sortMode === 'oldest') return when(a) - when(b);
+      if (sortMode === 'source-az') return byWords(sourceOf.get(a).text, sourceOf.get(b).text);
       if (sortMode === 'label-az') {
-        var xa = (a.label || '').toLowerCase();
-        var xb = (b.label || '').toLowerCase();
-        return xa < xb ? -1 : xa > xb ? 1 : 0;
+        return byWords(bookmarkWords(a, sourceOf.get(a).text).name, bookmarkWords(b, sourceOf.get(b).text).name);
       }
-      return (b.updated || b.created || 0) - (a.updated || a.created || 0);
+      return when(b) - when(a);
     });
     return filtered;
   }, [allBookmarks, sourceOf, searchQuery, sortMode]);
