@@ -21,6 +21,7 @@
    (integrity, Clear All's caches) keep console.warn, so nothing logs twice. */
 
 import { backupWarn } from './backup-warn.js';
+import { storeLabel } from './store-labels.js';
 
 /** The reader's own calendar date, YYYY-MM-DD, for backup file names. toISOString
  *  is UTC, so an evening export in the Americas was named for tomorrow (lw1).
@@ -70,12 +71,18 @@ const VERIFY_TOO_LARGE_TEXT = 'That file is too large to be a VOTReader backup (
  * with nothing (storage-backup-2 follow-up). The store ids stay in the console
  * warning backup.js already emits; a count is what the reader can act on.
  * Sticky (duration 0) whenever there is anything to read.
+ * data-3: `unreadable` names the stores whose record is broken; the file holds everything
+ * else, and the reader is told which part it lacks, in their words.
  * @param {string[]|undefined} problems
  * @param {boolean} nearLimit
+ * @param {string[]} [unreadable]
  * @returns {{ text: string, sticky: boolean }}
  */
-export function _savedBackupToast(problems, nearLimit) {
+export function _savedBackupToast(problems, nearLimit, unreadable) {
   const n = problems ? problems.length : 0;
+  const lost = unreadable && unreadable.length
+    ? ' without your ' + unreadable.map(storeLabel).join(', ') + ' (this device could not read ' + (unreadable.length === 1 ? 'it' : 'them') + '); everything else is in it'
+    : '';
   const stale = n
     ? ' — ' + n + ' recent change' + (n === 1 ? '' : 's') + ' may be missing; your device could not finish saving '
       + (n === 1 ? 'it' : 'them') + ' before the backup was taken'
@@ -84,7 +91,7 @@ export function _savedBackupToast(problems, nearLimit) {
     // id-datasafe 158: this file restores; it is the NEXT export the 16 MiB gate refuses.
     ? ' Note: your library is close to the 16 MB backup limit. This file restores fine, but once your library grows past the limit, Export will stop and say so.'
     : '';
-  return { text: 'Backup saved' + stale + '.' + limit, sticky: !!(n || nearLimit) };
+  return { text: 'Backup saved' + lost + stale + '.' + limit, sticky: !!(n || nearLimit || lost) };
 }
 
 /**
@@ -404,7 +411,7 @@ export function createBackupFlow(ctx) {
   const _finishV3Export = (/** @type {any} */ built) => {
     hideToast(_TOAST_ID);
     _markExported();
-    const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
+    const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES, built.unreadable);
     if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
   };
 

@@ -101,6 +101,20 @@ describe('StorageHealthBanner — scenario 1 (healthy)', () => {
 /* ─── Banner: E5 storage-slow (degraded hydration) ─────────────── */
 
 describe('StorageHealthBanner — E5 storage-slow (degraded)', () => {
+  it('data-3: a store that cannot be read is named, with Back up, instead of "slow to load"', () => {
+    const orig = StorageHealth.getStoresUnreadable;
+    StorageHealth.getStoresUnreadable = () => ['vot-history'];
+    try {
+      const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true });
+      const banner = container.querySelector('.sh-banner');
+      expect(banner.className).toContain('sh-banner-amber');
+      expect(banner.textContent).toContain('This device could not read your reading history');
+      expect(banner.textContent).toContain('New changes there will not be kept.');
+      expect(banner.textContent).not.toContain('Storage is slow to load');
+      expect([...banner.querySelectorAll('button')].map((b) => b.textContent)).toContain('Back up');
+    } finally { StorageHealth.getStoresUnreadable = orig; }
+  });
+
   it('shows an amber, non-dismissable banner when a store is degraded', () => {
     const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true });
     const banner = container.querySelector('.sh-banner');

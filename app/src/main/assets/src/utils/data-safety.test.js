@@ -1213,3 +1213,35 @@ describe('data-rest-n1: Liked Songs ride in the snapshots and come back on Resto
     expect(await DataSafety.saveLatest({ sink })).toBe('unchanged');
   });
 });
+
+describe('data-3: one unreadable store does not stop the snapshots', () => {
+  const HIST = [{ key: 'bible:john:3', at: 1 }, { key: 'bible:john:4', at: 2 }];
+  const BROKEN = { __votChunks: 1, gen: 'auditgone', n: 2, len: 20000 };
+
+  it('REPRO: vot-history unreadable: the pass snapshots, carrying its last good copy, and Restore leaves it alone', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE, 'vot-history': HIST });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    vi.useRealTimers();
+    DataSafety._resetForTests();
+    await IDBAdapter.put('vot-history', 'v', BROKEN);
+    stores[4]._state = 'degraded'; stores[4]._unreadable = true;          // what hydration made of it
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    expect(sink.files.size).toBe(2);
+    const newest = JSON.parse(sink.files.get([...sink.files.keys()].sort().reverse()[0]));
+    expect(newest.stores['vot-history']).toEqual(HIST);
+    expect(newest.stores['vot-annotations']).toEqual(ANN);
+    // A restore of the rest never writes over the broken record.
+    StorageHealth.setDataMissing({ name: [...sink.files.keys()][0], at: Date.now(), then: {}, now: {} });
+    await IDBAdapter.put('vot-notes', 'v', {});
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(true);
+    expect(await IDBAdapter.get('vot-notes', 'v')).toEqual(NOTES);
+    await expect(IDBAdapter.get('vot-history', 'v')).rejects.toMatchObject({ name: 'DataError' });
+  });
+
+  it('a store still loading (not broken) still waits', async () => {
+    stores[4]._state = 'degraded';
+    expect(await DataSafety.run({ sink: memorySink() })).toBe('not-loaded');
+  });
+});

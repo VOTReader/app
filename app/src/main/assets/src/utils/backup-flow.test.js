@@ -130,6 +130,11 @@ afterEach(() => {
 });
 
 describe('_savedBackupToast', () => {
+  it('data-3: names an unreadable store in words and stays up', () => {
+    expect(_savedBackupToast([], false, ['vot-history'])).toEqual({
+      text: 'Backup saved without your reading history (this device could not read it); everything else is in it.', sticky: true });
+    expect(_savedBackupToast(['vot-notes'], false, ['vot-history', 'vot-odd']).text).toMatch(/^Backup saved without your reading history, vot-odd \(this device could not read them\); everything else is in it — 1 recent change may be missing/);
+  });
   it('a clean backup is a short, fading toast', () => {
     expect(_savedBackupToast([], false)).toEqual({ text: 'Backup saved.', sticky: false });
   });

@@ -162,7 +162,9 @@ export function HydrationGate({ children }) {
       if (safetyTimer != null) clearTimeout(safetyTimer);
       safetyTimer = setTimeout(() => { safetyTimer = null; DataSafety.run(); }, DataSafety.freshDatabase() ? 0 : SAFETY_DELAY_MS);
     };
-    let waiting = lateRef.current;
+    // data-3: a store whose record is broken never loads by waiting; the pass goes on without it.
+    const unreadable = (/** @type {any} */ s) => typeof s.isUnreadable === 'function' && s.isUnreadable();
+    let waiting = lateRef.current.filter((s) => !unreadable(s));
     if (waiting.length === 0) {
       scheduleSafety();
       return () => { if (safetyTimer != null) clearTimeout(safetyTimer); };
@@ -170,10 +172,13 @@ export function HydrationGate({ children }) {
     /** @type {any} */ let timer = null;
     let loadedCount = 0;
     const onChange = () => {
-      const still = waiting.filter((s) => s.getState() !== 'loaded');
+      const still = waiting.filter((s) => s.getState() !== 'loaded' && !unreadable(s));
       if (still.length === waiting.length) return;
-      loadedCount += waiting.length - still.length;
+      const nowLoaded = waiting.filter((s) => s.getState() === 'loaded').length;
       waiting = still;
+      // data-3: only went unreadable: nothing new to show, so no remount; the pass may run.
+      if (nowLoaded === 0) { if (timer == null && waiting.length === 0) scheduleSafety(); return; }
+      loadedCount += nowLoaded;
       if (timer != null) clearTimeout(timer);
       const fire = () => {
         timer = null;

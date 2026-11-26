@@ -187,6 +187,8 @@ let _safariGateBlocked = false;
 // StorageHealthBanner — which only subscribes to StorageHealth — can surface
 // a low-key "storage is slow" heads-up.
 let _storesDegraded = false;
+/** data-3: the stores whose record is broken (cannot be read at all), by store name. @type {string[]} */
+let _storesUnreadable = [];
 // v04-03: true once a store met a database that a NEWER VOTReader upgraded (IDB
 // VersionError). This build can never open it, so the banner stops promising that
 // changes will be saved and says what to do instead. It never clears in a session.
@@ -810,6 +812,19 @@ function _setStoresDegraded(v) {
 }
 
 /**
+ * data-3: the stores whose record could not be read at all (cached-store calls it). The
+ * banner names them; a change notifies subscribers.
+ * @param {string[]} names
+ */
+function _setStoresUnreadable(names) {
+  var next = Array.isArray(names) ? names.slice().sort() : [];
+  if (next.join(',') === _storesUnreadable.join(',')) return;
+  _storesUnreadable = next;
+  if (_report) _report = Object.assign({}, _report);   // a new report: the banner re-renders
+  _bump();
+}
+
+/**
  * v04-03: set the "a newer VOTReader saved this database" flag (see _versionTooNew).
  * Cached stores call it, typeof-guarded, when IDB refuses to open with a VersionError.
  *
@@ -918,6 +933,7 @@ function _resetForTests(opts) {
   _safariWarningShownThisSession = false;
   _safariGateBlocked = false;
   _storesDegraded = false;
+  _storesUnreadable = [];
   _versionTooNew = false;
   _libraryElsewhere = null;
   _assessInFlight = null;
@@ -944,6 +960,9 @@ export const StorageHealth = {
   dismissScenario: _dismissScenario,
   isDismissed: _isDismissed,
   setStoresDegraded: _setStoresDegraded,
+  setStoresUnreadable: _setStoresUnreadable,
+  /** data-3: store names whose record cannot be read. @returns {string[]} */
+  getStoresUnreadable: function () { return _storesUnreadable.slice(); },
   setVersionTooNew: _setVersionTooNew,
   setLibraryElsewhere: _setLibraryElsewhere,
   setDataMissing: _setDataMissing,

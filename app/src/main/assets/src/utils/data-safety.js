@@ -70,7 +70,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
-import { storesNotLoaded, registeredStores, setStoreWriteFence, isStoreWriteFenced } from '../stores/cached-store.js';
+import { storesNotLoaded, storesUnreadable, registeredStores, setStoreWriteFence, isStoreWriteFenced } from '../stores/cached-store.js';
 import {
   mergeAnnotationsStore, mergeMapStore, mergeArrayStore, mergePlanStore, mergeListStore, mergeJournalIndexStore, mergeStateStore,
 } from '../stores/store-merge.js';
@@ -165,12 +165,19 @@ export function looksDamaged(then, now) {
   return a.some((v, i) => v >= MIN_SCORE && b[i] < v / 2);
 }
 
-/** Every registered store's record straight from the database. @returns {Promise<Record<string, any>>} */
+/** data-3: the names of the stores whose record cannot be read at all. @returns {Set<string>} */
+const _unreadableNames = () => new Set(storesUnreadable().map((s) => s._idbStoreName));
+
+/** Stores not loaded that waiting could still bring (data-3: an unreadable one never will). */
+const _stillLoading = () => storesNotLoaded().filter((s) => !(typeof s.isUnreadable === 'function' && s.isUnreadable()));
+
+/** Every registered store's record straight from the database, an unreadable one (data-3) left out. @returns {Promise<Record<string, any>>} */
 async function collectStores() {
   /** @type {Record<string, any>} */ const out = {};
+  const unreadable = _unreadableNames();
   for (const store of registeredStores()) {
     const name = store._idbStoreName;
-    if (!name || SKIP_STORES.has(name)) continue;
+    if (!name || SKIP_STORES.has(name) || unreadable.has(name)) continue;
     const v = await IDBAdapter.get(name, 'v');
     if (v !== undefined) out[name] = v;
   }
@@ -241,6 +248,19 @@ async function _collectMeta() {
 
 /** A stores JSON with the meta that rides beside it, for the "same as last time" check. @param {string} json @param {any} meta */
 const _withMeta = (json, meta) => (json && meta ? json + JSON.stringify(meta) : json);
+
+/**
+ * data-3: put each unreadable store's copy from the newest snapshot that reads into `stores`.
+ * @param {any} sink @param {Record<string, any>} stores @param {string[]} names
+ */
+async function _carryUnreadable(sink, stores, names) {
+  const found = await _newestReadable(sink, await sink.list());
+  const from = found.snap && found.snap.stores ? found.snap.stores : {};
+  const carried = names.filter((n) => from[n] !== undefined);
+  for (const n of carried) stores[n] = from[n];
+  DiagnosticLog.warn('data-health', 'could not read ' + names.join(', ') + ': ' +
+    (carried.length ? 'kept ' + carried.join(', ') + ' from ' + (found.entry && found.entry.name) : 'no snapshot holds it') + ' in this snapshot');
+}
 
 /** A local calendar day key. @param {number} ms */
 const dayOf = (ms) => new Date(ms).toDateString();
@@ -349,9 +369,14 @@ async function _run(opts) {
   const skip = skipToken != null;
   const sink = (opts && opts.sink) || snapshotSink();
   if (!sink) return 'no-sink';
-  if (storesNotLoaded().length) return 'not-loaded';
+  if (_stillLoading().length) return 'not-loaded';
   try {
     const stores = await collectStores();
+    // data-3: a store whose record is broken does not stop the pass. Its last good copy rides
+    // on from the newest snapshot that has it, so the library is judged whole and a broken
+    // store can never rotate its good copies out. Nothing here writes it back.
+    const unreadable = [..._unreadableNames()];
+    if (unreadable.length) await _carryUnreadable(sink, stores, unreadable);
     const meta = await _collectMeta();
     const summary = summarize(stores);
     const list = await sink.list();
@@ -768,7 +793,7 @@ export async function restoreMissing(opts) {
     return false;
   };
   if (!missing) return false;
-  if (!sink || storesNotLoaded().length) return said('Restore could not run yet. Your library is unchanged; try again in a moment.');
+  if (!sink || _stillLoading().length) return said('Restore could not run yet. Your library is unchanged; try again in a moment.');
   // W8: another tab changed the library under this one: this tab's writes would not land.
   if (heldByOtherTab()) return said('Your library was changed in another tab. Reload this tab, then try Restore again.');
   const snap = _parse(await sink.read(missing.name));
@@ -811,8 +836,10 @@ async function _restoreLocked(sink, missing, snap, opts) {
     await Promise.all(registeredStores().map((s) => (typeof s.whenSaved === 'function' ? s.whenSaved() : true)));
     const live = await collectStores();
     const wiped = isWiped(summarize(live));
+    const unreadable = _unreadableNames();
     for (const name of Object.keys(snap.stores)) {
-      if (SKIP_STORES.has(name)) continue;
+      // data-3: a store whose record is broken is left as it is (putting a copy over it is the reader's call).
+      if (SKIP_STORES.has(name) || unreadable.has(name)) continue;
       const merged = mergeForRestore(name, live[name], snap.stores[name], { wiped });
       if (merged !== live[name]) { await IDBAdapter.put(name, 'v', merged); wrote = true; _syncShim(name, merged); }
     }

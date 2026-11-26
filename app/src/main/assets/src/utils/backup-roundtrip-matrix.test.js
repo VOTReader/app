@@ -636,3 +636,24 @@ describe('data-rest-n1: Liked Songs survive export, a wipe and import', () => {
     expect(await IDBAdapter.get('meta', 'song-votes')).toEqual(VOTES);
   });
 });
+
+describe('data-3: an unreadable store does not block the backup', () => {
+  it('REPRO: vot-history broken: the export holds everything else and names it; nothing aborts', async () => {
+    await wipeDevice();
+    AnnotationStore.replaceAll({ 'bible:john:3:16': [{ id: 'a1', groupId: 'a1', kind: 'highlight', start: 0, end: 5, color: 'yellow', created: 1, updated: 1 }] });
+    await flush();
+    await IDBAdapter.put('vot-history', 'v', { __votChunks: 1, gen: 'auditgone', n: 2, len: 20000 });
+    HistoryStore._backgroundRetryDelays = [];
+    await relaunch();
+    expect(HistoryStore.isUnreadable()).toBe(true);
+    const built = await buildV3Manifest(exportCtx());
+    expect(built.ok).toBe(true);
+    expect(built.unreadable).toEqual(['vot-history']);
+    expect(built.problems).not.toContain('vot-history');
+    expect(built.manifest.stores['vot-history']).toBeUndefined();
+    expect(Object.keys(built.manifest.stores['vot-annotations'])).toEqual(['bible:john:3:16']);
+    const v2 = await buildExportPayload(exportCtx());
+    expect(v2.ok).toBe(true);
+    expect(v2.unreadable).toEqual(['vot-history']);
+  });
+});

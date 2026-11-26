@@ -157,7 +157,7 @@ async function _defaultStorageEstimate() {
  * `problems` on an `ok:true` result names the stores whose CONTENT may be one
  * change behind — not a reason to withhold the backup, only to say so.
  * @typedef {(
- *   | { ok: true, payload: any, problems: string[] }
+ *   | { ok: true, payload: any, problems: string[], unreadable?: string[] }
  *   | { ok: false, reason: 'media-limit' }
  *   | { ok: false, reason: 'read-failure', problems: string[] }
  * )} BuildExportResult
@@ -214,7 +214,7 @@ function _unloadedStores(storesMap, flagMap) {
  * @param {Record<string, any>} flagMap
  * @param {any} idbAdapter
  * @param {string[]} dataLsKeys  the localStorage keys carried as `data` (the boot shim)
- * @returns {Promise<{ staleProblems: string[], exportProblems: string[], data: Record<string, string>, stores: Record<string, any>, meta: Record<string, any> | null }>}
+ * @returns {Promise<{ staleProblems: string[], exportProblems: string[], data: Record<string, string>, stores: Record<string, any>, meta: Record<string, any> | null, unreadable: string[] }>}
  */
 async function _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys) {
   const staleProblems = _unloadedStores(storesMap, flagMap);
@@ -241,11 +241,17 @@ async function _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKey
 
   /** @type {Record<string, any>} */
   const stores = {};
+  /** data-3: stores whose record is broken (a DataError): the backup goes on without them and says so. @type {string[]} */
+  const unreadable = [];
   for (const name of Object.keys(storesMap)) {
     try {
       const v = await idbAdapter.get(name, 'v');
       if (v !== undefined) stores[name] = v;
-    } catch (e) { backupWarn('export: store read failed', name, e); exportProblems.push(name); }
+    } catch (e) {
+      backupWarn('export: store read failed', name, e);
+      if (e && /** @type {any} */ (e).name === 'DataError') unreadable.push(name);
+      else exportProblems.push(name);
+    }
   }
   for (const name of Object.keys(flagMap)) {
     try {
@@ -258,7 +264,8 @@ async function _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKey
   let meta = null;
   // Best effort: an unreadable votes map never costs the reader the rest of the backup.
   try { meta = await readBackupMeta(idbAdapter); } catch (e) { backupWarn('export: meta read failed', 'song-votes', e); }
-  return { staleProblems, exportProblems, data, stores, meta };
+  // An unreadable store is named once, as unreadable, not also as a change that may be missing.
+  return { staleProblems: staleProblems.filter((n) => !unreadable.includes(n)), exportProblems, data, stores, meta, unreadable };
 }
 
 /**
@@ -302,7 +309,7 @@ export async function buildExportPayload(ctx) {
   // (a) data (the LS boot-shim; V1 clients reading this file see just theme +
   // fontStyle restored, an intentional limitation) and (b) every store, read
   // straight from IDB after the durability barrier: _collectStoresForExport.
-  const { staleProblems, exportProblems, data, stores, meta } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
+  const { staleProblems, exportProblems, data, stores, meta, unreadable } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
 
   // (c) media: encode JournalMediaStore blobs as base64.
   /** @type {Record<string, any>} */
@@ -359,7 +366,7 @@ export async function buildExportPayload(ctx) {
     media: media,
   };
   if (meta) /** @type {any} */ (payload).meta = meta;
-  return { ok: true, payload, problems: staleProblems };
+  return { ok: true, payload, problems: staleProblems, unreadable };
 }
 
 /**
@@ -383,7 +390,7 @@ export async function buildExportPayload(ctx) {
  * only the media half differs.
  *
  * @param {BuildExportCtx} ctx
- * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}>, problems:string[] }
+ * @returns {Promise<{ ok:true, manifest:any, manifestBytes:number, mediaEntries: Array<{id:string, blob:Blob}>, problems:string[], unreadable?:string[] }
  *   | { ok:false, reason:'read-failure', problems:string[] }>}
  */
 export async function buildV3Manifest(ctx) {
@@ -396,7 +403,7 @@ export async function buildV3Manifest(ctx) {
   } = ctx;
 
   // The same durability barrier, data and store read as v2 (_collectStoresForExport).
-  const { staleProblems, exportProblems, data, stores, meta } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
+  const { staleProblems, exportProblems, data, stores, meta, unreadable } = await _collectStoresForExport(storesMap, flagMap, idbAdapter, dataLsKeys);
 
   // Media: per-blob METADATA for the manifest + the blob refs (SAME order) for
   // the container to stream. No base64, no size cap (streaming is bounded). The
@@ -451,7 +458,7 @@ export async function buildV3Manifest(ctx) {
   // exposing the size lets the export UI warn while the data still lives on
   // this device instead of at restore time on a wiped phone.
   const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest)).length;
-  return { ok: true, manifest, manifestBytes, mediaEntries, problems: staleProblems };
+  return { ok: true, manifest, manifestBytes, mediaEntries, problems: staleProblems, unreadable };
 }
 
 /**

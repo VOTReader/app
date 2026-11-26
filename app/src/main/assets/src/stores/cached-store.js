@@ -235,6 +235,8 @@ function _cloneSnapshot(v) {
  *   _idbLsShim: ((full: T | null) => any) | null,
  *   _idbHydrationTimeoutMs: number,
  *   _backgroundRetryDelays: number[],
+ *   _unreadable: boolean,
+ *   isUnreadable(): boolean,
  *   _schemaVersion: number,
  *   _migrations: Record<number, (old: any) => any>,
  *   _schemaMetaKey: string,
@@ -454,6 +456,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _idbLsShim: lsShim,
     _idbHydrationTimeoutMs: hydrationTimeoutMs,
     _backgroundRetryDelays: backgroundRetryDelays,
+    /** data-3: hydration met a DataError (a record whose pieces are gone): not slow, unreadable. */
+    _unreadable: false,
+    /** data-3: true while this store could not be read because its record is broken. */
+    isUnreadable() { return this._state !== 'loaded' && this._unreadable; },
     _schemaVersion: schemaVersion,
     _migrations: migrations,
     _schemaMetaKey: schemaMetaKey,
@@ -1087,6 +1093,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // terminal: degraded once, StorageHealth told (its own banner), no retry.
           const newerDb = typeof IDBAdapter.isVersionError === 'function' && IDBAdapter.isVersionError(err);
           if (newerDb) _reportNewerDatabase(storageKey);
+          if (_isBrokenRecord(err)) { self._unreadable = true; _reportUnreadable(); }
           if (self._state !== 'degraded') {
             self._state = 'degraded';
             // E5: trace the degraded transition (see the timeout path above).
@@ -1120,6 +1127,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         this._base = _cloneSnapshot(this._cache);
       }
       this._state = 'loaded';
+      if (this._unreadable) { this._unreadable = false; _reportUnreadable(); }
       // E5: this store recovered — clear the degraded banner ONLY if no other
       // store is still degraded (the setter no-ops when unchanged).
       if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(_anyStoreDegraded());
@@ -1251,6 +1259,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             _reportNewerDatabase(storageKey);
             return;
           }
+          if (_isBrokenRecord(err) && !self._unreadable) { self._unreadable = true; _reportUnreadable(); }
           attempt += 1;
           var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);
           if (idx < 0) return;
@@ -1354,6 +1363,27 @@ export function registeredStores() {
  */
 export function storesNotLoaded() {
   return Array.from(_idbStoreRegistry).filter(function (s) { return s._state !== 'loaded'; });
+}
+
+/**
+ * data-3: the registered stores whose record could not be read at all (a chunk manifest
+ * whose pieces are gone: idb-chunks throws a DataError). Unlike a slow store they will
+ * not load by waiting, so export and the snapshot pass go on without them and say so.
+ * @returns {Array<any>}
+ */
+export function storesUnreadable() {
+  return Array.from(_idbStoreRegistry).filter(function (s) { return s._state !== 'loaded' && s._unreadable; });
+}
+
+/** data-3: a read error that waiting will not fix: the record is broken. @param {any} err */
+function _isBrokenRecord(err) {
+  return !!err && err.name === 'DataError';
+}
+
+/** data-3: tell StorageHealth (its banner names them) which stores cannot be read. */
+function _reportUnreadable() {
+  if (typeof StorageHealth === 'undefined' || typeof StorageHealth.setStoresUnreadable !== 'function') return;
+  StorageHealth.setStoresUnreadable(storesUnreadable().map(function (s) { return s._idbStoreName; }));
 }
 
 /**

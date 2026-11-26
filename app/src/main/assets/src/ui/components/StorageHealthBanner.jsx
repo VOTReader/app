@@ -28,6 +28,7 @@ import { OfflineLibraryBanner, useTopStrip } from './OfflineLibraryBanner.jsx';
 import { showToast } from '../../utils/toast.js';
 import { openYourData } from '../../utils/your-data-link.js';
 import { Notice } from './UiParts.jsx';
+import { storeLabel } from '../../utils/store-labels.js';
 
 /** ds5 s16.1: a banner action that failed says so; the banner itself stays. Runs fn now (a throw is a rejection). */
 function _attempt(/** @type {() => any} */ fn) {
@@ -203,6 +204,18 @@ export function StorageHealthBanner({ onNavigateSettings }) {
     // E5: lowest priority — a store is stuck in the degraded hydration tier
     // (serving empty defaults). Placed last so it never masks a real quota /
     // write-fail / private-mode banner; auto-clears when the store recovers.
+    // data-3: a store whose record is broken will not catch up by waiting: name it, say what
+    // happens to new changes in it, and offer the backup of everything else.
+    const unreadable = storesDegraded && typeof StorageHealth.getStoresUnreadable === 'function' ? StorageHealth.getStoresUnreadable() : [];
+    if (unreadable.length) {
+      return {
+        id: 'storage-unreadable',
+        style: 'amber',
+        text: 'This device could not read your ' + unreadable.map(storeLabel).join(', ') + '. New changes there will not be kept. The automatic copies still hold the last good version; back up everything else now.',
+        dismissable: false,
+        buttons: [{ label: 'Back up', onClick: _goExport }],
+      };
+    }
     if (storesDegraded) {
       return {
         id: 'storage-slow',
