@@ -4111,6 +4111,8 @@
     /* large-text-n3: from 240% the three pills outgrow a phone ("Volumes" 66 px off screen at 300%); they wrap. */
     .vot-large-text .srch-corpus-row { flex-wrap:wrap; }
     .vot-large-text .srch-corpus-btn { flex:1 1 auto; }
+    /* A passage card's "Open Matthew 5" pill ran past the card edge at 300%; at large text it wraps inside the card. */
+    .vot-large-text .srch-direct-open { max-width:100%; white-space:normal; text-align:center; padding-block:6px; border-radius:var(--r-card); }
     .srch-scope-chip { display:inline-flex; align-items:center; gap:6px; min-height:var(--tap); margin:10px var(--gutter) 0; padding:0 14px; background:var(--surface-1); border:0; border-radius:var(--r-pill); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); text-align:left; cursor:pointer; }
     .srch-scope-chip.active { background:var(--accent-soft); color:var(--text-1); }
     .srch-scope-chip-icon, .srch-scope-chip-x { display:inline-flex; color:var(--accent); }

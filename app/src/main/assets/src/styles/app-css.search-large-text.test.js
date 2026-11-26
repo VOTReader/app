@@ -93,3 +93,14 @@ describe('the corpus pills at large Text Size', () => {
     expect(decls('.srch-corpus-row')['flex-wrap']).toBeUndefined();
   });
 });
+
+/* Seen live while fixing large-text-n3: a passage card's "Open Matthew 5" is a nowrap pill that ran past the card's
+   edge at 300%. At large text it wraps inside the card and becomes a rounded box. */
+describe("the passage card's Open button at large Text Size", () => {
+  it('wraps inside the card instead of being cut', () => {
+    const d = decls('.vot-large-text .srch-direct-open');
+    expect(d['white-space']).toBe('normal');
+    expect(d['max-width']).toBe('100%');
+    expect(d['border-radius']).toBe('var(--r-card)');
+  });
+});
