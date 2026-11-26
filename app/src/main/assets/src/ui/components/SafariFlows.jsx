@@ -35,26 +35,26 @@ export function Safari7DayModal() {
   return (
     <div className="sh-modal-backdrop">
       <div className="sh-modal" ref={trapRef} role="dialog" aria-modal="true" aria-label="Safari storage warning">
-        <h3 className="sh-modal-title">Before you start saving</h3>
-        <p className="sh-modal-text">
+        <h3 className="ui-sheet-title sh-modal-title">Before you start saving</h3>
+        <p className="ui-sheet-body sh-modal-text">
           {"Safari may delete your saved notes and highlights if you don't visit for 7 days. "}
           {"To keep your data safe, add VOTReader to your Home Screen."}
         </p>
         {showInstructions && (
           <div className="sh-modal-instructions">
             {isMac
-              ? <p className="sh-modal-text">In Safari: <strong>File</strong> {'>'} <strong>Add to Dock</strong></p>
-              : <p className="sh-modal-text">Tap the <strong>Share</strong> button {'>'} <strong>Add to Home Screen</strong></p>
+              ? <p className="ui-sheet-body sh-modal-text">In Safari: <strong>File</strong> {'>'} <strong>Add to Dock</strong></p>
+              : <p className="ui-sheet-body sh-modal-text">Tap the <strong>Share</strong> button {'>'} <strong>Add to Home Screen</strong></p>
             }
           </div>
         )}
         <div className="sh-modal-actions">
           {!showInstructions && (
-            <button className="sh-modal-btn sh-modal-btn-primary" onClick={() => setShowInstructions(true)}>
+            <button className="ui-btn is-primary sh-modal-btn sh-modal-btn-primary" onClick={() => setShowInstructions(true)}>
               How to add to Home Screen
             </button>
           )}
-          <button className="sh-modal-btn sh-modal-btn-secondary" onClick={_dismiss}>
+          <button className="ui-btn sh-modal-btn sh-modal-btn-secondary" onClick={_dismiss}>
             I understand the risk
           </button>
         </div>
@@ -113,8 +113,8 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
   return (
     <div className="sh-modal-backdrop sh-welcome-card">
       <div className="sh-modal" ref={trapRef} role="dialog" aria-modal="true" aria-label="Welcome to VOTReader">
-        <h3 className="sh-modal-title">Welcome to VOTReader!</h3>
-        <p className="sh-modal-text">
+        <h3 className="ui-sheet-title sh-modal-title">Welcome to VOTReader!</h3>
+        <p className="ui-sheet-body sh-modal-text">
           {"If you've been using VOTReader in Safari, your saved data "}
           {"didn't transfer automatically. To bring your data over:"}
         </p>
@@ -124,10 +124,10 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
           <li>Come back here {'>'} Settings {'>'} Import</li>
         </ol>
         <div className="sh-modal-actions">
-          <button className="sh-modal-btn sh-modal-btn-primary" onClick={_goImport}>
+          <button className="ui-btn is-primary sh-modal-btn sh-modal-btn-primary" onClick={_goImport}>
             {"I'll import my data"}
           </button>
-          <button className="sh-modal-btn sh-modal-btn-secondary" onClick={_skip}>
+          <button className="ui-btn sh-modal-btn sh-modal-btn-secondary" onClick={_skip}>
             {"I'm new — skip this"}
           </button>
         </div>

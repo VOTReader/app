@@ -52,3 +52,13 @@ describe("#53 'Couldn't copy' uses the shared title, body and button classes", (
     expect(s).toMatch(/className="ui-btn copy-fallback-btn"/);
   });
 });
+
+describe('#54 the Safari warning uses the shared title, body and button classes', () => {
+  it('ui-sheet-title, ui-sheet-body, ui-btn on both Safari cards', () => {
+    const s = src('../components/SafariFlows.jsx');
+    expect(s).not.toMatch(/className="sh-modal-title"/);
+    expect(s).not.toMatch(/className="sh-modal-text"/);
+    expect(s).not.toMatch(/className="sh-modal-btn /);
+    expect(s).toMatch(/ui-btn is-primary sh-modal-btn/);
+  });
+});

@@ -170,55 +170,28 @@
         display: flex; align-items: center; justify-content: center;
         padding: 1.5rem;
       }
+      /* Fix list #54: the Safari cards are drawn with the app's sheet parts (ui-sheet-title, ui-sheet-body, ui-btn on
+         SafariFlows.jsx); these rules keep the card, its spacing and #18's fit inside the screen. Light follows the tokens. */
       .sh-modal {
-        background: #13131f; border: 1px solid var(--gold-border);
-        border-radius: 12px; padding: 1.6rem 1.4rem;
+        background: var(--surface-1); border: 0; box-shadow: var(--shadow-float);
+        border-radius: var(--r-sheet); padding: 22px 18px 18px;
         max-width: 380px; width: 100%;
         /* Fix list #18: at text 200% the card ran off both ends of the screen with its buttons out of reach. */
         max-height: calc(100vh - 3rem); max-height: calc(100dvh - 3rem);
         overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
       }
-      .sh-modal-title {
-        margin: 0 0 0.7rem; font-size: var(--fs-18); color: var(--gold);
-        font-weight: 600;
-      }
-      .sh-modal-text {
-        margin: 0 0 0.7rem; font-size: var(--fs-15); line-height: 1.5;
-        color: var(--cream-muted);
-      }
+      .sh-modal-title { margin: 0 2px 10px; }
+      .sh-modal-text { margin: 0 2px 12px; }
       .sh-modal-steps {
-        margin: 0 0 1rem; padding-left: 1.4rem;
-        font-size: var(--fs-14); line-height: 1.6; color: var(--cream-muted);
+        margin: 0 2px 14px; padding-left: 1.4rem;
+        color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.5;
       }
-      .sh-modal-instructions { margin-bottom: 0.5rem; }
-      .sh-modal-actions {
-        display: flex; flex-direction: column; gap: 0.5rem;
-      }
-      .sh-modal-btn {
-        padding: 0.6rem 1rem; border-radius: 8px;
-        font-size: var(--fs-14); cursor: pointer; text-align: center;
-        border: 1px solid var(--gold-border);
-      }
-      .sh-modal-btn-primary {
-        background: rgba(176,142,87,0.15); color: var(--gold);
-      }
-      .sh-modal-btn-secondary {
-        background: transparent; color: var(--cream-muted);
-        border-color: rgba(255,255,255,0.15);
-      }
+      .sh-modal-instructions { margin-bottom: 4px; }
+      .sh-modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+      .sh-modal .sh-modal-btn { width: 100%; white-space: normal; text-align: center; padding-top: 8px; padding-bottom: 8px; }
+      .sh-modal .ui-btn:not(.is-primary) { background: var(--surface-2); }
+      .vot-large-text .sh-modal .sh-modal-btn { border-radius: var(--r-card); }   /* a two-line pill crowds its words' corners */
       .sh-welcome-card .sh-modal { max-width: 420px; }
-      body.light .sh-modal {
-        background: #faf8f4; border-color: rgba(160,130,70,0.3);
-      }
-      body.light .sh-modal-title { color: #5a4520; }
-      body.light .sh-modal-text, body.light .sh-modal-steps { color: #3a3020; }
-      body.light .sh-modal-btn-primary {
-        background: rgba(90,69,32,0.1); color: #5a4520;
-        border-color: rgba(90,69,32,0.3);
-      }
-      body.light .sh-modal-btn-secondary {
-        color: #5a5040; border-color: rgba(90,69,32,0.2);
-      }
 
       /* ── Reading Fonts — vendored, all-local (2026-07-31 owner call) ───
          Every Reading Font ships in the app under fonts/reading/ (~1.7 MB,

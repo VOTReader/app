@@ -84,3 +84,11 @@ describe("#53 'Couldn't copy' is drawn with the app's sheet parts", () => {
     expect(rule('.copy-fallback-text')).toMatch(/background:\s*var\(--surface-2\)/);
   });
 });
+
+describe('#54 the Safari warning is drawn with the app sheet parts', () => {
+  it('no navy card, serif text or small serif buttons of its own', () => {
+    expect(rule('.sh-modal')).toMatch(/background:\s*var\(--surface-1\)/);
+    expect(rule('.sh-modal-title')).not.toMatch(/font-size|color/);
+    expect(rule('.sh-modal .sh-modal-btn')).toMatch(/white-space:\s*normal/);   // beats .ui-btn's nowrap at text 2
+  });
+});
