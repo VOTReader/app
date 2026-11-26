@@ -52,3 +52,18 @@ export function relabelSections(secs, table, entriesOf) {
   });
   return changed ? out : secs;
 }
+
+/**
+ * The chips to show while the timings are still on their way: each file's own name with no range ("Section 2"),
+ * so a hand range that the timings will correct (WTLB Part Two) never shows first and then changes.
+ * @param {ReadonlyArray<any[]>} secs
+ * @returns {ReadonlyArray<any[]>}
+ */
+export function neutralSections(secs) {
+  if (!Array.isArray(secs)) return secs;
+  return secs.map((sec) => {
+    const label = String((sec && sec[0]) || '');
+    const at = label.indexOf(' · ');
+    return at > 0 ? [label.slice(0, at), ...sec.slice(1)] : sec;
+  });
+}

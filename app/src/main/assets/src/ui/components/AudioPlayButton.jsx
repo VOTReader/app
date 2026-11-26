@@ -27,8 +27,8 @@ import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
 import { useStoreVersion } from '../../hooks/use-store-version.js';
-import { audioSyncSectionsStore, loadAudioSyncSections } from '../../utils/sync-loaders.js';
-import { relabelSections } from '../../utils/section-labels.js';
+import { audioSyncSectionsStore, audioSyncSectionsSettled, loadAudioSyncSections } from '../../utils/sync-loaders.js';
+import { neutralSections, relabelSections } from '../../utils/section-labels.js';
 
 /** A collection's entries by volKey, from the registry globals (null before the corpus lands). @param {string} vk */
 const entriesOfVol = (vk) => {
@@ -47,7 +47,14 @@ export function useSyncedSections(sections) {
   useStoreVersion(audioSyncSectionsStore);
   React.useEffect(() => { if (has) void loadAudioSyncSections(); }, [has]);
   const table = /** @type {any} */ (globalThis).AUDIO_SYNC_SECTIONS || null;
-  return React.useMemo(() => (sections ? relabelSections(sections, table, entriesOfVol) : sections), [sections, table]);
+  // Until the timings land, the chips carry their names only, so a wrong hand range never shows and then changes.
+  // A failed load (or a page with no loader) settles too, and then the hand labels are what there is.
+  const waiting = !table && !audioSyncSectionsSettled();
+  return React.useMemo(() => {
+    if (!sections) return sections;
+    if (table) return relabelSections(sections, table, entriesOfVol);
+    return waiting ? neutralSections(sections) : sections;
+  }, [sections, table, waiting]);
 }
 
 /**

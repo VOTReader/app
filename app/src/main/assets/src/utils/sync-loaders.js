@@ -209,6 +209,13 @@ export function loadAudioSyncSections() {
   return l.load().catch(() => undefined);
 }
 
+/** The compilation timings have landed or failed to, or this page has no loader to fetch them with. @returns {boolean} */
+export function audioSyncSectionsSettled() {
+  if (!_hasFactory() && !_sections) return true;
+  const l = _sectionsLoader();
+  return !l || !!l.corpus.loaded || !!l.corpus.error;
+}
+
 /** useSyncExternalStore contract for the compilation timings' arrival. */
 export const audioSyncSectionsStore = {
   /** @param {() => void} cb */
