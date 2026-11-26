@@ -2,15 +2,14 @@
    ChapterBookmarkBtn — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+
 export function ChapterBookmarkBtn({ chapterBookmark }) {
   // Subscribe to BookmarkStore mutations. Guard with typeof check —
   // BookmarkStore is a cross-bundle global that may not be defined yet
   // in some bundle init orderings (defensive carryover from the legacy
   // pattern; the subscription is a no-op if Store is undefined).
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
-    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
-  );
+  useStoreVersionByName('BookmarkStore');
   const hlKey = chapterBookmark && chapterBookmark.hlKey;
   const existing = (hlKey && typeof BookmarkStore !== 'undefined')
     ? BookmarkStore.getForKey(hlKey)

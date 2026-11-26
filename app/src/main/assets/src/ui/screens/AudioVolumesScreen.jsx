@@ -13,6 +13,7 @@ import { queueTime } from '../components/PlayerSheets.jsx';
 import { lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 import { itemNoun, tracksSeconds } from './AudioCollectionScreen.jsx';
 import { ListGroup, ListRow } from '../components/UiParts.jsx';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -77,10 +78,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Back to Listen', onOpe
     void lengthsReady();
   }, []);
   React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
-  React.useSyncExternalStore(
-    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
 
   const collections = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((collection) => collection.cardId) : [];
   const votReady = votAudioReady();

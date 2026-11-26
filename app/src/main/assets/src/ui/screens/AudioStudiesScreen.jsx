@@ -17,6 +17,7 @@
 
 import { EmptyState, ListGroup, ListRow, RowPlay } from '../components/UiParts.jsx';
 import { studyTitleParts } from '../../utils/study-titles.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /** @returns {Array<any>} the loaded studies registry, [] until bible-studies.js lands */
 function studiesList() {
@@ -82,10 +83,7 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Back to Listen', onOpe
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, []);
-  React.useSyncExternalStore(
-    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
   const [, setStudiesLanded] = React.useState(0);
   // n6-09: loadBibleStudies resolves false when the fetch failed; say so, and
   // let the reader try again (as StudiesHome does), not "Loading..." for good.

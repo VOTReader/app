@@ -10,6 +10,7 @@ import { TranslationPill } from '../components/TranslationPill.jsx';
 import { ListGroup, ListRow, Segmented } from '../components/UiParts.jsx';
 import { BarAction } from '../components/RootNav.jsx';
 import { countOf } from '../../utils/download-tree.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, onCycleLayout, translation, onTranslation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
@@ -17,10 +18,7 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, on
   // full ~7 MB download wait. The subscription re-renders this component
   // when BOOKS becomes defined, replacing skeleton "—" counts with real
   // chapter totals. Idempotent — second mount returns the cached Promise.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)
-  );
+  useStoreVersionByName('__bibleCorpus');
   React.useEffect(() => {
     if (typeof window.__loadBibleCorpus === 'function') {
       window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));

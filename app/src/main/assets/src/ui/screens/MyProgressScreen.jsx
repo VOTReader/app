@@ -33,6 +33,7 @@ import { readKind, readWords, countedReads } from '../../utils/read-kind.js';
 import { usePlanRuns, runRow, finishDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /* Free globals, not imports: this screen ships in bundle-d (the lazy Personal
    Study bundle-g until lz1) and reads onIdle from the window slots
@@ -107,44 +108,17 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
     }
     return () => { alive = false; };
   }, []);
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__bibleCorpus');
+  useStoreVersionByName('__votCorpus');
+  useStoreVersionByName('__matthewCorpus');
 
   // Store subscriptions — counts re-render live on any mutation.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof NoteStore !== 'undefined') ? NoteStore.subscribe(cb) : () => {}, []),
-    () => (typeof NoteStore !== 'undefined') ? NoteStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof LinkStore !== 'undefined') ? LinkStore.subscribe(cb) : () => {}, []),
-    () => (typeof LinkStore !== 'undefined') ? LinkStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
-    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
-  );
-  const jrnVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof JournalStore !== 'undefined') ? JournalStore.subscribe(cb) : () => {}, []),
-    () => (typeof JournalStore !== 'undefined') ? JournalStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.subscribe(cb) : () => {}, []),
-    () => (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof ReadingStreakStore !== 'undefined') ? ReadingStreakStore.subscribe(cb) : () => {}, []),
-    () => (typeof ReadingStreakStore !== 'undefined') ? ReadingStreakStore.getVersion() : 0
-  );
+  useStoreVersionByName('NoteStore');
+  useStoreVersionByName('LinkStore');
+  useStoreVersionByName('BookmarkStore');
+  const jrnVer = useStoreVersionByName('JournalStore');
+  useStoreVersionByName('JournalStatsStore');
+  useStoreVersionByName('ReadingStreakStore');
   // Re-check the reading streak on every Progress open — an app left
   // running across midnight would otherwise show a stale unbroken streak
   // (the module-load recompute only runs once per boot).
@@ -153,21 +127,12 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
     // ds5 s11.1: the journal streak follows the same rule (its module-load recompute ran once).
     if (typeof JournalStatsStore !== 'undefined' && typeof JournalStatsStore.recomputeFromLoad === 'function') JournalStatsStore.recomputeFromLoad();
   }, []);
-  const annVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
-    () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
-    () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
-  );
+  const annVer = useStoreVersionByName('AnnotationStore');
+  useStoreVersionByName('ReadingStatsStore');
   // The Listening Library was the one store this dashboard never watched —
   // reading, journaling and annotation all reported here while the hours
   // spent listening went uncounted.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof AudioLibraryStore !== 'undefined') ? AudioLibraryStore.subscribe(cb) : () => {}, []),
-    () => (typeof AudioLibraryStore !== 'undefined') ? AudioLibraryStore.getVersion() : 0
-  );
+  useStoreVersionByName('AudioLibraryStore');
 
   // Voice-memo minutes — JournalMediaStore.list() is async (IDB cursor);
   // resolved once on mount. The row is omitted entirely at 0.

@@ -25,6 +25,7 @@ import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { ListGroup, ListRow, SectionLabel, UiButton } from '../components/UiParts.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
@@ -408,10 +409,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
   );
   React.useEffect(() => { if (vstore) { void vstore.load(); void vstore.loadTally(); } }, [vstore]);
   // The letters' titles (the Find box and "From the letter") ride the lazy VOT corpus.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
   React.useEffect(() => {
     if (cat && !cat.loaded) void cat.load();
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();

@@ -19,6 +19,7 @@ import { remainingLabel } from '../components/AudioShelf.jsx';
 import { formatClock } from '../components/AudioSeekSlider.jsx';
 import { secondsOf } from '../../utils/audio-lengths.js';
 import { readerName } from '../../utils/download-tree.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /** The song catalog (bundle-d's SongCatalog), or null before it is wired. @returns {any} */
 function songCatalog() {
@@ -69,10 +70,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, []);
-  React.useSyncExternalStore(
-    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
   // The song catalog is fetched once per launch; the saved songs name themselves once it is in.
   const cat = songCatalog();
   React.useSyncExternalStore(

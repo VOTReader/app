@@ -13,6 +13,7 @@ import { ListGroup, ListRow } from '../components/UiParts.jsx';
 import { BarAction } from '../components/RootNav.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { VOLUME_YEARS } from '../../utils/volume-facts.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 export function VolumesHome({ onSelect, onBack, onSearch }) {
   // Q8.3: VOT corpus is lazy. Subscribe + pre-fire on mount so the
@@ -24,10 +25,7 @@ export function VolumesHome({ onSelect, onBack, onSearch }) {
       window.__loadVotCorpus().catch((e) => console.warn('VOT corpus pre-load failed', e));
     }
   }, []);
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
   const _votReady = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
   const _cnt = (k) => colLetterArr(COL_BY_KEY.get(k)).length;
   // Q8.3: while corpus is still loading, NO tile is locked (we know they all

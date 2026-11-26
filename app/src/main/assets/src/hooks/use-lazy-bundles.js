@@ -12,6 +12,8 @@
    lazy SCREEN bundles e-h had subscriptions here too until lz1, 2026-10-13,
    folded their code into bundle-d; use-lazy-bundles.test.jsx reads index.html's
    loaders so a NEW lazy bundle fails until it is taught here.) */
+import { useStoreVersionByName } from './use-store-version.js';
+
 export function useLazyBundles() {
   // #1: signal the native splash to release the frame the React tree first paints —
   // a DETERMINISTIC app-ready handshake (AppInterface.onAppReady), replacing the
@@ -27,23 +29,11 @@ export function useLazyBundles() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0)
-  );
+  useStoreVersionByName('__bibleCorpus');
+  useStoreVersionByName('__matthewCorpus');
+  useStoreVersionByName('__votCorpus');
   // Answers Only God Can Give (src/data/answers.js). Its loader is not in
   // index.html: utils/sync-loaders.js creates it as bundle-d evaluates and
   // publishes the corpus here, so it exists before App first subscribes.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus.getVersion() : 0)
-  );
+  useStoreVersionByName('__answersCorpus');
 }

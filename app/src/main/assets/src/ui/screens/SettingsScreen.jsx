@@ -23,6 +23,7 @@ import { ActionSheet, SelectSheet } from '../components/SelectField.jsx';
 import { SettingsNavRow, SettingsStepRow, SetRowText, DataRow, RadioRows } from '../components/SettingsRow.jsx';
 import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
 import { InstallRow } from '../components/InstallCard.jsx';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
 const GROUP_TITLES = {
@@ -743,27 +744,15 @@ function arrowOptions() {
 const BACKUP_WORDS = 'keep backup back up export save copy safe restore';
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null, onSearchLibrary = null, onOpenPlans = null, onOpenGarden = null, onOpenProgress = null }) {
-  const bibleVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
-  );
-  const votVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
-  );
+  const bibleVer = useStoreVersionByName('__bibleCorpus');
+  const votVer = useStoreVersionByName('__votCorpus');
   // The Studies rows count Matthew and the Bible studies (mw17 A09.3).
-  const matthewVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
-  );
+  const matthewVer = useStoreVersionByName('__matthewCorpus');
   // U09.2: the Bible Translation value says "· NKJV until it downloads" while that is what the Bible shows. The
   // Editions row beside it reads the caches; this only re-renders when it does.
   React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
   const [studiesTick, setStudiesTick] = React.useState(0);
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
-    () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
-  );
+  useStoreVersionByName('ReadingStatsStore');
   const [openSections, setOpenSections] = React.useState(new Set());
   // Accordion state for the top-level setting GROUPS (redesign 2026-07-31).
   // All collapsed on entry — the screen reads as a scannable table of

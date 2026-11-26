@@ -30,6 +30,7 @@ import { chapterTitleOf } from '../components/AudioShelf.jsx';
 import { formatClock } from '../components/AudioSeekSlider.jsx';
 import { queueTime } from '../components/PlayerSheets.jsx';
 import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -161,10 +162,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
     if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesLanded((n) => n + 1); }, () => {});
     return () => { live = false; };
   }, [study]);
-  React.useSyncExternalStore(
-    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
 
   // The row whose menu sheet is open (listen.html au-rowmenu), by item id.
   const [menuFor, setMenuFor] = React.useState(/** @type {string | null} */ (null));

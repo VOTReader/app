@@ -28,6 +28,7 @@ import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { remainingLabel, relativePlayedAt } from '../components/AudioShelf.jsx';
 import { requestFullPlayer, playerFailLine } from '../components/player-open.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
@@ -218,10 +219,7 @@ export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, 
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
   }, []);
-  React.useSyncExternalStore(
-    React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
-    () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
-  );
+  useStoreVersionByName('__votCorpus');
   // The studies are their own lazy file (bible-studies.js); re-render once the registry lands.
   const [, setStudiesLanded] = React.useState(0);
   React.useEffect(() => {
