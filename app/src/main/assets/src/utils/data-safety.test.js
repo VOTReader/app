@@ -1245,3 +1245,26 @@ describe('data-3: one unreadable store does not stop the snapshots', () => {
     expect(await DataSafety.run({ sink: memorySink() })).toBe('not-loaded');
   });
 });
+
+describe('data-2: the library as it was before an import is kept', () => {
+  it('savePreImport writes a preImport copy through the sink; the snapshot list is untouched', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    await IDBAdapter.put('meta', 'song-votes', { 'song-a': { v: 1, at: 1 } });
+    const sink = Object.assign(memorySink('opfs'), { savePreImport: vi.fn(async () => true) });
+    expect(await DataSafety.savePreImport({ sink })).toBe(true);
+    const json = JSON.parse(sink.savePreImport.mock.calls[0][0]);
+    expect(json).toMatchObject({ snapshot: true, preImport: true, summary: { highlights: 2, notes: 2 } });
+    expect(json.stores['vot-annotations']).toEqual(ANN);
+    expect(json.meta).toEqual({ 'song-votes': { 'song-a': { v: 1, at: 1 } } });
+    expect(sink.files.size).toBe(0);
+  });
+
+  it('no sink that keeps one (the phone app, for now), or nothing to keep: false, quietly', async () => {
+    await seed({ 'vot-annotations': ANN });
+    expect(await DataSafety.savePreImport({ sink: memorySink() })).toBe(false);
+    const sink = Object.assign(memorySink('opfs'), { savePreImport: vi.fn(async () => true) });
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    expect(await DataSafety.savePreImport({ sink })).toBe(false);
+    expect(sink.savePreImport).not.toHaveBeenCalled();
+  });
+});

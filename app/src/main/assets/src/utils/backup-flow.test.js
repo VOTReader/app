@@ -1018,3 +1018,45 @@ describe('W8 refuter round 3: the end of an operation names the operation its st
     expect(calls).toEqual([['changing', undefined], ['changed', 'op-7']]);
   });
 });
+
+describe('data-2: before an import writes, the library is kept; the sheet shows this phone', () => {
+  it('REPRO: savePreImport runs after the confirm and before the first write', async () => {
+    const order = [];
+    put('DataSafety', { savePreImport: vi.fn(async () => { order.push('pre'); return true; }) });
+    globalThis.applyImportPayload.mockImplementation(async () => { order.push('apply'); return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] }; });
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(order).toEqual(['pre', 'apply']);
+  });
+
+  it('a pre-import copy that fails does not stop the import', async () => {
+    put('DataSafety', { savePreImport: vi.fn(async () => { throw new Error('quota'); }) });
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(globalThis.applyImportPayload).toHaveBeenCalled();
+  });
+
+  it('declining the sheet keeps no copy', async () => {
+    const savePreImport = vi.fn(async () => true);
+    put('DataSafety', { savePreImport });
+    ctx.confirmImport.mockResolvedValue(false);
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(savePreImport).not.toHaveBeenCalled();
+  });
+
+  it('the confirm details carry this phone counted like the file, photos and recordings included', async () => {
+    const disk = { 'vot-notes': { a: {}, b: {}, c: {} }, 'vot-bookmarks': [1] };
+    put('IDBAdapter', { get: async (name) => disk[name] });
+    put('JournalMediaStore', { allIds: async () => ['m1', 'm2'] });
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(LEGACY)], 'old.json'));
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    const details = ctx.confirmImport.mock.calls[0][1];
+    expect(details.here).toMatchObject({ notes: 3, bookmarks: 1, mediaCount: 2 });
+    expect(details.summary).toMatchObject({ highlights: 0, mediaCount: 0 });
+  });
+});

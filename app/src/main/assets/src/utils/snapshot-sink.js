@@ -29,6 +29,15 @@
 export const KEEP_DAYS = 7;
 export const KEEP_WEEKS = 4;
 const NAME = /^snap-(\d{8})-(\d{6})\.json$/;
+/** data-2: the copy saved just before an import writes (`pre-yyyyMMdd-HHmmss.json`). Never listed
+ *  with the snapshots (the health check never judges against it) and kept PRE_KEEP_MS. */
+const PRE_NAME = /^pre-(\d{8})-(\d{6})\.json$/;
+export const PRE_KEEP_MS = 7 * 86400000;
+
+/** The pre-import copies to delete: older than PRE_KEEP_MS. @param {string[]} names @param {number} nowMs */
+export function prunePreImportNames(names, nowMs) {
+  return names.filter((n) => PRE_NAME.test(n) && nowMs - snapshotTime(n.replace(/^pre-/, 'snap-')) > PRE_KEEP_MS);
+}
 const OPFS_DIR = 'vot-snapshots';
 
 /** @param {number} n */
@@ -109,10 +118,10 @@ function opfsSink() {
   const FH = /** @type {any} */ (globalThis).FileSystemFileHandle;
   if (!FH || !FH.prototype || typeof FH.prototype.createWritable !== 'function') return null;
   const dir = async () => (await nav.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true });
-  const names = async () => {
+  const names = async (re = NAME) => {
     /** @type {string[]} */ const out = [];
     const d = await dir();
-    for await (const key of d.keys()) if (NAME.test(key)) out.push(key);
+    for await (const key of d.keys()) if (re.test(key)) out.push(key);
     return out;
   };
   return {
@@ -155,9 +164,24 @@ function opfsSink() {
       try {
         const d = await dir();
         for (const n of await names()) await d.removeEntry(n);
+        for (const n of await names(PRE_NAME)) await d.removeEntry(n);   // data-2: Delete all my data takes these too
         return true;
       } catch (_e) { return false; }
     },
+    /** data-2: keep the library as it was just before an import, for PRE_KEEP_MS. @param {string} json */
+    savePreImport: async (/** @type {string} */ json) => {
+      try {
+        const d = await dir();
+        const h = await d.getFileHandle(snapshotName(Date.now()).replace(/^snap-/, 'pre-'), { create: true });
+        const w = await h.createWritable();
+        await w.write(json);
+        await w.close();
+        for (const n of prunePreImportNames(await names(PRE_NAME), Date.now())) { try { await d.removeEntry(n); } catch (_e) { /* next time */ } }
+        return true;
+      } catch (_e) { return false; }
+    },
+    /** data-2: the pre-import copies, newest first. */
+    listPreImport: async () => { try { return (await names(PRE_NAME)).sort().reverse(); } catch (_e) { return []; } },
   };
 }
 

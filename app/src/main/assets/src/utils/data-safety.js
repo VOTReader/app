@@ -589,6 +589,31 @@ async function _saveLatest(opts) {
   }
 }
 
+/**
+ * data-2: an import is about to replace stores. The library as it is now is kept as a
+ * pre-import copy (the web's snapshot folder, a week; never judged against, never rotated
+ * out by the snapshot that follows the import). Best effort: false when it could not be
+ * kept (no sink that keeps one: the phone app's lives in Kotlin and has none yet).
+ * @param {{ sink?: any, now?: () => number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function savePreImport(opts) {
+  const sink = (opts && opts.sink) || snapshotSink();
+  if (!sink || typeof sink.savePreImport !== 'function' || _cleared) return false;
+  try {
+    const stores = await collectStores();
+    const summary = summarize(stores);
+    if (score(summary) === 0 && summary.history === 0) return false;   // nothing to keep
+    const json = snapshotJson(stores, summary, ((opts && opts.now) || Date.now)(), await _collectMeta());
+    const ok = await sink.savePreImport(json.replace('"snapshot":true', '"snapshot":true,"preImport":true'));
+    DiagnosticLog.warn('data-health', ok ? 'kept the library as it was before the import' : 'could not keep a pre-import copy');
+    return !!ok;
+  } catch (e) {
+    DiagnosticLog.warn('data-health', 'pre-import copy failed: ' + ((e && /** @type {any} */ (e).name) || e));
+    return false;
+  }
+}
+
 /** TEST-ONLY: forget this page's state (a new boot). */
 /** @param {{ maxSnapshotBytes?: number }} [opts] */
 export function _resetForTests(opts) {
@@ -1023,4 +1048,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { whenJudged, judgedHealthy, weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, beginClear, abortClear, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };
+export const DataSafety = { savePreImport, whenJudged, judgedHealthy, weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, beginClear, abortClear, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };

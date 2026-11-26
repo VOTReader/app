@@ -438,13 +438,16 @@ function growthLine(samples) {
 }
 
 /* WS3 settings (st-restore, st-verify): what a backup file holds, one line per kind. */
-function BackupCounts({ s }) {
-  const rows = [['Notes', s.notes], ['Highlights', s.highlights], ['Journal entries', s.journal], ['Bookmarks', s.bookmarks]];
-  if (s.annotatedPassages) rows.splice(2, 0, ['Annotated passages', s.annotatedPassages]);
+export function BackupCounts({ s, here = null }) {
+  const keys = [['Notes', 'notes'], ['Highlights', 'highlights'], ['Journal entries', 'journal'], ['Bookmarks', 'bookmarks'], ['Photos and recordings', 'mediaCount']];
+  if (s.annotatedPassages) keys.splice(2, 0, ['Annotated passages', 'annotatedPassages']);
+  const n = (/** @type {any} */ v) => Number(v || 0).toLocaleString('en-US');
+  // data-2: the restore confirm shows this phone beside the file, so a reader sees what goes.
   return (
-    <div className="ui-group is-inset ws3-counts">
-      {rows.map(([k, n]) => (
-        <div key={k} className="ws3-count"><span>{k}</span><span className="ws3-count-n">{Number(n || 0).toLocaleString('en-US')}</span></div>
+    <div className={'ui-group is-inset ws3-counts' + (here ? ' has-here' : '')}>
+      {here ? <div className="ws3-count is-head"><span /><span className="ws3-count-n">Backup</span><span className="ws3-count-n">This phone</span></div> : null}
+      {keys.map(([label, k]) => (
+        <div key={k} className="ws3-count"><span>{label}</span><span className="ws3-count-n">{n(s[k])}</span>{here ? <span className="ws3-count-n">{n(here[k])}</span> : null}</div>
       ))}
     </div>
   );
@@ -1763,7 +1766,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           confirm={{ label: 'Restore and overwrite', danger: true, onConfirm: () => { _settleImportConfirm(true); return false; } }}>
           {importConfirm && importConfirm.summary ? (
             <>
-              <BackupCounts s={importConfirm.summary} />
+              <BackupCounts s={importConfirm.summary} here={importConfirm.here || null} />
               <p className="ws3-sheet-text">Restoring <strong>overwrites</strong> the kinds of data this backup contains. Any kind it does not include is left unchanged.{importConfirm.space || ''} This cannot be undone.</p>
             </>
           ) : importConfirm ? <p className="ws3-sheet-text">{importConfirm.message}</p> : null}

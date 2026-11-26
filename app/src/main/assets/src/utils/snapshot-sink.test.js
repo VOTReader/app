@@ -4,7 +4,7 @@
    read refuses names that are no snapshot, a save killed mid-write (an empty file older than a
    minute) is dropped, clear empties the folder, and without writable streams there is no sink. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { snapshotSink, snapshotName, snapshotTime, pruneSnapshotNames, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
+import { snapshotSink, snapshotName, snapshotTime, pruneSnapshotNames, prunePreImportNames, PRE_KEEP_MS, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
 
 /** One OPFS directory in memory: name -> text. */
 function fakeOpfs() {
@@ -309,5 +309,43 @@ describe('the OPFS sink, failure arms', () => {
     map.delete = origDelete;
     expect(files().has(first)).toBe(true);
     expect(files().size).toBe(2);
+  });
+});
+
+describe('data-2: the pre-import copy (web)', () => {
+  it('REPRO: the snapshot after an import no longer evicts the library as it was that morning', async () => {
+    const sink = snapshotSink();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.UTC(2026, 10, 23, 9));
+    await sink.save('{"morning":1}');                         // today's daily
+    vi.setSystemTime(Date.UTC(2026, 10, 23, 10));
+    expect(await sink.savePreImport('{"before":1}')).toBe(true);
+    vi.setSystemTime(Date.UTC(2026, 10, 23, 10, 5));
+    await sink.save('{"imported":1}');                        // the import's reload: today's daily goes
+    expect((await sink.list()).map((x) => x.name)).toEqual([snapshotName(Date.UTC(2026, 10, 23, 10, 5))]);   // never judged against
+    const pre = await sink.listPreImport();
+    expect(pre).toHaveLength(1);
+    expect(files().get(pre[0])).toBe('{"before":1}');
+    expect(await sink.read(pre[0])).toBe('');                // not a snapshot name: the health check never reads it
+  });
+
+  it('keeps each for a week, then drops it; Delete all my data takes them too', async () => {
+    const sink = snapshotSink();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const t0 = Date.UTC(2026, 10, 1, 12);
+    vi.setSystemTime(t0); await sink.savePreImport('{"a":1}');
+    vi.setSystemTime(t0 + 3 * DAY); await sink.savePreImport('{"b":1}');
+    expect(await sink.listPreImport()).toHaveLength(2);
+    vi.setSystemTime(t0 + PRE_KEEP_MS + DAY); await sink.savePreImport('{"c":1}');
+    expect((await sink.listPreImport()).map((n) => files().get(n))).toEqual(['{"c":1}', '{"b":1}']);
+    expect(await sink.clear()).toBe(true);
+    expect(await sink.listPreImport()).toEqual([]);
+    expect(files().size).toBe(0);
+  });
+
+  it('prunePreImportNames looks only at pre- names', () => {
+    const now = Date.UTC(2026, 10, 30, 12);
+    const old = snapshotName(now - PRE_KEEP_MS - DAY);
+    expect(prunePreImportNames([old, old.replace('snap-', 'pre-'), 'pre-x.json'], now)).toEqual([old.replace('snap-', 'pre-')]);
   });
 });

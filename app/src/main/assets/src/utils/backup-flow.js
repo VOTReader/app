@@ -561,6 +561,19 @@ export function createBackupFlow(ctx) {
     // toast + reload. `parsed` is the v2 JSON payload OR the v3 manifest (same
     // envelope shape); applyFn(storesMap, flagMap) → { importFailures,
     // writeFailures, skippedStores }. ONE source of truth for both formats.
+    /** data-2: what this phone holds now, counted the way the file is, for the confirm sheet (display only; null when unreadable). */
+    const _hereSummary = async () => {
+      try {
+        /** @type {Record<string, any>} */ const stores = {};
+        for (const name of Object.keys(_exportableStores())) {
+          const v = await IDBAdapter.get(name, 'v');
+          if (v !== undefined) stores[name] = v;
+        }
+        const ids = typeof JournalMediaStore !== 'undefined' && typeof JournalMediaStore.allIds === 'function' ? await JournalMediaStore.allIds() : [];
+        return summarizeBackupManifest({ stores, media: (ids || []).map(() => ({})) });
+      } catch (_e) { return null; }
+    };
+
     const _confirmDegradeApplyReload = async (parsed, applyFn, getIntegrity) => {
       const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
       // Summarize what's about to land for the confirm dialog.
@@ -608,9 +621,9 @@ export function createBackupFlow(ctx) {
       // (and therefore the caller's finally, which closes the native import
       // stream on Android) does not complete until the import truly settles.
       // WS3 settings (st-restore): the sheet also gets what the file holds, to show it as counts. Display only.
-      /** @type {{ date: string | null, summary: any, space: string } | null} */
+      /** @type {{ date: string | null, summary: any, space: string, here: any } | null} */
       let details = null;
-      try { details = { date: parsed.exportDate || null, summary: summarizeBackupManifest(parsed), space: spaceNote }; } catch (_e) { details = null; }
+      try { details = { date: parsed.exportDate || null, summary: summarizeBackupManifest(parsed), space: spaceNote, here: await _hereSummary() }; } catch (_e) { details = null; }
       const confirmed = await confirmImport(
         `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${spaceNote} This cannot be undone.`,
         details,
@@ -649,6 +662,12 @@ export function createBackupFlow(ctx) {
         hideToast(_TOAST_ID);
         _showToast('Your library was changed in another tab. Reload this tab, then import again.');
         return NOTHING_WRITTEN;
+      }
+
+      // data-2: keep the library as it is now before the first write: the snapshot the import's
+      // reload takes would otherwise be today's only copy, and this one would be pruned for it.
+      if (typeof DataSafety !== 'undefined' && typeof DataSafety.savePreImport === 'function') {
+        try { await DataSafety.savePreImport(); } catch (_e) { /* best effort: the import goes on */ }
       }
 
       // Restore-inflight marker: set BEFORE the first mutation, removed only on
