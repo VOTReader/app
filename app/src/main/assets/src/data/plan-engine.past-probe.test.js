@@ -4,7 +4,7 @@
    histories with such changes, then checks that the month calendar and the week strip still say the same. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, newRun, tickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, pauseRun, resumeRun } from './plan-engine.js';
+import { dayNum, dateOf, newRun, tickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, pauseRun, resumeRun } from './plan-engine.js';
 
 const at = (s, h = 12) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 /** mulberry32. @param {number} seed */
@@ -93,5 +93,18 @@ describe('the review\'s example: Keep my daily amount after a late stretch', () 
     const caught = catchUp(run, at('2026-12-10'));
     expect(caught.target).not.toBe(run.target);
     expect(cells(caught)).toEqual(before);
+  });
+});
+
+describe('the fourth review: earlier pins survive a second change of days', () => {
+  it('Jude over Tue–Sat from Tue Dec 1: Dec 1 (a rest day, pinned Dec 4) stays a rest day after two changes of days on Dec 10', () => {
+    let run = newRun({ plan: 'custom', weekdays: [false, false, true, true, true, true, true], tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3].map((c) => ({ k: 'jude:' + c, w: 500 })) }], pace: { mode: 'days', n: 9 } }, at('2026-12-01'));
+    expect(runStatus(run, at('2026-12-01')).spreadOn).toBe('2026-12-02');   // Dec 1: nothing to read today
+    const cells = (/** @type {any} */ r, /** @type {string} */ now) => Object.fromEntries(monthCells(r, 2026, 11, at(now)).filter((c) => c.date <= 3).map((c) => [c.date, c.state]));
+    expect(cells(run, '2026-12-04')).toEqual({ 1: 'none', 2: 'missed', 3: 'missed' });
+    run = changePace(run, { mode: 'by', date: '2026-12-20' }, at('2026-12-04'));
+    run = changeWeekdays(run, [true, true, false, true, true, false, false], at('2026-12-10'));   // Sun, Mon, Wed, Thu
+    run = changeWeekdays(run, [true, true, true, true, true, true, true], at('2026-12-10'));
+    expect(cells(run, '2026-12-10')).toEqual({ 1: 'none', 2: 'missed', 3: 'missed' });
   });
 });
