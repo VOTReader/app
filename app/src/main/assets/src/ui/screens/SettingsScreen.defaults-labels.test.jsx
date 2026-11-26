@@ -52,6 +52,16 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
   });
 });
 
+// product-settings-n1 (audit 11-23): History off also takes Continue off the Read tab (HomeScreen) and the
+// recent searches (SearchScreen); the row says so, so turning it off holds no surprise.
+describe('SettingsScreen — the History row says what turning it off also hides', () => {
+  it('names Continue and recent searches', () => {
+    renderSettings();
+    const desc = row('History').querySelector('.settings-row-desc').textContent;
+    expect(desc).toBe('A list of the chapters and letters you have opened. Turning it off also hides Continue on the Read tab and your recent searches.');
+  });
+});
+
 // look-8 (audit 11-23): the text size note says all text, and names the phone's font size only on Android.
 describe('SettingsScreen — the text size note', () => {
   const note = () => [...document.querySelectorAll('.ws1-note')].find((p) => /size of all text/.test(p.textContent));

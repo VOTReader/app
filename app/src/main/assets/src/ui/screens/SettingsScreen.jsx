@@ -1558,7 +1558,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           <SettingsSection label="History">
             <SettingsRow
               label="History"
-              desc="A list of the chapters and letters you have opened"
+              desc="A list of the chapters and letters you have opened. Turning it off also hides Continue on the Read tab and your recent searches."
               checked={settings.historyEnabled !== false}
               onToggle={() => onToggle("historyEnabled")}
             />
