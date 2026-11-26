@@ -3186,6 +3186,9 @@
     .ui-row-menu { flex: none; display: flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: -6px -8px -6px 0; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-2); cursor: pointer; }
     .ui-row-menu:active { background: var(--surface-2); }
     .ui-row-main { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; min-height: var(--tap); margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    /* Fix list 28: a Play lead sits beside the row's button, not in it; the button still takes a tap anywhere on the row. */
+    .ui-row.is-split > .ui-row-main::after { content: ''; position: absolute; inset: 0; }
+    .ui-row.is-split > :is(.ui-row-lead, .ui-row-star, .ui-row-menu) { position: relative; z-index: 1; }
     .root-sublist { background: var(--surface-2); }
     .root-sublist .root-row { padding-left: 26px; }
     .root-sublist .root-row-title { font-size: var(--fs-16); white-space: normal; }
@@ -9195,6 +9198,7 @@ body.light .install-ask-go { color: #fff; }
        words in a column a few letters wide), and Play all and Download stack instead of running off the screen. */
     .vot-large-text .listen-coll .listen-rec { flex-wrap: wrap; }
     .vot-large-text .listen-coll .listen-rec > .ui-row-main { flex: 1 1 100%; }
+    .vot-large-text .listen-coll .listen-rec.is-split > .ui-row-main { flex: 1 1 calc(100% - var(--icon-chip) - 14px); }   /* fix list 28: the Play stays beside the name */
     .vot-large-text .listen-coll .listen-rec > .ui-row-main + :is(.ui-row-star, .ui-row-menu) { margin-left: auto; }
     .vot-large-text :is(.listen-coll-actions, .songs-list-actions) { grid-template-columns: minmax(0, 1fr); }   /* 11-18: the Songs list's Play all + Shuffle ran off the right edge at 2.0 */
     .screen-layout:has(> .screen-scroll .listen-coll) > .top-nav > .bar-title { white-space: normal; overflow-wrap: break-word; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

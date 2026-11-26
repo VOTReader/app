@@ -67,9 +67,11 @@ export function ListRow({ icon, lead, over, title, meta, value, valueNone = fals
   one = false, noLead = false, ariaLabel, className = '', current = false, expanded = undefined }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
   const showChev = chevron === undefined ? !!onClick && !menu && !remove : chevron;
+  // Fix list 28: a Play lead is a button of its own, so with a tappable row it sits beside the row's button, never in it.
+  const split = !!onClick && !!lead && !noLead && /** @type {any} */ (lead).type === RowPlay;
   const body = (
     <>
-      {leading}
+      {split ? null : leading}
       <span className="ui-row-text">
         {over ? <span className="ui-row-over">{over}</span> : null}
         <span className="ui-row-title">{title}</span>
@@ -84,11 +86,12 @@ export function ListRow({ icon, lead, over, title, meta, value, valueNone = fals
       {showChev ? <UiIcon name="chev" className="ui-row-chev" /> : null}
     </>
   );
-  const rowCls = cx('ui-row', one && 'is-one', (noLead || !leading) && 'no-lead', className);
+  const rowCls = cx('ui-row', one && 'is-one', (noLead || !leading) && 'no-lead', split && 'is-split', className);
   const aria = current ? 'true' : undefined;
   if (menu || star || remove) {
     return (
       <div className={rowCls}>
+        {split ? leading : null}
         {onClick
           ? <button type="button" className="ui-row-main" onClick={onClick} aria-label={ariaLabel} aria-current={aria}>{body}</button>
           : <span className="ui-row-main" aria-current={aria}>{body}</span>}
@@ -116,6 +119,14 @@ export function ListRow({ icon, lead, over, title, meta, value, valueNone = fals
         <span className="ui-row-text"><span className="ui-row-title">{title}</span>{meta ? <span className="ui-row-meta">{meta}</span> : null}</span>
         <span className={cx('ui-switch', switchOn && 'is-on')} aria-hidden="true" />
       </button>
+    );
+  }
+  if (split) {
+    return (
+      <div className={rowCls}>
+        {leading}
+        <button type="button" className="ui-row-main" onClick={onClick} aria-label={ariaLabel} aria-current={aria} aria-expanded={expanded}>{body}</button>
+      </div>
     );
   }
   if (onClick) {

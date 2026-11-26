@@ -53,6 +53,28 @@ describe('the list row (rule 12)', () => {
     expect(play).toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
   });
 
+  /* Fix list 28: a row with a Play lead was a <button> holding the RowPlay <button> (invalid HTML; a screen reader
+     may not reach the inner Play). The row's main part and its Play are sibling buttons, in both row forms. */
+  it('a Play lead is never a button inside the row\'s button (fix list 28)', () => {
+    const play = vi.fn(); const open = vi.fn(); const more = vi.fn();
+    const { container } = render(<>
+      <ListRow lead={<RowPlay label="Play A" onClick={play} />} title="A" onClick={open} chevron />
+      <ListRow lead={<RowPlay label="Play B" onClick={play} />} title="B" onClick={open} menu={{ label: 'More for B', onClick: more }} />
+    </>);
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+    const rows = container.querySelectorAll('.ui-row');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.tagName).toBe('DIV');
+      expect(row.querySelector(':scope > .ui-row-lead.is-play')).not.toBeNull();
+      expect(row.querySelector(':scope > button.ui-row-main')).not.toBeNull();
+    }
+    fireEvent.click(rows[0].querySelector('.ui-row-main'));
+    expect(open).toHaveBeenCalledTimes(1); expect(play).not.toHaveBeenCalled();
+    fireEvent.click(rows[0].querySelector('.ui-row-lead'));
+    expect(play).toHaveBeenCalledTimes(1); expect(open).toHaveBeenCalledTimes(1);
+  });
+
   it('a section label aside is a muted count, or a gold link with a handler', () => {
     const all = vi.fn();
     const { container } = render(<><SectionLabel aside="3">Saved</SectionLabel><SectionLabel aside="See all" onAside={all}>History</SectionLabel></>);

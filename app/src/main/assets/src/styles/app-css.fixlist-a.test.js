@@ -67,3 +67,18 @@ describe('fix list 43: the Speed sheet\'s fine-tune row puts its label above the
     expect(label).toMatch(/flex-basis:\s*100%/);
   });
 });
+
+describe('fix list 28: a row whose Play sits beside its button still taps as one row', () => {
+  it('the main button stretches over the row, the Play, star and menu stay above it', () => {
+    const over = ruleBlock(CSS, '.ui-row.is-split > .ui-row-main::after {');
+    expect(over).toMatch(/position:\s*absolute/);
+    expect(over).toMatch(/inset:\s*0/);
+    const above = ruleBlock(CSS, '.ui-row.is-split > :is(.ui-row-lead, .ui-row-star, .ui-row-menu) {');
+    expect(above).toMatch(/z-index:\s*1/);
+  });
+
+  it('at large text a collection row keeps its Play beside the name', () => {
+    const block = ruleBlock(CSS, '.vot-large-text .listen-coll .listen-rec.is-split > .ui-row-main {');
+    expect(block).toMatch(/flex:\s*1 1 calc\(100% - var\(--icon-chip\) - 14px\)/);
+  });
+});
