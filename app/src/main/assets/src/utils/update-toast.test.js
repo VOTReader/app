@@ -38,7 +38,7 @@ vi.mock('./toast.js', async (importOriginal) => {
 });
 
 import { showToast } from './toast.js';
-import { openWhatsNew } from './whats-new.js';
+import { openWhatsNew, takeNewItems } from './whats-new.js';
 import { announceUpdateIfAny, offerListeningResume, markUpdateReload, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATE_RELOAD_FLAG, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
@@ -411,5 +411,163 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     expect(typeof offerListeningResume).toBe('function');
     expect(typeof window.__votUpdateToastResume).toBe('function');
     expect(window.__votUpdateToastResume).toBe(offerListeningResume);
+  });
+});
+
+describe('update-toast, failure and edge arms', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    _resetUpdateToast();
+    delete /** @type {any} */ (window).__votSwTookOver;
+    SW_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    APK_VERSION.value = null;
+    BRIDGE.isAndroid = false;
+    vi.mocked(showToast).mockClear();
+    vi.mocked(openWhatsNew).mockClear();
+    NOTES.value = [{ t: 2, text: 'A change a reader would notice.' }];
+    const stale = document.getElementById(UPDATED_TOAST_ID);
+    if (stale) stale.remove();
+  });
+  afterEach(() => {
+    BRIDGE.isAndroid = false;
+    try { delete /** @type {any} */ (navigator).serviceWorker; } catch (_e) { /* not stubbed */ }
+  });
+  const control = () => Object.defineProperty(navigator, 'serviceWorker', { value: { controller: {} }, configurable: true });
+
+  it('a non-function listening offer is dropped, and the announcement carries no tap', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    offerListeningResume(/** @type {any} */ (null));
+    offerListeningResume(/** @type {any} */ ('resume'));
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(document.getElementById(UPDATED_TOAST_ID).textContent).toBe(UPDATED_TOAST_TEXT);
+  });
+
+  it('Space taps the listening toast, any other key leaves it alone', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(onTap).not.toHaveBeenCalled();
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('markUpdateReload survives a sessionStorage that refuses the write', () => {
+    const orig = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (k, v) { if (k === UPDATE_RELOAD_FLAG) throw new Error('denied'); return orig.call(this, k, v); });
+    expect(() => markUpdateReload()).not.toThrow();
+    spy.mockRestore();
+    expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG)).toBeNull();
+  });
+
+  it('a sessionStorage that refuses the flag read falls back to the key path', async () => {
+    const orig = Storage.prototype.getItem;
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (k) { if (k === UPDATE_RELOAD_FLAG) throw new Error('denied'); return orig.call(this, k); });
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    spy.mockRestore();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('a localStorage that refuses the key read stores silently, as a first boot', async () => {
+    const orig = Storage.prototype.getItem;
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (k) { if (k === LAST_SEEN_BUILD_KEY) throw new Error('denied'); return orig.call(this, k); });
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(showToast).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('a localStorage that refuses the key write still announces; the next boot repeats', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    const orig = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (k, v) { if (k === LAST_SEEN_BUILD_KEY) throw new Error('private mode'); return orig.call(this, k, v); });
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(OLD);
+  });
+
+  it('reloaded for an update with a refusing key write: the toast shows, the key stays', async () => {
+    control();
+    markUpdateReload();
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    const orig = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (k, v) { if (k === LAST_SEEN_BUILD_KEY) throw new Error('private mode'); return orig.call(this, k, v); });
+    expect(await announceUpdateIfAny()).toBe('shown');
+    spy.mockRestore();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(OLD);
+  });
+
+  it('reloaded for an update with nothing to tell: quiet, and the key still follows', async () => {
+    control();
+    markUpdateReload();
+    NOTES.value = [];
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('quiet');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('a worker answer without a version falls through to the deployed file', async () => {
+    SW_VERSION.value = { corpusVersion: 'c45' };
+    APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('a deployed file without a version is no build at all: unknown, nothing stored', async () => {
+    BRIDGE.isAndroid = true;
+    SW_VERSION.value = { cacheVersion: '' };
+    APK_VERSION.value = { corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('unknown');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBeNull();
+  });
+
+  it('a service worker without a controller does not control the page', async () => {
+    Object.defineProperty(navigator, 'serviceWorker', { value: { controller: null }, configurable: true });
+    SW_VERSION.value = null;
+    APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('a serviceWorker read that throws counts as uncontrolled', async () => {
+    Object.defineProperty(navigator, 'serviceWorker', { get() { throw new Error('denied'); }, configurable: true });
+    SW_VERSION.value = null;
+    APK_VERSION.value = { cacheVersion: NEW, corpusVersion: 'c45' };
+    expect(await announceUpdateIfAny()).toBe('first');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('an empty stored build is a value, not an absence: a new build announces', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, '');
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it('an offer that lands while the whats-new list is read keeps the tap toast', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    let resolveItems = () => {};
+    vi.mocked(takeNewItems).mockImplementationOnce(() => new Promise((r) => { resolveItems = r; }));
+    const pending = announceUpdateIfAny();
+    await new Promise((r) => setTimeout(r, 0));
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    resolveItems([{ t: 2, text: 'A change a reader would notice.' }]);
+    expect(await pending).toBe('shown');
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(document.getElementById(UPDATED_TOAST_ID).textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
+  });
+
+  it('when no toast element appears, the action wiring stands down quietly', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    vi.mocked(showToast).mockImplementationOnce(() => {});
+    expect(await announceUpdateIfAny()).toBe('shown');
+    expect(document.getElementById(UPDATED_TOAST_ID)).toBeNull();
+    const opts = vi.mocked(showToast).mock.calls[0][0];
+    expect(() => opts.onHide()).not.toThrow();
   });
 });
