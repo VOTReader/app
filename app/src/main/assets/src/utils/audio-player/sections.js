@@ -46,7 +46,7 @@ export function _refreshSectionTitles() {
   for (const vk of Object.keys(all)) for (const t of sectionTracks(vk)) byUrl.set(t.url, t.title);
   let changed = false;
   _state.queue.forEach((t, i) => {
-    if (!t || t.key) return;   // '' is unkeyed too: insertUpcoming takes a track as it comes
+    if (!t || t.key != null) return;
     const title = byUrl.get(t.url);
     if (!title || title === t.title) return;
     _state.queue[i] = { ...t, title };

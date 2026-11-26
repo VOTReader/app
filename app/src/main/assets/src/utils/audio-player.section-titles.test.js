@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AudioPlayer } from './audio-player.js';
 import { syncedSections } from './audio-player/catalog.js';
+import * as core from './audio-player/core.js';
 import { trackUrl } from './audio-player/core.js';
 import { resetSyncLoadersForTests } from './sync-loaders.js';
 
@@ -122,14 +123,32 @@ describe('the player names a compilation by what it reads', () => {
     expect(titles()).toEqual(['Section 2 · 31–58']);
   });
 
-  it('added to an idle queue, or inserted as it comes (key \'\'), takes the synced range too', () => {
+  it('added to an idle queue: the synced range once the timings land', () => {
     installFactory();
     expect(AudioPlayer.addToQueue({ key: '', title: 'Section 1', url: trackUrl(A1) })).toBe(true);
-    expect(AudioPlayer.insertUpcoming(1, { key: '', title: 'Section 2', url: trackUrl(A2) })).toBe(true);
-    expect(titles()).toEqual(['Section 1', 'Section 2']);
+    expect(titles()).toEqual(['Section 1']);
     globalThis.AUDIO_SYNC_SECTIONS = TABLE;
     loader.corpus.land();
+    expect(titles()).toEqual(['Section 1 · Intro–30']);
+  });
+
+  it('removed before the timings land and put back after (Up next\'s Undo): the synced range, and no listener sees the edit half done', () => {
+    installFactory();
+    AudioPlayer.playSection('wtlb2', 0, 'Words To Live By: Part Two');
+    const removed = AudioPlayer.getState().queue[1];
+    expect(AudioPlayer.removeUpcoming(1)).toBe(true);
+    globalThis.AUDIO_SYNC_SECTIONS = TABLE;
+    loader.corpus.land();
+    expect(titles()).toEqual(['Section 1 · Intro–30']);
+    /** @type {Array<string | null>} */
+    const seen = [];
+    const off = AudioPlayer.subscribe(() => { seen.push(core._source ? core._source.mode : null); });
+    try {
+      expect(AudioPlayer.insertUpcoming(1, removed)).toBe(true);
+    } finally { off(); }
     expect(titles()).toEqual(['Section 1 · Intro–30', 'Section 2 · 31–58']);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((m) => m === core._source.mode)).toBe(true);
   });
 
   it('when the timings fail to load, the hand label comes back', () => {
