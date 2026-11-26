@@ -83,13 +83,16 @@ describe('small copy and a11y pieces', () => {
   });
 
   // WS2 settings: the line is the design's short one; the live dwell time is the row's value beside it.
+  // product-10 (audit 11-23): the knob sets when a day counts toward the streak, not when a page is marked read
+  // (Mark as read has its own rule), so it is named for the streak.
   it('the streak row states the live dwell time (A09.12)', () => {
     renderSettings({ dwellMs: '45000' });
-    expect(row('Count a page as read after').textContent).toContain('counts that day toward your reading streak');
-    expect(screen.getByRole('button', { name: 'Count a page as read after: 45 seconds' })).toBeTruthy();
+    expect(row('Count a streak day after').textContent).toContain('counts that day toward your reading streak');
+    expect(screen.getByRole('button', { name: 'Count a streak day after: 45 seconds' })).toBeTruthy();
+    expect(screen.queryByText('Count a page as read after')).toBeNull();
     cleanup();
     renderSettings({ dwellMs: '60000' });
-    expect(screen.getByRole('button', { name: 'Count a page as read after: 60 seconds' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Count a streak day after: 60 seconds' })).toBeTruthy();
   });
 
   it('the Letter voice description reads as plain sentences (s23.8)', () => {

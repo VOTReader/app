@@ -1299,8 +1299,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             <SelectField
               eyebrow="Reading"
-              title="Count a page as read after"
-              label="Count a page as read after"
+              title="Count a streak day after"
+              label="Count a streak day after"
               desc="This long on one chapter or letter counts that day toward your reading streak"
               find="dwell time seconds reading streak"
               value={settings.dwellMs || "20000"}
