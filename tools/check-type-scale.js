@@ -16,13 +16,14 @@
  * clamp() is allowed only when both ends are tokens.
  *
  * Usage: node tools/check-type-scale.js   (exit 1 on violation)
+ * checkTypeScale(root) returns the same report in-process (the test uses it).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ASSETS = path.join(__dirname, '..', 'app', 'src', 'main', 'assets');
+const SELF = fileURLToPath(import.meta.url);
+const REPO_ROOT = path.join(path.dirname(SELF), '..');
 const SKIP_DIRS = new Set(['dist', 'node_modules', 'data', 'fonts', 'icons']);
 
 /** Files to scan: the static CSS + every source module that can carry style text. */
@@ -55,47 +56,71 @@ const TOKEN_REF = /var\(\s*(--fsc?-\d+)\s*[),]/g;
 // against it. An undefined custom property doesn't error in CSS: the whole
 // declaration silently becomes 'unset', which is exactly how six phantom
 // tokens (--fs-9/17/19/22/27/34) shipped inert on 2026-08-09.
-const declared = new Set();
 const DECL_ANYWHERE = /(--fsc?-\d+)\s*:/g;   // --fs-N and --fsc-N share a line in the ladder
-const files = collect(ASSETS, []);
-for (const file of files) {
-  const text = fs.readFileSync(file, 'utf8');
-  let d;
-  DECL_ANYWHERE.lastIndex = 0;
-  while ((d = DECL_ANYWHERE.exec(text))) declared.add(d[1]);
+
+/**
+ * Scan `<root>/app/src/main/assets` and return what the CLI prints and its
+ * exit status. Exported so the test runs it in-process: a child process per
+ * case can wait 45-77 s in the hook's fast run, because on Windows a
+ * concurrent spawn in another vmThreads worker inherits the gate's stdout
+ * pipe and spawnSync waits for that pipe to close (check-css-tokens, 11-26).
+ * @param {string} [root] repo root (default: the one this file sits in)
+ * @returns {{ status: 0|1, stdout: string, stderr: string }}
+ */
+export function checkTypeScale(root = REPO_ROOT) {
+  const files = collect(path.join(root, 'app', 'src', 'main', 'assets'), []);
+  const texts = new Map(files.map((f) => [f, fs.readFileSync(f, 'utf8')]));
+
+  const declared = new Set();
+  for (const text of texts.values()) {
+    for (const d of text.matchAll(DECL_ANYWHERE)) declared.add(d[1]);
+  }
+
+  const violations = [];
+  const phantoms = [];
+  for (const file of files) {
+    const rel = path.relative(root, file).replace(/\\/g, '/');
+    const lines = stripBlockComments(texts.get(file)).split(/\r?\n/);
+    lines.forEach((line, i) => {
+      for (const r of line.matchAll(TOKEN_REF)) {
+        if (!declared.has(r[1])) phantoms.push(`${rel}:${i + 1}  var(${r[1]}) is not declared`);
+      }
+      if (TOKEN_DECL.test(line)) return;          // the ladder's own definition
+      for (const m of line.matchAll(LITERAL)) violations.push(`${rel}:${i + 1}  ${m[0].trim()}`);
+    });
+  }
+
+  if (violations.length || phantoms.length) {
+    const err = [];
+    if (violations.length) {
+      err.push('[type-scale] literal font-size values found — use a --fs-N / --fsc-N token');
+      err.push('             (the ladder is defined once in app.css :root):');
+      for (const v of violations) err.push('  ' + v);
+    }
+    if (phantoms.length) {
+      err.push('[type-scale] references to UNDECLARED scale tokens — the declaration is');
+      err.push('             silently unset at runtime; use a declared ladder step:');
+      for (const p of phantoms) err.push('  ' + p);
+    }
+    return { status: 1, stdout: '', stderr: err.join('\n') + '\n' };
+  }
+  return {
+    status: 0,
+    stdout: `[type-scale] OK — every font-size names a scale token, every token reference resolves (${declared.size} declared).\n`,
+    stderr: '',
+  };
 }
 
-const violations = [];
-const phantoms = [];
-for (const file of files) {
-  const rel = path.relative(path.join(__dirname, '..'), file).replace(/\\/g, '/');
-  const lines = stripBlockComments(fs.readFileSync(file, 'utf8')).split(/\r?\n/);
-  lines.forEach((line, i) => {
-    TOKEN_REF.lastIndex = 0;
-    let r;
-    while ((r = TOKEN_REF.exec(line))) {
-      if (!declared.has(r[1])) phantoms.push(`${rel}:${i + 1}  var(${r[1]}) is not declared`);
-    }
-    if (TOKEN_DECL.test(line)) return;          // the ladder's own definition
-    LITERAL.lastIndex = 0;
-    let m;
-    while ((m = LITERAL.exec(line))) {
-      violations.push(`${rel}:${i + 1}  ${m[0].trim()}`);
-    }
-  });
+/** Run as `node tools/check-type-scale.js` (pre-commit, CI, npm script). */
+function isMain() {
+  if (!process.argv[1]) return false;
+  const a = path.resolve(process.argv[1]);
+  return process.platform === 'win32' ? a.toLowerCase() === SELF.toLowerCase() : a === SELF;
 }
 
-if (violations.length || phantoms.length) {
-  if (violations.length) {
-    console.error('[type-scale] literal font-size values found — use a --fs-N / --fsc-N token');
-    console.error('             (the ladder is defined once in app.css :root):');
-    for (const v of violations) console.error('  ' + v);
-  }
-  if (phantoms.length) {
-    console.error('[type-scale] references to UNDECLARED scale tokens — the declaration is');
-    console.error('             silently unset at runtime; use a declared ladder step:');
-    for (const p of phantoms) console.error('  ' + p);
-  }
-  process.exit(1);
+if (isMain()) {
+  const r = checkTypeScale();
+  process.stdout.write(r.stdout);
+  process.stderr.write(r.stderr);
+  process.exitCode = r.status;
 }
-console.log(`[type-scale] OK — every font-size names a scale token, every token reference resolves (${declared.size} declared).`);
