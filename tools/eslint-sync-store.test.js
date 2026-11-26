@@ -21,9 +21,16 @@ describe('hooks-2: no X.subscribe member argument to useSyncExternalStore', () =
     expect(lint('React.useSyncExternalStore(window.__c.subscribe, () => 0);')[0]).toMatch(/this/);
   });
 
+  it('refuses the same bare member behind a guard (DownloadChooser, OfflineAudioControls)', () => {
+    expect(lint('React.useSyncExternalStore(s ? s.subscribe : noop, s ? s.getVersion : zero);')).toHaveLength(1);
+    expect(lint('React.useSyncExternalStore(s ? noop : s.subscribe, () => 0);')).toHaveLength(1);
+    expect(lint('React.useSyncExternalStore(s && s.subscribe, () => 0);')).toHaveLength(1);
+    expect(lint('useSyncExternalStore(l ? l.store.subscribe : noop, () => 0);')).toHaveLength(1);
+  });
+
   it('lets a wrapped subscribe through', () => {
     expect(lint('React.useSyncExternalStore(React.useCallback((cb) => Store.subscribe(cb), []), () => Store.getVersion());')).toEqual([]);
     expect(lint('React.useSyncExternalStore(subscribe, getSnapshot);')).toEqual([]);
-    expect(lint('React.useSyncExternalStore(a ? a.subscribe : noop, () => 0);')).toEqual([]);
+    expect(lint('React.useSyncExternalStore(s ? (cb) => s.subscribe(cb) : noop, () => 0);')).toEqual([]);
   });
 });

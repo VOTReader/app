@@ -127,10 +127,16 @@ export default [
          a store whose subscribe uses `this` then subscribes nothing (in the sloppy-mode bundles `this` is window)
          and the screen silently stops updating. Pass useStoreVersion(X) from hooks/use-store-version.js, or a
          wrapper: React.useCallback((cb) => X.subscribe(cb), []). */
-      'no-restricted-syntax': ['error',
-        { selector: "CallExpression[callee.property.name='useSyncExternalStore'][arguments.0.type='MemberExpression']", message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js) or React.useCallback((cb) => X.subscribe(cb), []).' },
-        { selector: "CallExpression[callee.name='useSyncExternalStore'][arguments.0.type='MemberExpression']", message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js) or React.useCallback((cb) => X.subscribe(cb), []).' },
-      ],
+      'no-restricted-syntax': ['error', ...[
+        '[arguments.0.type=\'MemberExpression\']',
+        // the same bare member behind a guard: `s ? s.subscribe : noop`, `s && s.subscribe`
+        '[arguments.0.type=\'ConditionalExpression\'][arguments.0.consequent.type=\'MemberExpression\']',
+        '[arguments.0.type=\'ConditionalExpression\'][arguments.0.alternate.type=\'MemberExpression\']',
+        '[arguments.0.type=\'LogicalExpression\'][arguments.0.right.type=\'MemberExpression\']',
+      ].map((arg) => ({
+        selector: "CallExpression:matches([callee.property.name='useSyncExternalStore'], [callee.name='useSyncExternalStore'])" + arg,
+        message: 'Pass the subscribe wrapped, not as X.subscribe: a store whose subscribe uses `this` would subscribe nothing. Use useStoreVersion(X) (hooks/use-store-version.js; inert for a null store) or React.useCallback((cb) => X.subscribe(cb), []).',
+      }))],
 
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of

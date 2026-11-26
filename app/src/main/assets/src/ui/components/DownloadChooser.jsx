@@ -28,14 +28,12 @@ import {
   countOf, formatLength, unitOnPhone, unitHeld, readerName, readingsOf, readingId, readingOnPhone, readingHeld,
   toggleReading, voiceSplit, byReaderWords, partsOnPhone,
 } from '../../utils/download-tree.js';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 /** On mobile data, an Apply past this asks first (brief 3e). */
 const MOBILE_ASK_BYTES = 100e6;
 /** A press this long on a chapter starts a range from it (brief 3c). */
 const LONG_PRESS_MS = 500;
-
-const _noSub = () => () => {};
-const _zero = () => 0;
 
 /** The lazy VOT corpus's version (letters and their audio arrive with it). */
 function useCorpusVersion() {
@@ -580,7 +578,7 @@ function VoiceBar({ voice, pick, onPick, units, only, onOnly }) {
  */
 export function DownloadChooser({ off, bibleAudio, focus, letterReader, after = null }) {
   const lengthsStore = typeof AudioLengths !== 'undefined' ? AudioLengths.lengthsStore : null;
-  React.useSyncExternalStore(lengthsStore ? lengthsStore.subscribe : _noSub, lengthsStore ? lengthsStore.getVersion : _zero);
+  useStoreVersion(lengthsStore);
   React.useEffect(() => {
     if (typeof AudioLengths !== 'undefined' && typeof AudioLengths.lengthsReady === 'function') void AudioLengths.lengthsReady();
   }, []);

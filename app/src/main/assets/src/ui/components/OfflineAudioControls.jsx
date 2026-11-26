@@ -17,6 +17,7 @@
 
 import { hideToast, showToast } from '../../utils/toast.js';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
+import { useStoreVersion } from '../../hooks/use-store-version.js';
 
 const _noSubscribe = () => () => {};
 const _noShape = () => '';
@@ -110,9 +111,6 @@ function useKeepFocus(state) {
   };
 }
 
-const _noSub = () => () => {};
-const _zero = () => 0;
-
 /**
  * false while the phone has no signal, or a request just failed at the network: bundle-d's NetStatus global (one
  * store for the app, 2026-10-05). A host without it (a test) reads navigator.onLine.
@@ -120,7 +118,7 @@ const _zero = () => 0;
  */
 export function useOnline() {
   const net = typeof NetStatus !== 'undefined' ? NetStatus : null;
-  React.useSyncExternalStore(net ? net.subscribe : _noSub, net ? net.getVersion : _zero);
+  useStoreVersion(net);
   return net ? !net.isOffline() : typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
@@ -192,7 +190,7 @@ export function unitState(off, urls) {
 export function useOfflineState(target) {
   const off = useOfflineAudio();
   const lengths = typeof AudioLengths !== 'undefined' ? AudioLengths : null;
-  React.useSyncExternalStore(lengths ? lengths.lengthsStore.subscribe : _noSub, lengths ? lengths.lengthsStore.getVersion : _zero);
+  useStoreVersion(lengths ? lengths.lengthsStore : null);
   if (!off) return null;
   const urls = (Array.isArray(target) ? target : []).map((t) => (typeof t === 'string' ? t : t && t.url)).filter((u) => typeof u === 'string');
   let seconds = 0;
@@ -471,7 +469,7 @@ export function useListenMinutes(tracks, paced = false) {
   );
   const rate = paced && lib ? Number(lib.getPlaybackRate()) : 1;
   const lengths = typeof AudioLengths !== 'undefined' ? AudioLengths : null;
-  React.useSyncExternalStore(lengths ? lengths.lengthsStore.subscribe : _noSub, lengths ? lengths.lengthsStore.getVersion : _zero);
+  useStoreVersion(lengths ? lengths.lengthsStore : null);
   React.useEffect(() => { if (lengths && !lengths.lengthsLoaded()) void lengths.lengthsReady(); }, [lengths]);
   const list = Array.isArray(tracks) ? tracks : [];
   if (!lengths || !list.length) return null;
