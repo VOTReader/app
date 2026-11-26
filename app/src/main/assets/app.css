@@ -6100,8 +6100,10 @@
     .ws3-count:last-child { border-bottom:0; }
     .ws3-count-n { color:var(--text-2); font-size:var(--ts-meta); }
     /* data-2: the restore confirm's "Backup | This phone" columns. */
-    .ws3-counts.has-here .ws3-count { display:grid; grid-template-columns:minmax(0,1fr) auto auto; column-gap:var(--sp-4); }
-    .ws3-counts.has-here .ws3-count-n { min-width:5.5em; text-align:right; }
+    /* The pair keeps its two columns; at large text it moves under the label, right-aligned. */
+    .ws3-counts.has-here .ws3-count { flex-wrap:wrap; column-gap:var(--sp-4); }
+    .ws3-count-pair { display:flex; gap:var(--sp-4); margin-left:auto; }
+    .ws3-count-pair .ws3-count-n { min-width:5em; text-align:right; white-space:nowrap; }
     .ws3-count.is-head { min-height:0; padding-top:var(--sp-2); padding-bottom:var(--sp-2); }
     .ws3-count.is-head .ws3-count-n { color:var(--text-3, var(--text-2)); font-size:var(--ts-meta); }
     .ws3-sheet-foot { margin-top:0; }

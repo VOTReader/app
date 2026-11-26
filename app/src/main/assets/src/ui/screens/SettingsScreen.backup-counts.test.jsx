@@ -6,7 +6,7 @@ import { render, cleanup } from '@testing-library/react';
 import { BackupCounts } from './SettingsScreen.jsx';
 
 afterEach(cleanup);
-const rows = (c) => [...c.querySelectorAll('.ws3-count')].map((r) => [...r.children].map((x) => x.textContent));
+const rows = (c) => [...c.querySelectorAll('.ws3-count')].map((r) => [r.children[0].textContent, ...[...r.querySelectorAll('.ws3-count-n')].map((x) => x.textContent)]);
 
 describe('BackupCounts (data-2)', () => {
   const file = { notes: 0, highlights: 0, journal: 0, bookmarks: 1, mediaCount: 0 };

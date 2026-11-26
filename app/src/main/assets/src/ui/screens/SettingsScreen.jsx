@@ -445,9 +445,10 @@ export function BackupCounts({ s, here = null }) {
   // data-2: the restore confirm shows this phone beside the file, so a reader sees what goes.
   return (
     <div className={'ui-group is-inset ws3-counts' + (here ? ' has-here' : '')}>
-      {here ? <div className="ws3-count is-head"><span /><span className="ws3-count-n">Backup</span><span className="ws3-count-n">This phone</span></div> : null}
-      {keys.map(([label, k]) => (
-        <div key={k} className="ws3-count"><span>{label}</span><span className="ws3-count-n">{n(s[k])}</span>{here ? <span className="ws3-count-n">{n(here[k])}</span> : null}</div>
+      {here ? <div className="ws3-count is-head"><span /><span className="ws3-count-pair"><span className="ws3-count-n">Backup</span><span className="ws3-count-n">This phone</span></span></div> : null}
+      {keys.map(([label, k]) => (here
+        ? <div key={k} className="ws3-count"><span>{label}</span><span className="ws3-count-pair"><span className="ws3-count-n">{n(s[k])}</span><span className="ws3-count-n">{n(here[k])}</span></span></div>
+        : <div key={k} className="ws3-count"><span>{label}</span><span className="ws3-count-n">{n(s[k])}</span></div>
       ))}
     </div>
   );
