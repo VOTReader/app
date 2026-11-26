@@ -438,11 +438,16 @@ function growthLine(samples) {
   return 'How fast your data grows. ' + how + ' across ' + samples.length + ' measurements since ' + first.d + '.';
 }
 
-/* WS3 settings (st-restore, st-verify): what a backup file holds, one line per kind. */
-export function BackupCounts({ s, here = null }) {
+/**
+ * WS3 settings (st-restore, st-verify): the rows the counts sheet shows, [label, summary field], in order.
+ * @param {any} s  a summarizeBackupManifest summary
+ * @param {any} [here]  this phone's summary, on the restore confirm
+ * @returns {Array<[string, string]>}
+ */
+function _backupCountRows(s, here = null) {
+  /** @type {Array<[string, string]>} */
   const keys = [['Notes', 'notes'], ['Highlights', 'highlights'], ['Journal entries', 'journal'], ['Bookmarks', 'bookmarks'], ['Photos and recordings', 'mediaCount']];
   if (s.annotatedPassages) keys.splice(2, 0, ['Annotated passages', 'annotatedPassages']);
-  const absent = Array.isArray(s.absent) ? s.absent : [];
   const unknown = Array.isArray(s.unknown) ? s.unknown : [];
   const skipped = Array.isArray(s.skipped) ? s.skipped : [];
   // data-7: the other kinds a restore overwrites, each when the file or this phone holds any, or the file carries
@@ -451,6 +456,27 @@ export function BackupCounts({ s, here = null }) {
   for (const kk of /** @type {Array<[string, string]>} */ ([['Links', 'links'], ['Notebooks', 'notebooks'], ['Journal notebooks', 'journalNotebooks'], ['Reading plans', 'plans'], ['Marked read', 'readMarks']])) {
     if (Number(s[kk[1]] || 0) || (here && Number(here[kk[1]] || 0)) || unknown.indexOf(kk[1]) >= 0 || skipped.indexOf(kk[1]) >= 0) keys.splice(keys.length - 1, 0, kk);
   }
+  return keys;
+}
+
+/**
+ * The restore confirm's line under the counts when a row reads "skipped": what that means for this phone. The
+ * restore writes no part it refuses (backup.js _applyStoresAndFlags and the V1 fallback skip it, every path), so
+ * that kind on this phone is kept as it is. Nothing when no row reads "skipped".
+ * @param {{ s: any, here?: any }} props
+ */
+export function RestoreSkipNote({ s, here = null }) {
+  const skipped = Array.isArray(s.skipped) ? s.skipped : [];
+  if (!_backupCountRows(s, here).some(([, k]) => skipped.indexOf(k) >= 0)) return null;
+  return <p className="ws3-sheet-text ws3-skip-note">{"This app can't read the skipped kinds in this backup, so the restore leaves the ones on this phone as they are."}</p>;
+}
+
+/* WS3 settings (st-restore, st-verify): what a backup file holds, one line per kind. */
+export function BackupCounts({ s, here = null }) {
+  const keys = _backupCountRows(s, here);
+  const absent = Array.isArray(s.absent) ? s.absent : [];
+  const unknown = Array.isArray(s.unknown) ? s.unknown : [];
+  const skipped = Array.isArray(s.skipped) ? s.skipped : [];
   const n = (/** @type {any} */ v) => Number(v || 0).toLocaleString('en-US');
   // A kind the file does not carry reads as a dash, not 0: the restore leaves it untouched, and 0 reads as a wipe.
   // A kind it carries but cannot count (a counts-only file's highlights or read marks) is a dash too. 0 means empty.
@@ -1781,6 +1807,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           {importConfirm && importConfirm.summary ? (
             <>
               <BackupCounts s={importConfirm.summary} here={importConfirm.here || null} />
+              <RestoreSkipNote s={importConfirm.summary} here={importConfirm.here || null} />
               <p className="ws3-sheet-text">Restoring <strong>overwrites</strong> the kinds of data this backup contains. Any kind it does not include is left unchanged.{importConfirm.space || ''} This cannot be undone.</p>
             </>
           ) : importConfirm ? <p className="ws3-sheet-text">{importConfirm.message}</p> : null}
