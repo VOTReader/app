@@ -40,6 +40,7 @@ describe('#20 a row with a value beside it wraps its words instead of cutting th
   it('title and meta wrap in rows that hold a .ui-row-value', () => {
     const b = rule(':is(.ui-row, .root-row):has(:is(.ui-row-value, .root-row-count)) :is(.ui-row-title, .ui-row-meta, .root-row-title, .root-row-sub)');
     expect(b).toMatch(/white-space:\s*normal/);
-    expect(b).toMatch(/overflow-wrap:\s*break-word/);
+    // no break-word: at text 2 it split a long word ('Chapt/er 3' in History) where the large-text rules cut it before
+    expect(b).not.toMatch(/overflow-wrap/);
   });
 });

@@ -3179,7 +3179,7 @@
     .root-row-sub, .ui-row-meta { margin-top: 1px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Fix list #20: a value beside a row (a notebook's name, a count) left the words no room and cut them ('Move to a notebo…');
        the words wrap instead, as they already do at large text. */
-    :is(.ui-row, .root-row):has(:is(.ui-row-value, .root-row-count)) :is(.ui-row-title, .ui-row-meta, .root-row-title, .root-row-sub) { white-space: normal; overflow-wrap: break-word; }
+    :is(.ui-row, .root-row):has(:is(.ui-row-value, .root-row-count)) :is(.ui-row-title, .ui-row-meta, .root-row-title, .root-row-sub) { white-space: normal; }
     .ui-row-meta:has(> .ui-meta-cut) { display: flex; } .ui-meta-cut { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .ui-meta-keep { flex: none; white-space: pre; }
     .root-row-count, .ui-row-value { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); }
     .ui-row-value.is-none { color: var(--text-2); }   /* "None yet" is read: muted, not tertiary (LIGHT1: --text-3 read 4.11:1 dark, 3.13 light) */
