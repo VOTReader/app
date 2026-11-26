@@ -2,22 +2,26 @@
    Cluster D entry — screens + sheets + components + utils + late stores + App
    ═══════════════════════════════════════════════════════════════════════
    This file is the esbuild entry point for dist/bundle-d.js. It imports
-   every public symbol from the cluster's 82 modules and re-exposes them
+   every public symbol from the cluster's modules and re-exposes them
    on `window` so the rest of the app (the boot script at the bottom of
    index.html — ReactDOM.createRoot + render — plus the lexical-mirror
    script that runs just before it, plus cross-cluster consumers in
    A/B/C) can continue to call them by bare name.
 
-   Cluster D contents:
-   - 21 screens (LetterView, WtlbEntryView, BibleChapterView, …)
-   - 33 components (Segments, FootnoteSheet, NavButtons, …)
-   - 13 sheets (NoteSheet, SelectionToolbar, LinkPicker, …)
-   - 11 utility modules (hl-keys, dates, garden, nav-index, …)
+   Cluster D contents (159 imported modules, counted 2026-11-26; the
+   imports below are the live list):
+   - 38 screens (LetterView, WtlbEntryView, BibleChapterView, …)
+   - 61 components (Segments, FootnoteSheet, NavButtons, …)
+   - 15 sheets (NoteSheet, SelectionToolbar, LinkPicker, …)
+   - 36 utility modules (hl-keys, dates, garden, nav-index, …)
+   - screen-routes.jsx, the search engine (search/engine.js,
+     recent-searches.js, search-data.js) and two hooks (use-autoscroll,
+     use-pager-gesture)
    - thumb-store + translations (late stores/data that load after the
      stores cluster's stores — kept here historically because they're
      called by App code only, never by the modules in B/C)
    - App — the composition root (Q2.7-1). The function the boot script
-     mounts via ReactDOM.createRoot. Lives at src/app.js, alongside
+     mounts via ReactDOM.createRoot. Lives at src/app.jsx, alongside
      ui/, hooks/, stores/, data/, etc.
 
    Like Clusters B and C, this bundle is emitted as an esbuild IIFE — it
@@ -30,7 +34,8 @@
    NO TRUE EVAL-TIME INTRA-D DEPENDENCIES exist. Every cross-D reference
    in this cluster happens inside function bodies (React component
    renderers, event handlers, utility helpers) — never at module top
-   level. So this entry file uses only explicit named imports — no
+   level. So this entry file uses explicit named imports (plus one
+   side-effect import, search-data.js, for its window.VotSearchData) — no
    workaround imports were needed for cycles or eager-init ordering.
 
    Module-private state that USED to live in inline scripts in index.html

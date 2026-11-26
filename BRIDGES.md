@@ -38,19 +38,19 @@ all assigned exactly once each in that hook. The hook's header comment
 already enumerates the 10 — this section mirrors it for greppability.
 
 ### `__openNote`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:177` — `() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }`
+- **Setter:** `src/hooks/use-sheet-orchestration.js:133` — `() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }`
 - **Cleanup:** `delete window.__openNote` on hook teardown
-- **Consumers:** `renderer/annotation-engine.jsx` (tap on note mark or note icon), `ui/sheets/SelectionToolbar.jsx` (link-button + Note action)
+- **Consumers:** `renderer/annotation-engine.jsx:280,579` (tap on a note icon), `ui/sheets/SelectionToolbar.jsx:647,671` (tap on a note icon or a note mark)
 
 ### `__openLinkPicker`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:170` (paired effect with `openLinkPickerForTarget`)
-- **Cleanup:** none in current code (paired effect re-assigns both each render — see also `__openLinkPickerForTarget`)
-- **Consumers:** SelectionToolbar (Link button on selection)
+- **Setter:** `src/hooks/use-link-picker-orchestration.js:113` (one effect with `__openLinkPickerForTarget`)
+- **Cleanup:** `delete window.__openLinkPicker` on teardown (:116)
+- **Consumers:** none in `src/`; only the hook's own tests call it
 
 ### `__openLinkPickerForTarget`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:171`
-- **Cleanup:** none (re-assigned each render)
-- **Consumers:** `ui/sheets/JournalInsertSheet.jsx` (Insert > Link), SelectionToolbar
+- **Setter:** `src/hooks/use-link-picker-orchestration.js:114` (one effect with `__openLinkPicker`)
+- **Cleanup:** `delete window.__openLinkPickerForTarget` on teardown (:117)
+- **Consumers:** `utils/journal-link-picker.js:8,12` (calls it), `ui/sheets/JournalInsertSheet.jsx:48,49` (checks it before Insert > card/excerpt link)
 
 ### `__openLinkSidebar`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:181` — `delete` on cleanup
@@ -61,8 +61,8 @@ already enumerates the 10 — this section mirrors it for greppability.
 - **Consumers:** SelectionToolbar (tap on existing highlight/underline mark)
 
 ### `__showMultiNote`
-- **Setter:** `src/hooks/use-sheet-orchestration.js:183` — `delete` on cleanup
-- **Consumers:** `renderer/annotation-engine.jsx` (multi-icon merge with `data-count > 1`), SelectionToolbar (tap on note mark when multiple groupIds overlap)
+- **Setter:** `src/hooks/use-sheet-orchestration.js:135` — `delete` on cleanup
+- **Consumers:** `renderer/annotation-engine.jsx:279,577` (a merged note icon over more than one group), `ui/sheets/SelectionToolbar.jsx:646,670` (a merged icon, or overlapping note marks under the tap)
 
 ### `__openBookmarkPopover`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:184` — `delete` on cleanup
@@ -125,9 +125,9 @@ setup effect.
 - **Consumers:** `ui/components/HomeBtn.jsx:9`, `ui/components/FootnoteListSection.jsx:71`
 
 ### `__goSearch`
-- **Setter:** `index.html:1570` (useEffect, cleanup `= null` at :1571)
+- **Setter:** `src/hooks/use-search.js:361` (useEffect with no deps, cleanup `= null` at :362)
 - **Cleanup:** `window.__goSearch = null` on effect re-run
-- **Consumers:** `ui/sheets/SelectionToolbar.jsx:488` (Search-selection action)
+- **Consumers:** `ui/sheets/SelectionToolbar.jsx:1196` (Search-selection action), `hooks/use-desktop-keyboard.js:53` (`/` or Ctrl/Cmd+F)
 
 ### `__songsBack`
 - **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: the Songs screen's Back while `screen === 'audio-library-songs'`, else `null`)
@@ -162,9 +162,9 @@ setup effect.
   joins the pass's load signals, so the reader's marks are painted on the new paragraphs)
 
 ### `__activeNoteGroup`
-- **Setter:** `index.html:1190` — written continuously, mirrors `noteSheetTarget.groupId`
+- **Setter:** `src/hooks/use-dom-annotation-sync.js:306` — rewritten whenever `noteSheetTarget` changes, mirrors its `groupId`
 - **Cleanup:** none (always reflects current state — nulled when no sheet open)
-- **Consumers:** `renderer/annotation-engine.jsx:332,338` (drives `applyActiveNoteState` wavy-underline)
+- **Consumers:** `renderer/annotation-engine.jsx:682` (`applyActiveNoteState` lights the open note's marks and icon)
 
 ### `__onReadingComplete`
 - **Setter:** `src/hooks/useMarkAsRead.js:72` — useEffect while the active reading
