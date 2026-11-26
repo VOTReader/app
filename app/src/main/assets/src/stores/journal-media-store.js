@@ -769,11 +769,15 @@ export var JournalMediaStore = (function() {
      * snapshot). We read id+`created` in ONE cursor pass, then delete via delete()
      * (which keeps the object-URL cache clean). Omitting cutoffMs keeps the legacy
      * "prune every unreferenced id" behavior.
+     * `moreReferenced`, when given, is asked AFTER the scan and before any delete, and every id it names survives
+     * too (review 11-26: the journal as stored, which holds a sibling PWA tab's saves this tab's memory lacks; a
+     * record that tab linked during the scan is named there by then). If it rejects, nothing is deleted.
      * @param {string[]} referencedIds
      * @param {number} [cutoffMs]  sweep-start timestamp; records `created` >= this survive
+     * @param {() => Promise<string[]>} [moreReferenced]
      * @returns {Promise<number>}
      */
-    pruneOrphans: function(referencedIds, cutoffMs) {
+    pruneOrphans: function(referencedIds, cutoffMs, moreReferenced) {
       /** @type {Record<string, boolean>} */
       var set = {};
       (referencedIds || []).forEach(function(id) { set[id] = true; });
@@ -798,6 +802,14 @@ export var JournalMediaStore = (function() {
           };
           req.onerror = function() { reject(req.error); };
           guardTx(store, reject);
+        });
+      }).then(function(toRemove) {
+        if (typeof moreReferenced !== 'function' || !toRemove.length) return toRemove;
+        return moreReferenced().then(function(more) {
+          /** @type {Record<string, boolean>} */
+          var keep = {};
+          (more || []).forEach(function(id) { keep[id] = true; });
+          return toRemove.filter(function(id) { return !keep[id]; });
         });
       }).then(function(toRemove) {
         return Promise.all(toRemove.map(function(id) { return self.delete(id); })).then(function() { return toRemove.length; });

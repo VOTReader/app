@@ -114,6 +114,26 @@ describe('useJournalMediaSweep — pre-existing orphan sweep (regression guard)'
     expect(pruneOrphans).toHaveBeenCalledWith(['a', 'b'], expect.any(Number));
   });
 
+  it('also keeps what the stored journal names, read under the journal save lock (a sibling tab, review 11-26)', async () => {
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    const held = vi.fn((fn) => fn());
+    /** @type {any} */ (globalThis).JournalMediaStore = fakeMediaStore({ pruneOrphans });
+    /** @type {any} */ (globalThis).JournalStore = {
+      isReady: () => true,
+      getState: () => 'loaded',
+      collectAllMediaIds: () => ['a'],
+      mediaIdsOnDisk: () => Promise.resolve(['b']),
+      withSavesHeld: held,
+    };
+
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4000);
+
+    expect(held).toHaveBeenCalledTimes(1);
+    expect(pruneOrphans).toHaveBeenCalledWith(['a'], expect.any(Number), expect.any(Function));
+    await expect(pruneOrphans.mock.calls[0][2]()).resolves.toEqual(['b']);
+  });
+
   it('skips the orphan prune when JournalStore is not ready (degraded/pending)', async () => {
     const pruneOrphans = vi.fn().mockResolvedValue(0);
     /** @type {any} */ (globalThis).JournalMediaStore = fakeMediaStore({ pruneOrphans });

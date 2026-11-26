@@ -38,7 +38,8 @@
      JournalStore.collectAllMediaIds()  → for orphan cleanup
 ═══════════════════════════════════════════════════════════════ */
 
-import { CachedStore, extendStore } from './cached-store.js';
+import { CachedStore, extendStore, isStoreWriteFenced } from './cached-store.js';
+import { IDBAdapter } from './idb-adapter.js';
 import { mergeListStore } from './store-merge.js';
 import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
 import { AnnotationStore } from './annotation-store.js';
@@ -674,6 +675,42 @@ export var JournalStore = extendStore(
         }
       }
       return ids;
+    },
+
+    /**
+     * Every mediaId the journal AS STORED references, read fresh from IndexedDB. Another PWA tab's saves
+     * reach the disk without reaching this tab's memory, so the orphan sweep keeps these too (review 11-26:
+     * a photo a sibling tab linked after this tab loaded was pruned). Rejects when it cannot read, and the
+     * sweep then deletes nothing.
+     * @returns {Promise<string[]>}
+     */
+    mediaIdsOnDisk() {
+      if (isStoreWriteFenced()) return Promise.reject(new Error('journal: store fenced (Clear All or import)'));
+      return IDBAdapter.get('vot-journal', 'v').then(function(data) {
+        /** @type {string[]} */
+        var ids = [];
+        var list = (data && Array.isArray(data.list)) ? data.list : [];
+        for (var i = 0; i < list.length; i++) {
+          var blocks = (list[i] && list[i].blocks) || [];
+          for (var j = 0; j < blocks.length; j++) {
+            var b = blocks[j];
+            if (b && (b.type === 'image' || b.type === 'audio') && b.mediaId) ids.push(b.mediaId);
+          }
+        }
+        return ids;
+      });
+    },
+
+    /**
+     * Run `fn` while no tab can save the journal (the cross-tab save lock, cached-store _saveMerged), so what
+     * mediaIdsOnDisk read stays true until `fn` settles. Runs it unlocked where navigator.locks is missing.
+     * @template T @param {() => Promise<T>} fn @returns {Promise<T>}
+     */
+    withSavesHeld(fn) {
+      if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+        return navigator.locks.request('vot-store:vot-journal', fn);
+      }
+      return fn();
     },
 
     /**

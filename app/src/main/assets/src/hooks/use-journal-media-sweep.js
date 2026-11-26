@@ -123,7 +123,13 @@ function _sweep(restoreAtBoot, restoreNow, queryable) {
     // is never reclaimed — it's too new to be a real orphan.
     const sweepStart = Date.now();
     const referenced = JournalStore.collectAllMediaIds();
-    JournalMediaStore.pruneOrphans(referenced, sweepStart).then((n) => {
+    // Another PWA tab may have linked media since this tab loaded the journal: what the stored journal names is
+    // kept too, read after the scan with the journal's save lock held, so a save already under way lands first and
+    // none lands between that read and the deletes (review 11-26).
+    const prune = typeof JournalStore.mediaIdsOnDisk === 'function'
+      ? () => JournalStore.withSavesHeld(() => JournalMediaStore.pruneOrphans(referenced, sweepStart, () => JournalStore.mediaIdsOnDisk()))
+      : () => JournalMediaStore.pruneOrphans(referenced, sweepStart);
+    prune().then((n) => {
       if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
     }).catch((e) => console.warn('Journal media orphan sweep failed', e));
   } catch (e) { console.warn('Journal media orphan sweep threw', e); }
