@@ -20,6 +20,11 @@
  * dispatch with catchup=true, which the PC sends at +10 min when no run came (D:/Swarm/tools/main-ci-watch.py). A window with
  * nothing new still publishes nothing (deploy-target.mjs, the build-sha floor), so a catch-up is harmless.
  *
+ * release-pipeline-n1 (audit 2026-11-23): GitHub started every scheduled run of 11-19..22 6.6-9.2 h after its cron, and
+ * the gate, judging by the cron line alone, published them at 13:01 or 14:00 Denver, and each publish reloads every
+ * open reader. A scheduled run that starts more than LATE_MS after its own cron instant is now not due: the PC's
+ * catch-up dispatch (main-ci-watch.py) or the next window publishes instead. The schedule itself is unchanged.
+ *
  * Usage (the deploy's gate job): EVENT_NAME=<github.event_name> SCHEDULE=<github.event.schedule>
  *   LAST_PUBLISH_AT=<ISO time or empty> CATCHUP=<true|false> node tools/release-window.mjs
  * Writes due=true|false to $GITHUB_OUTPUT (or stdout). A manual dispatch (not a catch-up) is always due.
@@ -61,6 +66,9 @@ export function isReleaseWindow(cron, now) {
   return !!t && WINDOW_HOURS.includes(zoneHour(t));
 }
 
+/** How late a scheduled run may start after its own cron instant and still publish (release-pipeline-n1). */
+export const LATE_MS = 2 * 3600 * 1000;
+
 /** How long after a window began a run off the window hour may still catch it up (the next cron hour). */
 export const CATCHUP_MS = 3 * 3600 * 1000;
 
@@ -98,6 +106,10 @@ export function decide(p) {
   if (p.eventName === 'schedule') {
     const c = cronInstant(p.schedule || '', now);
     if (!c) return { due: false, why: `not a daily cron line: ${p.schedule || '-'}` };
+    const late = now.getTime() - c.getTime();
+    if (late > LATE_MS) {
+      return { due: false, why: `started ${(late / 3600000).toFixed(1)} h after its cron (${c.toISOString()}): too late to reload open readers; the next window publishes` };
+    }
     t = c;
   } else if (p.eventName !== 'workflow_dispatch') {
     return { due: false, why: `${p.eventName || 'no event'} never publishes` };

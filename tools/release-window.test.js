@@ -103,6 +103,17 @@ describe('decide (up2): once per window, a catch-up for a missed one', () => {
   it('a late start still counts for its own window: the cron line decides, not the clock', () => {
     expect(at('7 12 * * *', '2026-10-23T13:40:00Z', '2026-10-23T08:03:07Z').due).toBe(true);
   });
+  it('release-pipeline-n1: a run that starts more than 2 h after its cron waits for the next window', () => {
+    // Run 44943913462: cron 7 13 (06:07 MST) started 20:00:24Z and published at 13:01 Denver, reloading open readers.
+    expect(at('7 13 * * *', '2026-11-21T20:00:24Z', '2026-11-21T04:20:00Z').due).toBe(false);
+    expect(at('7 13 * * *', '2026-11-21T20:00:24Z', '2026-11-21T04:20:00Z').why).toMatch(/6\.9 h after its cron/);
+    expect(at('7 13 * * *', '2026-11-21T20:00:24Z', '').due).toBe(false);
+    // The evening window's cron 7 4 (21:07 MST), started 8 h late the next morning.
+    expect(at('7 4 * * *', '2026-11-22T12:15:00Z', '2026-11-21T13:20:00Z').due).toBe(false);
+    // Up to 2 h late still publishes for its own window.
+    expect(at('7 13 * * *', '2026-11-21T15:06:00Z', '2026-11-21T04:20:00Z').due).toBe(true);
+    expect(at('7 13 * * *', '2026-11-21T15:08:00Z', '2026-11-21T04:20:00Z').due).toBe(false);
+  });
   it('a catch-up dispatch (the PC row) publishes only when nothing published since the window began', () => {
     const d = (now, last) => decide({ eventName: 'workflow_dispatch', catchup: true, now: z(now), lastPublishAt: last });
     expect(d('2026-10-23T12:50:00Z', '2026-10-23T08:03:07Z').due).toBe(true);

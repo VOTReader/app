@@ -52,6 +52,9 @@ on:
   # time UTC-6, winter time UTC-7) and the gate's tools/release-window.mjs lets through the one
   # that is the Denver hour that day, read from the run's own cron line (a scheduled run often
   # starts late; the hour it starts in must not choose the window).
+  # release-pipeline-n1 (audit 2026-11-23): a run that starts more than 2 h after its cron
+  # (GitHub started them 7-9 h late on 11-19..22) is not due: publishing mid-afternoon reloads
+  # every open reader. The PC's catch-up dispatch or the next window publishes instead.
   #
   # What publishes is unchanged (ci10): the NEWEST commit on main whose CI is green
   # (tools/deploy-target.mjs), never older than what is live (the build-sha.txt floor). A window
