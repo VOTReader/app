@@ -45,6 +45,7 @@ class FakeCache {
     return undefined;
   }
   async put(req, res) { this.store.set(this._key(req), res); }
+  async delete(req) { return this.store.delete(this._key(req)); }
   // A real Cache lists Requests; the fake lists its URL keys (the SW reads either).
   async keys() { return [...this.store.keys()]; }
 }
@@ -907,8 +908,28 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
     expect(fetchEvent(sw, getReq('https://app.test/app/songs-1/x.mp3'))).toBeDefined();
   });
 
-  it('serves covers and lyrics stale-while-revalidate: the cached copy at once, the fresh one stored for next time', async () => {
+  /* platform-8 (audit 2026-11-23): a cover is named by its song id and never changes, yet every view asked the network
+     again. A kept cover answers alone; a lyric (text, which can be corrected) stays stale-while-revalidate. */
+  it('a kept cover answers alone: no network ask', async () => {
     const url = 'https://app.test/songs/thumbs/512/3fa9c1d2e4b5.webp';
+    const netCalls = [];
+    const waited = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return { ok: true, redirected: false, body: 'x', clone: () => ({ body: 'x' }) }; } });
+    const cache = await songsCache(sw);
+    const kept = { body: 'thumb-v1' };
+    await cache.put(url, kept);
+    let p;
+    sw.handlers.fetch({ request: getReq(url), respondWith: (promise) => { p = promise; }, waitUntil: (w) => { waited.push(w); } });
+    expect(await p).toBe(kept);
+    await Promise.all(waited);
+    expect(netCalls).toEqual([]);
+    const fresh = 'https://app.test/songs/thumbs/512/aaaaaaaaaaa1.webp';
+    expect((await fetchEvent(sw, getReq(fresh))).body).toBe('x');      // one not kept is fetched and kept
+    expect(await cache.match(fresh)).toEqual({ body: 'x' });
+  });
+
+  it('serves lyrics stale-while-revalidate: the cached copy at once, the fresh one stored for next time', async () => {
+    const url = 'https://app.test/songs/lyrics/3fa9c1d2e4b5.json';
     const fresh = { ok: true, redirected: false, body: 'thumb-v2', clone: () => ({ body: 'thumb-v2' }) };
     const netCalls = [];
     const waited = [];
@@ -1076,6 +1097,30 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
 
     /* web-platform-n2 (audit 2026-11-23): the warm-up pulled 1,613 covers, 13.85 MB, on Data Saver and mobile data
        too. On such a link the covers come as the reader sees them. */
+    /* platform-8 (audit 2026-11-23): covers and lyrics stayed after a takedown (537 of 2,150 songs hidden). A fresh
+       catalog drops those of songs it hides or no longer lists, on any link; a catalog listing no songs drops nothing. */
+    it('a fresh catalog drops the covers and lyrics of songs it hides or no longer lists', async () => {
+      const lyric = (id) => 'https://app.test/songs/lyrics/' + id + '.json';
+      const big = (id) => 'https://app.test/songs/thumbs/512/' + id + '.webp';
+      const GONE = 'fffffffffff9';
+      const cache = await run(async (r) => {
+        const url = typeof r === 'string' ? r : r.url;
+        return url === CAT ? catalogResp() : { ok: true, redirected: false, body: url };
+      }, async (c) => {
+        for (const u of [thumb(A), big(A), lyric(A), thumb(HID), big(HID), lyric(HID), thumb(GONE), lyric(GONE)]) await c.put(u, { body: 'kept' });
+        await c.put('https://app.test/songs/votes.json', { body: 'votes' });
+      }, { type: 'cellular' });
+      for (const u of [thumb(A), big(A), lyric(A), 'https://app.test/songs/votes.json']) expect(await cache.match(u), u).toBeTruthy();
+      for (const u of [thumb(HID), big(HID), lyric(HID), thumb(GONE), lyric(GONE)]) expect(await cache.match(u), u).toBeFalsy();
+    });
+
+    it('a catalog listing no songs drops nothing', async () => {
+      const empty = { ok: true, redirected: false, clone: () => ({ json: async () => ({ songs: [] }) }) };
+      const cache = await run(async (r) => ((typeof r === 'string' ? r : r.url) === CAT ? empty : { ok: true, body: 'x' }),
+        async (c) => { await c.put(thumb(A), { body: 'kept' }); });
+      expect(await cache.match(thumb(A))).toBeTruthy();
+    });
+
     it('Data Saver or mobile data: no cover is fetched; Wi-Fi warms them', async () => {
       for (const [connection, want] of [[{ type: 'wifi', saveData: true }, 0], [{ type: 'cellular' }, 0], [{ type: 'wifi' }, 3]]) {
         const calls = [];

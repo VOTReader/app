@@ -1154,7 +1154,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirstCatalog(event, false));
     return;
   }
-  if (url.pathname.startsWith('/songs/thumbs/') || url.pathname.startsWith('/songs/lyrics/')) {
+  // platform-8: a cover is named by its song id and never changes, so a kept one answers alone; a lyric is text a
+  // correction can reach, so it stays stale-while-revalidate (the audit measured those asks as mostly 304s).
+  if (url.pathname.startsWith('/songs/thumbs/')) {
+    event.respondWith(cacheFirstSongFile(event.request));
+    return;
+  }
+  if (url.pathname.startsWith('/songs/lyrics/')) {
     event.respondWith(staleWhileRevalidate(event));
     return;
   }
@@ -1266,6 +1272,39 @@ async function staleWhileRevalidate(event) {
   return response || new Response('Songs not available offline', { status: 503, statusText: 'Service Unavailable' });
 }
 
+/** A song's cover: the kept copy, else the network's, kept when it answers cleanly (platform-8). */
+async function cacheFirstSongFile(request) {
+  const cache = await caches.open(SONGS_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  let response = null;
+  try { response = await fetch(request); } catch (_e) { response = null; }
+  if (response && response.ok && !response.redirected) {
+    try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
+  }
+  return response || new Response('Songs not available offline', { status: 503, statusText: 'Service Unavailable' });
+}
+
+/* TAKEN DOWN, DROPPED (platform-8, audit 2026-11-23). Covers and lyrics stayed in the songs bucket after their song
+   was hidden or delisted (537 of 2,150 songs hidden then). A fresh catalog drops every kept cover and lyric of a song
+   it hides or no longer lists, on any link (it fetches nothing). A catalog that lists no songs drops nothing: that is
+   a broken answer, not a takedown of the whole catalog. */
+const SONG_FILE = /^\/songs\/(?:thumbs\/\d+|lyrics)\/([0-9a-f]{12})\.(?:webp|json)$/;
+async function pruneSongFiles(catalogResponse) {
+  let catalog = null;
+  try { catalog = await catalogResponse.json(); } catch (_e) { return; }
+  const songs = catalog && Array.isArray(catalog.songs) ? catalog.songs : [];
+  const listed = new Set(songs.filter((x) => x && !x.hid && SONG_THUMB_ID.test(x.id)).map((x) => x.id));
+  if (!listed.size) return;
+  const cache = await caches.open(SONGS_CACHE);
+  for (const key of await cache.keys()) {
+    let path = '';
+    try { path = new URL(typeof key === 'string' ? key : key.url).pathname; } catch (_e) { continue; }
+    const m = SONG_FILE.exec(path);
+    if (m && !listed.has(m[1])) { try { await cache.delete(key); } catch (_e) { /* the next catalog tries again */ } }
+  }
+}
+
 /* n3-06: the catalog is the one songs file that changes in place (a takedown
    hides a song, a publish adds some), so the network's answer wins: stale-while-
    revalidate answered with the previous launch's copy and a takedown reached a
@@ -1293,7 +1332,10 @@ async function networkFirstCatalog(event, warm = true) {
   const network = fetch(request).then(async (response) => {
     if (response && response.ok && !response.redirected) {
       try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
-      if (warm && typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
+      if (warm && typeof event.waitUntil === 'function') {
+        event.waitUntil(pruneSongFiles(response.clone()).catch(() => {}));
+        event.waitUntil(warmSongThumbs(response.clone()));
+      }
     }
     return response;
   }).catch(() => null);
