@@ -73,6 +73,32 @@ describe('Saved answers (O5)', () => {
     expect(onOpenTopic).toHaveBeenLastCalledWith('god-speaks-about-the-sabbath', expect.anything(), 'Saved answers', null, null, expect.any(Number));
   });
 
+  /* Fix list 7: Copy the words dropped the copy's answer (no 'Copied') and wrapped words that already open on a
+     curly quote in a second pair. */
+  it("'Copy the words' copies one pair of quotes and says Copied", async () => {
+    stores(MARKS);
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    window.showToast = vi.fn();
+    render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={noop} />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Saved line options' })[1]);   // “Thus says The Lord
+    await act(async () => { fireEvent.click(screen.getByText('Copy the words')); });
+    expect(writeText).toHaveBeenCalledWith('“Thus says The Lord”');
+    expect(window.showToast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Copied' }));
+    delete navigator.clipboard;
+  });
+
+  it("'Copy the words' says Could not copy when the clipboard refuses", async () => {
+    stores(MARKS);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('no')) }, configurable: true });
+    window.showToast = vi.fn();
+    render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={noop} />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Saved line options' })[0]);
+    await act(async () => { fireEvent.click(screen.getByText('Copy the words')); });
+    expect(window.showToast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Could not copy' }));
+    delete navigator.clipboard;
+  });
+
   it('empty: says how to save one; a mark made elsewhere appears at once', () => {
     const s = stores({});
     render(<AnswersSaved {...nav} entries={ANSWERS} onOpenTopic={noop} />);

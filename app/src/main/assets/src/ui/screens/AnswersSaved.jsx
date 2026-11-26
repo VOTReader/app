@@ -19,10 +19,20 @@ import { answersIndexOf, answersPlainText } from '../../utils/answers-search.js'
 import { EmptyState } from '../components/UiParts.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
-import { copyText } from '../../utils/copy-share.js';
+import { copyNow } from '../../utils/copy-share.js';
 import { relativeDate } from '../../utils/dates.js';
 import { ANSWERS_MAIN_PAGE_ID } from '../../utils/answers-shelves.js';
 import { LeadTitle, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
+
+/* Fix list 7: copy inside the tap (copyNow) and say how it went; the words wear one pair of quotes, as the list
+   shows them, even when the marked text already opens on a curly quote. */
+function copyWords(/** @type {string} */ text) {
+  const say = (/** @type {string} */ m) => {
+    const show = /** @type {any} */ (globalThis).showToast;
+    if (typeof show === 'function') show({ id: 'vot-toast-copy', className: 'vot-toast', text: m });
+  };
+  copyNow('“' + text.replace(/^“|”$/g, '') + '”').then((r) => say(r === 'copied' ? 'Copied' : 'Could not copy'));
+}
 
 /**
  * @param {{ entries: any[], fontScale?: any, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any,
@@ -97,7 +107,7 @@ export function AnswersSaved({ entries, fontScale, onBack, onSearch, onHistory, 
       <ActionSheet open={!!menu} onClose={closeMenu} title={menu ? menu.it.text : ''} sub={menu ? menu.title : ''}
         actions={menu ? [
           { id: 'open', icon: 'book', label: 'Open in the answer', onSelect: () => { const m = menu; setMenu(null); open(m.id, m.it); } },
-          { id: 'copy', icon: 'copy', label: 'Copy the words', onSelect: () => { const m = menu; setMenu(null); copyText('“' + m.it.text + '”'); } },
+          { id: 'copy', icon: 'copy', label: 'Copy the words', onSelect: () => { const m = menu; setMenu(null); copyWords(m.it.text); } },
           { id: 'remove', icon: 'trash', label: 'Remove', danger: true, onSelect: () => { const m = menu; setMenu(null); setToRemove(m.it); } },
         ] : []} />
       <ActionSheet open={!!toRemove} onClose={closeRemove} title="Remove this saved line?"
