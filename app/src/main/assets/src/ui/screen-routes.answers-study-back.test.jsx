@@ -76,13 +76,20 @@ describe('reading2-1: a study link in an Answers topic keeps the way back', () =
     expect(e.destSnapshot).toEqual(expect.objectContaining({ screen: 'bible-study-chapter', studyId: 'one-page', studyChapterId: 'only' }));
   });
 
-  it('a study the app cannot open goes to the website and records nothing', () => {
+  it('a locked study stays in the app, as before: no web page, no back entry', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const { props, nav } = topicNav();
     nav.openStudy('locked', 'https://example.invalid/locked');
+    expect(open).not.toHaveBeenCalled();
+    expect(props.pushFromLetter).not.toHaveBeenCalled();
+  });
+
+  it('a study the app does not have opens its web page and records nothing', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { props, nav } = topicNav();
     nav.openStudy('not-here', 'https://example.invalid/missing');
     expect(props.pushFromLetter).not.toHaveBeenCalled();
     expect(props.selectStudy).not.toHaveBeenCalled();
-    expect(open).toHaveBeenCalledTimes(2);
+    expect(open).toHaveBeenCalledTimes(1);
   });
 });

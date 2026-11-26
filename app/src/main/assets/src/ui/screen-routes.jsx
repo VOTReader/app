@@ -1176,7 +1176,9 @@ export function buildScreenRoutes({
             : { screen: 'bible-study-index', bookId: null, chapterNum: null, letterId: null, studyId: slug, studyChapterId: null },
         });
         _startNewTrail(); selectStudy(slug);
-      } else if (url) window.open(url, '_blank', 'noopener');
+      } else if (!study && url) window.open(url, '_blank', 'noopener');
+      // A study the app has but cannot open (locked, or no chapters) stays in the app, as before: selectStudy
+      // refused it then too. No web page, no back entry, and the reader's trail is kept.
     },
     searchLibrary: (q) => { setSearchQuery(q); goSearch(); },
     goToRef: (ref) => {
