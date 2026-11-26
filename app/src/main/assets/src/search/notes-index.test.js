@@ -2,7 +2,7 @@
    footnote refs stay out. They live in an index of their own (notes-index.js), so the main index, and every ranked
    result and bench, is exactly what it was. */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { buildNoteDocs, notesSearcher } from './notes-index.js';
+import { buildNoteDocs, notesSearcher, notesSearcherAsync } from './notes-index.js';
 import { buildDocs } from './index-builder.js';
 
 const VOT_DATA = {
@@ -145,5 +145,68 @@ describe('notesSearcher', () => {
   it('small words alone find nothing, and a word typed with a slip still finds its heading', () => {
     expect(S.search('the of')).toEqual([]);
     expect(S.search('beatitudse')[0].doc.text).toBe('The Beatitudes');
+  });
+});
+
+describe('buildNoteDocs (junk corpora) + notesSearcherAsync + search edges (votreader-tests-7 item 9)', () => {
+  let prevData;
+  beforeAll(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+  });
+  afterAll(() => {
+    window.VotSearchData = prevData;
+    for (const k of ['BOOKS', 'BOOKS_RESTORED', 'MATTHEW']) delete globalThis[k];
+  });
+
+  it('skips junk books, chapters and notes, and falls back where a title, id or ref is missing', () => {
+    const JUNK = {
+      BOOKS: {
+        junknull: null,
+        junknoch: { id: 'junknoch', title: 'No Chapters' },
+        plain: { chapters: [null, { num: 3 }, { num: 4, title: 'T4', sections: [{ heading: 'H4', verses: [{ n: 1 }] }] }] },
+      },
+      BOOKS_RESTORED: {},
+      MATTHEW: { chapters: [null, { num: 7 }, { num: 8, title: 'MT8', votNotes: [null, { vol: 'V' }, { excerpt: 'E1' }, { ref: 'bogus', excerpt: 'E2' }, { ref: ' 9:2', excerpt: 'E3' }] }] },
+    };
+    for (const k of Object.keys(JUNK)) globalThis[k] = JUNK[k];
+    const docs = buildNoteDocs();
+    const h = docs.filter((d) => d.kind === 'heading');
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ bookId: 'plain', chapterNum: 4, verseNum: 1, text: 'H4', title: '', ref: 'plain 4:1' });
+    const c = docs.filter((d) => d.kind === 'chapter-title');
+    expect(c.map((d) => d.bookId + ' ' + d.chapterNum)).toEqual(['plain 4', 'matthew 8']);
+    const n = docs.filter((d) => d.kind === 'study-note');
+    expect(n.map((d) => d.chapterNum + ':' + d.verseNum)).toEqual(['8:0', '8:0', '9:2']);
+    expect(n[0]).toMatchObject({ text: 'E1', heading: '', ref: 'Matthew 8' });
+    expect(n[1].ref).toBe('Matthew bogus');
+  });
+
+  it('builds nothing when no corpora are loaded', () => {
+    for (const k of Object.keys(GLOBALS)) delete globalThis[k];
+    expect(buildNoteDocs()).toEqual([]);
+  });
+
+  it('notesSearcherAsync indexes the same docs and searches them', async () => {
+    for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
+    const docs = buildNoteDocs();
+    const A = await notesSearcherAsync(docs);
+    expect(A.size).toBe(docs.length);
+    expect(A.search('creation week')[0].doc.text).toBe('The Creation Week');
+  });
+
+  it('search edges: empty query, exclusion and quotes stripped, stop words kept on request, short slip, corpus all, empty scope, limit', () => {
+    for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
+    const S = notesSearcher(buildNoteDocs());
+    expect(S.size).toBeGreaterThan(0);
+    expect(S.search('')).toEqual([]);
+    expect(S.search(null)).toEqual([]);
+    expect(S.search('creation -week')[0].doc.text).toBe('The Creation Week');
+    expect(S.search('"creation"')[0].doc.text).toBe('The Creation Week');
+    expect(S.search('creation', { useStopWords: false })[0].doc.text).toBe('The Creation Week');
+    expect(S.search('zzzz')).toEqual([]);
+    expect(S.search('creation', { corpus: 'all' })[0].doc.text).toBe('The Creation Week');
+    expect(S.search('creation', { scope: {} })[0].doc.text).toBe('The Creation Week');
+    expect(S.search('creation week', { limit: 1 })).toHaveLength(1);
   });
 });

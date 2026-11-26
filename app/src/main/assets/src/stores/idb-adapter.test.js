@@ -701,3 +701,236 @@ describe('IDBAdapter W8 - the fences are checked again right before the transact
     expect(await IDBAdapter.get('vot-state', 'v')).toEqual({ ok: 1 });
   });
 });
+
+/* votreader-tests-7 item 9: the branches the suites above never reached — describeUpgrade's reset
+   wording, the engine line's fallbacks, versionchange listeners, open() failing three ways, an
+   upgrade over stores that already exist, delete/commitMigration under the fences (at the door and
+   again in the queue), and getAll's cursor/abort failures. */
+describe('IDBAdapter — item 9 branches (votreader-tests-7)', () => {
+  const history = (n) => Array.from({ length: n }, (_, i) => ({ key: 'bible:john:' + i, ts: 1791749447996 + i, title: 'John ' + i + ' — “In the beginning”' }));
+  afterEach(() => { IDBAdapter.setWriteFence(false); IDBAdapter.setHoldCheck(null); vi.restoreAllMocks(); });
+
+  it('describeUpgrade: a reset keeps the browser’s reason; an ordinary step and no event say nothing', () => {
+    expect(IDBAdapter.describeUpgrade({ oldVersion: 11, newVersion: 12, dataLoss: 'total', dataLossMessage: 'gone' }))
+      .toBe('database reset by the browser (v11 -> v12); dataLoss total: gone');
+    expect(IDBAdapter.describeUpgrade({ oldVersion: 11, newVersion: 12, dataLoss: 'none' })).toBe('');
+    expect(IDBAdapter.describeUpgrade({ oldVersion: 0, newVersion: 14 }))
+      .toBe('database created fresh (v0 -> v14); dataLoss unreported');
+    expect(IDBAdapter.describeUpgrade(null)).toBe('');
+    expect(IDBAdapter.describeUpgrade(undefined)).toBe('');
+  });
+
+  it('the data-health line names the engine: Chrome version, else the agent’s first word, else unknown', async () => {
+    const origUA = navigator.userAgent;
+    const setUA = (v) => Object.defineProperty(navigator, 'userAgent', { value: v, configurable: true });
+    try {
+      const warn = vi.spyOn(DiagnosticLog, 'warn');
+      setUA('Mozilla/5.0 Chrome/120.0.1 Safari/537.36');
+      await IDBAdapter.get('vot-state', 'v');
+      expect(warn).toHaveBeenCalledWith('data-health', expect.stringContaining('[Chrome/120.0.1]'));
+      warn.mockClear();
+      await resetIdb();
+      setUA('TestAgent/2.0 (X11; Linux)');
+      await IDBAdapter.get('vot-state', 'v');
+      expect(warn).toHaveBeenCalledWith('data-health', expect.stringContaining('[TestAgent/2.0]'));
+      warn.mockClear();
+      await resetIdb();
+      setUA('');
+      await IDBAdapter.get('vot-state', 'v');
+      expect(warn).toHaveBeenCalledWith('data-health', expect.stringContaining('[unknown engine]'));
+      warn.mockClear();
+      await resetIdb();
+      Object.defineProperty(navigator, 'userAgent', { get() { throw new Error('no agent'); }, configurable: true });
+      await IDBAdapter.get('vot-state', 'v');
+      expect(warn).toHaveBeenCalledWith('data-health', expect.stringContaining('[unknown engine]'));
+      warn.mockRestore();
+    } finally {
+      setUA(origUA);
+    }
+  });
+
+  it('onVersionChange listeners hear the event; unsubscribing stops it; a throwing listener stops nobody', async () => {
+    const seen = vi.fn();
+    const off = IDBAdapter.onVersionChange(seen);
+    const db = await IDBAdapter.open();
+    db.onversionchange(/** @type {any} */ ({ oldVersion: 14, newVersion: null }));
+    expect(seen).toHaveBeenCalledWith({ oldVersion: 14, newVersion: null });
+    off();
+    const db2 = await IDBAdapter.open();
+    db2.onversionchange(/** @type {any} */ ({ oldVersion: 14, newVersion: 15 }));
+    expect(seen).toHaveBeenCalledTimes(1);
+
+    const good = vi.fn();
+    const offBad = IDBAdapter.onVersionChange(() => { throw new Error('listener bug'); });
+    const offGood = IDBAdapter.onVersionChange(good);
+    const db3 = await IDBAdapter.open();
+    expect(() => db3.onversionchange(/** @type {any} */ (undefined))).not.toThrow();
+    expect(good).toHaveBeenCalledWith({});
+    offBad(); offGood();
+  });
+
+  it('onBrowserClose: unsubscribing stops it; a throwing listener stops nobody', async () => {
+    const seen = vi.fn();
+    const off = IDBAdapter.onBrowserClose(seen);
+    off();
+    const db = await IDBAdapter.open();
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    db.onclose(new Event('close'));
+    expect(seen).not.toHaveBeenCalled();
+
+    const good = vi.fn();
+    const offBad = IDBAdapter.onBrowserClose(() => { throw new Error('listener bug'); });
+    const offGood = IDBAdapter.onBrowserClose(good);
+    db.onclose(new Event('close'));
+    expect(good).toHaveBeenCalledTimes(1);
+    offBad(); offGood();
+    warn.mockRestore();
+  });
+
+  it('open() rejects when indexedDB.open throws synchronously', async () => {
+    IDBAdapter._resetForTests();
+    const spy = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new Error('sync boom'); });
+    try {
+      await expect(IDBAdapter.open()).rejects.toThrow('sync boom');
+    } finally {
+      spy.mockRestore();
+      IDBAdapter._resetForTests();
+    }
+  });
+
+  it('open() rejects with its own words when the request fails without an error, and when blocked', async () => {
+    IDBAdapter._resetForTests();
+    /** @type {any} */ const fakeReq = {};
+    const spy = vi.spyOn(indexedDB, 'open').mockImplementation(() => fakeReq);
+    try {
+      const p = IDBAdapter.open();
+      fakeReq.onerror({ target: { error: null } });
+      await expect(p).rejects.toThrow(/IDB open failed/);
+      IDBAdapter._resetForTests();
+      const p2 = IDBAdapter.open();
+      fakeReq.onblocked();
+      await expect(p2).rejects.toThrow(/blocked/);
+    } finally {
+      spy.mockRestore();
+      IDBAdapter._resetForTests();
+    }
+  });
+
+  it('an upgrade over a store that already exists keeps it and creates the rest, quietly', async () => {
+    await new Promise((resolve, reject) => {
+      const r = indexedDB.open(IDBAdapter.DB_NAME, 1);
+      r.onupgradeneeded = () => { r.result.createObjectStore('vot-state'); };
+      r.onsuccess = () => { r.result.close(); resolve(undefined); };
+      r.onerror = () => reject(r.error);
+    });
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    const db = await IDBAdapter.open();
+    expect(IDBAdapter.openInfo()).toMatchObject({ oldVersion: 1, newVersion: IDBAdapter.DB_VERSION });
+    expect(warn).not.toHaveBeenCalled();
+    for (const name of IDBAdapter.STORE_NAMES) {
+      expect(db.objectStoreNames.contains(name)).toBe(true);
+    }
+    warn.mockRestore();
+  });
+
+  it('delete rejects an unknown store name', async () => {
+    await expect(IDBAdapter.delete('not-a-store', 'v')).rejects.toThrow(/Unknown IDB store/);
+  });
+
+  it('delete under Clear All’s fence resolves and lands nothing', async () => {
+    await IDBAdapter.put('vot-notes', 'v', { n: 1 });
+    IDBAdapter.setWriteFence(true);
+    try {
+      await expect(IDBAdapter.delete('vot-notes', 'v')).resolves.toBeUndefined();
+    } finally { IDBAdapter.setWriteFence(false); }
+    expect(await IDBAdapter.get('vot-notes', 'v')).toEqual({ n: 1 });
+  });
+
+  it('commitMigration under Clear All’s fence resolves and lands nothing', async () => {
+    IDBAdapter.setWriteFence(true);
+    try {
+      await expect(IDBAdapter.commitMigration('vot-bookmarks', [{ id: 'b1' }], 2)).resolves.toBeUndefined();
+    } finally { IDBAdapter.setWriteFence(false); }
+    expect(await IDBAdapter.get('vot-bookmarks', 'v')).toBeUndefined();
+    expect(await IDBAdapter.get('meta', 'schema:vot-bookmarks')).toBeUndefined();
+  });
+
+  it('delete is refused when a hold rises while it waits in the queue, and again after open()', async () => {
+    let calls = 0;
+    IDBAdapter.setHoldCheck(() => { calls += 1; return calls >= 2; });
+    await expect(IDBAdapter.delete('vot-notes', 'v')).rejects.toMatchObject({ name: 'WriteFenced' });
+    calls = 0;
+    IDBAdapter.setHoldCheck(() => { calls += 1; return calls >= 3; });
+    await expect(IDBAdapter.delete('vot-notes', 'v')).rejects.toMatchObject({ name: 'WriteFenced' });
+    IDBAdapter.setHoldCheck(null);
+  });
+
+  it('commitMigration is refused when a hold rises while it waits in the queue, and again after open()', async () => {
+    let calls = 0;
+    IDBAdapter.setHoldCheck(() => { calls += 1; return calls >= 2; });
+    await expect(IDBAdapter.commitMigration('vot-bookmarks', [], 3)).rejects.toMatchObject({ name: 'WriteFenced' });
+    calls = 0;
+    IDBAdapter.setHoldCheck(() => { calls += 1; return calls >= 3; });
+    await expect(IDBAdapter.commitMigration('vot-bookmarks', [], 3)).rejects.toMatchObject({ name: 'WriteFenced' });
+    IDBAdapter.setHoldCheck(null);
+    expect(await IDBAdapter.get('meta', 'schema:vot-bookmarks')).toBeUndefined();
+  });
+
+  it('getAll rejects with a DataError when a value’s pieces do not add up', async () => {
+    await IDBAdapter.put('vot-history', 'v', history(3000));
+    const db = await IDBAdapter.open();
+    await new Promise((res) => { const tx = db.transaction('vot-history', 'readwrite'); tx.objectStore('vot-history').delete(IDBKeyRange.bound('v#chunk:', 'v#chunk:￿')); tx.oncomplete = res; });
+    await expect(IDBAdapter.getAll('vot-history')).rejects.toMatchObject({ name: 'DataError' });
+  });
+
+  async function fakeGetAll() {
+    const db = await IDBAdapter.open();
+    /** @type {any} */ const fakeReq = { error: null };
+    /** @type {any} */ const fakeTx = { error: null, objectStore: () => ({ openCursor: () => fakeReq }) };
+    const spy = vi.spyOn(db, 'transaction').mockImplementation(() => fakeTx);
+    const p = IDBAdapter.getAll('vot-notes');
+    await new Promise((r) => setTimeout(r, 0));
+    return { p, fakeReq, fakeTx, restore: () => spy.mockRestore() };
+  }
+
+  it('getAll rejects with the cursor’s error, or its own words when there is none', async () => {
+    const a = await fakeGetAll();
+    a.fakeReq.error = new Error('cursor boom');
+    a.fakeReq.onerror();
+    await expect(a.p).rejects.toThrow('cursor boom');
+    a.restore();
+    const b = await fakeGetAll();
+    b.fakeReq.onerror();
+    await expect(b.p).rejects.toThrow(/cursor failed/);
+    b.restore();
+  });
+
+  it('getAll rejects on abort with the transaction’s error, else the request’s, else a made AbortError', async () => {
+    const a = await fakeGetAll();
+    a.fakeTx.error = new Error('tx abort');
+    a.fakeTx.onabort();
+    await expect(a.p).rejects.toThrow('tx abort');
+    a.restore();
+    const b = await fakeGetAll();
+    b.fakeReq.error = new Error('req abort');
+    b.fakeTx.onabort();
+    await expect(b.p).rejects.toThrow('req abort');
+    b.restore();
+    const c = await fakeGetAll();
+    c.fakeTx.onabort();
+    await expect(c.p).rejects.toMatchObject({ name: 'AbortError' });
+    c.restore();
+  });
+
+  it('the made AbortError falls back to a plain Error where DOMException cannot be built', async () => {
+    vi.stubGlobal('DOMException', undefined);
+    try {
+      const a = await fakeGetAll();
+      a.fakeTx.onabort();
+      await expect(a.p).rejects.toMatchObject({ name: 'AbortError' });
+      a.restore();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
