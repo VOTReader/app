@@ -269,7 +269,9 @@ export function unionStrings(ours, theirs) {
  * honoured), then the ticks of both copies merge three ways against the base:
  * a chapter read in one tab is never lost to a pace change made in another,
  * and one un-marked in one tab (C4) stays un-marked unless the other tab
- * changed it too.
+ * changed it too. A spread-out plan's pinned rest days (`rested`, kept by a
+ * change of target or days) stay when only one copy has them: the other copy
+ * was written before the change, or by a build that never wrote the field.
  * @param {any} base @param {any} ours @param {any} theirs
  * @returns {any[]}
  */
@@ -288,7 +290,8 @@ export function mergePlanStore(base, ours, theirs) {
       if (k in b && (!(k in ot) || !(k in tt))) continue;
       ticks[k] = k in ot ? ot[k] : tt[k];
     }
-    return { ...r, ticks };
+    const rested = r.rested || o.rested || t.rested;
+    return rested ? { ...r, ticks, rested } : { ...r, ticks };
   });
 }
 

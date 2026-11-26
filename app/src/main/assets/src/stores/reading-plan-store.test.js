@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'Indexed
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
-import { newRun, runStatus } from '../data/plan-engine.js';
+import { newRun, runStatus, tickItem, catchUp } from '../data/plan-engine.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
 const run = (items, plan = 'x') => newRun({ plan, tracks: [{ kind: 'bible', by: 'count', items: items.map((k) => ({ k, w: 600 })) }], pace: { mode: 'days', n: items.length } }, at('2026-10-22'));
@@ -109,5 +109,44 @@ describe('mergePlanStore', () => {
     const a = run(['genesis:1']), b = run(['exodus:1']);
     const out = mergePlanStore([a], [], [a, b]);
     expect(out.map((r) => r.id)).toEqual([b.id]);
+  });
+});
+
+describe('a run\'s pinned rest days (rested) survive the store, backups and merges (Hub Lock 11-26, point 2)', () => {
+  /** A Ruth run over 20 days, read Dec 3, caught up Dec 10: it holds `rested`. */
+  const pinned = () => catchUp(tickItem(newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01')), 'ruth:1', '2026-12-03', at('2026-12-03').getTime()), at('2026-12-10'));
+
+  it('(d) put, get and replaceAll keep it, and so does a stored copy read back', () => {
+    const r = pinned();
+    expect(r.rested && r.rested.until).toBe('2026-12-10');
+    ReadingPlanStore.put(r);
+    expect(ReadingPlanStore.get(r.id)).toEqual(r);
+    ReadingPlanStore.replaceAll([JSON.parse(JSON.stringify(r))]);
+    expect(ReadingPlanStore.get(r.id).rested).toEqual(r.rested);
+  });
+
+  it('(b) a backup from before the field (no rested, or the older list of dates) restores as it was', () => {
+    const r = pinned();
+    const bare = { ...r }; delete bare.rested;
+    ReadingPlanStore.replaceAll([bare]);
+    expect('rested' in ReadingPlanStore.get(r.id)).toBe(false);
+  });
+
+  it('(c) two copies of a run merge with the rested of whichever has it, whichever copy is newer', () => {
+    const r = pinned();
+    const bare = { ...r }; delete bare.rested;
+    const newer = (/** @type {any} */ x) => ({ ...x, updated: x.updated + 60000, ticks: { ...x.ticks, 'ruth:2': '2026-12-11' } });
+    // The copy without it is the newer (a tick on a device still on 03d0ea090, or one that never made the change).
+    const a = mergePlanStore([bare], [newer(bare)], [r]).find((x) => x.id === r.id);
+    expect(a.rested).toEqual(r.rested);
+    expect(a.ticks).toEqual({ 'ruth:1': '2026-12-03', 'ruth:2': '2026-12-11' });
+    const b = mergePlanStore([bare], [r], [newer(bare)]).find((x) => x.id === r.id);
+    expect(b.rested).toEqual(r.rested);
+    // A restore merges the live record with the snapshot's, base-less, through the same merge (data-safety).
+    expect(mergePlanStore(null, [newer(bare)], [r])[0].rested).toEqual(r.rested);
+    expect(mergePlanStore(null, [r], [newer(bare)])[0].rested).toEqual(r.rested);
+    // Both have it: the newer copy's stays.
+    const later = { ...newer(r), rested: { until: '2026-12-11', ranges: [['2026-12-01', '2026-12-02']] } };
+    expect(mergePlanStore(null, [r], [later])[0].rested).toEqual(later.rested);
   });
 });
