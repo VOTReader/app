@@ -73,3 +73,19 @@ describe('Settings rows at large Text Size', () => {
     expect(decls('.ws1-settings .settings-row-head')['flex-wrap']).toBe('nowrap');
   });
 });
+
+describe('Reading progress names (large-text-n1)', () => {
+  it('wrap at every size instead of an ellipsis ("The Volumes of …" from 130%)', () => {
+    const d = decls('.ws3-prog .progress-row-label');
+    expect(d['white-space']).toBe('normal');
+    expect(d['text-overflow']).toBe('clip');
+    expect(d.overflow).toBe('visible');
+  });
+  it('keep most of the row at large text, the tally and Clear wrapping under them', () => {
+    expect(decls('.vot-large-text .ws3-prog .progress-row')['flex-wrap']).toBe('wrap');
+    const t = decls('.vot-large-text .ws3-prog .progress-section-toggle');
+    expect(t['flex-wrap']).toBe('wrap');
+    expect(t['min-width']).toBe('60%');
+    expect(decls('.vot-large-text .ws3-prog .ws3-prog-name')['min-width']).toBe('55%');
+  });
+});

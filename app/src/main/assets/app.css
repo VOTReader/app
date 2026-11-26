@@ -6113,6 +6113,13 @@
     .ws3-prog-name { display:flex; flex:1; flex-direction:column; min-width:0; }
     .ws3-prog .progress-row-label { color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); letter-spacing:0; }
     .ws3-prog .progress-row-tally { min-width:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; }
+    /* large-text-n1: a name wraps rather than end in "…" (cut from 130%); at large text the name keeps most of the
+       row and the tally, then Clear, wrap under it (at 300% the names were one letter wide). */
+    .ws3-prog .progress-row-label { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:break-word; }
+    .vot-large-text .ws3-prog .progress-row { flex-wrap:wrap; }
+    .vot-large-text .ws3-prog .progress-section-toggle { flex-wrap:wrap; min-width:60%; }
+    .vot-large-text .ws3-prog .ws3-prog-name { min-width:55%; }
+    .vot-large-text .ws3-prog .progress-row-tally { margin-left:auto; }
     .ws3-prog-bar.ui-progress { max-width:140px; margin:var(--sp-2) 0 0; }
     .ws3-prog-chev { display:inline-flex; flex:none; color:var(--text-3); }
     .ws3-prog .ws3-clear.settings-clear-btn { flex:none; min-height:36px; padding:0 var(--sp-3); border:0; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
