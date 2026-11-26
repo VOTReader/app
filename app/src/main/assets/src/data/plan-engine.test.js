@@ -116,6 +116,19 @@ describe('the flexible schedule', () => {
     expect(isReadingDay(run, /** @type {number} */ (dayNum('2026-10-03')))).toBe(false);
   });
 
+  it('a pause made before a later start moves the finish only by the reading days after the start', () => {
+    let run = bibleYear(at('2026-11-26'));
+    run = { ...run, start: '2026-12-15' };
+    const target = run.target;
+    run = pauseRun(run, at('2026-11-26'));
+    const early = resumeRun(run, at('2026-12-01'));     // paused and resumed, all before the start
+    expect(early.target).toBe(target);
+    expect(early.pauses || []).toEqual([]);
+    const late = resumeRun(run, at('2026-12-18'));      // Dec 15-17 were reading days lost
+    expect(late.target).toBe(dateOf(/** @type {number} */ (dayNum(target)) + 3));
+    expect(late.pauses.at(-1)).toEqual(['2026-12-15', '2026-12-17']);
+  });
+
   it('5-day weeks: weekends are not reading days and do not make the reader behind', () => {
     const wk = [false, true, true, true, true, true, false];
     let run = newRun({ plan: 'nt', tracks: [{ kind: 'bible', by: 'count', items: bibleItems().slice(929) }], weekdays: wk, pace: { mode: 'days', n: 52 } }, at('2026-10-23'));   // a Friday

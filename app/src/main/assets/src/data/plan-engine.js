@@ -763,10 +763,13 @@ export function pauseRun(run, now) {
   return { ...run, status: 'paused', paused: todayKey(now), updated: now.getTime() };
 }
 
-/** Resume: the pause becomes a closed range and the target moves later by the reading days it covered. */
+/** Resume: the pause becomes a closed range and the target moves later by the reading days it covered. Days before
+ *  the plan's start were never reading days, so a pause made before a later start counts only from the start. */
 export function resumeRun(run, now) {
   if (!run.paused) return run;
-  const a = /** @type {number} */ (dayNum(run.paused)), b = /** @type {number} */ (dayNum(todayKey(now))) - 1;
+  const startN = dayNum(run.start);
+  const pausedN = /** @type {number} */ (dayNum(run.paused));
+  const a = startN != null && startN > pausedN ? startN : pausedN, b = /** @type {number} */ (dayNum(todayKey(now))) - 1;
   const base = { ...run, paused: undefined, status: /** @type {'running'} */ ('running') };
   delete base.paused;
   if (b < a) return { ...base, updated: now.getTime() };
