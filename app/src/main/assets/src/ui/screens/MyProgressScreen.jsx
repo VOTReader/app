@@ -371,7 +371,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, sett
   })();
   /** @param {any} r */
   const finishedLine = (r) => {
-    const n = /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1;
+    const n = Math.max(1, /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1);
     return 'Started ' + finishDate(r.start, new Date()) + ' · finished ' + finishDate(r.finished, new Date()) + ' · ' + n + (n === 1 ? ' day' : ' days');
   };
   /* A NEW PROFILE IS ONE LINE AND ONE ACTION (n117, A08.3): it was the sentence and then a page of

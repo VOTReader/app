@@ -54,7 +54,8 @@ export function stoppedLine(r, now) {
 /** "8 days · finished Oct 30" for a finished run. @param {any} r */
 export function finishedLine(r) {
   const a = dayNum(r.start), b = dayNum(r.finished);
-  const n = a != null && b != null ? b - a + 1 : 0;
+  // A plan read through before its start date was finished in under a day, never in fewer.
+  const n = a != null && b != null ? Math.max(1, b - a + 1) : 0;
   return (n ? countOf(n, 'day') + ' · ' : '') + 'finished ' + finishDate(r.finished, new Date());
 }
 
