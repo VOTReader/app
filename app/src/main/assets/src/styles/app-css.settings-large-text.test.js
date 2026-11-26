@@ -89,3 +89,18 @@ describe('Reading progress names (large-text-n1)', () => {
     expect(decls('.vot-large-text .ws3-prog .ws3-prog-name')['min-width']).toBe('55%');
   });
 });
+
+/* large-text-n5 (audit 2026-11-23): at large text a My Progress tile (and a plan's fact tile) lays the number
+   beside its label in a flex row; the number has overflow-wrap:anywhere, so it shrank and broke ("250" became
+   "25" over "0", "1,284" three lines at 300%). The number keeps its width; the label takes the rest and wraps. */
+describe('My Progress and plan fact numbers at large Text Size (large-text-n5)', () => {
+  it('never shrink, so a number is not broken across lines', () => {
+    for (const sel of ['.vot-large-text .plan-fact b', '.vot-large-text .prg-tile b']) expect(decls(sel).flex, sel).toBe('none');
+  });
+  it('leave the label the rest of the row, wrapping', () => {
+    for (const sel of ['.vot-large-text .plan-fact span', '.vot-large-text .prg-tile span']) {
+      expect(decls(sel).flex, sel).toBe('1 1 0');
+      expect(decls(sel)['min-width'], sel).toBe('0');
+    }
+  });
+});

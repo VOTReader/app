@@ -3630,6 +3630,9 @@
     /* 2310: at large text a fact tile's word ('chapters', 'reading') is wider than a third of the phone: one tile a row, number beside its words */
     .vot-large-text :is(.plan-facts, .prg-tiles) { grid-template-columns: minmax(0, 1fr); }
     .vot-large-text :is(.plan-fact, .prg-tile) { display: flex; flex-direction: row; align-items: baseline; gap: 0 10px; }
+    /* large-text-n5: the number keeps its width (it shrank and broke: "250" as "25" over "0"); the label wraps. */
+    .vot-large-text .plan-fact b, .vot-large-text .prg-tile b { flex: none; }
+    .vot-large-text .plan-fact span, .vot-large-text .prg-tile span { flex: 1 1 0; min-width: 0; }
     .vot-large-text .prg-tile span { margin-top: 0; }
     .plan-date { max-width: 100%; min-width: 0; }
     .vot-large-text .plan-opt { flex-direction: column; align-items: stretch; gap: 6px; }   /* label over its choices: the choices get the sheet's width */
