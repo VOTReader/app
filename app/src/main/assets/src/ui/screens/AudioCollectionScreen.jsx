@@ -32,6 +32,7 @@ import { queueTime } from '../components/PlayerSheets.jsx';
 import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 import { useStoreVersionByName, useStoreVersion } from '../../hooks/use-store-version.js';
 import { itemNoun } from '../../utils/item-noun.js';
+import { useSyncedSections } from '../components/AudioPlayButton.jsx';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -187,7 +188,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
   const { label, items, col } = resolveSource(volKey);
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
   const missing = items.length - playable.length;
-  const sections = bible || study ? null : AudioPlayer.sectionsFor(volKey);
+  const sections = useSyncedSections(bible || study ? null : AudioPlayer.sectionsFor(volKey));
   // Per ROW, through the one rule every Listening Library surface uses: a
   // collection that declares a letter screen, or any Bible edition (whose
   // tracks open the book's chapter in the reader). The screen-level `!bible`

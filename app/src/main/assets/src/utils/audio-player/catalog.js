@@ -5,6 +5,7 @@
 
 import { audioReaderLabel, isSongKey } from '../audio-track.js';
 import { songTrack } from '../song-catalog.js';
+import { relabelSections } from '../section-labels.js';
 import {
   _alternates,
   _assetUrlFor,
@@ -134,7 +135,31 @@ export function bibleChapterStart(volKey, bookId, chapterNum) {
  */
 export function sectionsFor(volKey) {
   const s = _sections();
-  return (s && s[volKey]) || null;
+  const raw = (s && s[volKey]) || null;
+  return raw ? syncedSections(raw) : null;
+}
+
+/** The last relabelling per hand-labelled list, so a caller gets the same array until the timings change. */
+const _relabelled = new WeakMap();
+/**
+ * A compilation list labelled from its synced rows once the read-along timings have landed (reader-behaviour-n4:
+ * WTLB Part Two's hand labels ran two entries behind), else as AUDIO_SECTIONS has it. Stable per (list, timings).
+ * @param {ReadonlyArray<any[]>} raw
+ * @returns {Array<any[]>}
+ */
+export function syncedSections(raw) {
+  const g = _g();
+  const table = g.AUDIO_SYNC_SECTIONS || null;
+  if (!table) return /** @type {any} */ (raw);
+  const hit = _relabelled.get(raw);
+  if (hit && hit.table === table) return hit.out;
+  const entriesOf = (/** @type {string} */ vk) => {
+    const col = g.COL_BY_KEY && typeof g.COL_BY_KEY.get === 'function' ? g.COL_BY_KEY.get(vk) : null;
+    return col && typeof g.colLetterArr === 'function' ? g.colLetterArr(col) : null;
+  };
+  const out = /** @type {any} */ (relabelSections(raw, table, entriesOf));
+  _relabelled.set(raw, { table, out });
+  return out;
 }
 
 /**

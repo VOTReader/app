@@ -27,6 +27,28 @@ import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
 import { useStoreVersion } from '../../hooks/use-store-version.js';
+import { audioSyncSectionsStore, loadAudioSyncSections } from '../../utils/sync-loaders.js';
+import { relabelSections } from '../../utils/section-labels.js';
+
+/** A collection's entries by volKey, from the registry globals (null before the corpus lands). @param {string} vk */
+const entriesOfVol = (vk) => {
+  const g = /** @type {any} */ (globalThis);
+  const col = g.COL_BY_KEY && typeof g.COL_BY_KEY.get === 'function' ? g.COL_BY_KEY.get(vk) : null;
+  return col && typeof g.colLetterArr === 'function' ? g.colLetterArr(col) : null;
+};
+
+/**
+ * Compilation rows labelled from their synced rows (reader-behaviour-n4): asks for the read-along timings once and
+ * redraws when they land, so "Section 2 · 29–56" becomes "Section 2 · 31–58", the entries that file reads.
+ * @param {ReadonlyArray<any[]> | null | undefined} sections
+ */
+export function useSyncedSections(sections) {
+  const has = !!(sections && sections.length);
+  useStoreVersion(audioSyncSectionsStore);
+  React.useEffect(() => { if (has) void loadAudioSyncSections(); }, [has]);
+  const table = /** @type {any} */ (globalThis).AUDIO_SYNC_SECTIONS || null;
+  return React.useMemo(() => (sections ? relabelSections(sections, table, entriesOfVol) : sections), [sections, table]);
+}
 
 /**
  * The Listen pill's words when a tap would resume (ra4): "Resume · N min left", N the nearest whole minute
@@ -227,10 +249,11 @@ export function bibleHero(bibleAudio, book, chapterNum) {
  * @param {(index: number) => void} props.onPlay
  */
 export function AudioSectionChips({ sections, onPlay }) {
-  if (!sections || !sections.length) return null;
+  const shown = useSyncedSections(sections);
+  if (!shown || !shown.length) return null;
   return (
     <div className="audio-sec-chips">
-      {sections.map((s, i) => (
+      {shown.map((s, i) => (
         <AudioPlayButton key={s[1] || i} variant="chip" label={s[0]} onClick={() => onPlay(i)} />
       ))}
     </div>
