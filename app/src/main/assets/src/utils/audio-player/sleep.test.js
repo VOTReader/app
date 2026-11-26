@@ -323,7 +323,21 @@ describe('audio-player sleep', () => {
 /* audio-1 (audit 2026-11-23): the end usually comes with the screen off. The "+15 min" offer waits for the
    return, and a Play soon after the end (the lock screen, a headset) arms another quarter hour by itself. */
 describe('after a sleep end', () => {
-  const hidden = (v) => vi.stubGlobal('document', { visibilityState: v ? 'hidden' : 'visible' });
+  /* Not vi.stubGlobal('document', ...): in the vmThreads pool (the pre-commit hook's fast run) the global is jsdom's
+     window, whose `document` is unforgeable, so replacing it throws "Cannot redefine property: document". A
+     configurable getter on the real document works in every pool; the original descriptor is put back after each test. */
+  let visibility = 'visible';
+  let saved;
+  const hidden = (v) => { visibility = v ? 'hidden' : 'visible'; };
+  beforeEach(() => {
+    saved = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+  });
+  afterEach(() => {
+    if (saved) Object.defineProperty(document, 'visibilityState', saved);
+    else Reflect.deleteProperty(document, 'visibilityState');   // jsdom's own getter (on the prototype) answers again
+    visibility = 'visible';
+  });
   const end = () => { S.setSleepTimer(15); vi.advanceTimersByTime(15 * 60000); h.state.status = 'paused'; };
 
   it('holds the offer while the screen is off and shows it on the return, if still paused', () => {
