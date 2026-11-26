@@ -210,3 +210,42 @@ describe('buildNoteDocs (junk corpora) + notesSearcherAsync + search edges (votr
     expect(S.search('creation week', { limit: 1 })).toHaveLength(1);
   });
 });
+
+describe('buildNoteDocs keeps Hidden Manna out (owner policy)', () => {
+  const G = {
+    MATTHEW: { chapters: [{ num: 23, votNotes: [
+      { ref: '23:32, 36', vol: 'Woe to Dallas', letter: 'Woe to Dallas', excerpt: 'Fill up then, the measure of the sin of your fathers!' },
+      { ref: '23:33', vol: 'Volume Two', letter: 'Concerning the Meek', excerpt: 'Serpents, brood of vipers.' },
+    ] }] },
+    HIDDEN_MANNA: [{ id: 'woe-to-dallas', title: 'Woe to Dallas', blocks: [] }],
+  };
+  let prevData;
+  beforeAll(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(G)) globalThis[k] = G[k];
+  });
+  afterAll(() => {
+    window.VotSearchData = prevData;
+    for (const k of Object.keys(G)) delete globalThis[k];
+  });
+
+  it('emits no study note that quotes a Hidden Manna letter, and keeps the others', () => {
+    const notes = buildNoteDocs().filter((d) => d.kind === 'study-note');
+    expect(notes.some((d) => /measure of the sin/.test(d.text))).toBe(false);
+    expect(notes.some((d) => /brood of vipers/.test(d.text))).toBe(true);
+  });
+
+  it('also honours index.html\'s HIDDEN_MANNA_TITLES when hidden-manna.js is not loaded', () => {
+    const g = /** @type {any} */ (globalThis);
+    delete g.HIDDEN_MANNA;
+    g.HIDDEN_MANNA_TITLES = new Set(['Woe to Dallas']);
+    try {
+      const notes = buildNoteDocs().filter((d) => d.kind === 'study-note');
+      expect(notes.map((d) => d.text).join(' ')).not.toMatch(/measure of the sin/);
+    } finally {
+      delete g.HIDDEN_MANNA_TITLES;
+      g.HIDDEN_MANNA = G.HIDDEN_MANNA;
+    }
+  });
+});

@@ -31,6 +31,20 @@ function noteVerse(ref, chNum) {
 }
 
 /**
+ * Every Hidden Manna letter title: index.html's HIDDEN_MANNA_TITLES (what the Study Bible badges by) and the titles in
+ * hidden-manna.js, so a letter added to either is kept out of search.
+ * @returns {Set<string>}
+ */
+function hiddenMannaTitles() {
+  /** @type {Set<string>} */ const out = new Set();
+  if (typeof HIDDEN_MANNA_TITLES !== 'undefined' && HIDDEN_MANNA_TITLES) for (const t of HIDDEN_MANNA_TITLES) out.add(String(t).trim());
+  if (typeof HIDDEN_MANNA !== 'undefined' && Array.isArray(HIDDEN_MANNA)) {
+    for (const l of HIDDEN_MANNA) if (l && l.title) out.add(String(l.title).trim());
+  }
+  return out;
+}
+
+/**
  * The study notes, chapter summaries and section headings of the loaded corpora, one doc each, in the main index's
  * doc shape (the fields SrchCard and the result router read).
  * @returns {Array<Object>}
@@ -75,6 +89,7 @@ export function buildNoteDocs() {
 
   // ─── Matthew Study Bible: chapter summaries and study notes, Volumes (its footnote refs stay out) ───
   const mt = typeof MATTHEW !== 'undefined' ? MATTHEW : null;
+  const hidden = hiddenMannaTitles();
   if (mt && Array.isArray(mt.chapters)) {
     for (const ch of mt.chapters) {
       if (!ch) continue;
@@ -82,6 +97,8 @@ export function buildNoteDocs() {
       if (ch.title) docs.push(base({ ...where, kind: 'chapter-title', chapterNum: ch.num, verseNum: 0, text: ch.title, ref: 'Matthew ' + ch.num + ' · Study Bible' }));
       for (const note of ch.votNotes || []) {
         if (!note || !note.excerpt) continue;
+        // Hidden Manna stays out of search (owner policy): its notes are reached only from the Study Bible itself.
+        if (hidden.has(String(note.letter || '').trim()) || hidden.has(String(note.vol || '').trim())) continue;
         const at = noteVerse(note.ref, ch.num);
         docs.push(base({
           ...where, kind: 'study-note', chapterNum: at.ch, verseNum: at.v, text: String(note.excerpt),

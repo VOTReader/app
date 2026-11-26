@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-deea192f33';
+const CACHE_VERSION = 'v1.0.2-187a36e02f';
 const CORPUS_VERSION = 'c78'; // c77->c78 (2026-11-22): site sync -- five new Letters to The Lord's Little Flock from thevolumesoftruth.com (Together in One Place, Intrinsically and Intimately Intertwined, Without Compromise, Revelation, A Division in Spirit; nums 62-66, no recordings yet), and the site's edits since c77 applied: Reasonable Service (an italic run), Discernment (an italic run and footnote 4, Isaiah 64:5-6), Offerings ("well-pleasing"), And He Shall Be Called I AM (its new voice-over video and the Related Topic "The Name of The Lord"), The State of the Dead study ("Mentioned 41 times"). // PREVIOUS c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -321,7 +321,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'edc25a07b32952ab4ade6f8e10ffa2b0efc4822629f190c0cc60d6f8b8f669e5',
   './dist/bundle-c.js': 'e691f0abcd1a4e310492d0734f161ad5de2f3c51a11637aac379b24e79a098d2',
-  './dist/bundle-d.js': 'bc1d0a4e7a2693a4d2ee8d028ac89a12f7181ac7896211feb404f64022eb0885',
+  './dist/bundle-d.js': '08592f7fbe76591f5a1c6feed26f18771882c3cc0f43ff25ba6ca2c90c43520f',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './index.html': '945e194f94f7eb487873fbad9b3cb591b77464ae37bd7d11fa7a5c9b1477d207',
   './manifest.json': '03184e4a7e1e6f5bb544bbbaa536127cf9c41468946c6c423d05202144f336e4',
