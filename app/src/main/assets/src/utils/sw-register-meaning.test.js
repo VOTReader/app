@@ -71,6 +71,27 @@ describe('warmMeaningFiles', () => {
   });
 });
 
+/* web-platform-n1 (audit 2026-11-23): the warm-up opened a second download of the model while Search was still
+   loading it. The engine lives in another bundle (bundle-d), so its state is read off window.VotSearchMini. */
+describe('warmMeaningFiles while Search loads the model', () => {
+  it('asks for nothing; once the model is not loading, it warms', async () => {
+    stubWorker(true);
+    const got = [];
+    stubFetch(got);
+    let status = 'loading';
+    /** @type {any} */ (window).VotSearchMini = { meaningStatus: () => ({ status }) };
+    try {
+      await warmMeaningFiles();
+      expect(got).toEqual([]);
+      status = 'failed';
+      await warmMeaningFiles();
+      expect(got[0]).toBe('manifest.json');
+    } finally {
+      delete /** @type {any} */ (window).VotSearchMini;
+    }
+  });
+});
+
 describe('warmMeaningSearch', () => {
   it('a page the worker takes over later warms once it does', async () => {
     vi.useFakeTimers();

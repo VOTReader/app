@@ -1262,6 +1262,43 @@ describe('service-worker — the meaning search’s files, kept (path to 500, 20
     expect((await fetchEvent(sw, getReq(MAN))).body).toBe('net:' + MAN);
   });
 
+  /* web-platform-n1 (audit 2026-11-23): the worker stored the whole file before answering, so on a link under about
+     7 Mbps the page got no headers inside semantic.js's 45 s stall limit, gave up, and a second download started. */
+  it('the page gets the answer before the copy is stored', async () => {
+    const sw = bootSW({ fetchImpl: net([]) });
+    const store = await sw.caches.open('vot-semantic-v1');
+    store.put = () => new Promise(() => {});        // a body that never ends: the copy never finishes
+    const waited = [];
+    let p;
+    sw.handlers.fetch({ request: getReq(MODEL), respondWith: (x) => { p = x; }, waitUntil: (w) => { waited.push(w); } });
+    const got = await Promise.race([p, new Promise((res) => setTimeout(() => res('held'), 200))]);
+    expect(got.body).toBe('net:' + MODEL);
+    expect(waited).toHaveLength(1);                 // the worker stays up for the copy
+  });
+
+  it('two asks at once make one download: the second is answered from the first one’s copy', async () => {
+    const calls = [];
+    const sw = bootSW({ fetchImpl: net(calls) });
+    const store = await sw.caches.open('vot-semantic-v1');
+    const put = store.put.bind(store);
+    let release;
+    const gate = new Promise((res) => { release = res; });
+    store.put = async (req, res) => { await gate; return put(req, res); };
+    const one = fetchEvent(sw, getReq(MODEL));
+    const two = fetchEvent(sw, getReq(MODEL));
+    expect((await one).body).toBe('net:' + MODEL);
+    release();
+    expect((await two).body).toBe('stored:' + MODEL);
+    expect(calls.filter((c) => c[0] === MODEL)).toHaveLength(1);
+  });
+
+  it('a download that fails lets the next ask try again', async () => {
+    let n = 0;
+    const sw = bootSW({ fetchImpl: async (req) => { n++; if (n === 1) throw new Error('offline'); return { ok: true, status: 200, redirected: false, body: 'net', clone() { return { body: 'stored' }; } }; } });
+    expect((await fetchEvent(sw, getReq(MODEL))).status).toBe(503);
+    expect((await fetchEvent(sw, getReq(MODEL))).body).toBe('net');
+  });
+
   it('activate never deletes them', async () => {
     const sw = bootSW();
     await (await sw.caches.open('vot-semantic-v1')).put(MODEL, { body: 'kept' });

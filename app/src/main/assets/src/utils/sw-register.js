@@ -268,6 +268,10 @@ export async function warmMeaningFiles() {
   try {
     if (navigator.onLine === false) return;
     if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    // Search is loading them now (bundle-d's engine): a second download of the same files would run beside it (web-platform-n1)
+    const search = /** @type {any} */ (window).VotSearchMini;
+    const meaning = search && typeof search.meaningStatus === 'function' ? search.meaningStatus() : null;
+    if (meaning && meaning.status === 'loading') return;
     const base = new URL('./semantic/', document.baseURI);
     const r = await fetch(new URL('manifest.json', base));
     if (!r.ok) return;

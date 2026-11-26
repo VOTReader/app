@@ -1122,7 +1122,7 @@ self.addEventListener('fetch', (event) => {
   // The on-device meaning search (src/search/semantic.js): its files are kept in their own
   // cache, fetched once and never again (see SEMANTIC_CACHE).
   if (SEMANTIC_PATH.test(url.pathname)) {
-    event.respondWith(semanticResponse(event.request, SEMANTIC_MANIFEST.test(url.pathname)));
+    event.respondWith(semanticResponse(event, SEMANTIC_MANIFEST.test(url.pathname)));
     return;
   }
 
@@ -1451,25 +1451,49 @@ const SEMANTIC_CACHE = 'vot-semantic-v1';
 const SEMANTIC_PATH = /\/semantic\/[A-Za-z0-9][A-Za-z0-9._/-]{0,120}$/;
 const SEMANTIC_MANIFEST = /\/semantic\/manifest\.json$/;
 
-/** @param {Request} request @param {boolean} networkFirst */
-async function semanticResponse(request, networkFirst) {
+/** The files on their way (web-platform-n1): a second ask for one waits for the first's copy, never a second download. */
+/** @type {Map<string, Promise<void>>} */
+const semanticInFlight = new Map();
+
+/** @param {any} event @param {boolean} networkFirst */
+async function semanticResponse(event, networkFirst) {
+  const request = event.request;
   const cache = await caches.open(SEMANTIC_CACHE);
+  /** @type {(() => void)|null} */ let landed = null;
   if (!networkFirst) {
     const hit = await cache.match(request);
     if (hit) return hit;
+    const pending = semanticInFlight.get(request.url);
+    if (pending) {
+      await pending;
+      const kept = await cache.match(request);
+      if (kept) return kept;
+    } else {
+      // set in the same step as the look above: an ask that comes while this one waits for its answer finds it
+      semanticInFlight.set(request.url, new Promise((res) => { landed = () => { semanticInFlight.delete(request.url); res(); }; }));
+    }
   }
+  const done = () => { if (landed) landed(); };
   let response;
   try {
     response = await fetch(request, { cache: networkFirst ? 'no-cache' : 'reload' });
   } catch (_e) {
+    done();
     const hit = await cache.match(request);
     return hit || new Response('Not available offline', { status: 503, statusText: 'Service Unavailable' });
   }
   // a redirect is a captive portal or a proxy, not the file: never pinned (SW-4). A store that refuses the
   // copy (full storage, common on iOS) loses only the copy: the page still gets the good download, which
-  // used to become a 503 and turn meaning search off for the session (sweep W35)
+  // used to become a 503 and turn meaning search off for the session (sweep W35).
+  // THE ANSWER AT ONCE (web-platform-n1, audit 2026-11-23): the page gets the response as soon as its headers
+  // arrive and the copy is stored as the bytes stream in. Awaiting the store held the headers back until the whole
+  // file was in, and semantic.js gives up on a file that sends nothing for 45 s: under about 7 Mbps the meaning
+  // files never arrived, and the worker's orphaned downloads ran on beside the next try.
   if (response && response.ok && !response.redirected) {
-    try { await cache.put(request, response.clone()); } catch (_e) { /* full store: served, not kept */ }
+    const store = cache.put(request, response.clone()).catch(() => { /* full store: served, not kept */ }).then(done);
+    if (typeof event.waitUntil === 'function') event.waitUntil(store);
+  } else {
+    done();
   }
   return response;
 }
