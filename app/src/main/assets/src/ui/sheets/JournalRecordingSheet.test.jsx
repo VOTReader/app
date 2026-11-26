@@ -218,7 +218,8 @@ describe('JournalRecordingSheet — durable before preview (journal-3)', () => {
     expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);   // not twice
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave.mock.calls[0][0].mediaId).toBe('media-1');
-    expect(window.JournalMediaStore.markLinked).toHaveBeenCalledWith('media-1');
+    // The marker stays until the editor sees the entry on disk (review 11-26), never cleared by the sheet itself.
+    expect(window.JournalMediaStore.markLinked).not.toHaveBeenCalled();
   });
 });
 

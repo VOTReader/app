@@ -178,6 +178,9 @@ function sourcePixelSize(blob) {
    app is killed - which a page frozen or stalled in the background does to auto-commit -
    make the WebView destroy this origin's whole IndexedDB at the next open, the
    reader's library included (stores/idb-chunks.js header; reproduced on vot_api34). */
+/** A marked photo older than this before a sweep is pruned like any orphan (its entry never saved). */
+var STALE_PHOTO_MS = 7 * 24 * 60 * 60 * 1000;
+
 export var JournalMediaStore = (function() {
   /** One write at a time on this database (the colliding lock is per database). */
   var _writeQ = writeQueue();
@@ -618,7 +621,8 @@ export var JournalMediaStore = (function() {
             var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
             if (!cursor) { resolve(out); return; }
             var v = cursor.value || {};
-            if (v.unlinked === true && !set[v.id]) {
+            // A marked photo is one whose entry has not reached the disk yet; it is never offered back as a recording.
+            if (v.unlinked === true && !set[v.id] && v.type !== 'image') {
               out.push({ id: v.id, type: v.type, mime: v.mime, size: v.size, width: v.width, height: v.height, duration: v.duration, created: v.created, unlinked: true });
             }
             cursor.continue();
@@ -797,7 +801,10 @@ export var JournalMediaStore = (function() {
             // An unreferenced record carrying it is UNCLAIMED, not orphaned:
             // the bytes are real and the user has never been shown them, so it
             // is surfaced by the Hub banner rather than deleted here.
-            if (!set[rec.id] && !rec.unlinked && created < cutoff) toRemove.push(rec.id);
+            // A marked PHOTO is not offered back (only recordings are): its entry never reached the disk, so once it
+            // is a week older than the sweep it is an orphan like any other (review 11-26).
+            var stalePhoto = rec.unlinked && rec.type === 'image' && created < cutoff - STALE_PHOTO_MS;
+            if (!set[rec.id] && (!rec.unlinked || stalePhoto) && created < cutoff) toRemove.push(rec.id);
             cursor.continue();
           };
           req.onerror = function() { reject(req.error); };

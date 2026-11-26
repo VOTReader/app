@@ -191,6 +191,7 @@ describe('JournalHubScreen — unclaimed recordings are offered back', () => {
       getVersion: () => 1,
       all: () => entries.slice(),
       collectAllMediaIds: () => [],
+      linkMediaWhenSaved: vi.fn(() => Promise.resolve([])),
       add: vi.fn((seed) => { added.push(seed); return { id: 'e-new', ...seed }; }),
       togglePin: vi.fn(),
       remove: vi.fn(),
@@ -237,7 +238,8 @@ describe('JournalHubScreen — unclaimed recordings are offered back', () => {
     expect(added.length).toBe(1);
     const blocks = added[0].blocks;
     expect(blocks.some((b) => b.type === 'audio' && b.mediaId === 'm_lost')).toBe(true);
-    expect(window.JournalMediaStore.markLinked).toHaveBeenCalledWith('m_lost');
+    // The marker clears only once the new entry is on disk (review 11-26), so Recover asks the journal to link it.
+    expect(window.JournalStore.linkMediaWhenSaved).toHaveBeenCalledWith(['m_lost']);
   });
 
   it('W16 refuter: a recovered recording is an entry like any other, so it is counted once', async () => {

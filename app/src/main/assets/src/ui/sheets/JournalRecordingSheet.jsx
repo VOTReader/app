@@ -744,12 +744,10 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       duration: previewDurationRef.current || seconds,
       samples: samplesOut
     });
-    // Best-effort, and safe in this direction only: the authoritative test for
-    // "unclaimed" is marker AND unreferenced, so a failed clear costs at most
-    // one spurious banner row if this entry is later deleted. Clearing the
-    // marker BEFORE onSave would hand the record to the sweep with nothing
-    // protecting it.
-    if (JournalMediaStore.markLinked) JournalMediaStore.markLinked(id);
+    // The marker stays: the editor clears it once the entry holding this
+    // recording is on disk (JournalStore.linkMediaWhenSaved). Clearing it here,
+    // before that save lands, handed the record to another tab's sweep with
+    // nothing on disk protecting it (review 11-26).
     committedIdRef.current = null;
     cleanup();
   }

@@ -130,7 +130,7 @@ export function JournalHubScreen(props) {
     // W16 refuter: an entry with content like any other, so it counts once (every
     // delete or exit prune of a counted entry takes one back).
     try { if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordNewEntry((e && e.created) || Date.now()); } catch (_e) { /* stats are best-effort */ }
-    if (JournalMediaStore.markLinked) JournalMediaStore.markLinked(rec.id);
+    if (JournalStore.linkMediaWhenSaved) JournalStore.linkMediaWhenSaved([rec.id]);   // the marker clears once the new entry is on disk
     setUnclaimed(function(list) { return list.filter(function(r) { return r.id !== rec.id; }); });
   }
 

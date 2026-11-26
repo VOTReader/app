@@ -40,6 +40,7 @@
 
 import { CachedStore, extendStore, isStoreWriteFenced } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
+import { JournalMediaStore } from './journal-media-store.js';
 import { mergeListStore } from './store-merge.js';
 import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
 import { AnnotationStore } from './annotation-store.js';
@@ -699,6 +700,29 @@ export var JournalStore = extendStore(
         }
         return ids;
       });
+    },
+
+    /**
+     * Drop the `unlinked` marker of each of `ids` (a new photo or recording) once the journal that holds it is on
+     * disk: after this tab's last journal write has landed, and only for ids the stored journal really references.
+     * Clearing it sooner hands the media to another tab's orphan sweep before any entry on disk protects it (review
+     * 11-26). Resolves with the ids it linked; an id not yet on disk keeps its marker for a later call. Never rejects.
+     * @param {string[]} ids @returns {Promise<string[]>}
+     */
+    linkMediaWhenSaved(ids) {
+      var want = (ids || []).filter(Boolean);
+      if (!want.length) return Promise.resolve([]);
+      var self = this;
+      return self.whenSaved()
+        .then(function(ok) { return ok ? self.mediaIdsOnDisk() : []; })
+        .then(function(onDisk) {
+          /** @type {Record<string, boolean>} */ var set = {};
+          onDisk.forEach(function(id) { set[id] = true; });
+          var linked = want.filter(function(id) { return set[id]; });
+          return Promise.all(linked.map(function(id) { return JournalMediaStore.markLinked(id).catch(function() { /* stays marked: safe */ }); }))
+            .then(function() { return linked; });
+        })
+        .catch(function() { return []; });
     },
 
     /**

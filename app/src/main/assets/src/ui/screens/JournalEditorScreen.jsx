@@ -350,6 +350,14 @@ export function JournalEditorScreen(props) {
   // IMMEDIATE (not the 1.2s debounce) — see the auto-save effect below and
   // onFileChosen / onRecordingSaved.
   var immediateSaveRef = useRef(false);
+  // New photos and recordings keep their `unlinked` marker until the entry that holds them is on disk (review 11-26).
+  var pendingLinkRef = useRef(/** @type {Set<string>} */ (new Set()));
+  function linkPendingMedia() {
+    if (!pendingLinkRef.current.size || !JournalStore.linkMediaWhenSaved) return;
+    JournalStore.linkMediaWhenSaved(Array.from(pendingLinkRef.current)).then(function(linked) {
+      linked.forEach(function(id) { pendingLinkRef.current.delete(id); });
+    });
+  }
 
   // Always-fresh refs that mirror the latest state. Used by the unmount
   // cleanup to flush, since useEffect cleanup closures capture stale state.
@@ -388,12 +396,14 @@ export function JournalEditorScreen(props) {
       _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
       showSavedWhenDurable();
+      linkPendingMedia();
       return;
     }
     var t = setTimeout(function() {
       _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
       showSavedWhenDurable();
+      linkPendingMedia();
     }, 1200);
     return function() { clearTimeout(t); };
   }, [entryId, title, blocks, mood]);
@@ -1066,6 +1076,7 @@ export function JournalEditorScreen(props) {
     else next.push(block);
     JournalStore.update(eid, { blocks: next });
     _maybeRecordNewEntryStats(eid, cur.title, next);   // a new entry whose first content is this photo counts now
+    if (JournalStore.linkMediaWhenSaved) JournalStore.linkMediaWhenSaved([mid]);
   }
 
   // The photo failed after the reader left, and the entry it kept from the exit
@@ -1095,10 +1106,12 @@ export function JournalEditorScreen(props) {
         blob: out.blob,
         mime: 'image/jpeg',
         width: out.width,
-        height: out.height
+        height: out.height,
+        unlinked: true   // marked until its entry is on disk, so no tab's sweep can take it first
       });
     }).then(function(mid) {
       settle();
+      pendingLinkRef.current.add(mid);
       if (!mountedRef.current) { addPhotoAfterExit(mid); return; }
       immediateSaveRef.current = true;  // persist the new image block at once (skip the 1.2s debounce)
       insertBlockBelow(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
@@ -1120,6 +1133,7 @@ export function JournalEditorScreen(props) {
   function onRecordingSaved(info) {
     setShowRec(false);
     if (!info || !info.mediaId) return;
+    pendingLinkRef.current.add(info.mediaId);   // its marker clears once this entry is on disk
     immediateSaveRef.current = true;  // persist the new audio block at once (skip the 1.2s debounce)
     insertBlockBelow(JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '', samples: info.samples || null }));
   }
