@@ -14,7 +14,12 @@
  *     number), and `What's new: none` keeps it out;
  *   - a release may say it as a whole: a commit with `What's new (release): <words>` lines (a long branch landing at
  *     once, vot-ui 2026-11-16: 343 commits of work-in-progress subjects) makes those lines the release's whole list,
- *     in place of every commit's own lines in the same range. Items already published are kept as before.
+ *     in place of the lines of every commit before it (a feat or fix after the newest release commit still speaks for
+ *     itself: the APK reads the newest 300 commits, and one release commit there froze its list from 11-17, audit
+ *     2026-11-23 release-pipeline-n2). Items already published are kept as before;
+ *   - never in test or tool words (audit 2026-11-23 pipeline-3: the live list read like test logs): a clause naming a
+ *     walk (e2e-), a browser store or event, a contrast ratio, a kit class or a code name is dropped, and a line whose
+ *     lead clause is one goes whole. Items already published are cleaned the same way at each deploy.
  *
  * Output: { generated, since, items: [{ t, text }] }, newest first, at most MAX_ITEMS. `t` is the commit time (epoch
  * ms); the app shows the items newer than the last ones it showed (or, the first time, newer than `since`).
@@ -47,7 +52,7 @@ export function linesOf(message) {
   const text = String(message || '').replace(/\r\n/g, '\n');
   const own = [...text.matchAll(/^What's new:\s*(.+?)\s*$/gim)].map((m) => m[1]);
   if (own.some((l) => /^none\.?$/i.test(l))) return [];
-  if (own.length) return own.map(sentence).filter(Boolean);
+  if (own.length) return own.map(readerLine).filter(Boolean);
   const subject = text.split('\n')[0].trim();
   const m = /^([a-z]+)(?:\(([^)]*)\))?!?:\s*(.+)$/.exec(subject);
   if (!m || !KEEP_TYPES.has(m[1])) return [];
@@ -56,8 +61,34 @@ export function linesOf(message) {
   let words = m[3];
   if (/\brefuter\b|\breview round\b/i.test(words)) return [];   // the follow-up a reviewer asked for, not news
   words = stripIds(words);
-  const s = sentence(words);
+  const s = readerLine(words);
   return s ? [s] : [];
+}
+
+// Names a reader knows that look like code names (camelCase or an inner capital).
+const KNOWN_NAMES = new Set(['iPhone', 'iPhones', 'iPad', 'iPads', 'iOS', 'iPadOS', 'macOS', 'YouTube', 'GitHub', 'WhatsApp',
+  'PayPal', 'JavaScript', 'PowerPoint', 'OneDrive', 'LibreOffice', 'eBook', 'eBooks']);
+/** Test and tool words: a walk, a browser store or event, a contrast ratio, a kit class or token (text-1), lane work names. */
+const JARGON = [/\be2e\b|\be2e-/i, /\b(?:localStorage|sessionStorage|IndexedDB|contextmenu|pointerdown|pointerup|touchstart|touchend|useEffect|useState)\b/i,
+  /\b\d+(?:\.\d+)?:1\b/, /(?:^|[\s(])\.?ui-[a-z]/, /\bhunt\b/i, /^pass \d+\b/i, /\bkit\b/i, /\b[a-z]+-\d+\b/, /\brefuter\b|\breview round\b/i];
+/** @param {string} clause */
+function isJargon(clause) {
+  if (JARGON.some((re) => re.test(clause))) return true;
+  // a code name: camelCase (historyStore) or an inner capital (HistoryStore, ConfirmStrip), not a name a reader knows
+  for (const m of clause.matchAll(/\b(?:[a-z]+[A-Z]|[A-Z][a-z]+[A-Z])[A-Za-z]*\b/g)) if (!KNOWN_NAMES.has(m[0])) return true;
+  return false;
+}
+
+/**
+ * One line as a reader sees it: clauses (split at "; ") in test or tool words dropped, none at all when the lead
+ * clause is one, then a plain sentence. Applied to new lines and to items already published.
+ * @param {string} s
+ * @returns {string}
+ */
+export function readerLine(s) {
+  const clauses = String(s || '').replace(/\s+/g, ' ').trim().split(/;\s+/);
+  if (!clauses[0] || isJargon(clauses[0])) return '';
+  return sentence(clauses.filter((c) => c && !isJargon(c)).join('; '));
 }
 
 /**
@@ -81,11 +112,11 @@ export function stripIds(s) {
   return out.trim();
 }
 
-/** Capitalised, one line, ending in a full stop. @param {string} s */
+/** Capitalised, one line, ending in a full stop (a question or an exclamation keeps its own mark). @param {string} s */
 function sentence(s) {
   const t = String(s || '').replace(/\s+/g, ' ').trim().replace(/[.;:,\s]+$/, '');
   if (!t) return '';
-  return t[0].toUpperCase() + t.slice(1) + '.';
+  return t[0].toUpperCase() + t.slice(1) + (/[?!]$/.test(t) ? '' : '.');
 }
 
 /**
@@ -97,13 +128,19 @@ export function buildItems(commits, prev = []) {
   /** @type {{ t: number, text: string }[]} */
   const fresh = [];
   const release = commits.filter((c) => releaseLinesOf(c.message).length);
-  // A release that says it as a whole: its lines alone, newest first in the order written (each a millisecond apart).
-  if (release.length) {
-    for (const c of release) releaseLinesOf(c.message).forEach((text, i) => fresh.push({ t: (Number(c.t) || 0) - i, text }));
-  } else {
-    for (const c of commits) for (const text of linesOf(c.message)) fresh.push({ t: Number(c.t) || 0, text });
+  // A release that says it as a whole: its lines, newest first in the order written (each a millisecond apart), stand
+  // for every commit before it; a commit after the newest release commit still speaks for itself.
+  for (const c of release) releaseLinesOf(c.message).forEach((text, i) => fresh.push({ t: (Number(c.t) || 0) - i, text }));
+  const cut = release.length ? Math.max(...release.map((c) => Number(c.t) || 0)) : -Infinity;
+  for (const c of commits) {
+    if (!((Number(c.t) || 0) > cut)) continue;
+    for (const text of linesOf(c.message)) fresh.push({ t: Number(c.t) || 0, text });
   }
-  const all = [...fresh, ...(Array.isArray(prev) ? prev : [])].filter((i) => i && typeof i.text === 'string' && Number.isFinite(i.t));
+  const old = (Array.isArray(prev) ? prev : [])
+    .filter((i) => i && typeof i.text === 'string')
+    .map((i) => ({ t: i.t, text: readerLine(i.text) }))
+    .filter((i) => i.text);
+  const all = [...fresh, ...old].filter((i) => i && typeof i.text === 'string' && Number.isFinite(i.t));
   all.sort((a, b) => b.t - a.t);
   const seen = new Set();
   const out = [];
