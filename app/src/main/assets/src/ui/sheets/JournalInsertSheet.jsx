@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { foldLower } from '../../utils/fold-accents.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { SheetHandle } from '../components/SheetHandle.jsx';
 import { openJournalLinkPicker } from '../../utils/journal-link-picker.js';
@@ -150,11 +151,12 @@ export function JournalInsertSheet(props) {
   }
 
   function filterByText(items, getText) {
-    var q = query.trim().toLowerCase();
+    // accents off on both sides (i18n-text-n4)
+    var q = foldLower(query.trim());
     if (!q) return items;
     return items.filter(function(item) {
       var hay = getText(item) || '';
-      return hay.toLowerCase().indexOf(q) >= 0;
+      return foldLower(hay).indexOf(q) >= 0;
     });
   }
 
@@ -359,8 +361,8 @@ export function JournalInsertSheet(props) {
     } catch (_e) { counts = new Map(); uncategorized = 0; }
     var noteCount = function(nbId) { return nbId === 'uncategorized' ? uncategorized : (counts.get(nbId) || 0); };
     var rows = [{ id: 'uncategorized', name: 'Uncategorized' }].concat(nbs);
-    var q = query.trim().toLowerCase();
-    if (q) rows = rows.filter(function(nb) { return (nb.name || '').toLowerCase().indexOf(q) >= 0; });
+    var q = foldLower(query.trim());
+    if (q) rows = rows.filter(function(nb) { return foldLower(nb.name || '').indexOf(q) >= 0; });
     return (
       <>
         {searchPill()}

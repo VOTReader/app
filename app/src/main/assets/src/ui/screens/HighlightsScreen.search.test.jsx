@@ -144,3 +144,19 @@ describe('HighlightsScreen — large libraries', () => {
     expect(resolves).toBe(40);
   });
 });
+
+/* i18n-text-n4 (audit 2026-11-23): the box filtered with a plain toLowerCase().indexOf, so "unigenito" showed
+   "0 of 3 highlights" and only "unigénito" found the mark. */
+describe('HighlightsScreen — accents', () => {
+  it('a word typed without its accent finds the accented mark', () => {
+    globalThis.AnnotationStore = { subscribe: () => () => {}, getVersion: () => 0, all: () => ({
+      ...MARKS,
+      'bible:john:3:16': [{ id: 'a3', groupId: 'g3', kind: 'highlight', color: 'yellow', text: 'ha dado a su Hijo unigénito', created: 300, updated: 300 }],
+    }) };
+    show();
+    fireEvent.change(box(), { target: { value: 'unigenito' } });
+    expect(rows()).toEqual(['ha dado a su Hijo unigénito']);
+    fireEvent.change(box(), { target: { value: 'UNIGÉNITO' } });
+    expect(rows()).toEqual(['ha dado a su Hijo unigénito']);
+  });
+});

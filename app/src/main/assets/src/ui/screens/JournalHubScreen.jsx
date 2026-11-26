@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { UiIcon } from '../components/UiIcon.jsx';
+import { foldLower } from '../../utils/fold-accents.js';
 import { ActionSheet } from '../components/SelectField.jsx';
 import { Segmented, EmptyState } from '../components/UiParts.jsx';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
@@ -275,7 +276,7 @@ export function JournalHubScreen(props) {
     return t;
   }
 
-  var searchQ = query.trim().toLowerCase().replace(/\s+/g, ' ');
+  var searchQ = foldLower(query.trim()).replace(/\s+/g, ' ');
   function matching(list) {
     return searchQ ? list.filter(function(e) { return entrySearchText(e).indexOf(searchQ) >= 0; }) : list;
   }

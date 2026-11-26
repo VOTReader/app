@@ -7,6 +7,7 @@
    bundle-d fills — one copy of each law, and no second module state.
    mark-kinds.js is the exception: pure, stateless, a few lines (v05-04). */
 import { isCountedMark } from '../../utils/mark-kinds.js';
+import { foldLower } from '../../utils/fold-accents.js';
 import { ListSearch, ListLine } from '../components/LibraryList.jsx';
 import { Chip, EmptyState, UiButton } from '../components/UiParts.jsx';
 
@@ -152,7 +153,7 @@ export function HighlightsScreen(props) {
     var m = new Map();
     marks.forEach(function(mk) {
       var t = (typeof _bookmarkSourceLabel === 'function') ? (_bookmarkSourceLabel(mk.hlKey) || '') : '';
-      m.set(mk, { text: t, lower: t.toLowerCase() });
+      m.set(mk, { text: t, lower: foldLower(t) });
     });
     return m;
   }, [marks]);
@@ -165,9 +166,10 @@ export function HighlightsScreen(props) {
   }, [marks]);
 
   var sorted = useMemo(function() {
-    var q = query.trim().toLowerCase();
+    // accents off on both sides: "unigenito" finds "unigénito" (i18n-text-n4)
+    var q = foldLower(query.trim());
     var list = q ? marks.filter(function(m) {
-      return (m.text || '').toLowerCase().indexOf(q) >= 0 || sourceOf.get(m).lower.indexOf(q) >= 0;
+      return foldLower(m.text || '').indexOf(q) >= 0 || sourceOf.get(m).lower.indexOf(q) >= 0;
     }) : marks.slice();
     if (typeFilter !== 'all') {
       list = list.filter(function(m) { return m.kind === typeFilter; });

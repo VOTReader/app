@@ -127,3 +127,15 @@ describe('formatSelection — B / I / Scripture marks', () => {
     expect(out.match(/_([^_\n]+?)_/g)).toEqual(['_one_', '_two_']);
   });
 });
+
+describe('search ignores accents (i18n-text-n4)', () => {
+  const entry = { id: 'e1', title: 'Notas', blocks: [{ type: 'p', text: 'Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito.' }] };
+  it('searchText folds accents, so a typed query without them is found', () => {
+    expect(JournalHelpers.searchText(entry).indexOf('unigenito')).toBeGreaterThan(-1);
+  });
+  it('searchSnippet finds the accented word and shows it as written', () => {
+    const s = JournalHelpers.searchSnippet(entry, 'unigenito', 120);
+    expect(s && s.hit).toBe('unigénito');
+    expect(JournalHelpers.searchSnippet(entry, 'unigénito', 120).hit).toBe('unigénito');
+  });
+});

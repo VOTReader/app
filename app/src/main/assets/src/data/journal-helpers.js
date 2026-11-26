@@ -30,6 +30,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
+import { foldLower } from '../utils/fold-accents.js';
 import { BookmarkStore } from '../stores/bookmark-store.js';
 import { COL_BY_KEY, findEntryContext } from './scripture-resolution.js';
 import { NoteStore } from '../stores/note-store.js';
@@ -199,7 +200,8 @@ export var JournalHelpers = (function() {
       if (b.type === 'verse-block' && typeof b.ref === 'string') parts.push(plainInline(b.ref));
     }
     if (entry.tags && entry.tags.length) parts.push(plainInline(entry.tags.join(' ')));
-    return parts.join('\n').toLowerCase();
+    // accents off (i18n-text-n4): the hub folds its query the same way
+    return foldLower(parts.join('\n'));
   }
 
   /* id-datasafe 121: the text around a search hit, for the hub's cards. `q` is the
@@ -225,7 +227,7 @@ export var JournalHelpers = (function() {
     if (entry.tags && entry.tags.length) parts.push({ t: plainInline(entry.tags.join(' ')), where: 'tag' });
     for (var j = 0; j < parts.length; j++) {
       var text = parts[j].t;
-      var at = text.toLowerCase().indexOf(q);
+      var at = foldLower(text).indexOf(foldLower(q));
       if (at < 0) continue;
       var room = Math.max(0, span - q.length);
       var from = Math.max(0, at - Math.floor(room / 3));

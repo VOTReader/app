@@ -116,6 +116,17 @@ describe('bookmark drill', () => {
     expect(screen.getByText('Isaiah 40')).toBeTruthy();
   });
 
+  it('search ignores accents (i18n-text-n4)', () => {
+    window.BookmarkStore = { all: () => [
+      { id: 'a', label: 'Salmo 23' }, { id: 'b', label: 'Génesis 1' },
+    ] };
+    mountSheet();
+    fireEvent.click(screen.getByText('Bookmark'));
+    fireEvent.change(screen.getByPlaceholderText('Search bookmarks…'), { target: { value: 'genesis' } });
+    expect(screen.queryByText('Salmo 23')).toBeNull();
+    expect(screen.getByText('Génesis 1')).toBeTruthy();
+  });
+
   // Sweep low (mw9): the picker sorted the store's own live array (all() is the cache; _save persists it).
   it('lists newest first and leaves the live store array in its order', () => {
     const live = [{ id: 'old', label: 'Older', updated: 1 }, { id: 'new', label: 'Newer', updated: 9 }];
