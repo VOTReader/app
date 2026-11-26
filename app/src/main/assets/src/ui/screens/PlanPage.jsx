@@ -26,7 +26,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runStatus, schedule, sections, streak, itemsLabel, itemsWords, minutesFor, itemKinds, dayItems, totalDays,
-  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate, canCountOwnOnly } from '../../data/plan-engine.js';
+  catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, startToday, firstRecutDate, canCountOwnOnly, heldDay } from '../../data/plan-engine.js';
 import { planDef, bookTitle } from '../../data/plan-catalog.js';
 import { saveRun, stopRun, itemRef, planStatus, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, isReminderTime, lastActive } from '../../utils/plan-reminder.js';
@@ -278,7 +278,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
       <div className="ui-card plan-today plan-today-paused">
         <p className="plan-today-head"><span className="root-eyebrow">Paused</span></p>
         <p className="plan-today-title">{run.paused ? 'Paused since ' + monthDay(run.paused) : 'Paused'}</p>
-        <p className="plan-today-sub">{'Day ' + (st.todayDay + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
+        <p className="plan-today-sub">{'Day ' + (heldDay(run, st) + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
         <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume</button>
       </div>
     );

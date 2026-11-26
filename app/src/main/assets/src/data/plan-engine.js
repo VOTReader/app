@@ -407,6 +407,13 @@ export function runStatus(run, now) {
   };
 }
 
+/**
+ * The day a paused or stopped plan's line names ("Day N of M", "Day N is waiting for you"): the portion on a plan read
+ * day after day (as on 03d0ea090, even when today's was just read); on a spread-out plan, the Today card's own day,
+ * since its empty days are never "the portion". @param {PlanRun} run @param {{ day: number, todayDay: number }} st
+ */
+export function heldDay(run, st) { return hasEmptyDays(run) ? st.todayDay : st.day; }
+
 /** THE "is this plan late" decision, in calendar days later than planned (0 = on time, paused or not started). */
 export const lateDays = (/** @type {PlanRun} */ run, /** @type {Date} */ now) => runStatus(run, now).late;
 

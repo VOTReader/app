@@ -23,7 +23,7 @@ import { usePlanNav, planNavMounted, keepPlanNav, pushPlanView, replacePlanView,
 import { endPlanSession } from '../../utils/plan-session.js';
 import { usePlanRuns, saveRun, runRow, continueRun, startOverRun, countOwnOnlyRun, finishDate } from '../../utils/plan-runs-view.js';
 import { showUndoToast } from '../../utils/toast.js';
-import { runStatus, newRun, dayNum, itemKinds, againPace } from '../../data/plan-engine.js';
+import { runStatus, newRun, dayNum, itemKinds, againPace, heldDay } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBarTitle, GEAR, countOf } from '../components/PlanBits.jsx';
@@ -103,7 +103,7 @@ function PlanStopped({ run, now, onContinue, onStartOver, onDone }) {
   return (
     <div className="root-screen plans-hub plan-finished plan-stopped">
       <h2 className="plan-daydone-title">{'You stopped ' + runName(run, null)}</h2>
-      <p className="plan-daydone-sub">{(run.stopped ? 'Stopped ' + finishDate(run.stopped, new Date()) + ' · ' : '') + 'day ' + Math.min(st.total, st.todayDay + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
+      <p className="plan-daydone-sub">{(run.stopped ? 'Stopped ' + finishDate(run.stopped, new Date()) + ' · ' : '') + 'day ' + Math.min(st.total, heldDay(run, st) + 1) + ' of ' + st.total.toLocaleString('en-US')}</p>
       <p className="plan-daydone-sub">{row.counts + ' read'}</p>
       <button type="button" className="ui-btn is-primary is-wide" onClick={onContinue}>Continue where I stopped</button>
       <button type="button" className="ui-btn is-wide" onClick={onStartOver}>Start over from day 1</button>

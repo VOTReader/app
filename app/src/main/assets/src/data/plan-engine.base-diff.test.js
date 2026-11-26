@@ -4,7 +4,8 @@
    day, the days ahead in the month are numbered from today's portion, not one past it. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, todayKey, dayItems, newRun, tickItem, streak, monthCells, runStatus, isReadingDay, hasEmptyDays, totalDays } from './plan-engine.js';
+import { dayNum, dateOf, todayKey, dayItems, newRun, tickItem, streak, monthCells, runStatus, isReadingDay, hasEmptyDays, totalDays, creditRead, catchUp, spreadOut, pauseRun } from './plan-engine.js';
+import { planStateLine, stoppedLine } from '../ui/screens/ReadingPlansScreen.jsx';
 import * as base from './__fixtures__/plan-engine-03d0ea090.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
@@ -82,8 +83,18 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
     expectSameAsBase(run, now);
   });
 
+  it('a 7-chapter plan, Day 3 read and paused the same evening: "Day 4 of 7", as on 03d0ea090', () => {
+    let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: chapters('genesis', 7) }], pace: { mode: 'days', n: 7 } }, at('2026-11-24'));
+    ['2026-11-24', '2026-11-25', '2026-11-26'].forEach((date, d) => { run = readDay(run, d, date); });
+    const eve = at('2026-11-26', 21);
+    run = pauseRun(run, eve);
+    expect(planStateLine(run, eve)).toMatchObject({ lead: 'Paused', rest: 'Day 4 of 7' });
+    expect(stoppedLine({ ...run, paused: undefined, status: 'stopped', stopped: '2026-11-26' }, eve)).toMatch(/ · day 4 of 7$/);
+    expectSameAsBase(run, eve);
+  });
+
   it('random reading histories (seeded) on plans of every pace and weekday set', () => {
-    let tried = 0;
+    let tried = 0, held = 0, recuts = 0;
     for (let seed = 1; seed <= 120; seed++) {
       const r = rng(seed);
       const days = 3 + Math.floor(r() * 30);
@@ -95,17 +106,42 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
       if (hasEmptyDays(run)) continue;   // a words cut may still leave a day empty: that is a spread-out plan
       tried++;
       const startN = /** @type {number} */ (dayNum(run.start));
+      // Some plans start with chapters read before (credited, undated).
+      if (r() < 0.2) { const upTo = 1 + Math.floor(r() * 5); run = creditRead(run, (_b, c) => Number(c) <= upTo); }
       const span = 5 + Math.floor(r() * 60);
+      const recutAt = r() < 0.3 ? startN + Math.floor(r() * span) : -1, recut = r() < 0.5 ? catchUp : spreadOut;
+      // Half the histories run up to today itself, so today's portion is often read (a pause the same evening).
+      const endN = startN + span - 1 + (r() < 0.5 ? 0 : 1 + Math.floor(r() * 3));
       let next = 0;
-      for (let n = startN; n < startN + span && next < totalDays(run); n++) {
+      while (next < totalDays(run) && dayItems(run, next).every((it) => it.k in run.ticks)) next++;
+      for (let n = startN; n <= Math.min(endN, startN + span - 1) && next < totalDays(run); n++) {
+        if (n === recutAt) {
+          // Catch me up or Spread it out, on the day the reader chose it (a cut that leaves a day empty is spread out).
+          const cut = recut(run, at(dateOf(n)));
+          if (!hasEmptyDays(cut)) { run = cut; recuts++; next = runStatus(run, at(dateOf(n))).day; }
+        }
         const p = r();
         if (p < 0.55) run = readDay(run, next++, dateOf(n));
         else if (p < 0.65 && next + 1 < totalDays(run)) { run = readDay(run, next++, dateOf(n)); run = readDay(run, next++, dateOf(n)); }
         else if (p < 0.72) { const it = dayItems(run, next)[0]; if (it) run = tickItem(run, it.k, dateOf(n), 1); }
       }
-      const now = at(dateOf(startN + span + Math.floor(r() * 3)));
+      const now = at(dateOf(endN), r() < 0.3 ? 21 : 9);
+      // Paused or stopped on a recent date (often the day of the last read): the line names the day 03d0ea090 named.
+      const q = r(), heldOn = endN - Math.floor(r() * 3);
+      if (q < 0.25) {
+        run = pauseRun(run, at(dateOf(heldOn), 21));
+        const was = base.runStatus(run, now);
+        if (!was.finished) { expect(planStateLine(run, now)).toMatchObject({ lead: 'Paused', rest: 'Day ' + (was.day + 1) + ' of ' + was.total }); held++; }
+      } else if (q < 0.45) {
+        run = { ...run, status: /** @type {'stopped'} */ ('stopped'), stopped: dateOf(heldOn) };
+        const was = base.runStatus(run, now);
+        expect(stoppedLine(run, now).split(' · ').pop()).toBe('day ' + Math.min(was.total, was.day + 1) + ' of ' + was.total.toLocaleString('en-US'));
+        held++;
+      }
       expectSameAsBase(run, now);
     }
     expect(tried).toBeGreaterThan(80);
+    expect(held).toBeGreaterThan(20);
+    expect(recuts).toBeGreaterThan(5);
   });
 });

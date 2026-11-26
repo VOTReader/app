@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runRow, letterSource, planStatus, finishDate, readSpan, weekdayDate } from '../../utils/plan-runs-view.js';
-import { runStatus, itemsLabel, itemsCount } from '../../data/plan-engine.js';
+import { runStatus, itemsLabel, itemsCount, heldDay } from '../../data/plan-engine.js';
 import { PLAN_CATALOG, PLAN_GROUPS, catalogFacts, runName, bookTitle } from '../../data/plan-catalog.js';
 import { PlanRing, PlanSec, CHEVRON, countOf } from '../components/PlanBits.jsx';
 
@@ -35,7 +35,7 @@ export function planStateLine(run, now) {
   const line = (/** @type {string} */ lead, rest = '') => ({ lead, rest, paused: status.key === 'paused', behind: status.key === 'behind' });
   // The Today card's own fields (runStatus todayDay and spreadOn): a spread-out plan's next reading may fall after
   // tomorrow, and its empty day has nothing to read.
-  if (status.key === 'paused') return line('Paused', 'Day ' + (st.todayDay + 1) + ' of ' + st.total);
+  if (status.key === 'paused') return line('Paused', 'Day ' + (heldDay(run, st) + 1) + ' of ' + st.total);
   if (status.key === 'starts' || status.key === 'finished' || status.key === 'behind') return line(status.text);
   const next = st.todayItems;
   const label = itemsLabel(next, bookTitle);
@@ -51,7 +51,7 @@ export function planStateLine(run, now) {
 /** "Stopped Nov 10 · day 11 of 365" for a stopped run. @param {any} r @param {Date} now */
 export function stoppedLine(r, now) {
   const st = runStatus(r, now);
-  return planStatus(r, now, st).text + ' · day ' + Math.min(st.total, st.todayDay + 1) + ' of ' + st.total.toLocaleString('en-US');
+  return planStatus(r, now, st).text + ' · day ' + Math.min(st.total, heldDay(r, st) + 1) + ' of ' + st.total.toLocaleString('en-US');
 }
 
 /** "8 days · finished Oct 30" for a finished run. @param {any} r */
