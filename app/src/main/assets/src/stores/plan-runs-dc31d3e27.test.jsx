@@ -96,6 +96,17 @@ describe('plan runs the shipping build (dc31d3e27) wrote, opened by this build',
   });
 });
 
+describe('continuing a plan stopped while paused keeps the pause (review 11-26)', () => {
+  it('the pause runs from when it began, not from the stop', () => {
+    const r = Object.values(byState()).find((x) => x.status === 'running');
+    if (!r) throw new Error('fixture has no running plan');
+    const paused = { ...clone(r), start: '2026-11-01', status: 'stopped', paused: '2026-11-06', stopped: '2026-11-10' };
+    const back = continueRun(paused, NOW);
+    expect(back.status).toBe('running');
+    expect(back.pauses.at(-1)).toEqual(['2026-11-06', '2026-11-15']);
+  });
+});
+
 describe('the status counts reading days of slip (hub 22:35)', () => {
   beforeEach(() => { localStorage.clear(); });
   afterEach(() => cleanup());

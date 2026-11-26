@@ -190,7 +190,9 @@ export function stopRun(run, now) { saveRun({ ...run, status: 'stopped', updated
  */
 export function continueRun(run, now) {
   const { stopped, ...rest } = run;
-  const asPaused = /** @type {PlanRun} */ ({ ...rest, status: 'paused', paused: stopped || todayKey(now) });
+  // Stopped while paused (Stop is offered on a paused plan): the pause began first, so it runs from there.
+  const from = rest.paused && (!stopped || rest.paused <= stopped) ? rest.paused : (stopped || todayKey(now));
+  const asPaused = /** @type {PlanRun} */ ({ ...rest, status: 'paused', paused: from });
   return resumeRun(asPaused, now);
 }
 
