@@ -9,6 +9,9 @@ import * as ReactDOM from 'react-dom';
 /** @type {any} */ (globalThis).ReactDOM = ReactDOM;
 /** @type {any} */ (globalThis).JournalCardMenu = JournalCardMenu;
 
+// The praying hands (two UTF-16 code units) start at index 49, so a 50-character title cut lands between them.
+const EMOJI = 'Thanks for every small mercy in this long week and'.slice(0, 49) + '\u{1F64F} and for the people who carried us.';
+const LONE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const LONG = 'Grace for today, and strength for the road ahead of us, and rest in the evening once the work is done.';
 const ENTRIES = [
   { id: 'rec', title: '', created: 1720000000000, updated: 1720000000000, tags: [],
@@ -19,6 +22,10 @@ const ENTRIES = [
     blocks: [{ id: 'p2', type: 'p', text: 'A short first paragraph.' }] },
   { id: 'long', title: '', created: 1720000300000, updated: 1720000300000, tags: [],
     blocks: [{ id: 'p3', type: 'p', text: LONG }] },
+  { id: 'dots', title: '', created: 1720000400000, updated: 1720000400000, tags: [],
+    blocks: [{ id: 'p4', type: 'p', text: 'Wait for it…' }] },
+  { id: 'emoji', title: '', created: 1720000500000, updated: 1720000500000, tags: [],
+    blocks: [{ id: 'p5', type: 'p', text: EMOJI }] },
 ];
 
 beforeEach(() => {
@@ -64,5 +71,23 @@ describe('a journal card says its words once', () => {
     const preview = c.querySelector('.jrn-card-preview').textContent;
     expect(preview).toBe('…of us, and rest in the evening once the work is done.');
     expect(preview).not.toContain('Grace for today');
+  });
+  it('a short untitled note ending in its own "…": the title shows it all and there is no preview', () => {
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    const c = card(container, 'Wait for it…');
+    expect(c).toBeTruthy();
+    expect(c.querySelector('.jrn-card-preview')).toBeNull();
+  });
+  it('a cut never splits an emoji: no half of one in the title or the preview', () => {
+    expect(EMOJI.codePointAt(49)).toBe(0x1F64F);
+    const title = JournalHelpers.entryDisplayTitle(ENTRIES[5]);
+    expect(LONE.test(title)).toBe(false);
+    expect(title).toBe(EMOJI.slice(0, 49).trim() + '…');
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    const preview = card(container, title).querySelector('.jrn-card-preview').textContent;
+    expect(LONE.test(preview)).toBe(false);
+    expect(preview).toContain('\u{1F64F}');
+    const p = JournalHelpers.previewText({ blocks: [{ type: 'p', text: 'x'.repeat(159) + '\u{1F64F}' + ' tail' }] }, 160);
+    expect(LONE.test(p)).toBe(false);
   });
 });

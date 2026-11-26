@@ -190,9 +190,12 @@ export function JournalHubScreen(props) {
     // An untitled entry takes its title from this same preview: say it once ("[Voice recording]", a short note). A
     // longer note's title is its first words cut short ("Grace for today and…"): the preview goes on from there.
     if (preview && title && !(entry.title && entry.title.trim())) {
+      // A title that shows the whole text (a short note, even one ending in its own "…") leaves nothing to preview.
+      var whole = title === JournalHelpers.previewText(entry, 1e9);
       var head = title.slice(-1) === '…' ? title.slice(0, -1) : title;
       var full = JournalHelpers.previewText(entry, head.length + 160);
-      if (full.indexOf(head) === 0) {
+      if (whole) preview = '';
+      else if (full.indexOf(head) === 0) {
         // A title cut inside a word: the preview starts at that word ("…of us"), never halfway through it.
         var cut = head.length;
         var sp = full.lastIndexOf(' ', cut);

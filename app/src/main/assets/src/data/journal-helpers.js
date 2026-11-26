@@ -145,7 +145,12 @@ export var JournalHelpers = (function() {
       if (b.type === 'p' || b.type === 'quote' || b.type === 'h2') {
         if (b.text && b.text.trim()) {
           var t = plainInline(b.text);
-          if (t.length > maxLen) t = t.substring(0, maxLen).trim() + '…';
+          if (t.length > maxLen) {
+            // Never between the two halves of an emoji (a surrogate pair): the cut steps back a code unit instead.
+            var end = maxLen, c = t.charCodeAt(end - 1);
+            if (c >= 0xD800 && c <= 0xDBFF) end--;
+            t = t.substring(0, end).trim() + '…';
+          }
           return t;
         }
       }
