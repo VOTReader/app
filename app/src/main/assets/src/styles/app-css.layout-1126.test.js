@@ -102,3 +102,14 @@ describe('visual2-7: at large text the hint\'s Got it drops under the tip, still
     expect((decls('.rd-menu-sheet .more-menu-hint .more-menu-item-text') || {})['flex-wrap']).toBeUndefined();
   });
 });
+
+/* visual2-2 (px half): the install popup's rem sides pushed its title off screen at the largest text. */
+describe('visual2-2: the install popup keeps px sides and a capped icon', () => {
+  it('the sheet and its sticky button bar use px sides', () => {
+    expect(decls('.install-steps').padding).toMatch(/^1\.25rem 16px /);
+    expect(decls('.vot-large-text .install-ask-actions')).toMatchObject({ margin: '0 -16px', 'padding-left': '16px', 'padding-right': '16px' });
+  });
+  it('the app icon stops at 72px', () => {
+    expect(decls('.install-ask-icon')).toMatchObject({ width: 'min(3.5rem, 72px)', height: 'min(3.5rem, 72px)' });
+  });
+});

@@ -9100,7 +9100,9 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .install-steps-backdrop { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; }
 .install-steps {
   box-sizing: border-box; width: 100%; max-width: 34rem; max-height: 92vh; overflow-y: auto;
-  padding: 1.25rem 1rem calc(1rem + var(--inset-bottom, 0px)); border-top: 1px solid var(--gold-border);
+  /* visual2-2 (11-26): px sides, as every other sheet. 1rem sides grew to 48px at the largest text and pushed the title
+     off the screen. */
+  padding: 1.25rem 16px calc(1rem + var(--inset-bottom, 0px)); border-top: 1px solid var(--gold-border);
   border-radius: 16px 16px 0 0; background: var(--bg); color: var(--cream); font-family: var(--font-body);
 }
 @media (min-width: 700px) { .install-steps-backdrop { align-items: center; } .install-steps { border: 1px solid var(--gold-border); border-radius: 16px; } }
@@ -9123,8 +9125,8 @@ body.light .install-step-num { color: #fff; }
 /* The popup's buttons hold the foot of the sheet while its words scroll under them (largest text, small screen). */
 .install-ask-actions { position: sticky; bottom: 0; padding: 0.4rem 0 calc(1rem + var(--inset-bottom, 0px)); background: var(--bg); }
 /* At large text the words run under the buttons: a line across the sheet says so, where a cut box edge looked broken. */
-.vot-large-text .install-ask-actions { margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; border-top: 1px solid var(--gold-border); }
-.install-ask-icon { display: block; width: 3.5rem; height: 3.5rem; margin: 0 auto 0.6rem; border-radius: 22%; }
+.vot-large-text .install-ask-actions { margin: 0 -16px; padding-left: 16px; padding-right: 16px; border-top: 1px solid var(--gold-border); }
+.install-ask-icon { display: block; width: min(3.5rem, 72px); height: min(3.5rem, 72px); margin: 0 auto 0.6rem; border-radius: 22%; }
 .install-ask-go {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 52px; margin-top: 0.5rem;
   padding: 0.4rem 16px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold); color: #000; cursor: pointer; text-decoration: none;
