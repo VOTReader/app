@@ -105,3 +105,167 @@ describe('indexJSONParts', () => {
     } finally { clock.mockRestore(); }
   });
 });
+
+/* Edge cases (votreader-tests-7 item 5): empty indexes, stored fields without text, legacy v1 JSON,
+   unknown parts, and indexJSONParts defaults / late drops. Small indexes throughout — the 9000-doc
+   suites above already prove the part sizes. */
+describe('index-transfer edges', () => {
+  const smallDocs = [
+    { id: 'a', kind: 'verse', title: '', text: 'grace and mercy' },
+    { id: 'b', kind: 'verse', title: '', text: 'still waters' },
+    { id: 'c', kind: 'letter', title: 'Letter c', text: 'cedar of lebanon' },
+  ];
+
+  function smallIndex() {
+    const ms = new MiniSearch(OPTIONS);
+    ms.addAll(smallDocs);
+    return ms;
+  }
+
+  it('hands over an empty index as the head alone (JSON parts)', () => {
+    const empty = new MiniSearch(OPTIONS);
+    const json = JSON.stringify(empty);
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexParts(JSON.parse(json), (m) => msgs.push(m));
+    expect(msgs).toHaveLength(1);
+    const asm = indexAssembler(MiniSearch, msgs[0].head, OPTIONS);
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(MiniSearch.loadJSON(json, OPTIONS)));
+  });
+
+  it('hands over an empty index as the head alone (maps)', () => {
+    const empty = new MiniSearch(OPTIONS);
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexMaps(empty, (m) => msgs.push(structuredClone(m)));
+    expect(msgs).toHaveLength(1);
+    const asm = indexAssembler(MiniSearch, msgs[0].head, OPTIONS);
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(MiniSearch.loadJSON(JSON.stringify(empty), OPTIONS)));
+  });
+
+  it('posts stored fields that carry no text (JSON parts)', () => {
+    const js = JSON.parse(JSON.stringify(smallIndex()));
+    delete js.storedFields['0'].text;
+    js.storedFields['1'].text = 42;
+    js.storedFields['2'] = null;
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexParts(js, (m) => msgs.push(m));
+    let asm = /** @type {any} */ (null);
+    for (const m of msgs) {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, OPTIONS);
+      else asm.add(m.part, m.entries);
+    }
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(MiniSearch.loadJS(js, OPTIONS)));
+  });
+
+  it('posts stored fields that carry no text (maps)', () => {
+    const noText = { fields: ['title', 'text'], storeFields: ['title', 'kind'], idField: 'id' };
+    const ms = new MiniSearch(noText);
+    ms.addAll(smallDocs);
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexMaps(ms, (m) => msgs.push(structuredClone(m)));
+    let asm = /** @type {any} */ (null);
+    for (const m of msgs) {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, noText);
+      else asm.add(m.part, m.entries);
+    }
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(MiniSearch.loadJSON(JSON.stringify(ms), noText)));
+  });
+
+  it('assembles a legacy version-1 index', () => {
+    const js = JSON.parse(JSON.stringify(smallIndex()));
+    js.serializationVersion = 1;
+    js.index = js.index.map(([term, data]) => [term, Object.fromEntries(Object.entries(data).map(([f, freqs]) => [f, { ds: freqs }]))]);
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexParts(js, (m) => msgs.push(m));
+    let asm = /** @type {any} */ (null);
+    for (const m of msgs) {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, OPTIONS);
+      else asm.add(m.part, m.entries);
+    }
+    const loaded = MiniSearch.loadJS(js, OPTIONS);
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(loaded));
+    expect(asm.ms.search('cedar').map((/** @type {any} */ r) => r.id)).toEqual(['c']);
+  });
+
+  it('refuses an unknown part in either mode', () => {
+    const jsonMsgs = /** @type {any[]} */ ([]);
+    postIndexParts(JSON.parse(JSON.stringify(smallIndex())), (m) => jsonMsgs.push(m));
+    const jsonAsm = indexAssembler(MiniSearch, jsonMsgs[0].head, OPTIONS);
+    expect(() => jsonAsm.add('bogus', [])).toThrow('index-transfer: unknown part bogus');
+    const mapMsgs = /** @type {any[]} */ ([]);
+    postIndexMaps(smallIndex(), (m) => mapMsgs.push(m));
+    const mapsAsm = indexAssembler(MiniSearch, mapMsgs[0].head, OPTIONS);
+    expect(() => mapsAsm.add('bogus', [])).toThrow('index-transfer: unknown part bogus');
+  });
+
+  it('writes JSON with the default live, slice and turn', async () => {
+    const ms = smallIndex();
+    const parts = /** @type {string[]} */ (await indexJSONParts(ms));
+    expect(JSON.parse(parts.join(''))).toEqual(JSON.parse(JSON.stringify(ms)));
+  });
+
+  it('turns with the default timer when no turn is given', async () => {
+    const fake = {
+      _documentCount: 200,
+      _nextId: 200,
+      _documentIds: new Map(Array.from({ length: 200 }, (_, i) => [i, 'd' + i])),
+      _fieldIds: { title: 0, text: 1 },
+      _fieldLength: new Map(),
+      _avgFieldLength: [1, 2],
+      _storedFields: new Map(),
+      _dirtCount: 0,
+      _index: new Map(),
+    };
+    let t = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 1));
+    try {
+      const parts = /** @type {string[]} */ (await indexJSONParts(fake, { sliceMs: 1 }));
+      expect(parts.length).toBeGreaterThan(1);
+      expect(JSON.parse(parts.join('')).documentCount).toBe(200);
+    } finally { clock.mockRestore(); }
+  });
+
+  it('leaves out a member JSON leaves out (undefined)', async () => {
+    const fake = {
+      _documentCount: 2,
+      _nextId: 2,
+      _documentIds: new Map([[0, 'd0'], [1, undefined]]),
+      _fieldIds: { title: 0, text: 1 },
+      _fieldLength: new Map([[0, [1, 3]], [1, [0, 2]]]),
+      _avgFieldLength: [0.5, 2.5],
+      _storedFields: new Map([[0, { title: '', text: 'grace' }], [1, undefined]]),
+      _dirtCount: 0,
+      _index: new Map([['grace', new Map([[1, new Map([[0, 1]])]])]]),
+    };
+    const parts = /** @type {string[]} */ (await indexJSONParts(fake, { sliceMs: 8, turn: async () => {} }));
+    const parsed = JSON.parse(parts.join(''));
+    expect(parsed.documentIds).toEqual({ 0: 'd0' });
+    expect(parsed.storedFields).toEqual({ 0: { title: '', text: 'grace' } });
+  });
+
+  it('is dropped in each later phase, not only the first', async () => {
+    const entries = (/** @type {(i: number) => any} */ make) => new Map(Array.from({ length: 200 }, (_, i) => [i, make(i)]));
+    const fake = {
+      _documentCount: 200,
+      _nextId: 200,
+      _documentIds: entries((i) => 'd' + i),
+      _fieldIds: { title: 0, text: 1 },
+      _fieldLength: entries(() => [1, 2]),
+      _avgFieldLength: [1, 2],
+      _storedFields: entries((i) => ({ title: '', text: 't' + i })),
+      _dirtCount: 0,
+      _index: new Map(Array.from({ length: 200 }, (_, i) => ['w' + i, new Map([[1, new Map([[i, 1]])]])])),
+    };
+    // 1 ms a clock reading, 1 ms slices: a turn (and a live check) every 64 entries.
+    // documentIds turns are live calls 1-3, fieldLength 4-6, storedFields 7-9, index 10-12.
+    for (const failAt of [5, 8, 11]) {
+      let t = 0;
+      let calls = 0;
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 1));
+      try {
+        const parts = await indexJSONParts(fake, { sliceMs: 1, turn: async () => {}, live: () => ++calls < failAt });
+        expect(parts, `failAt ${failAt}`).toBeNull();
+        expect(calls).toBe(failAt);
+      } finally { clock.mockRestore(); }
+    }
+  });
+});

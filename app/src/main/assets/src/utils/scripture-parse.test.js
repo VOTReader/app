@@ -29,6 +29,8 @@ import {
   parseRefRanges,
   lastVerseOfFirstRange,
   echoVersesForRef,
+  getNotesForVerse,
+  getEchoesForVerse,
   parseRefRange,
   splitIntoVerses,
 } from './scripture-parse.js';
@@ -320,5 +322,130 @@ describe('splitIntoVerses — multi-strategy chain', () => {
     it('single-verse refs keep the no-split contract (verse part present)', () => {
       expect(splitIntoVerses('For God so loved the world', 'John 3:16')).toBeNull();
     });
+  });
+});
+
+describe('getNotesForVerse', () => {
+  const chapter = {
+    scriptures: [
+      { ref: '5-7', id: 's1' },
+      { ref: '9', id: 's2' },
+      { ref: '11-12, 14', id: 's3' },
+    ],
+    votNotes: [
+      { ref: '7', id: 'n1' },
+      { ref: '5-6, 9', id: 'n2' },
+    ],
+  };
+
+  it('anchors on the last verse of the first range', () => {
+    expect(getNotesForVerse(chapter, 7)).toEqual({
+      scriptures: [{ ref: '5-7', id: 's1' }],
+      votNotes: [{ ref: '7', id: 'n1' }],
+    });
+    expect(getNotesForVerse(chapter, 9)).toEqual({
+      scriptures: [{ ref: '9', id: 's2' }],
+      votNotes: [],
+    });
+    expect(getNotesForVerse(chapter, 12).scriptures).toEqual([{ ref: '11-12, 14', id: 's3' }]);
+  });
+
+  it('returns empty lists when nothing anchors on the verse', () => {
+    expect(getNotesForVerse(chapter, 5)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getNotesForVerse(chapter, 14)).toEqual({ scriptures: [], votNotes: [] });
+  });
+
+  it('tolerates a chapter with missing or empty note arrays', () => {
+    expect(getNotesForVerse({}, 7)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getNotesForVerse({ scriptures: [], votNotes: [] }, 7)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getNotesForVerse({ scriptures: chapter.scriptures }, 7).votNotes).toEqual([]);
+    expect(getNotesForVerse({ votNotes: chapter.votNotes }, 7).scriptures).toEqual([]);
+  });
+});
+
+describe('getEchoesForVerse', () => {
+  const chapter = {
+    scriptures: [
+      { ref: '5-7, 9, 11-12', id: 's1' },
+      { ref: '9', id: 's2' },
+    ],
+    votNotes: [
+      { ref: '5-6, 9', id: 'n1' },
+      { ref: '7', id: 'n2' },
+    ],
+  };
+
+  it('matches the end of every range after the first', () => {
+    expect(getEchoesForVerse(chapter, 9)).toEqual({
+      scriptures: [{ ref: '5-7, 9, 11-12', id: 's1' }],
+      votNotes: [{ ref: '5-6, 9', id: 'n1' }],
+    });
+    expect(getEchoesForVerse(chapter, 12).scriptures).toEqual([{ ref: '5-7, 9, 11-12', id: 's1' }]);
+  });
+
+  it('does not match first-range ends or single-range refs', () => {
+    expect(getEchoesForVerse(chapter, 7)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getEchoesForVerse(chapter, 6)).toEqual({ scriptures: [], votNotes: [] });
+  });
+
+  it('tolerates a chapter with missing or empty note arrays', () => {
+    expect(getEchoesForVerse({}, 9)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getEchoesForVerse({ scriptures: [], votNotes: [] }, 9)).toEqual({ scriptures: [], votNotes: [] });
+    expect(getEchoesForVerse({ scriptures: chapter.scriptures }, 9).votNotes).toEqual([]);
+    expect(getEchoesForVerse({ votNotes: chapter.votNotes }, 9).scriptures).toEqual([]);
+  });
+});
+
+describe('parseRefRange — reversed and degenerate comma ranges', () => {
+  it('returns null when a reversed range leaves fewer than two verses', () => {
+    // "9-7" expands to nothing, so "5:9-7, 9" has one verse left and
+    // falls through to the single-range match, which the comma defeats.
+    expect(parseRefRange('5:9-7, 9')).toBeNull();
+    expect(parseRefRange('5:7-5, 9-8')).toBeNull();
+  });
+
+  it('expands a degenerate range to its single verse', () => {
+    expect(parseRefRange('5:7-7, 9')).toEqual({ start: 7, end: 9, verses: [7, 9] });
+  });
+});
+
+describe('splitIntoVerses — marker-prefix and superscript edges', () => {
+  it('ends the decimal run at the first mismatched marker', () => {
+    expect(splitIntoVerses('1. one 3. three', '5:1-3')).toEqual([
+      { vNum: 1, text: 'one 3. three' },
+    ]);
+    expect(splitIntoVerses('1. one 1. again 2. two', '5:1-3')).toEqual([
+      { vNum: 1, text: 'one 1. again 2. two' },
+    ]);
+  });
+
+  it('falls back when the first decimal marker is not the first verse', () => {
+    expect(splitIntoVerses('2. two 3. three', '5:1-3')).toEqual([
+      { vNum: 1, text: '2. two 3. three' },
+    ]);
+  });
+
+  it('ignores a superscript outside the verse list', () => {
+    expect(splitIntoVerses('first ²second ⁵fifth', '5:1-3')).toEqual([
+      { vNum: 1, text: 'first ²second ⁵fifth' },
+    ]);
+  });
+
+  it('falls back when superscripts are complete but out of order', () => {
+    expect(splitIntoVerses('¹one ³three ²two', '5:1-3')).toEqual([
+      { vNum: 1, text: '¹one ³three ²two' },
+    ]);
+  });
+
+  it('splits chapter-shaped text under an empty ref', () => {
+    expect(splitIntoVerses('1. alpha 2. beta', '')).toEqual([
+      { vNum: 1, text: 'alpha' },
+      { vNum: 2, text: 'beta' },
+    ]);
+  });
+
+  it('returns null for empty chapter text and a lone chapter marker', () => {
+    expect(splitIntoVerses('', '1 Kings 22')).toBeNull();
+    expect(splitIntoVerses('1. only verse', 'Psalm 23')).toBeNull();
   });
 });
