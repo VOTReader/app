@@ -124,8 +124,8 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    /** Next and previous belong to the page's queue; the system surfaces show both buttons. */
-    private class PageOwnsTheQueue(player: Player) : ForwardingPlayer(player) {
+    /** Next and previous belong to the page's queue; the system surfaces show both buttons. Internal for its tests. */
+    internal class PageOwnsTheQueue(player: Player) : ForwardingPlayer(player) {
         override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
             .addAll(
                 Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
@@ -163,7 +163,8 @@ class PlaybackService : MediaSessionService() {
         private fun send(cmd: String) { commandSink?.invoke(cmd, 0L) }
     }
 
-    private inner class Callback : MediaSession.Callback {
+    /** The exported service's only guards (refutation S3). Internal for its tests. */
+    internal inner class Callback : MediaSession.Callback {
         /**
          * Another app's controller (the system's media card, Bluetooth, a car, a watch) gets transport only: play,
          * pause, seek within the recording, next and previous. Changing the list, jumping to an item or setting
