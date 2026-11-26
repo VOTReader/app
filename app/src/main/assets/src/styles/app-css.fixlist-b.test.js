@@ -44,3 +44,12 @@ describe('#20 a row with a value beside it wraps its words instead of cutting th
     expect(b).not.toMatch(/overflow-wrap/);
   });
 });
+
+describe('#31 option sheets keep a Close a screen reader can reach', () => {
+  it('the row sheet hides its × visually, not from assistive tech', () => {
+    const b = rule('.ui-row-sheet .sheet-handle-back');
+    expect(b).not.toMatch(/display:\s*none/);
+    expect(b).toMatch(/clip-path:\s*inset\(50%\)/);
+    expect(b).toMatch(/width:\s*1px/);
+  });
+});

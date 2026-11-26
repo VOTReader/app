@@ -5687,8 +5687,9 @@
     .plan-sheet .sheet-handle-back, .ui-sheet:has(> .ui-sheet-foot) .sheet-handle-back, .jrn-insert-sheet .sheet-handle-back { display: none; }
     /* POL6 (mock library .sheet .who): a row's actions sheet (a bookmark, a note, a link, a journal entry) is led by
        the row itself - its title at the row's size (serif 600 18/23), the muted line under it, no x (the grabber, the
-       scrim and Back close it). Opt in with className="ui-row-sheet"; a titled menu keeps the sheet title and x. */
-    .ui-row-sheet .sheet-handle-back { display: none; }
+       scrim and Back close it). Opt in with className="ui-row-sheet"; a titled menu keeps the sheet title and x.
+       Fix list #31: the x is hidden from sight only, so it stays the screen reader's Close (SheetHandle's one Close stop). */
+    .ui-row-sheet .sheet-handle-back { width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
     .ui-row-sheet .ui-sheet-head { margin: 0 0 12px; padding-top: 8px; }
     .ui-row-sheet .ui-sheet-title { font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); }
     /* the full player's put-away chevron and the Answers sheets keep theirs at the left (mock listen p-full, answers) */
