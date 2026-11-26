@@ -110,6 +110,11 @@ class PlanReminderTest {
         )!!
         assertEquals(setOf(fri), plans[0].rest)
         assertEquals(emptySet(), plans[1].rest)
+        // The page now sends the next reading's date instead; a list stored before it has none.
+        val next = PlanReminder.parse(list("""{"id":"ruth","done":"2026-10-22","restUntil":"2026-10-24"}""", """{"id":"x","restUntil":"bad"}"""))!!
+        assertEquals(fri.plusDays(1), next[0].restUntil)
+        assertNull(next[1].restUntil)
+        assertNull(plans[0].restUntil)
     }
 
     @Test

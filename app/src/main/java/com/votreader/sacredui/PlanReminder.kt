@@ -33,7 +33,9 @@ import java.time.ZonedDateTime
  * The page's contract (JSON in, JSON out; unknown fields ignored):
  *   in  {"plans":[{"id","name","time":"HH:MM","weekdays":[7 x bool, Sunday first],"done":"YYYY-MM-DD",
  *                  "active":"YYYY-MM-DD","end":"YYYY-MM-DD","paused":bool,"start":"YYYY-MM-DD",
- *                  "rest":["YYYY-MM-DD", ...]}]}   (an empty list turns it off; "rest", days with nothing to read, may be absent)
+ *                  "restUntil":"YYYY-MM-DD"}]}   (an empty list turns it off; "restUntil", a spread-out plan's next
+ *                  reading date, no reminder before it, may be absent; an older page sent "rest", a list of days with
+ *                  nothing to read, still read)
  *   out {"ok":bool,"allowed":bool,"next":<epoch ms, 0 = none>,"quiet":[ids gone quiet]}
  * A tap opens the app; the plan's id waits for the page in [takeOpened] (and reaches a running page as
  * JsEvent.PlanReminderOpen).
@@ -154,6 +156,7 @@ object PlanReminder {
                 rest = o.optJSONArray("rest")?.let { a ->
                     (0 until minOf(a.length(), MAX_REST)).mapNotNull { PlanReminderLogic.parseDate(a.optString(it, "")) }.toSet()
                 } ?: emptySet(),
+                restUntil = PlanReminderLogic.parseDate(o.optString("restUntil", "")),
             )
         }
         return out

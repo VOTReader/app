@@ -53,6 +53,7 @@ object PlanReminderLogic {
         val paused: Boolean = false,
         val start: LocalDate? = null,
         val rest: Set<LocalDate> = emptySet(),
+        val restUntil: LocalDate? = null,
     )
 
     /**
@@ -103,14 +104,18 @@ object PlanReminderLogic {
      * reminder) are not untouched days: a long wait for the next reading never makes the plan go quiet.
      */
     fun isQuiet(plan: Plan, day: LocalDate, setOn: LocalDate?): Boolean {
-        val since = plan.active ?: setOn ?: return false
+        // A spread-out plan waiting for its next reading ([Plan.restUntil]) starts counting on that reading's day.
+        val touched = plan.active ?: setOn
+        val waited = plan.restUntil?.minusDays(1)
+        val since = (if (touched != null && waited != null) maxOf(touched, waited) else touched ?: waited) ?: return false
         val rested = plan.rest.count { it.isAfter(since) && !it.isAfter(day) }
         return ChronoUnit.DAYS.between(since, day) - rested > QUIET_AFTER_DAYS
     }
 
     /** Whether [plan] wants a reminder on [day]: a reading day, not done, not a rest day, not gone quiet. */
     fun dueOn(plan: Plan, day: LocalDate, setOn: LocalDate?): Boolean =
-        readsOn(plan, day) && plan.done != day && day !in plan.rest && !isQuiet(plan, day, setOn)
+        readsOn(plan, day) && plan.done != day && day !in plan.rest && (plan.restUntil == null || !day.isBefore(plan.restUntil)) &&
+            !isQuiet(plan, day, setOn)
 
     /** The ids of the plans that have gone quiet by [today] (the page asks once whether to keep each). */
     fun quiet(plans: List<Plan>, today: LocalDate, setOn: LocalDate?): List<String> =
@@ -135,7 +140,7 @@ object PlanReminderLogic {
         // grace after it: catch up on yesterday's reminder now, as one at 7:30 lost at 9:00 is caught up on.
         if (catchUp && dueSlots(plans, today.minusDays(1), now, lastNotified, setOn).isNotEmpty()) return now
         // Look a week ahead, or as far as a plan's later start (at most a year), so the alarm is set for it.
-        val horizon = plans.mapNotNull { it.start }.maxOfOrNull { java.time.temporal.ChronoUnit.DAYS.between(today, it) }
+        val horizon = plans.flatMap { listOfNotNull(it.start, it.restUntil) }.maxOfOrNull { java.time.temporal.ChronoUnit.DAYS.between(today, it) }
             ?.coerceIn(8L, 366L) ?: 8L
         for (offset in 0L..horizon) {
             val day = today.plusDays(offset)

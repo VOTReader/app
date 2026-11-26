@@ -295,4 +295,30 @@ class PlanReminderLogicTest {
         // A plan with no rest days (every plan read day after day, and a list stored before rest days) is unchanged.
         assertTrue(PlanReminderLogic.dueOn(plan(done = thu, active = thu), fri, thu))
     }
+
+    @Test
+    fun `a spread-out plan waiting for its next reading (restUntil) is reminded on that day, never before, and goes quiet only after it`() {
+        // Saturdays only, 3 readings over 6 Saturdays: read Saturday Oct 10, the next reading Saturday Oct 24.
+        val satOnly = listOf(false, false, false, false, false, false, true)
+        val sat = fri.plusDays(1)
+        val jonah = plan(weekdays = satOnly, done = sat.minusDays(14), active = sat.minusDays(14)).copy(restUntil = sat)
+        assertFalse(PlanReminderLogic.dueOn(jonah, sat.minusDays(7), null))
+        assertFalse(PlanReminderLogic.isQuiet(jonah, sat, null))
+        assertTrue(PlanReminderLogic.dueOn(jonah, sat, null))
+        assertEquals(listOf<String>(), PlanReminderLogic.quiet(listOf(jonah), sat, null))
+        // Weekdays, 4 readings over 50 weekdays: 40 days of waiting, days off included.
+        val weekdays = listOf(false, true, true, true, true, true, false)
+        val due = fri.plusDays(40)
+        val nahum = plan(weekdays = weekdays, done = fri, active = fri).copy(restUntil = due)
+        for (d in 1L..39L) assertFalse(PlanReminderLogic.dueOn(nahum, fri.plusDays(d), fri), "day $d")
+        assertTrue(PlanReminderLogic.dueOn(nahum, due, fri))
+        assertEquals(at(due, 7, 30), PlanReminderLogic.nextFire(listOf(nahum), at(fri, 8), fri, fri, false))
+        // Quiet counts from the day it was due: still reminded a week after it, quiet the day after that.
+        assertFalse(PlanReminderLogic.isQuiet(nahum, due.plusDays(6), fri))
+        assertTrue(PlanReminderLogic.isQuiet(nahum, due.plusDays(8), fri))
+        // Daily, 3 readings over 90 days: a 45-day wait, longer than any list of days, is still one date.
+        val long = plan(done = fri, active = fri).copy(restUntil = fri.plusDays(45))
+        for (d in 1L..44L) assertFalse(PlanReminderLogic.dueOn(long, fri.plusDays(d), fri), "day $d")
+        assertEquals(at(fri.plusDays(45), 7, 30), PlanReminderLogic.nextFire(listOf(long), at(fri, 8), fri, fri, false))
+    }
 }

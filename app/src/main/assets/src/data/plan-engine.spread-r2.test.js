@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { dateOf, dayNum, dayItems, newRun, tickItem, runStatus, schedule, pauseRun, resumeRun, hasEmptyDays, streak, monthCells } from './plan-engine.js';
 import { planStateLine, stoppedLine } from '../ui/screens/ReadingPlansScreen.jsx';
-import { doneToday, restDates } from '../utils/plan-reminder.js';
+import { doneToday, restUntil } from '../utils/plan-reminder.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 const book = (b, n, days) => newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: Array.from({ length: n }, (_, i) => ({ k: b + ':' + (i + 1), w: 600 })) }], pace: { mode: 'days', n: days } }, at('2026-11-26'));
@@ -71,7 +71,7 @@ describe('a late reader on a spread-out plan gets the next reading today', () =>
     const line = planStateLine(run, sat);
     expect(line.lead + ' ' + line.rest).not.toMatch(/Nothing to read today|behind/);
     // The reminder stays on: Saturday is not a rest day and not done.
-    expect(restDates(run, sat)).toEqual([]);
+    expect(restUntil(run, sat)).toBe('');
     expect(doneToday(run, sat)).toBe(false);
   });
 

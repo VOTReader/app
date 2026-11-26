@@ -20,7 +20,7 @@
    as snapshot-sink.js); tests pass `bridge`.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { runStatus, dayItems, todayKey, dayNum, dateOf, isReadingDay } from '../data/plan-engine.js';
+import { runStatus, dayItems, todayKey, dayNum, dateOf } from '../data/plan-engine.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun & { remind?: string }} RemindRun */
 /** @typedef {{ ok: boolean, allowed: boolean, next: number, quiet: string[] }} ReminderStatus */
@@ -71,25 +71,14 @@ export function doneToday(run, now) {
 }
 
 /**
- * The reading days that a spread-out plan gives nothing to read: its empty days before the next reading (the Today
- * card's "Nothing to read today"), from the day after the plan was last touched (`active`), at most 31 (the native
- * side's cap), the days from today on first. The native side decides the days ahead from the list alone, and counts
- * a plan's quiet days without the rest days since `active`; the next sync (a tick, a boot) sends the ones after.
- * [] for every other plan, and for a reader behind the plan (who gets the next reading today).
- * @param {RemindRun} run @param {Date} now @returns {string[]}
+ * The date a spread-out plan's next reading falls on when the Today card says "Nothing to read today" (runStatus
+ * spreadOn), else ''. The native side sends no reminder before it, and counts the plan's quiet days from it, so every
+ * day of the wait (its days off included) and any length of wait stays out of both. '' for every other plan, and for
+ * a reader behind the plan (who gets the next reading today).
+ * @param {RemindRun} run @param {Date} now @returns {string}
  */
-export function restDates(run, now) {
-  const st = runStatus(run, now);
-  const due = dayNum(st.spreadOn);
-  if (due == null) return [];
-  const todayN = /** @type {number} */ (dayNum(todayKey(now)));
-  const from = todayN + (st.doneToday ? 1 : 0);
-  const ahead = [], past = [];
-  for (let n = from; n < due && ahead.length < 31; n++) if (isReadingDay(run, n)) ahead.push(dateOf(n));
-  // Before today: every reading day since the plan was last touched waited for the same reading.
-  const sinceN = dayNum(lastActive(run));
-  if (sinceN != null) for (let n = from - 1; n > sinceN && ahead.length + past.length < 31; n--) if (isReadingDay(run, n)) past.unshift(dateOf(n));
-  return [...past, ...ahead];
+export function restUntil(run, now) {
+  return runStatus(run, now).spreadOn;
 }
 
 /**
@@ -110,8 +99,8 @@ export function reminderPayload(runs, now, nameOf) {
     if (Array.isArray(run.weekdays) && run.weekdays.length === 7) p.weekdays = run.weekdays.map(Boolean);
     if (typeof run.start === 'string' && dayNum(run.start) != null) p.start = run.start;
     if (doneToday(run, now)) p.done = todayKey(now);
-    const rest = restDates(run, now);
-    if (rest.length) p.rest = rest;   // absent otherwise: the list of a plan read day after day is unchanged
+    const until = restUntil(run, now);
+    if (until) p.restUntil = until;   // absent otherwise: the list of a plan read day after day is unchanged
     plans.push(p);
   }
   return { plans };

@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { newRun, tickItem, pauseRun, resumeRun, runStatus } from '../data/plan-engine.js';
 import {
-  supported, isReminderTime, lastActive, doneToday, reminderPayload, restDates, syncPlanReminders, reminderStatus,
+  supported, isReminderTime, lastActive, doneToday, reminderPayload, restUntil, syncPlanReminders, reminderStatus,
   askForReminders, openReminderSettings, onReminderOpen, _resetForTests,
 } from './plan-reminder.js';
 
@@ -183,14 +183,15 @@ describe('a spread-out plan\'s empty days (the reminder said "ready" while the c
     const run = tickItem(ruth(), 'ruth:1', '2026-11-26', 1);
     const p = reminderPayload([run], at('2026-11-26', 20)).plans[0];
     expect(p.done).toBe('2026-11-26');
-    expect(p.rest).toEqual(['2026-11-27']);
-    expect(restDates(run, at('2026-11-27'))).toEqual(['2026-11-27']);
+    expect(p.restUntil).toBe('2026-11-28');
+    expect('rest' in p).toBe(false);
+    expect(restUntil(run, at('2026-11-27'))).toBe('2026-11-28');
   });
   it('a reading due today, or a plan read day after day: no rest days, and the list keeps its old shape', () => {
     const run = tickItem(ruth(), 'ruth:1', '2026-11-26', 1);
-    expect(restDates(run, at('2026-11-28'))).toEqual([]);
-    expect('rest' in reminderPayload([run], at('2026-11-28')).plans[0]).toBe(false);
-    expect('rest' in reminderPayload([{ ...run3({ id: 'g' }), remind: '07:30' }], at('2026-11-26')).plans[0]).toBe(false);
+    expect(restUntil(run, at('2026-11-28'))).toBe('');
+    expect('restUntil' in reminderPayload([run], at('2026-11-28')).plans[0]).toBe(false);
+    expect('restUntil' in reminderPayload([{ ...run3({ id: 'g' }), remind: '07:30' }], at('2026-11-26')).plans[0]).toBe(false);
   });
   it('a long wait (2 chapters over 30 days, 14 rest days): a list sent days later still names the rest days since the read', () => {
     // Day 8 (Dec 3) holds chapter 1, day 23 (Dec 18) chapter 2: Dec 4 to Dec 17 have nothing to read.
@@ -199,8 +200,28 @@ describe('a spread-out plan\'s empty days (the reminder said "ready" while the c
     expect(runStatus(read, at('2026-12-09')).spreadOn).toBe('2026-12-18');
     const p = reminderPayload([read], at('2026-12-09')).plans[0];
     expect(p.active).toBe('2026-12-03');
-    expect(p.rest[0]).toBe('2026-12-04');
-    expect(p.rest.length).toBe(14);
-    expect(p.rest[p.rest.length - 1]).toBe('2026-12-17');
+    expect(p.restUntil).toBe('2026-12-18');
+  });
+  // The third review's cases: a wait with days off in it, and a wait longer than any list the page could send.
+  const book = (b, n, days, weekdays, startOn) => ({ ...newRun({ plan: 'custom', startOn, weekdays, tracks: [{ kind: 'bible', by: 'count', items: Array.from({ length: n }, (_, i) => ({ k: b + ':' + (i + 1), w: 600 })) }], pace: { mode: 'days', n: days } }, at('2026-11-26')), id: b, remind: '07:30' });
+  it('Saturdays only, 3 readings over 6 Saturdays, read Dec 12: the next reading Dec 26 is sent as the end of the wait', () => {
+    const sat = [false, false, false, false, false, false, true];
+    const run = tickItem(book('jonah', 3, 6, sat, '2026-12-12'), 'jonah:1', '2026-12-12', 1);
+    expect(runStatus(run, at('2026-12-14')).spreadOn).toBe('2026-12-26');
+    expect(reminderPayload([run], at('2026-12-14')).plans[0]).toMatchObject({ active: '2026-12-12', restUntil: '2026-12-26' });
+  });
+  it('weekdays, 4 readings over 50 weekdays, and daily, 3 readings over 90 days read Dec 1: the whole wait in one date', () => {
+    const wk = [false, true, true, true, true, true, false];
+    let run = book('nahum', 3, 90, undefined, '2026-12-01');
+    run = tickItem(run, runStatus(run, at('2026-12-01')).todayItems[0]?.k ?? 'nahum:1', '2026-12-01', 1);
+    const due = runStatus(run, at('2026-12-02')).spreadOn;
+    expect(due >= '2026-12-31').toBe(true);   // a wait of 30 days, longer than the 31-day list's rest days less a week of quiet
+    expect(reminderPayload([run], at('2026-12-02')).plans[0].restUntil).toBe(due);
+    const w = book('haggai', 4, 50, wk, '2026-12-01');
+    const first = /** @type {string} */ (runStatus(w, at('2026-12-01')).spreadOn || '2026-12-01');
+    const read = tickItem(w, 'haggai:1', first, 1);
+    const next = runStatus(read, at(first)).spreadOn;
+    expect(next > first).toBe(true);
+    expect(reminderPayload([read], at(first)).plans[0].restUntil).toBe(next);
   });
 });
