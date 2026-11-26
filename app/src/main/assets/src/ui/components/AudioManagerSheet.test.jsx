@@ -1623,3 +1623,24 @@ describe('AudioManagerSheet — Up next counts recordings, as the head does (fix
     expect(within(upNext()).getByRole('button', { name: 'Next track' }).disabled).toBe(false);
   });
 });
+
+/* Fix list 15: Your own stepped to a length a chip also names (15/30/45/60), then Start, lit the chip and left Your
+   own unlit, as if the choice were lost. The listener's own choice stays lit, also after the sheet reopens; a chip
+   tapped afterwards takes it back. */
+describe('AudioManagerSheet — Sleep: Your own at a chip length stays Your own (fix list 15)', () => {
+  it('Your own 15 min then Start lights Your own, not the 15 min chip', () => {
+    startCollection();
+    openSheet();
+    emit('playing');
+    openSleep();
+    fireEvent.click(screen.getByRole('button', { name: '5 minutes less' }));   // 20 -> 15
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(AudioPlayer.getState().sleepMinutes).toBe(15);
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom').classList.contains('is-active')).toBe(true);
+    expect(sleepChip('15 min').getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Start' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(sleepChip('30 min'));
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom').classList.contains('is-active')).toBe(false);
+    expect(sleepChip('30 min').getAttribute('aria-pressed')).toBe('true');
+  });
+});

@@ -91,6 +91,9 @@ export function SpeedSheet({ rate, song, onClose }) {
   );
 }
 
+/** The end time of the countdown Your own's Start armed (fix list 15); a chip's countdown has another. */
+let _ownSleepEndsAt = 0;
+
 /** Custom sleep: the stepper's bounds and step, in minutes (setSleepTimer takes 1-120). */
 const CUSTOM_MIN = 5;
 const CUSTOM_MAX = 120;
@@ -110,8 +113,9 @@ export function SleepSheet({ state, noun, onClose }) {
   }, [state.sleepEndsAt]);
   const left = AudioPlayer.getSleepRemainingSeconds();
   const preset = [15, 30, 45, 60];
-  // A countdown armed at a length no chip names is the listener's own one.
-  const customArmed = !!state.sleepEndsAt && preset.indexOf(state.sleepMinutes) < 0;
+  // A countdown armed at a length no chip names is the listener's own one, and so is one Your own's Start armed at a
+  // length a chip also names (fix list 15: Start at 15 lit the 15 min chip). Kept by its end time, so it outlives the sheet.
+  const customArmed = !!state.sleepEndsAt && (preset.indexOf(state.sleepMinutes) < 0 || state.sleepEndsAt === _ownSleepEndsAt);
   const [custom, setCustom] = React.useState(customArmed ? state.sleepMinutes : 20);
   const off = !state.sleepEndsAt && !state.sleepAtTrackEnd && !state.sleepAtQueueEnd;
   const status = state.sleepAtTrackEnd ? 'Stops after this ' + noun
@@ -143,7 +147,7 @@ export function SleepSheet({ state, noun, onClose }) {
         <button type="button" className="audio-manager-round" aria-label="5 minutes more" disabled={custom >= CUSTOM_MAX}
           onClick={() => setCustom(Math.min(CUSTOM_MAX, custom + CUSTOM_STEP))}>+</button>
         <button type="button" className="np-custom-go" aria-pressed={customArmed && state.sleepMinutes === custom}
-          onClick={() => AudioPlayer.setSleepTimer(custom)}>Start</button>
+          onClick={() => { AudioPlayer.setSleepTimer(custom); _ownSleepEndsAt = AudioPlayer.getState().sleepEndsAt || 0; }}>Start</button>
       </div>
       <div className="np-grid np-sleep-off">
         {chip('off', 'Off', off, () => AudioPlayer.clearSleepTimer())}
