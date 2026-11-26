@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { dayNum, dateOf, todayKey, dayItems, newRun, tickItem, streak, monthCells, runStatus, isReadingDay, hasEmptyDays, totalDays, creditRead, catchUp, spreadOut, pauseRun } from './plan-engine.js';
 import { planStateLine, stoppedLine } from '../ui/screens/ReadingPlansScreen.jsx';
+import { continueRun } from '../utils/plan-runs-view.js';
 import * as base from './__fixtures__/plan-engine-03d0ea090.js';
 
 const at = (s, h = 9) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
@@ -42,6 +43,8 @@ function expectSameAsBase(run, now) {
   // "Day N of M" (runRow's day): 03d0ea090 said the day just read once today's was done, else the portion's.
   const was = base.runStatus(run, now);
   expect(st.todayDay).toBe(was.doneToday ? was.day - 1 : was.day);
+  expect(st.doneToday).toBe(was.doneToday);
+  expect(st.projected).toBe(was.projected);
   const todayN = /** @type {number} */ (dayNum(todayKey(now)));
   // 03d0ea090 numbered every day ahead one too high when today's portion was not due today (today a day off).
   const shift = !st.doneToday && !st.finished && !isReadingDay({ ...run, paused: undefined }, todayN) ? 1 : 0;
@@ -94,7 +97,7 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
   });
 
   it('random reading histories (seeded) on plans of every pace and weekday set', () => {
-    let tried = 0, held = 0, recuts = 0;
+    let tried = 0, held = 0, recuts = 0, twoTrack = 0, oldCut = 0, finishedToday = 0, continued = 0, early = 0;
     for (let seed = 1; seed <= 120; seed++) {
       const r = rng(seed);
       const days = 3 + Math.floor(r() * 30);
@@ -102,8 +105,16 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
       const weekdays = r() < 0.6 ? [true, true, true, true, true, true, true] : Array.from({ length: 7 }, () => r() < 0.6);
       const startKey = dateOf(/** @type {number} */ (dayNum('2026-09-01')) + Math.floor(r() * 60));
       const by = r() < 0.5 ? 'count' : 'words';
-      let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by, items: chapters('psalms', count) }], pace: { mode: 'days', n: days }, weekdays }, at(startKey));
+      const shape = r();
+      /** @type {any[]} */ let tracks = [{ kind: 'bible', by, items: chapters('psalms', count) }];
+      // Two tracks side by side; or an old short cut (before even cuts) whose last days are empty.
+      if (shape < 0.2) tracks = [tracks[0], { kind: 'bible', by: 'count', items: chapters('proverbs', days + Math.floor(r() * 10)) }];
+      if (shape >= 0.2 && shape < 0.4) tracks = [{ kind: 'bible', by: 'words', items: chapters('psalms', 2 + Math.floor(r() * (days - 1))).map((it, i) => (i ? it : { ...it, w: 9000 })) }];
+      let run = newRun({ plan: 'custom', tracks, pace: { mode: 'days', n: days }, weekdays }, at(startKey));
+      if (shape >= 0.2 && shape < 0.4) run = { ...run, segs: run.segs.map((sg) => ({ ...sg, even: false })) };
       if (hasEmptyDays(run)) continue;   // a words cut may still leave a day empty: that is a spread-out plan
+      if (tracks.length > 1) twoTrack++;
+      if (shape >= 0.2 && shape < 0.4 && !dayItems(run, totalDays(run) - 1).length) oldCut++;
       tried++;
       const startN = /** @type {number} */ (dayNum(run.start));
       // Some plans start with chapters read before (credited, undated).
@@ -125,10 +136,25 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
         else if (p < 0.65 && next + 1 < totalDays(run)) { run = readDay(run, next++, dateOf(n)); run = readDay(run, next++, dateOf(n)); }
         else if (p < 0.72) { const it = dayItems(run, next)[0]; if (it) run = tickItem(run, it.k, dateOf(n), 1); }
       }
-      const now = at(dateOf(endN), r() < 0.3 ? 21 : 9);
+      // A plan read to its end: often seen on the day its last reading was done (finished today).
+      const lastRead = Math.max(...Object.values(run.ticks).map((v) => dayNum(v) ?? -Infinity));
+      const nowN = runStatus(run, at(dateOf(endN))).finished && r() < 0.6 && lastRead > -Infinity ? lastRead : endN;
+      if (nowN === lastRead && base.runStatus(run, at(dateOf(nowN))).finished) finishedToday++;
+      const now = at(dateOf(nowN), r() < 0.3 ? 21 : 9);
       // Paused or stopped on a recent date (often the day of the last read): the line names the day 03d0ea090 named.
-      const q = r(), heldOn = endN - Math.floor(r() * 3);
-      if (q < 0.25) {
+      const q = r(), heldOn = nowN - Math.floor(r() * 3);
+      if (q < 0.08) {
+        // Paused before its start: a plan made to start later, paused at once.
+        let fresh = newRun({ plan: 'custom', tracks, pace: { mode: 'days', n: days }, weekdays }, at(dateOf(nowN + 3 + Math.floor(r() * 5))));
+        if (shape >= 0.2 && shape < 0.4) fresh = { ...fresh, segs: fresh.segs.map((sg) => ({ ...sg, even: false })) };
+        if (!hasEmptyDays(fresh)) {
+          fresh = pauseRun({ ...fresh }, now);
+          const was = base.runStatus(fresh, now);
+          expect(planStateLine(fresh, now)).toMatchObject({ lead: 'Paused', rest: 'Day ' + (was.day + 1) + ' of ' + was.total });
+          expectSameAsBase(fresh, now);
+          early++;
+        }
+      } else if (q < 0.25) {
         run = pauseRun(run, at(dateOf(heldOn), 21));
         const was = base.runStatus(run, now);
         if (!was.finished) { expect(planStateLine(run, now)).toMatchObject({ lead: 'Paused', rest: 'Day ' + (was.day + 1) + ' of ' + was.total }); held++; }
@@ -137,11 +163,19 @@ describe('a plan that reads one day after another behaves as on 03d0ea090', () =
         const was = base.runStatus(run, now);
         expect(stoppedLine(run, now).split(' · ').pop()).toBe('day ' + Math.min(was.total, was.day + 1) + ' of ' + was.total.toLocaleString('en-US'));
         held++;
+        if (r() < 0.5) {
+          // Continue where I stopped, a few days later: the stopped days become a pause.
+          const later = at(dateOf(nowN + 1 + Math.floor(r() * 4)));
+          run = continueRun(run, later);
+          expectSameAsBase(run, later);
+          continued++;
+        }
       }
       expectSameAsBase(run, now);
     }
     expect(tried).toBeGreaterThan(80);
     expect(held).toBeGreaterThan(20);
     expect(recuts).toBeGreaterThan(5);
+    expect([twoTrack, oldCut, finishedToday, continued, early].every((c) => c >= 3)).toBe(true);
   });
 });

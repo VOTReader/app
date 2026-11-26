@@ -382,7 +382,8 @@ export function runStatus(run, now) {
   while (last >= 0 && !dayItems(run, last).length) last--;
   const gap = day - 1 - last;   // empty days between the last day with readings and the portion
   let doneToday = false;
-  if (last >= 0) {
+  // A finished plan whose last days are empty is not "done today" (as on 03d0ea090): the day just read is not its last.
+  if (last >= 0 && !(finished && last < day - 1)) {
     const prev = dayItems(run, last);
     doneToday = prev.some((it) => ticks[it.k] === dateOf(today)) && todayTicked === 0;
   }
