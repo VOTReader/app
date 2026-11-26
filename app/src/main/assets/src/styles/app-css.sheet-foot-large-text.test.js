@@ -44,6 +44,10 @@ describe('a sheet foot at large text keeps its buttons on the screen', () => {
     expect(b).not.toMatch(/padding[^;]*rem/);
   });
 
+  it('a nowrap run inside a foot button stays on one line (a size\'s number and unit)', () => {
+    expect(rule('.ui-sheet-foot .ui-nowrap')).toMatch(/white-space:\s*nowrap/);
+  });
+
   it('large text: the Verify sheet\'s empty stand-in for Restore it takes no row', () => {
     expect(rule('.vot-large-text .ui-sheet-foot > span:empty')).toMatch(/display:\s*none/);
   });

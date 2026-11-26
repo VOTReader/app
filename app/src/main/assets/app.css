@@ -5506,6 +5506,8 @@
     .vot-large-text .ui-sheet-foot { grid-template-columns: minmax(0, 1fr); }
     .vot-large-text .ui-sheet-foot > .ui-btn { min-width: 0; height: auto; white-space: normal; text-align: center; padding: 6px 12px; border-radius: var(--r-card); }
     .vot-large-text .ui-sheet-foot > span:empty { display: none; }   /* the Verify sheet's stand-in for a missing Restore it */
+    /* A run inside a wrapping label that stays on one line, as a size's number and unit ("1.24 GB"). */
+    .ui-sheet-foot .ui-nowrap { white-space: nowrap; }
     /* the ⋯ dropdown (MoreMenu.jsx) on the tokens: a surface card with no outline, worded rows in the UI
        face with a gold icon, inset hairlines; its steppers and segments are surface pills, the chosen one soft gold */
     .more-menu { padding: 6px 0; background: var(--surface-1); color: var(--text-1); border: 0; border-radius: var(--r-card); box-shadow: var(--shadow-float); font-family: var(--font-ui); }

@@ -42,3 +42,19 @@ describe('CollectionDownload voice pick (fix list 13)', () => {
     expect(screen.getByText('On this phone')).toBeTruthy();
   });
 });
+
+/* At 300 % the confirm label "Download 1.24 GB" wrapped as "Download 1.24 / GB" (shots 11-26, foot-q). The size in
+   the button keeps its number and unit together; the size row and formatBytes keep an ordinary space. */
+describe('CollectionDownload size label', () => {
+  it('keeps the size\'s number and unit in one nowrap run, with an ordinary space in the name', () => {
+    render(<CollectionDownload label="Volume One" unitsFor={unitsFor} readers={['B']} onOpenDownloads={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Download Volume One' }));
+    const go = screen.getAllByRole('button').find((b) => /^Download\s\d/.test(b.textContent || ''));
+    expect(go).toBeTruthy();
+    expect(go.textContent).not.toMatch(/\u00a0/);
+    const size = go.querySelector('.ui-nowrap');
+    expect(size).toBeTruthy();
+    expect(size.textContent).toMatch(/^\d[\d.,]* \S+$/);
+    expect(go.textContent).toBe('Download ' + size.textContent);
+  });
+});
