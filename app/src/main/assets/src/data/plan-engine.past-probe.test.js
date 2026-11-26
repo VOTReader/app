@@ -4,7 +4,7 @@
    histories with such changes, then checks that the month calendar and the week strip still say the same. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, newRun, tickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, pauseRun, resumeRun } from './plan-engine.js';
+import { dayNum, dateOf, newRun, tickItem, untickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, pauseRun, resumeRun } from './plan-engine.js';
 
 const at = (s, h = 12) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 /** mulberry32. @param {number} seed */
@@ -106,5 +106,30 @@ describe('the fourth review: earlier pins survive a second change of days', () =
     run = changeWeekdays(run, [true, true, false, true, true, false, false], at('2026-12-10'));   // Sun, Mon, Wed, Thu
     run = changeWeekdays(run, [true, true, true, true, true, true, true], at('2026-12-10'));
     expect(cells(run, '2026-12-10')).toEqual({ 1: 'none', 2: 'missed', 3: 'missed' });
+  });
+});
+
+describe('the fourth review: an untick is the same on both sides of a pin', () => {
+  it('Ruth over 20 days: the Dec 13 reading unticked Dec 21, ticked again Dec 26; Catch me up on Dec 15, 17 or 23 changes no past day', () => {
+    const cells = (/** @type {any} */ r, /** @type {string} */ now) => monthCells(r, 2026, 11, at(now)).filter((c) => c.date < 27).map((c) => c.state);
+    /** @param {string | null} caught */
+    const live = (caught) => {
+      let run = newRun({ plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, at('2026-12-01'));
+      /** @type {Record<string, string[]>} */ const seen = {};
+      for (let n = /** @type {number} */ (dayNum('2026-12-01')); n <= /** @type {number} */ (dayNum('2026-12-26')); n++) {
+        const key = dateOf(n), now = at(key);
+        if (key === caught) run = catchUp(run, now);
+        if (key === '2026-12-21') run = untickItem(run, /** @type {string} */ (Object.keys(run.ticks).find((k) => run.ticks[k] === '2026-12-13')), now);
+        const st = runStatus(run, now);
+        // What the card offers, read on the day it is offered, up to Dec 13; Ruth 3 again on Dec 26.
+        if ((key <= '2026-12-13' && !st.doneToday && !st.spreadOn) || key === '2026-12-26') for (const it of st.todayItems) run = tickItem(run, it.k, key, 1);
+        if (key === '2026-12-21' || key === '2026-12-26') seen[key] = cells(run, key);
+      }
+      expect(run.ticks).toEqual({ 'ruth:1': '2026-12-03', 'ruth:2': '2026-12-08', 'ruth:3': '2026-12-26' });
+      return seen;
+    };
+    const plain = live(null);
+    expect(plain['2026-12-21'].slice(12, 20)).toEqual(Array(8).fill('missed'));   // Dec 13 to 20: Ruth 3 not read
+    for (const caught of ['2026-12-15', '2026-12-17', '2026-12-23']) expect(live(caught)).toEqual(plain);
   });
 });

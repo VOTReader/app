@@ -929,12 +929,19 @@ function startTodayRaw(run, now) {
   return { ...moved, target: dateOf(nthReadingDay(moved, first, days - 1)) };
 }
 
-/** Untick one item (the session's "Not read yet"). @param {PlanRun} run @param {string} k @param {Date} now */
+/**
+ * Untick one item (the session's "Not read yet"). An untick says "I didn't read that", on both sides of a change's
+ * pin: the rest days pinned on and after the date it was read are judged again as if it was never read, as the days
+ * after the pin are (a tick again counts from its own new date). @param {PlanRun} run @param {string} k @param {Date} now
+ */
 export function untickItem(run, k, now) {
   if (!(k in (run.ticks || {}))) return run;
   const ticks = { ...(run.ticks || {}) };
+  const was = ticks[k];
   delete ticks[k];
   const next = { ...run, ticks, updated: now.getTime() };
+  const r = run.rested;
+  if (was && r && was < r.until) next.rested = { until: was, dates: r.dates.filter((d) => d < was) };
   if (next.status === 'finished') { next.status = 'running'; delete next.finished; }
   return next;
 }
