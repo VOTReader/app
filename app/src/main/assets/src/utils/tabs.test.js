@@ -257,3 +257,139 @@ describe('navOriginLabel', () => {
     expect(navOriginLabel({ screen: 'volumes-home' })).toBe('Volumes');
   });
 });
+/* votreader-tests-7 item 8: the describeTab branches the corpus-backed
+   screens take (BOOKS / MATTHEW_PLAIN / studies / index collections) and
+   the content-key / scroll-key fallbacks no earlier case reached. */
+describe('describeTab — corpus-backed screens (tests-7 item 8)', () => {
+  const g = /** @type {any} */ (globalThis);
+  afterEach(() => {
+    delete g.BOOKS; delete g.OT_BOOK_IDS; delete g.MATTHEW_PLAIN;
+    delete g.SCRIPTURE_GENRES; delete g._studies;
+  });
+
+  it('a tab with no screen at all is Home', () => {
+    expect(describeTab({})).toEqual({ title: 'Home', subtitle: 'Read', resolved: true });
+  });
+
+  it('a BOOKS chapter names the book, its testament, and a missing chapter as ?', () => {
+    g.BOOKS = {
+      genesis: { id: 'genesis', title: 'Genesis' },
+      john: { id: 'john', title: 'John' },
+    };
+    g.OT_BOOK_IDS = new Set(['genesis']);
+    expect(describeTab({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 }))
+      .toEqual({ title: 'Genesis · Ch. 1', subtitle: 'Old Testament', resolved: true });
+    expect(describeTab({ screen: 'bible-ch', bookId: 'john' }))
+      .toEqual({ title: 'John · Ch. ?', subtitle: 'New Testament', resolved: true });
+  });
+
+  it('the plain Matthew resolves through MATTHEW_PLAIN once its corpus is present', () => {
+    g.MATTHEW_PLAIN = { id: 'matthew-plain', title: 'Matthew (plain)' };
+    g.OT_BOOK_IDS = new Set();
+    expect(describeTab({ screen: 'bible-ch', bookId: 'matthew-plain', chapterNum: 2 }))
+      .toEqual({ title: 'Matthew (plain) · Ch. 2', subtitle: 'New Testament · Gospels', resolved: true });
+  });
+
+  it('book index screens name the book and its testament, or fall back unresolved', () => {
+    g.BOOKS = { genesis: { id: 'genesis', title: 'Genesis' }, john: { id: 'john', title: 'John' } };
+    g.OT_BOOK_IDS = new Set(['genesis']);
+    expect(describeTab({ screen: 'bible-idx', bookId: 'genesis' }))
+      .toEqual({ title: 'Genesis', subtitle: 'Old Testament', resolved: true });
+    expect(describeTab({ screen: 'matthew-idx', bookId: 'john' }))
+      .toEqual({ title: 'John', subtitle: 'New Testament', resolved: true });
+    expect(describeTab({ screen: 'bible-idx', bookId: 'gone' }))
+      .toEqual({ title: 'Book', subtitle: 'New Testament', resolved: false });
+  });
+
+  it('a genre tab before the genre table loads is unresolved, and a one-sided table still names its genres', () => {
+    expect(describeTab({ screen: 'scripture-genre', genreId: 'law' }))
+      .toEqual({ title: 'Scriptures', subtitle: 'Browse by genre', resolved: false });
+    g.SCRIPTURE_GENRES = { ot: [{ id: 'law', label: 'The Law' }] };
+    expect(describeTab({ screen: 'scripture-genre', genreId: 'law' }).title).toBe('The Law');
+    g.SCRIPTURE_GENRES = { nt: [{ id: 'gospels', label: 'Gospels' }] };
+    expect(describeTab({ screen: 'scripture-genre', genreId: 'gospels' }).title).toBe('Gospels');
+  });
+
+  it('an entry collection falls back to Entry, and index collections name their index', () => {
+    g.colLetterArr = () => [];
+    expect(describeTab({ screen: 'blessed-entry', letterId: 'intro' }))
+      .toEqual({ title: 'Entry', subtitle: 'The Blessed', resolved: false });
+    g.COL_BY_INDEX_SC = new Map([
+      ['vot-index', { kind: 'letter', label: 'Volume Two' }],
+      ['blessed-index', { kind: 'blessed', label: 'The Blessed' }],
+    ]);
+    expect(describeTab({ screen: 'vot-index' })).toEqual({ title: 'Volume Two', subtitle: 'Letter index', resolved: true });
+    expect(describeTab({ screen: 'blessed-index' })).toEqual({ title: 'The Blessed', subtitle: 'Entry index', resolved: true });
+  });
+
+  it('names the remaining Listen shelves and the Scripture Web', () => {
+    expect(describeTab({ screen: 'audio-library-volumes' }).subtitle).toBe('The Volumes of Truth');
+    expect(describeTab({ screen: 'audio-library-collection' }).subtitle).toBe('Recordings in one source');
+    expect(describeTab({ screen: 'audio-library-saved' }).subtitle).toBe('Saved recordings');
+    expect(describeTab({ screen: 'audio-library-bible' }).subtitle).toBe('The Bible');
+    expect(describeTab({ screen: 'audio-library-studies' }).subtitle).toBe('Bible/Letter Studies');
+    expect(describeTab({ screen: 'audio-library-songs' })).toEqual({ title: 'Songs of the Letters', subtitle: 'Sung by the flock', resolved: true });
+    expect(describeTab({ screen: 'scripture-web' })).toEqual({ title: 'The Scripture Web', subtitle: 'Cross-reference atlas', resolved: true });
+    expect(describeTab({ screen: 'studies-home' }).title).toBe('Studies');
+  });
+
+  it('study index and chapter screens resolve through the studies table, or fall back unresolved', () => {
+    g._studies = () => [
+      { slug: 'purity', title: 'Purity', chapters: [{ id: 'ch1', title: 'Chapter One' }] },
+      { slug: 'bare', title: 'Bare Study' },
+    ];
+    expect(describeTab({ screen: 'bible-study-index', studyId: 'purity' }))
+      .toEqual({ title: 'Purity', subtitle: 'Bible Letter Study', resolved: true });
+    expect(describeTab({ screen: 'bible-study-index', studyId: 'gone' }))
+      .toEqual({ title: 'Study', subtitle: 'Bible Letter Study', resolved: false });
+    expect(describeTab({ screen: 'bible-study-chapter', studyId: 'purity', studyChapterId: 'ch1' }))
+      .toEqual({ title: 'Chapter One', subtitle: 'Purity', resolved: true });
+    expect(describeTab({ screen: 'bible-study-chapter', studyId: 'purity', studyChapterId: 'gone' }))
+      .toEqual({ title: 'Study Chapter', subtitle: 'Purity', resolved: false });
+    expect(describeTab({ screen: 'bible-study-chapter', studyId: 'bare', studyChapterId: 'ch1' }))
+      .toEqual({ title: 'Study Chapter', subtitle: 'Bare Study', resolved: false });
+    expect(describeTab({ screen: 'bible-study-chapter', studyId: 'gone' }))
+      .toEqual({ title: 'Study Chapter', subtitle: 'Bible Letter Study', resolved: false });
+  });
+});
+
+describe('tabContentKey / scrollKeyForTab fallbacks (tests-7 item 8)', () => {
+  it('a scope without words still keys the search tab; volume and kind-only scopes spell out', () => {
+    const plain = tabContentKey({ screen: 'search' });
+    const byVolume = tabContentKey({ screen: 'search', searchScope: { volumeId: 'v2' } });
+    expect(byVolume).not.toBe(plain);
+    expect(byVolume.endsWith('|:v2|')).toBe(true);
+    const byKind = tabContentKey({ screen: 'search', searchScope: { kind: 'book' } });
+    expect(byKind.endsWith('|book:|')).toBe(true);
+    // A scope that is not an object, and words that are not a string, add nothing.
+    expect(tabContentKey({ screen: 'search', searchScope: 'book' })).toBe(plain);
+    expect(tabContentKey(/** @type {any} */ ({ screen: 'search', searchQuery: 42 }))).toBe(plain);
+  });
+
+  it('journal-editor keys on its entry like the viewer; a collection without a key keeps the plain key', () => {
+    expect(tabContentKey({ screen: 'journal-editor', journalEntryId: 'j9' }))
+      .not.toBe(tabContentKey({ screen: 'journal-editor', journalEntryId: 'j8' }));
+    expect(tabContentKey({ screen: 'journal-editor' })).toBe('journal-editor|||||||');
+    expect(tabContentKey({ screen: 'audio-library-collection' })).toBe('audio-library-collection|||||||');
+  });
+
+  it('scroll keys fall back to empty ids, and an Answers shelf keys on its group', () => {
+    expect(scrollKeyForTab({ screen: 'bible-study-chapter' })).toBe('study--');
+    expect(scrollKeyForTab({ screen: 'bible-idx' })).toBe('bible-idx-');
+    expect(scrollKeyForTab({ screen: 'bible-study-index' })).toBe('bible-study-index-');
+    expect(scrollKeyForTab({ screen: 'scripture-genre' })).toBe('scripture-genre-');
+    expect(scrollKeyForTab({ screen: 'answers-group', letterId: '5' })).toBe('answers-group-5');
+    expect(scrollKeyForTab({ screen: 'answers-group' })).toBe('answers-group-');
+  });
+
+  it('navOriginLabel is Home for an empty screen, a nameless title, and a describe that throws', () => {
+    const g = /** @type {any} */ (globalThis);
+    expect(navOriginLabel({ screen: '' })).toBe('Home');
+    g.COL_BY_INDEX_SC = new Map([['x-index', { kind: 'letter', label: '' }]]);
+    expect(navOriginLabel({ screen: 'x-index' })).toBe('Home');
+    // colLetterArr is not stubbed here: describing a letter tab throws, and
+    // Back must still speak a name.
+    expect(navOriginLabel({ screen: 'vot-letter', letterId: 'x' })).toBe('Home');
+  });
+});
+

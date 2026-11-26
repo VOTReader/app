@@ -479,3 +479,177 @@ describe('AudioLibraryStore — a full saved shelf (s09.3)', () => {
     expect(saved[saved.length - 1]).toMatchObject({ url: track(1).url, savedAt: 1 });
   });
 });
+/* votreader-tests-7 item 8: the guard arms no earlier case reached — junk
+   at the import boundary, junk tracks/ids at the mutators, and the
+   deferred (pre-load) returns of every mutator. */
+describe('AudioLibraryStore — guards and junk input (tests-7 item 8)', () => {
+  const sid = (n) => n.toString(16).padStart(12, '0');
+  const song = (n) => ({ key: 'song:' + sid(n), title: 'Song ' + n, sub: null, url: 'https://votreader.github.io/songs-1/' + sid(n) + '.mp3', readerCode: '', partLabel: 'Pop' });
+
+  it('normalizeAudioLibrary answers the empty library for anything that is not a record', () => {
+    const empty = { v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [], songKept: [] };
+    expect(normalizeAudioLibrary(null)).toEqual(empty);
+    expect(normalizeAudioLibrary('a library, honest')).toEqual(empty);
+    expect(normalizeAudioLibrary([track(1)])).toEqual(empty);
+    expect(normalizeAudioLibrary(42)).toEqual(empty);
+  });
+
+  it('a small import carrying the same recording twice keeps the newest copy only', () => {
+    const data = normalizeAudioLibrary({
+      saved: [{ ...track(1), title: 'Old copy', savedAt: 5 }, { ...track(1), title: 'New copy', savedAt: 9 }],
+      recent: [{ ...track(2), playedAt: 3 }, { ...track(2), playedAt: 7 }],
+    });
+    expect(data.saved).toHaveLength(1);
+    expect(data.saved[0]).toMatchObject({ title: 'New copy', savedAt: 9 });
+    expect(data.recent).toHaveLength(1);
+    expect(data.recent[0].playedAt).toBe(7);
+  });
+
+  it('junk tracks are refused by every recording mutator', () => {
+    expect(AudioLibraryStore.isSaved(null)).toBe(false);
+    expect(AudioLibraryStore.isSaved('not a track')).toBe(false);
+    expect(AudioLibraryStore.toggleSaved(null)).toBe(false);
+    expect(AudioLibraryStore.setSaved(null, true)).toBe(false);
+    AudioLibraryStore.recordPlayed(null);
+    AudioLibraryStore.recordPlayed({ url: 'https://example.test/x.mp3' });
+    expect(AudioLibraryStore.saved()).toEqual([]);
+    expect(AudioLibraryStore.recent()).toEqual([]);
+  });
+
+  it('setSaved on a song track writes the songs shelf, on and off', () => {
+    expect(AudioLibraryStore.setSaved(song(3), true)).toBe(true);
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(3)]);
+    expect(AudioLibraryStore.saved()).toEqual([]);
+    expect(AudioLibraryStore.setSaved(song(3), false)).toBe(false);
+    expect(AudioLibraryStore.songSaved()).toEqual([]);
+  });
+
+  it('undoEviction with a junk side does nothing; a pushed row already back is not duplicated; a dateless pushed row is stamped now', () => {
+    AudioLibraryStore.toggleSaved(track(1));
+    AudioLibraryStore.undoEviction(null, { ...track(2), savedAt: 3 });
+    AudioLibraryStore.undoEviction(track(2), /** @type {any} */ (null));
+    expect(AudioLibraryStore.saved().map((t) => t.url)).toEqual([track(1).url]);
+    // track(1) is already saved: putting it "back" must not add a second row.
+    AudioLibraryStore.undoEviction(track(9), { ...track(1), savedAt: 5 });
+    expect(AudioLibraryStore.saved()).toHaveLength(1);
+    // A pushed row whose savedAt did not survive is stamped with now, not 0.
+    AudioLibraryStore.undoEviction(track(9), { ...track(2), savedAt: 0 });
+    const saved = AudioLibraryStore.saved();
+    expect(saved).toHaveLength(2);
+    expect(saved[1]).toMatchObject({ url: track(2).url, savedAt: Date.now() });
+  });
+
+  it('restoreRecent ignores anything that is not a non-empty list', () => {
+    AudioLibraryStore.recordPlayed(track(1));
+    AudioLibraryStore.restoreRecent(null);
+    AudioLibraryStore.restoreRecent([]);
+    AudioLibraryStore.restoreRecent('rows');
+    expect(AudioLibraryStore.recent().map((t) => t.url)).toEqual([track(1).url]);
+  });
+
+  it('junk song ids are refused by every song mutator', () => {
+    expect(AudioLibraryStore.setSongSaved('not-an-id', true)).toBe(false);
+    AudioLibraryStore.recordSongPlayed('not-an-id');
+    expect(AudioLibraryStore.removeSongRecent('not-an-id')).toBe(false);
+    expect(AudioLibraryStore.songSaved()).toEqual([]);
+    expect(AudioLibraryStore.songRecent()).toEqual([]);
+  });
+
+  it('setSongsKept ignores a non-list, an empty list, and a list of junk; the same list twice is a no-op', () => {
+    AudioLibraryStore.setSongsKept(/** @type {any} */ ('kept, trust me'), true);
+    AudioLibraryStore.setSongsKept([], true);
+    AudioLibraryStore.setSongsKept(['nope', 42], true);
+    expect(AudioLibraryStore.songKept()).toEqual([]);
+    AudioLibraryStore.setSongsKept([sid(1), sid(2)], true);
+    AudioLibraryStore.setSongsKept([sid(1), sid(2)], true);   // already exactly so
+    expect(AudioLibraryStore.songKept()).toEqual([sid(1), sid(2)]);
+  });
+
+  it('setting the rate it already has answers the rate and changes nothing', () => {
+    expect(AudioLibraryStore.setPlaybackRate(1)).toBe(1);
+    expect(AudioLibraryStore.getPlaybackRate()).toBe(1);
+    AudioLibraryStore.setPlaybackRate(1.5);
+    expect(AudioLibraryStore.setPlaybackRate(1.5)).toBe(1.5);
+    expect(AudioLibraryStore.getPlaybackRate()).toBe(1.5);
+  });
+
+  it('reads during a queue replay are built fresh, not served from the memo', () => {
+    AudioLibraryStore.toggleSaved(track(1));
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(true);   // memo now warm
+    const store = /** @type {any} */ (AudioLibraryStore);
+    store._replaying = true;
+    try {
+      expect(AudioLibraryStore.saved().map((t) => t.url)).toEqual([track(1).url]);
+      expect(AudioLibraryStore.getPlays()).toBe(0);
+    } finally { store._replaying = false; }
+  });
+});
+
+describe('AudioLibraryStore — every mutator deferred before load (tests-7 item 8)', () => {
+  const sid = (n) => n.toString(16).padStart(12, '0');
+
+  /** @type {any} */ let putSpy;
+
+  /** Boot the store into 'degraded' with IndexedDB's answer held back.
+   *  @returns {Promise<(data: any) => Promise<void>>} lands the given record */
+  async function degradedBoot() {
+    /** @type {(v: any) => void} */ let answer = () => {};
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    AudioLibraryStore._resetForTests();
+    const hydrated = AudioLibraryStore._hydrate();
+    await vi.advanceTimersByTimeAsync(3000);
+    await hydrated;
+    expect(AudioLibraryStore.getState()).toBe('degraded');
+    return async (data) => {
+      getSpy.mockResolvedValue(data);
+      answer(data);
+      await vi.advanceTimersByTimeAsync(0);
+    };
+  }
+
+  const written = async () => {
+    for (let i = 0; i < 50 && !putSpy.mock.calls.some((c) => c[0] === 'vot-audio-library'); i++) await vi.advanceTimersByTimeAsync(10);
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('each deferred mutator answers from the empty overlay, then lands on the real record', async () => {
+    const land = await degradedBoot();
+    AudioLibraryStore.recordPlayed(track(1));
+    expect(AudioLibraryStore.countPlay()).toBe(1);          // the overlay's lower bound: the deferred play above is already on its shelf
+    expect(AudioLibraryStore.countCompletion()).toBe(1);    // deferred ops land on the overlay at once, so the reader sees them
+    expect(AudioLibraryStore.removeRecent(track(2).url)).toBe(true);
+    expect(AudioLibraryStore.clearRecent()).toEqual([]);
+    expect(AudioLibraryStore.setPlaybackRate(1.5)).toBe(1.5);
+    AudioLibraryStore.recordSongPlayed(sid(1));
+    expect(AudioLibraryStore.removeSongRecent(sid(2))).toBe(true);
+    AudioLibraryStore.setSongsKept([sid(3)], true);
+    AudioLibraryStore.restoreRecent([{ ...track(4), playedAt: 5 }]);
+    AudioLibraryStore.undoEviction(track(5), { ...track(6), savedAt: 7 });
+    await land({
+      v: 1, saved: [], recent: [{ ...track(2), playedAt: 9 }], rate: 1, plays: 0, completions: 0,
+      songSaved: [], songRecent: [sid(2)], songKept: [],
+    });
+    await written();
+    expect(AudioLibraryStore.getState()).toBe('loaded');
+    // Replay order is call order: t1 played, t2 removed, shelf cleared, t4 restored.
+    expect(AudioLibraryStore.recent().map((t) => t.url)).toEqual([track(4).url]);
+    expect(AudioLibraryStore.getPlays()).toBe(1);
+    expect(AudioLibraryStore.getCompletions()).toBe(1);
+    expect(AudioLibraryStore.getPlaybackRate()).toBe(1.5);
+    expect(AudioLibraryStore.songRecent()).toEqual([sid(1)]);
+    expect(AudioLibraryStore.songKept()).toEqual([sid(3)]);
+    expect(AudioLibraryStore.saved()).toMatchObject([{ url: track(6).url, savedAt: 7 }]);
+  });
+
+  it('a deferred replaceAll lands as the whole library', async () => {
+    const land = await degradedBoot();
+    AudioLibraryStore.replaceAll({ saved: [{ ...track(3), savedAt: 42 }], rate: 0.75 });
+    await land({ v: 1, saved: [{ ...track(1), savedAt: 1 }], recent: [], rate: 2, plays: 0, completions: 0 });
+    await written();
+    expect(AudioLibraryStore.saved()).toMatchObject([{ url: track(3).url, savedAt: 42 }]);
+    expect(AudioLibraryStore.getPlaybackRate()).toBe(0.75);
+  });
+});
+
