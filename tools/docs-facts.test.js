@@ -9,7 +9,7 @@
    3. Every sha256 and byte count in VENDORED-LIBS.md's table matches the file
       on disk, so editing a vendored file without re-pinning it fails here. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,5 +53,29 @@ describe('docs state the current build facts', () => {
       if (got !== sha || buf.length !== Number(bytes)) off.push(rel + ' is ' + buf.length + ' B ' + got);
     }
     expect(off).toEqual([]);
+  });
+
+  // pipeline-4 (2026-11-26): ten ARCHITECTURE.md paths still named .js files that had become .jsx.
+  it('no doc cites a .js path that exists only as .jsx', () => {
+    const docs = ['ARCHITECTURE.md', 'BRIDGES.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'README.md',
+      ...readdirSync(resolve(ROOT, 'docs')).filter((f) => f.endsWith('.md')).map((f) => 'docs/' + f)];
+    const bad = [];
+    for (const doc of docs) {
+      read(resolve(ROOT, doc)).split('\n').forEach((line, i) => {
+        for (const m of line.matchAll(/([\w./-]+?)\.js\b(?!x)/g)) {
+          const rel = m[1] + '.js';
+          const at = [resolve(ASSETS, rel), resolve(ASSETS, 'src', rel), resolve(ROOT, rel)];
+          if (!at.some(existsSync) && at.some((p) => existsSync(p + 'x'))) bad.push(doc + ':' + (i + 1) + ' ' + rel);
+        }
+      });
+    }
+    expect(bad).toEqual([]);
+  });
+
+  // pipeline-4: deploys moved to two daily windows on 2026-10-23; README still said every push deploys.
+  it('README does not say every push deploys while deploy-web.yml publishes on a schedule', () => {
+    const wf = read(resolve(ROOT, '.github', 'workflows', 'deploy-web.yml'));
+    const readme = read(resolve(ROOT, 'README.md'));
+    if (/^\s+schedule:/m.test(wf)) expect(/every push to `?main`? deploys/i.test(readme)).toBe(false);
   });
 });

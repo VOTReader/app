@@ -40,7 +40,7 @@ already enumerates the 10 — this section mirrors it for greppability.
 ### `__openNote`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:177` — `() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }`
 - **Cleanup:** `delete window.__openNote` on hook teardown
-- **Consumers:** `renderer/annotation-engine.js` (tap on note mark or note icon), `ui/sheets/SelectionToolbar.js` (link-button + Note action)
+- **Consumers:** `renderer/annotation-engine.jsx` (tap on note mark or note icon), `ui/sheets/SelectionToolbar.jsx` (link-button + Note action)
 
 ### `__openLinkPicker`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:170` (paired effect with `openLinkPickerForTarget`)
@@ -50,7 +50,7 @@ already enumerates the 10 — this section mirrors it for greppability.
 ### `__openLinkPickerForTarget`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:171`
 - **Cleanup:** none (re-assigned each render)
-- **Consumers:** `ui/sheets/JournalInsertSheet.js` (Insert > Link), SelectionToolbar
+- **Consumers:** `ui/sheets/JournalInsertSheet.jsx` (Insert > Link), SelectionToolbar
 
 ### `__openLinkSidebar`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:181` — `delete` on cleanup
@@ -62,7 +62,7 @@ already enumerates the 10 — this section mirrors it for greppability.
 
 ### `__showMultiNote`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:183` — `delete` on cleanup
-- **Consumers:** `renderer/annotation-engine.js` (multi-icon merge with `data-count > 1`), SelectionToolbar (tap on note mark when multiple groupIds overlap)
+- **Consumers:** `renderer/annotation-engine.jsx` (multi-icon merge with `data-count > 1`), SelectionToolbar (tap on note mark when multiple groupIds overlap)
 
 ### `__openBookmarkPopover`
 - **Setter:** `src/hooks/use-sheet-orchestration.js:184` — `delete` on cleanup
@@ -127,7 +127,7 @@ setup effect.
 ### `__goSearch`
 - **Setter:** `index.html:1570` (useEffect, cleanup `= null` at :1571)
 - **Cleanup:** `window.__goSearch = null` on effect re-run
-- **Consumers:** `ui/sheets/SelectionToolbar.js:488` (Search-selection action)
+- **Consumers:** `ui/sheets/SelectionToolbar.jsx:488` (Search-selection action)
 
 ### `__songsBack`
 - **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build: the Songs screen's Back while `screen === 'audio-library-songs'`, else `null`)
@@ -164,7 +164,7 @@ setup effect.
 ### `__activeNoteGroup`
 - **Setter:** `index.html:1190` — written continuously, mirrors `noteSheetTarget.groupId`
 - **Cleanup:** none (always reflects current state — nulled when no sheet open)
-- **Consumers:** `renderer/annotation-engine.js:332,338` (drives `applyActiveNoteState` wavy-underline)
+- **Consumers:** `renderer/annotation-engine.jsx:332,338` (drives `applyActiveNoteState` wavy-underline)
 
 ### `__onReadingComplete`
 - **Setter:** `src/hooks/useMarkAsRead.js:72` — useEffect while the active reading

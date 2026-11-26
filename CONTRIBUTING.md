@@ -148,7 +148,7 @@ on them through the same corpus objects. The contract and its one race class are
 5. always: the packaged-APK asset check and the `ASSET_INTEGRITY` check.
 
 A docs-only commit runs step 5 and nothing else. There is no build-and-stage-first step before an `index.html` or
-`manifest.json` edit any more: the rebuild runs before the tests, so `service-worker.test.js` reads fresh hashes.
+`manifest.json` edit any more: the rebuild runs before the gates that read `dist/`.
 Never kill the hook while it runs `lint-staged`: that tool swaps the staged content into the working tree and keeps
 a backup in `git stash`, and a killed run leaves both behind (`git stash list` shows it).
 
