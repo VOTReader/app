@@ -125,6 +125,18 @@ function heldReading(run, n, startN, total) {
   return k < total && dayItems(run, k).length > 0;
 }
 
+/**
+ * Whether the run has an empty day before a day with readings: a plan spread over more days than it has readings
+ * (d682e8ed7). Every other plan (one reading day after another, an old short cut's empty last days included) keeps
+ * the days in a row, week strip and month calendar it had before spread-out plans (03d0ea090), exactly.
+ * @param {PlanRun} run
+ */
+export function hasEmptyDays(run) {
+  let empty = false;
+  for (const day of planDays(run)) { if (!day.parts.length) empty = true; else if (empty) return true; }
+  return false;
+}
+
 /** Reading days in [a, b] (dates as day numbers). */
 function readingDaysBetween(run, a, b) {
   const r = { ...run, paused: undefined };
@@ -473,13 +485,16 @@ export function streak(run, now) {
   // A plan spread over more days than it has readings (d682e8ed7) has empty days, and an old short cut left its last
   // days empty: a date holds a reading only when the plan's day for it has items. From today on that is the day the
   // schedule plans for the date; before today, one reading day each from the start, as the plan was laid out.
+  // Every other plan counts every reading day, as it always did (03d0ea090).
+  const spread = hasEmptyDays(run);
   const planned = new Set();
-  for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
-  const holds = (/** @type {number} */ n) => (n >= today ? planned.has(dateOf(n)) : heldReading(run, n, startN, total));
+  if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date) planned.add(d.date);
+  const holds = (/** @type {number} */ n) => (!spread ? n >= startN && isReadingDay({ ...run, paused: undefined }, n)
+    : n >= today ? planned.has(dateOf(n)) : heldReading(run, n, startN, total));
   let inRow = 0;
   for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
     if (done.has(dateOf(n))) { inRow++; continue; }
-    if (n === today || !isReadingDay(run, n) || !holds(n)) continue;
+    if (n === today || !isReadingDay(run, n) || (spread && !holds(n))) continue;
     break;
   }
   const sunday = today - weekdayOf(today);
@@ -496,7 +511,7 @@ export function streak(run, now) {
     const key = dateOf(n);
     const isDone = done.has(key);
     if (isDone) weekDone++;
-    const holdsReading = isDone || holds(n);
+    const holdsReading = (spread && isDone) || holds(n);
     if (holdsReading) weekDays++;
     const inPlan = n >= startN && (fin == null || n <= fin) && (stop == null || n < stop) && !(known != null && n < known);
     const off = inPlan && !isReadingDay(run, n);
@@ -523,9 +538,15 @@ export function monthCells(run, year, month, now) {
   const out = [];
   // The days still to read on the dates the schedule plans them (the one place a spread-out plan's empty days and a
   // next reading's spread day are laid out): a date is ahead only when its planned day holds a reading.
+  // Every other plan keeps 03d0ea090's calendar: each reading day up to the finish holds the next day, one each.
+  const spread = hasEmptyDays(run);
+  const nopause = { ...run, paused: undefined };
   /** @type {Map<string, number>} */ const plannedOn = new Map();
-  for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date && d.day >= st.day) plannedOn.set(d.date, d.day);
+  if (spread) for (const d of schedule(run, now)) if (!d.done && d.items.length && d.date && d.day >= st.day) plannedOn.set(d.date, d.day);
   const first = /** @type {number} */ (dayNum(year + '-' + String(month + 1).padStart(2, '0') + '-01'));
+  let planned = st.day;
+  // Planned days before this month's first future date: count the reading days from today up to it.
+  if (!spread && first > today) planned += readingDaysBetween(run, today + (st.doneToday ? 1 : 0), first - 1);
   for (let date = 1; date <= last; date++) {
     const n = first + date - 1;
     const key = dateOf(n);
@@ -535,12 +556,15 @@ export function monthCells(run, year, month, now) {
     else if (n === today) state = 'today';
     else if (n < today) {
       state = readOn.has(key) ? 'read'
-        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && heldReading(run, n, start, st.total) ? 'missed' : 'none');
+        : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) && (!spread || heldReading(run, n, start, st.total)) ? 'missed' : 'none');
     }
-    else if (!st.finished && end != null && n <= end && plannedOn.has(key)) {
+    else if (!st.finished && end != null && n <= end && (spread ? plannedOn.has(key) : isReadingDay(nopause, n))) {
       state = 'ahead';
-      day = /** @type {number} */ (plannedOn.get(key));
+      day = spread ? /** @type {number} */ (plannedOn.get(key)) : planned++;
     }
+    // Today's portion takes today only when today is a reading day: 03d0ea090 counted it on a day off too, so every
+    // day after one read one too high.
+    if (!spread && n === today && !st.doneToday && !st.finished && isReadingDay(nopause, n)) planned++;
     out.push({ date, weekday: weekdayOf(n), state, read: readOn.has(key), day });
   }
   return out;
