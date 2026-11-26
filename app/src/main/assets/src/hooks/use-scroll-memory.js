@@ -14,8 +14,8 @@
      - flushScrollToActiveTab   (React.useCallback, dep [updateActiveTab])
                                  Writes { y, pct } into the active tab's
                                  scrollPositions map for the current screen.
-     - Debounced scroll-listener effect (attaches to __scrollEl with 300 ms
-                                 re-poll; fires flushScrollToActiveTab after
+     - Debounced scroll-listener effect (one capture listener on the document,
+                                 filtered on __scrollEl; fires flushScrollToActiveTab after
                                  120 ms idle; stamps liveScrollRef per event).
      - Visibility/pagehide effect (flushes before OS kill or tab-switch).
      - Screen-change restore effect (commits liveScrollRef for the key being
@@ -377,15 +377,18 @@ export function useScrollMemory({
   }, [updateActiveTab]);
 
   // ── Effect 1: debounced scroll-listener attach ─────────────────────────
-  // Re-polls every 300 ms in case __scrollEl hasn't mounted yet.
+  // hooks-3 (audit 2026-11-23): one capture-phase listener on the document, filtered on __scrollEl, in place of a
+  // 300 ms poll that re-attached to each new container: no timer runs forever, and a new screen's first scrolls (in
+  // the poll's gap) are heard. Scroll events do not bubble, but they pass the document in the capture phase.
   React.useEffect(() => {
     let timeout;
-    let currentEl = null;
-    const onScroll = () => {
+    const onScroll = (/** @type {Event} */ e) => {
+      const currentEl = __scrollEl;
+      if (!currentEl || e.target !== currentEl) return;   // a sheet's or a list's own scroll is not the screen's
       // Exact-position stash, every event (ref write — no re-render). Skipped
       // while the tabs overview is open, mirroring the flush guard, so the
       // overview's own scrolling can't masquerade as screen position.
-      if (currentEl && !tabsOverviewOpenRef.current) {
+      if (!tabsOverviewOpenRef.current) {
         const y = currentEl.scrollTop;
         const max = Math.max(currentEl.scrollHeight - currentEl.clientHeight, 1);
         // s04.4: the anchor query (every data-hl-key, then a binary search of rects) ran on every scroll event.
@@ -401,16 +404,8 @@ export function useScrollMemory({
       clearTimeout(timeout);
       timeout = setTimeout(flushScrollToActiveTab, 120);
     };
-    const attach = () => {
-      if (__scrollEl !== currentEl) {
-        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-        currentEl = __scrollEl;
-        if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 300);
-    return () => {clearInterval(poll);if (currentEl) currentEl.removeEventListener("scroll", onScroll);clearTimeout(timeout);};
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {document.removeEventListener("scroll", onScroll, { capture: true });clearTimeout(timeout);};
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRefMirror ref read via .current — call-time fresh, stable object identity (same contract as in flushScrollToActiveTab above). liveScrollRef/scrollKeyRef are plain useRefs. Deps stay [flushScrollToActiveTab] so the listener re-attaches only when the flush identity changes.
   }, [flushScrollToActiveTab]);
 

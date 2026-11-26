@@ -48,6 +48,7 @@ function makeScrollEl() {
   const e = document.createElement('div');
   Object.defineProperty(e, 'scrollHeight', { value: 2000, configurable: true });
   Object.defineProperty(e, 'clientHeight', { value: 600, configurable: true });
+  document.body.appendChild(e);   // in the document, as the app's is: the hook listens at the document (hooks-3)
   return e;
 }
 
@@ -87,6 +88,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  document.body.replaceChildren();
   delete (/** @type {any} */ (globalThis).__scrollEl);
   delete (/** @type {any} */ (globalThis).COL_BY_LETTER_SC);
 });
@@ -97,6 +99,34 @@ describe('useScrollMemory — steady-state debounced capture', () => {
     settleRestoreRaf();
     act(() => { scrollTo(900); vi.advanceTimersByTime(150); });
     expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 900 });
+  });
+});
+
+describe('hooks-3: no poll for the scroll container', () => {
+  it('a container that mounts after the hook is heard from its first scroll, with no timer run', () => {
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const fresh = makeScrollEl();
+    /** @type {any} */ (globalThis).__scrollEl = fresh;   // a new screen's ScreenLayout ref
+    el = fresh;
+    act(() => { scrollTo(700); });                      // scrolled inside the old 300 ms poll gap
+    rerender(baseProps({ letterId: 'beta' }));          // and left at once
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 700 });
+  });
+  it('scrolls of other scrollers (a sheet, a list) are not the screen position', () => {
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const other = makeScrollEl();
+    other.scrollTop = 1200;
+    act(() => { other.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha']).toBeUndefined();
+  });
+  it('sets no interval', () => {
+    const spy = vi.spyOn(globalThis, 'setInterval');
+    const { unmount } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    expect(spy).not.toHaveBeenCalled();
+    unmount();
+    spy.mockRestore();
   });
 });
 
