@@ -850,8 +850,8 @@ function changeWeekdaysRaw(run, weekdays, now) {
   if (!run.pace) return next;
   // FIXB: a finish-by date already behind the re-cut start keeps the days left instead (it gave one day).
   const byEnd = run.pace.mode === 'by' ? dayNum(run.pace.date || '') : null;
-  return byEnd != null && byEnd >= recutStart(next, now) ? changePace(next, run.pace, now)
-    : changePace(next, run.pace, now, totalDays(run) - runStatus(run, now).day);
+  return byEnd != null && byEnd >= recutStart(next, now) ? changePaceRaw(next, run.pace, now)
+    : changePaceRaw(next, run.pace, now, totalDays(run) - runStatus(run, now).day);
 }
 
 /**
@@ -884,11 +884,12 @@ export function readCount(/** @type {PlanTrack[]} */ tracks, /** @type {(bid: st
  * carries over by its key with its own date (an undated, credited tick stays undated and counted); the reminder and the
  * download choice carry too. What is left is then cut at the plan's pace by changePace, so a length stays the whole
  * plan's ("90 days" with 40 read leaves 50) and a Finish by date stays that date; a paused plan stays paused. Day
- * notes are keyed by day number and stay on the old run. The caller keeps the old run, stopped, under Past plans.
+ * notes are keyed by day number and stay on the old run, and so do its pinned rest days (pinRests): the new run's
+ * days start today. The caller keeps the old run, stopped, under Past plans.
  * @param {PlanRun} run the plan as it is @param {{ plan: string, name?: string, tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays?: boolean[], pace: PlanPace }} spec its new contents and choices @param {Date} now @returns {PlanRun}
  */
-function replaceContentsRaw(run, spec, now) {
+export function replaceContents(run, spec, now) {
   const todayN = /** @type {number} */ (dayNum(todayKey(now)));
   const startN = dayNum(run.start);
   let next = newRun({ ...spec, startOn: startN != null && startN > todayN ? run.start : undefined }, now);
@@ -907,8 +908,8 @@ function replaceContentsRaw(run, spec, now) {
     const pace = next.pace;
     if (next.status !== 'finished' && pace && pace.mode === 'days') {
       const left = next.tracks.flatMap((t) => t.items).filter((it) => !(it.k in ticks));
-      next = changePace(next, pace, now, lengthDays(next, Math.max(1, Math.floor(Number(pace.n) || 1)), runStatus(run, now).day, left));
-    } else if (next.status !== 'finished' && pace) next = changePace(next, pace, now);
+      next = changePaceRaw(next, pace, now, lengthDays(next, Math.max(1, Math.floor(Number(pace.n) || 1)), runStatus(run, now).day, left));
+    } else if (next.status !== 'finished' && pace) next = changePaceRaw(next, pace, now);
   }
   if (next.status !== 'finished' && (run.status === 'paused' || run.paused)) next = pauseRun(next, now);
   return next;
@@ -941,8 +942,9 @@ export function canCountOwnOnly(run) {
   return !!run && (run.credited || 0) > 0 && run.from !== 'rp1' && (run.status === 'running' || run.status === 'paused');
 }
 
-/** Start today instead of a later start date: the plan's days move up with it. */
-function startTodayRaw(run, now) {
+/** Start today instead of a later start date: the plan's days move up with it. Only a plan not started yet moves, so
+    it has no past days to pin (pinRests). */
+export function startToday(run, now) {
   const st = runStatus(run, now);
   if (!st.notStarted) return run;
   const key = todayKey(now);
@@ -1110,11 +1112,6 @@ export const changePace = (run, pace, now, keepDays) => pinRests(run, changePace
 /** changeWeekdays, keeping the past rest days as they were (pinRests). @type {typeof changeWeekdaysRaw} */
 export const changeWeekdays = (run, weekdays, now) => pinRests(run, changeWeekdaysRaw(run, weekdays, now), now);
 
-/** replaceContents, keeping the past rest days as they were (pinRests). @type {typeof replaceContentsRaw} */
-export const replaceContents = (run, spec, now) => pinRests(run, replaceContentsRaw(run, spec, now), now);
-
-/** startToday, keeping the past rest days as they were (pinRests). @type {typeof startTodayRaw} */
-export const startToday = (run, now) => pinRests(run, startTodayRaw(run, now), now);
 
 /** resumeRun, keeping the past rest days as they were (pinRests). @type {typeof resumeRunRaw} */
 export const resumeRun = (run, now) => pinRests(run, resumeRunRaw(run, now), now);

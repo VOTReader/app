@@ -4,7 +4,7 @@
    histories with such changes, then checks that the month calendar and the week strip still say the same. */
 
 import { describe, it, expect } from 'vitest';
-import { dayNum, dateOf, newRun, tickItem, untickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, pauseRun, resumeRun } from './plan-engine.js';
+import { dayNum, dateOf, newRun, tickItem, untickItem, runStatus, monthCells, streak, isReadingDay, hasEmptyDays, catchUp, changePace, changeWeekdays, replaceContents, startToday, pauseRun, resumeRun } from './plan-engine.js';
 
 const at = (s, h = 12) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, h); };
 /** mulberry32. @param {number} seed */
@@ -153,5 +153,26 @@ describe('the fourth review: pinned rest days are kept as ranges', () => {
     expect(year(old)).toEqual(year(caught));
     expect(year(caught).filter((s) => s === 'missed').length).toBeGreaterThan(0);
     expect(streak(old, now)).toEqual(streak(caught, now));
+  });
+});
+
+describe('the fourth review: only a change with past days to keep pins them', () => {
+  const ruth = (/** @type {Date} */ made, /** @type {string} */ [startOn] = []) => newRun({ plan: 'custom', startOn, tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })) }], pace: { mode: 'days', n: 20 } }, made);
+  it('new contents on Dec 12 make a new run from today: the old run\'s pinned rest days stay on the old run', () => {
+    let run = ruth(at('2026-12-01'));
+    run = tickItem(run, 'ruth:1', '2026-12-03', 1);
+    run = tickItem(run, 'ruth:2', '2026-12-08', 1);
+    run = catchUp(run, at('2026-12-10'));
+    expect(run.rested && run.rested.until).toBe('2026-12-10');
+    const spec = { plan: 'custom', tracks: [{ kind: 'bible', by: 'count', items: [1, 2, 3, 4].map((c) => ({ k: 'ruth:' + c, w: 600 })).concat([{ k: 'jonah:1', w: 600 }]) }], pace: run.pace };
+    const next = replaceContents(run, spec, at('2026-12-12'));
+    expect(next.start).toBe('2026-12-12');
+    expect(next.ticks).toEqual(run.ticks);
+    expect(next.rested).toBeUndefined();
+  });
+  it('Start today on a plan made to start later has no past to pin', () => {
+    const run = startToday(ruth(at('2026-12-01'), ['2026-12-07']), at('2026-12-03'));
+    expect(run.start).toBe('2026-12-03');
+    expect(run.rested).toBeUndefined();
   });
 });
