@@ -183,6 +183,30 @@ describe('HistoryScreen — search', () => {
     expect(cardTitles()).toEqual(['The Wide Path']);
   });
 
+  // r3 review: the row says "Entry 31" for Words To Live By, so that is what finds it; an Answers topic shows no
+  // number, so none is indexed for it.
+  it('finds a Words To Live By row by the number it shows, and an Answers topic by no number', () => {
+    setupGlobals();
+    globalThis.COL_BY_INDEX_SC = new Map([
+      ['vol-one-idx', { label: 'Volume One', readKey: 'volume-one', volKey: 'one', kind: 'letter' }],
+      ['wtlb2-idx', { label: 'Words To Live By: Part Two', readKey: 'wtlb2', volKey: 'wtlb2', kind: 'wtlb' }],
+      ['answers-idx', { label: 'Answers Only God Can Give', readKey: 'answers', volKey: 'answers', kind: 'wtlb' }],
+    ]);
+    renderScreen([
+      letter('e31', 'Be Still', 31, today(10), { volumeScreen: 'wtlb2-idx' }),
+      letter('topic-a', 'A Topic', 412, today(20), { volumeScreen: 'answers-idx' }),
+      ...HISTORY,
+    ]);
+    type('entry 31');
+    expect(cardTitles()).toEqual(['Be Still']);
+    type('letter 31');
+    expect(cardTitles()).toEqual([]);
+    type('412');
+    expect(cardTitles()).toEqual([]);
+    type('letter 1');
+    expect(cardTitles()).toEqual(['The Wide Path']);
+  });
+
   it('ignores case and surrounding whitespace', () => {
     setupGlobals();
     renderScreen(HISTORY);

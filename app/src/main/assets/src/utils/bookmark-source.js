@@ -19,6 +19,7 @@
 
 /* ── Source label for a bookmark ─────────────────────────────── */
 import { _bookTitle } from './note-source.js';
+import { itemNumber } from './item-noun.js';
 
 export function _bookmarkSourceLabel(hlKey) {
   if (!hlKey) return 'Bookmark';
@@ -89,14 +90,18 @@ export function _bookmarkSourcePlace(hlKey) {
   return '';
 }
 
-/* POL5: a letter's number for that line ("Volume One · Letter 1", mock v2 l-book); '' where it has none (a
-   preface, a Holy Days or Blessed entry, a chapter, which already says its number in its name). */
+/* POL5: a piece's number for that line, in its collection's words as History says it ("Volume One · Letter 1",
+   "Words To Live By: Part Two · Entry 31", mock v2 l-book); '' where it has none (a preface, a Holy Days or Blessed
+   entry, a chapter, which already says its number in its name, or an Answers topic, which is keyed wtlb: too). */
 export function _bookmarkSourceNumber(hlKey) {
   var parts = String(hlKey || '').split(':');
   if (parts[0] !== 'letter' && parts[0] !== 'wtlb') return '';
   var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], parts[0]) : null;
   var num = ctx && ctx.entry ? ctx.entry.num : null;
-  return num ? 'Letter ' + num : '';
+  if (!num) return '';
+  var cols = typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY && typeof COL_BY_KEY.values === 'function' ? Array.from(COL_BY_KEY.values()) : [];
+  var col = cols.find(function(c) { return c && ctx.collection && c.label === ctx.collection; }) || { kind: ctx.kind || parts[0] };
+  return itemNumber(col, num) || '';
 }
 
 export function _bookmarkSourceEndpoint(hlKey) {

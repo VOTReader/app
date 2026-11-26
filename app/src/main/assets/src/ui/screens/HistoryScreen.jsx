@@ -11,6 +11,7 @@ import { ActionSheet } from '../components/SelectField.jsx';
 import { EmptyState } from '../components/UiParts.jsx';
 import { ListSearch } from '../components/LibraryList.jsx';
 import { countOf } from '../../utils/download-tree.js';
+import { historyEntryWords } from '../components/HistoryEntryCard.jsx';
 
 /**
  * Everything about one entry a reader might type to find it again, lowercased
@@ -31,7 +32,8 @@ function _entrySearchText(entry) {
   const parts = [];
   if (entry.type === 'letter') {
     const col = entry.volumeScreen && typeof COL_BY_INDEX_SC !== 'undefined' ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
-    parts.push(col ? col.label : '', entry.letterTitle, 'Letter ' + entry.letterNum, entry.letterId);
+    // The number as the row shows it ("Entry 31" in Words To Live By, none for an Answers topic), so it finds the row.
+    parts.push(col ? col.label : '', entry.letterTitle, historyEntryWords(entry).num, entry.letterId);
   } else if (entry.type === 'study-chapter') {
     parts.push(entry.studyTitle, entry.studySlug, entry.chapterTitle, 'Part ' + entry.chapterNum);
   } else {

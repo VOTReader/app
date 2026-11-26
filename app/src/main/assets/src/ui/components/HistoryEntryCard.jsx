@@ -7,10 +7,7 @@
    screen, which can resolve one book per render instead of one per row. */
 import { timeAgo } from '../../utils/dates.js';
 import { ListRow } from './UiParts.jsx';
-import { itemNoun } from '../../utils/item-noun.js';
-
-/** The volKey of the collection whose pieces carry no number a reader would know (an Answers topic). */
-const UNNUMBERED = new Set(['answers']);
+import { itemNumber } from '../../utils/item-noun.js';
 
 /**
  * How a History row names a place, shared with the Read tab's Continue and the Library's Recently read
@@ -39,9 +36,7 @@ export function historyEntryWords(entry) {
   const label = (isStudy
     ? (typeof studyAbbrev === 'function' ? studyAbbrev(entry.studySlug, entry.studyTitle) : entry.studyTitle)
     : isLetter ? (col ? col.label : legacyVol) : entry.bookTitle) || '';
-  const noun = isLetter ? itemNoun(col, 1) : isStudy ? 'part' : 'chapter';
-  const num = isLetter && col && UNNUMBERED.has(col.volKey) ? null
-    : n != null && n !== '' ? noun.charAt(0).toUpperCase() + noun.slice(1) + ' ' + n : null;
+  const num = isLetter ? itemNumber(col, n) : n != null && n !== '' ? (isStudy ? 'Part ' : 'Chapter ') + n : null;
   return { title, label, num, fallback: num || label || (isLetter ? 'Letter' : isStudy ? 'Part' : 'Chapter') };
 }
 

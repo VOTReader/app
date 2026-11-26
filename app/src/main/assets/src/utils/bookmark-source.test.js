@@ -214,7 +214,7 @@ describe('_bookmarkSourceNumber', () => {
   it('only letter and wtlb keys carry a number', () => {
     G.findEntryContext = () => ({ entry: { num: 7 } });
     expect(_bookmarkSourceNumber('letter:abc')).toBe('Letter 7');
-    expect(_bookmarkSourceNumber('wtlb:abc')).toBe('Letter 7');
+    expect(_bookmarkSourceNumber('wtlb:abc')).toBe('Entry 7');
     expect(_bookmarkSourceNumber('blessed:abc')).toBe('');
     expect(_bookmarkSourceNumber('bible:john:3:16')).toBe('');
     expect(_bookmarkSourceNumber('')).toBe('');
@@ -230,6 +230,24 @@ describe('_bookmarkSourceNumber', () => {
     expect(_bookmarkSourceNumber('letter:x')).toBe('');
     G.findEntryContext = () => null;
     expect(_bookmarkSourceNumber('letter:x')).toBe('');
+  });
+
+  // r3 review: a WTLB bookmark said "Letter 31" while History said "Entry 31", and an Answers topic (keyed wtlb: too,
+  // AnswersTopic.jsx) showed its place in the file as a number. The line now says what History says.
+  it('names the number in its collection\'s words, and gives an Answers topic none', () => {
+    G.COL_BY_KEY = new Map([
+      ['wtlb2', { volKey: 'wtlb2', kind: 'wtlb', label: 'Words To Live By: Part Two' }],
+      ['answers', { volKey: 'answers', kind: 'wtlb', label: 'Answers Only God Can Give' }],
+      ['one', { volKey: 'one', kind: 'letter', label: 'Volume One' }],
+    ]);
+    try {
+      G.findEntryContext = () => ({ kind: 'wtlb', collection: 'Words To Live By: Part Two', entry: { num: 31 } });
+      expect(_bookmarkSourceNumber('wtlb:e31')).toBe('Entry 31');
+      G.findEntryContext = () => ({ kind: 'wtlb', collection: 'Answers Only God Can Give', entry: { num: 412 } });
+      expect(_bookmarkSourceNumber('wtlb:a-topic')).toBe('');
+      G.findEntryContext = () => ({ kind: 'letter', collection: 'Volume One', entry: { num: 4 } });
+      expect(_bookmarkSourceNumber('letter:l4')).toBe('Letter 4');
+    } finally { delete G.COL_BY_KEY; }
   });
 
   it('no resolver loaded means no number', () => {
