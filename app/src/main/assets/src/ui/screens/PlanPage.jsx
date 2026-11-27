@@ -250,7 +250,7 @@ function CatchUpSheet({ run, now, onClose, onReadTwo }) {
 
 /**
  * @param {{ run: any, now: Date, settingsOpen: boolean, onSettings: (open: boolean) => void, catchUpAtOpen?: boolean, onStartOver?: () => void,
- *   onRead: (day: number, k?: string, span?: number) => void, onListen?: (refs: any[], name: string) => void, tracksOf?: (refs: any[]) => any[],
+ *   onRead: (day: number, k?: string, span?: number) => void, onListen?: (refs: any[], name: string, runId?: string) => void, tracksOf?: (refs: any[]) => any[],
  *   onSchedule: (at?: number) => void, onDaySheet: (day: number) => void, onNote?: (day: number) => void, noteOf?: (day: number) => string | null,
  *   onStopped: (prev: any) => void, name: string, onEdit?: () => void, onOwnOnly?: () => void }} props
  *   catchUpAtOpen: open on Catch up (Home's and the list's "N days behind")
@@ -341,7 +341,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, catchUpAtOpen = f
           <button type="button" className="ui-btn is-primary" onClick={() => onRead(st.day)}>{st.todayTicked ? 'Continue reading' : 'Start reading'}</button>
           {onListen && listenRefs.length ? (
             <PlanListen refs={listenRefs} tracksOf={tracksOf} label={'Listen to today: ' + itemsLabel(left, bookTitle)}
-              onListen={() => onListen(listenRefs, name)} />
+              onListen={() => onListen(listenRefs, name, run.id)} />
           ) : null}
         </div>
       </div>

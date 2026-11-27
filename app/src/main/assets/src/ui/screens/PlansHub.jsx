@@ -116,7 +116,7 @@ const MANAGE_TOAST = 'vot-toast-plan-manage';
 
 /**
  * @param {{ readingPlans?: any, isRead: (bid: string, cid: any) => boolean, onPlansMoved?: (left: any[]) => void,
- *   onBack: () => void, backLabel?: string, onSearch?: () => void, onListen?: (refs: any[], name: string) => void,
+ *   onBack: () => void, backLabel?: string, onSearch?: () => void, onListen?: (refs: any[], name: string, runId?: string) => void,
  *   planTracks?: (refs: any[]) => any[], onNote?: (entryId: string) => void,
  *   onStartSession: (runId: string, day: number, k?: string, span?: number) => void }} props
  */

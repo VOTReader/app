@@ -388,11 +388,14 @@ export function buildScreenRoutes({
   // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
   // stops when the portion ends: each Bible chapter in the reader's audio edition, each letter in its
   // collection's recording. Items with no recording are passed over; with none, Read opens the first.
-  const listenPlanItem = (refs, label) => {
+  // plan-own: runId names the plan whose Listen this is, so a plan that counts only its own reading counts these listens.
+  const listenPlanItem = (refs, label, runId) => {
     const list = (Array.isArray(refs) ? refs : refs ? [refs] : []).filter(Boolean);
     if (!list.length) return;
     const items = planPortion(list);
     const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
+    const ps = _planStore();
+    if (started && typeof runId === 'string' && ps && typeof ps.setListening === 'function') ps.setListening({ runId, keys: list.map((r) => r.bid + ':' + r.cid) });
     if (!started) openPlanItem(list[0]);
   };
   // plans2 3.5: a reading session, one sitting of one plan day (utils/plan-session.js). It opens the item tapped, else

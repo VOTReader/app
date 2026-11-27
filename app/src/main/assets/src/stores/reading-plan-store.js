@@ -55,13 +55,17 @@ const _begun = (/** @type {any} */ r, /** @type {string} */ key) => !(typeof r.s
 /** @typedef {{ bid: string, cid: string | number, runIds: string[] }} PlanOffer a plan item finished from elsewhere, not counted */
 /** @type {PlanSitting | null} */
 let _sitting = null;
+/** The portion a plan's own Listen is playing (its run, the readings left to finish, and the day it began): a full listen
+    of one of them is "opened from the plan" too. @type {{ runId: string, keys: string[], on: string } | null} */
+let _listening = null;
 /** @type {Set<(o: PlanOffer) => void>} */
 const _offerSubs = new Set();
 
 /** The keys of (bid, cid) this run counts now: all of them when it counts reading from anywhere, else the ones its open sitting holds.
     @param {any} r @param {string[]} keys */
-const _countable = (r, keys) => (countsAnywhere(r) ? keys
-  : _sitting && _sitting.runId === r.id ? keys.filter((k) => /** @type {PlanSitting} */ (_sitting).keys.includes(k)) : []);
+const _countable = (r, keys) => (countsAnywhere(r) ? keys : keys.filter((k) =>
+  (_sitting && _sitting.runId === r.id && _sitting.keys.includes(k))
+  || (_listening && _listening.runId === r.id && _listening.on === todayKey(new Date()) && _listening.keys.includes(k))));
 
 export const ReadingPlanStore = extendStore(
   CachedStore('vot-reading-plans', /** @type {PlanRun[]} */ ([]), { idb: true, crossTabMerge: mergePlanStore }),
@@ -140,6 +144,12 @@ export const ReadingPlanStore = extendStore(
         if (out !== r) changed = true;
         return out;
       });
+      // A reading of the plan's Listen counted once is done with: a later read of it elsewhere is elsewhere.
+      if (_listening && !(/** @type {any} */ (this))._replaying) {
+        const l = _listening;
+        _listening = { ...l, keys: l.keys.filter((k) => !keys.includes(k) || !live.some((r) => r.id === l.runId && hasIt(r))) };
+        if (!_listening.keys.length) _listening = null;
+      }
       if (changed) {
         this._cache = next;
         this._save();
@@ -160,6 +170,16 @@ export const ReadingPlanStore = extendStore(
      */
     setSitting(s) {
       _sitting = s && typeof s.runId === 'string' && Array.isArray(s.keys) ? { runId: s.runId, keys: s.keys.slice() } : null;
+    },
+
+    /**
+     * A plan's own Listen started playing these readings (screen-routes listenPlanItem): a full listen of one of them,
+     * today, counts for that plan even when it counts only its own reading. null forgets it.
+     * @param {{ runId: string, keys: string[] } | null} l
+     */
+    setListening(l) {
+      _listening = l && typeof l.runId === 'string' && Array.isArray(l.keys) && l.keys.length
+        ? { runId: l.runId, keys: l.keys.slice(), on: todayKey(new Date()) } : null;
     },
 
     /**
