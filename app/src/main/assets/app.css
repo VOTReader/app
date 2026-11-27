@@ -8948,6 +8948,24 @@ body.light .install-ask-go { color: #fff; }
     .vot-large-text .listen-coll .listen-rec > .ui-row-main { flex: 1 1 100%; }
     .vot-large-text .listen-coll .listen-rec.is-split > .ui-row-main { flex: 1 1 calc(100% - var(--icon-chip) - 14px); }   /* fix list 28: the Play stays beside the name */
     .vot-large-text .listen-coll .listen-rec > .ui-row-main + :is(.ui-row-star, .ui-row-menu) { margin-left: auto; }
+    /* Below large text a collection row keeps Play, star and menu beside the name, and a long word in the name
+       ("Misinterpretation", or a number set against its word, "147Contentions") broke in the middle once the
+       name's share got too small. Each row now wraps its star and menu under the name on its own, at the exact
+       width where its own longest word would no longer fit: the name's flex basis is its min-content (the meta
+       line, which ellipsises, adds none). The star carries the menu's room (its outer 36 px and the 14 px gap) as a
+       right margin that the menu takes back as a negative left margin, so the star fits on the first line only when
+       the menu does too, and both sit exactly where they did; a wrapped pair is packed right by justify-content.
+       The name still grows to fill its line and may still shrink, so a word wider than the whole row breaks as
+       before instead of pushing the row wide. A row whose words fit stays as it was, at every size. */
+    @supports (flex-basis: min-content) {
+      :root:not(.vot-large-text) .listen-coll .listen-rec { flex-wrap: wrap; justify-content: flex-end; }
+      :root:not(.vot-large-text) .listen-coll .listen-rec > .ui-row-main { flex-basis: min-content; max-width: 100%; }   /* grow and shrink stay 1 from .ui-row-main */
+      :root:not(.vot-large-text) .listen-coll .listen-rec.is-split > .ui-row-main { max-width: calc(100% - var(--icon-chip) - 14px); }
+      :root:not(.vot-large-text) .listen-coll .listen-rec .ui-row-meta { contain: inline-size; }
+      :root:not(.vot-large-text) .listen-coll .listen-rec > .ui-row-star:has(+ .ui-row-menu) { margin-right: calc(-4px + var(--tap) - 8px + 14px); }
+      :root:not(.vot-large-text) .listen-coll .listen-rec > .ui-row-star + .ui-row-menu { margin-left: calc(-1 * (var(--tap) - 8px + 14px)); }
+    }
+    /* An engine without flex-basis: min-content keeps the rows as they were. */
     .vot-large-text :is(.listen-coll-actions, .songs-list-actions) { grid-template-columns: minmax(0, 1fr); }   /* 11-18: the Songs list's Play all + Shuffle ran off the right edge at 2.0 */
     .screen-layout:has(> .screen-scroll .listen-coll) > .top-nav > .bar-title { white-space: normal; overflow-wrap: break-word; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .listen-rec .ui-row-meta .coverage-badge { margin-left: var(--sp-2); }
