@@ -3444,7 +3444,7 @@
     .plan-opt + .plan-opt { border-top: 1px solid var(--border); }
     .plan-opt-label { flex: none; width: 4.6rem; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 600; }
     .plan-opt-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-    .plan-opt-text { flex: 1 1 auto; color: var(--cream); font-size: var(--fs-16); }
+    .plan-opt-text { flex: 1 1 auto; color: var(--cream); font-family: var(--pl-ui, var(--font-ui)); font-size: var(--fs-16); }
     .plan-opt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
     /* plan-own: the Counting switch stays beside its words at large text; the words wrap instead (200%: it dropped to a line of its own) */
     .plan-count-line { flex-wrap: nowrap; }
