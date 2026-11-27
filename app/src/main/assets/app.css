@@ -2265,7 +2265,7 @@
     .meta-spoken { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
     .meta-for { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
     .meta-note { font-size:var(--fs-14); color:var(--gold-dim); font-style:italic; margin-top:0.4rem; }
-    .meta-preamble { margin-top:0.6rem; font-size:var(--fs-15); color:var(--cream-muted); font-style:italic; line-height:1.6; border-top:1px solid var(--gold-border); padding-top:0.6rem; }
+    .meta-preamble { margin-top:1rem; font-size:var(--fs-15); color:var(--cream-muted); font-style:italic; line-height:1.6; } /* text-plain D02: no hairline above (Corbin 2026-11-26); 1rem keeps the gap the rule and its padding made */
     .meta-addendum { font-size:var(--fs-14); color:var(--gold-dim); font-style:italic; margin-top:0.4rem; }
     .meta-addendum a { color:var(--gold); text-decoration:none; }
     @media (hover: hover) { .meta-addendum a:hover { color:var(--gold-bright); } }
