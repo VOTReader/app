@@ -3914,7 +3914,7 @@
        real height after its first paint, so the placeholder estimate only affects
        the very first scroll past it (minimal jank). chrome108 floor supports it. */
     .section-block { margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 500px; }
-    .section-heading { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
+    .section-heading { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.8rem; } /* text-plain D06: no underline (Corbin 2026-11-26) */
     /* Poetic books (Psalms, Proverbs, etc.) render each verse on its own line */
     .verses-block.is-poetry .verse { display:block; margin-bottom:0.5rem; text-indent:0; padding-left:1.8rem; position:relative; }
     .verses-block.is-poetry .verse .verse-num { position:absolute; left:0; top:0.15rem; }

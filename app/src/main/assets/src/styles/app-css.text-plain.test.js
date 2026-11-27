@@ -70,3 +70,10 @@ describe('D03: a section intro has no gold bar down its left side', () => {
     for (const r of rules) expect(r.block).not.toMatch(/padding(-left)?:[^;]*var\(--sp-4\)/);
   });
 });
+
+describe('D06: a Bible section heading is not underlined', () => {
+  it('.section-heading draws no bottom border', () => {
+    expect(rulesFor('section-heading').length).toBeGreaterThan(0);
+    expect(lines('section-heading', 'bottom')).toEqual([]);
+  });
+});
