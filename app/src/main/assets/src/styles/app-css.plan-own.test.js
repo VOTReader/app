@@ -16,4 +16,7 @@ describe('the Counting line (plan-own)', () => {
   it('the note under it uses the UI font in the custom builder too (no --pl-ui there)', () => {
     expect(block('.plan-opt-note')).toContain('font-family: var(--pl-ui, var(--font-ui));');
   });
+  it("the switch's words and the other lines of the card ('Finish by', 'Keep the next 7 days') use the UI font, as Start, Length and Days do", () => {
+    expect(block('.plan-opt-text')).toBe('flex: 1 1 auto; color: var(--cream); font-family: var(--pl-ui, var(--font-ui)); font-size: var(--fs-16);');
+  });
 });
