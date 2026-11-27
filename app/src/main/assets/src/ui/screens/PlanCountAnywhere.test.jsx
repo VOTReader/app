@@ -37,7 +37,7 @@ describe('the start sheet: Count reading from anywhere', () => {
     render(<PlansHub {...base()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
     expect(sw().getAttribute('aria-checked')).toBe('false');
-    expect(screen.getByText('Only what you open from this plan counts toward it.')).toBeTruthy();
+    expect(screen.getByText('Only what you open from this plan counts.')).toBeTruthy();
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start plan' })); });
     expect(ReadingPlanStore.active()[0].countAnywhere).toBe(false);
   });
@@ -47,7 +47,7 @@ describe('the start sheet: Count reading from anywhere', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
     fireEvent.click(sw());
     expect(sw().getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByText('A chapter or letter in this plan counts wherever you read it.')).toBeTruthy();
+    expect(screen.getByText('Its readings count wherever you read them.')).toBeTruthy();
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start plan' })); });
     expect(ReadingPlanStore.active()[0].countAnywhere).toBe(true);
   });
