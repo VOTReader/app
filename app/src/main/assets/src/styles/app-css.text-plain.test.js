@@ -90,3 +90,10 @@ describe('D10: an Answers section heading has no hairline above it', () => {
     expect(dropped).toEqual([]);
   });
 });
+
+describe('D11: the ✦ in an Answers topic (from the source text) has no lines either side', () => {
+  it('.ans-orn draws nothing before or after its ✦', () => {
+    const drawn = [...rulesFor('ans-orn', '::before'), ...rulesFor('ans-orn', '::after')].filter((r) => /content:/.test(r.block) && !/content:\s*none/.test(r.block));
+    expect(drawn.map((r) => r.sel)).toEqual([]);
+  });
+});
