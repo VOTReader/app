@@ -2188,9 +2188,9 @@
       .bottom-nav-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); overflow-wrap: break-word; }
       .bottom-nav-title { font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); line-height: 1.35; margin-top: 3px; }
       /* ── ORNAMENT DIVIDER ── */
-      .ornament-divider { display: flex; align-items: center; gap: 0.75rem; margin: 2.5rem 0 1.5rem; }
-      .ornament-divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent); }
-      .ornament-divider-symbol { font-family: 'Cinzel', serif; font-size: var(--fs-12); color: var(--gold-dim); letter-spacing: 0.15em; }
+      /* text-plain D05 (Corbin 2026-11-26): the ✦ divider after the last line is gone; its space stays. min-height keeps
+         the two margins from collapsing into one on an empty box. */
+      .reading-end-gap { min-height: 1px; margin: 2.5rem 0 1.5rem; }
       /* ── ANIMATIONS ── */
       /* ── INLINE NOTES (studies pass 3, hub 2026-11-18) ──
          "Study notes: In the text": a verse's notes are one card of rows under it, in the parts the chapter's end
@@ -2706,10 +2706,6 @@
     @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
     /* ── FOOTNOTE LIST ── */
     .footnote-list { margin-top:var(--label-above); }
-    /* The ✦ ornament IS the finishing rule (owner directive 2026-08-06): when
-       the footnote list sits directly under it (letters that END on a
-       standalone "Says The Lord." closing), the list's own top border would
-       stack a second line under the ornament — drop it and tighten up. */
 
     /* Read-along: the sentence currently being read aloud (CSS Custom
        Highlight API — no DOM mutation; only these properties apply). */
@@ -6498,7 +6494,7 @@
     .settings-section-label, .bottom-nav-card,
     .back-hint-row, .mini-title, .tabs-overview-meta,
     .audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .chapter-nav-sticky, .vot-toast, .scroll-notch-marker,
-    .ornament-divider, .install-card-sentinel {
+    .install-card-sentinel {
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     input, textarea { user-select: text; -webkit-user-select: text; }

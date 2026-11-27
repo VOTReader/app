@@ -443,13 +443,9 @@ export function BibleChapterView(props) {
               </div>
             ));
           })()}
-          {/* Reading-end sentinel: end of verses, before ornament and nav. */}
+          {/* Reading-end sentinel: end of verses, before the gap and nav. text-plain D05: no ✦ divider (Corbin 2026-11-26). */}
           <div className="reading-end" />
-          <div className="ornament-divider" aria-hidden="true">
-            <div className="ornament-divider-line" />
-            <div className="ornament-divider-symbol">✦</div>
-            <div className="ornament-divider-line" />
-          </div>
+          <div className="reading-end-gap" aria-hidden="true" />
           <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
           {planNav ? null : <EndNav
             prev={prevCh ? { label: 'Previous chapter', title: `${book.title} ${prevCh.num}`, onClick: () => onNavigate(prevCh.num) }

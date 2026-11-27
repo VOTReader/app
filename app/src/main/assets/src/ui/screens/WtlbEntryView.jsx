@@ -619,11 +619,8 @@ export function WtlbEntryView(props) {
               </div>
             )}
 
-            <div className="ornament-divider" aria-hidden="true">
-              <div className="ornament-divider-line" />
-              <div className="ornament-divider-symbol">✦</div>
-              <div className="ornament-divider-line" />
-            </div>
+            {/* text-plain D05: no ✦ divider; the gap keeps its space (Corbin 2026-11-26) */}
+            <div className="reading-end-gap" aria-hidden="true" />
             {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
 
             {/* End matter (W3-14: an entry had none). Songs of the Letters (L4): the songs made from this entry.

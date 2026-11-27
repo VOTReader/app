@@ -54,6 +54,17 @@ describe('LetterView: the end of a letter (UX wave 3)', () => {
     expect(order).toEqual(['related-section', 'bottom-nav']);
   });
 
+  /* text-plain D05 (Corbin 2026-11-26 "Go and do the star"): no ✦ divider under the text; an empty gap keeps its space. */
+  it('the text ends with no star divider; a plain gap holds the space above Mark as read', () => {
+    const { container } = view({ onMarkRead: () => {}, isRead: () => false });
+    expect(container.querySelector('.ornament-divider')).toBeNull();
+    expect(container.textContent).not.toContain('✦');
+    const gap = container.querySelector('.reading-end + .reading-end-gap');
+    expect(gap).not.toBeNull();
+    expect(gap.textContent).toBe('');
+    expect(gap.nextElementSibling.className).toBe('mark-read-row');
+  });
+
   it('Mark as read marks it; once read it says Read and Undo takes it back (U01.1)', () => {
     const onMarkRead = vi.fn();
     const onUnmark = vi.fn();

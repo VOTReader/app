@@ -636,19 +636,9 @@ export function LetterView(props) {
             {/* Reading-end sentinel: positioned at the actual end of body text. */}
             <div className="reading-end" />
 
-            {/* Ornament placement (owner directive 2026-08-05): when the letter
-                ENDS on a standalone closing block ("Says The Lord."), the ✦
-                belongs directly under it — not pushed below the footnote list.
-                A letter whose last block is ordinary text (closing phrase
-                inline mid-paragraph, or no closing at all) keeps the divider in
-                its old spot between footnotes and the prev/next cards. */}
-            {/* W2d r-end (mock v2): one ✦ under the text whatever the last block is, then Marked as read,
-                then the footnotes (they sat between the text and the ✦). */}
-            <div className="ornament-divider" aria-hidden="true">
-              <div className="ornament-divider-line" />
-              <div className="ornament-divider-symbol">✦</div>
-              <div className="ornament-divider-line" />
-            </div>
+            {/* text-plain D05 (Corbin 2026-11-26: "Go and do the star"): the ✦ divider that sat here (the 08-05 finishing
+                rule) is gone; this empty gap keeps its 2.5rem / 1.5rem of space before Mark as read and the footnotes. */}
+            <div className="reading-end-gap" aria-hidden="true" />
 
             {!studyMode && markAsReadEnabled && onMarkRead && isRead ? (
               <MarkReadRow read={isRead(letter.id)} onMark={() => onMarkRead()} onUndo={onUnmark} />

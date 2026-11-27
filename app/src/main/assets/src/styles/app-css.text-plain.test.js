@@ -97,3 +97,21 @@ describe('D11: the ✦ in an Answers topic (from the source text) has no lines e
     expect(drawn.map((r) => r.sel)).toEqual([]);
   });
 });
+
+describe('D05: no star divider after the last line of a reading (Corbin 2026-11-26: "Go and do the star")', () => {
+  const src = (p) => readFileSync(resolve(here, '..', 'ui', 'screens', p), 'utf8');
+  it.each(['LetterView.jsx', 'WtlbEntryView.jsx', 'BibleChapterView.jsx'])('%s draws no ✦ divider, only the plain gap', (f) => {
+    const s = src(f);
+    expect(s).not.toMatch(/ornament-divider/);
+    expect(s).not.toMatch(/>✦</);
+    expect(s).toMatch(/className="reading-end-gap"/);
+  });
+  it('app.css keeps the divider\'s space for the gap and has no divider rules left', () => {
+    expect(rulesFor('ornament-divider')).toEqual([]);
+    expect(rulesFor('ornament-divider-line')).toEqual([]);
+    const gap = rulesFor('reading-end-gap');
+    expect(gap.length).toBe(1);
+    expect(gap[0].block).toMatch(/margin:\s*2\.5rem 0 1\.5rem/);
+    expect(gap[0].block).not.toMatch(/border|background/);
+  });
+});
