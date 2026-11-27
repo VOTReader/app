@@ -77,3 +77,16 @@ describe('D06: a Bible section heading is not underlined', () => {
     expect(lines('section-heading', 'bottom')).toEqual([]);
   });
 });
+
+describe('D10: an Answers section heading has no hairline above it', () => {
+  it('.ans-sh draws no top border', () => {
+    expect(rulesFor('ans-sh').length).toBeGreaterThan(0);
+    expect(lines('ans-sh', 'top')).toEqual([]);
+  });
+  it('the row just above a heading keeps its own bottom line (it was dropped only because the heading drew one)', () => {
+    const dropped = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g; let m;
+    while ((m = re.exec(CSS))) if (/\+\s*(\.ans-reading\s*>\s*)?\.ans-sh/.test(m[1]) && /border-bottom:\s*0/.test(m[2])) dropped.push(m[1].trim());
+    expect(dropped).toEqual([]);
+  });
+});
