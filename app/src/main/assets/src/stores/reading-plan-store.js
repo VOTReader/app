@@ -52,7 +52,8 @@ const _keysFor = (/** @type {string} */ bid, /** @type {any} */ cid) =>
 const _begun = (/** @type {any} */ r, /** @type {string} */ key) => !(typeof r.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.start) && r.start > key);
 
 /** @typedef {{ runId: string, keys: string[] }} PlanSitting the plan sitting open now: its run and the readings of its day(s) */
-/** @typedef {{ bid: string, cid: string | number, runIds: string[] }} PlanOffer a plan item finished from elsewhere, not counted */
+/** @typedef {{ bid: string, cid: string | number, runIds: string[], at: number }} PlanOffer a plan item finished from elsewhere, not counted
+    (at: when it was read, so Count it dates the tick by the read, r7) */
 /** @type {PlanSitting | null} */
 let _sitting = null;
 /** The portion a plan's own Listen is playing (its run, the readings left to finish, and the day it began): a full listen
@@ -162,7 +163,7 @@ export const ReadingPlanStore = extendStore(
       }
       // Once per read: a call queued before the store loaded is applied at once (to the pending copy) and replayed later.
       if (offer.length && !(/** @type {any} */ (this))._replaying) {
-        const o = { bid: String(bid), cid, runIds: offer };
+        const o = { bid: String(bid), cid, runIds: offer, at: when.getTime() };
         for (const f of [..._offerSubs]) { try { f(o); } catch (e) { console.warn('plan offer failed', e); } }
       }
       return held;

@@ -97,7 +97,7 @@ describe('the offer: a plan item finished from elsewhere', () => {
     const stop = ReadingPlanStore.onOffer((o) => seen.push(o));
     ReadingPlanStore.noteRead('genesis', 1, at('2026-10-23'));
     stop();
-    expect(seen).toEqual([{ bid: 'genesis', cid: 1, runIds: [off.id] }]);
+    expect(seen).toEqual([{ bid: 'genesis', cid: 1, runIds: [off.id], at: at('2026-10-23').getTime() }]);
   });
 
   it('a read inside the sitting offers nothing for that run; nothing is offered when no OFF run holds it', () => {
@@ -272,7 +272,7 @@ describe('what ends a sitting, with the switch off', () => {
     const { seen, stop } = offers();
     expect(ReadingPlanStore.noteRead('genesis', 1)).toBe(false);
     stop();
-    expect(seen).toEqual([{ bid: 'genesis', cid: 1, runIds: [off.id] }]);
+    expect(seen).toEqual([{ bid: 'genesis', cid: 1, runIds: [off.id], at: expect.any(Number) }]);
     expect(ReadingPlanStore.get(off.id).ticks).toEqual({});
     ReadingPlanStore.countRead(seen[0].runIds, 'genesis', 1);
     expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);

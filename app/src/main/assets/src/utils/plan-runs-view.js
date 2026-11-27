@@ -282,12 +282,13 @@ export function usePlanCountOffer() {
   const store = _store();
   React.useEffect(() => {
     if (!store || typeof store.onOffer !== 'function') return undefined;
-    return store.onOffer((/** @type {{ bid: string, cid: any, runIds: string[] }} */ o) => {
+    return store.onOffer((/** @type {{ bid: string, cid: any, runIds: string[], at?: number }} */ o) => {
       const runs = o.runIds.map((id) => store.get(id)).filter(Boolean);
       if (!runs.length) return;
       const text = runs.length === 1 ? 'In ' + runName(runs[0], letterSource()) : 'In ' + runs.length + ' of your plans';
       showUndoToast(COUNT_TOAST, text, () => {
-        store.countRead(runs.map((r) => r.id), o.bid, o.cid);
+        // Dated by the read, not the tap: a read at 23:59 counted at 00:00 is the day it was read (r7).
+        store.countRead(runs.map((r) => r.id), o.bid, o.cid, Number.isFinite(o.at) ? new Date(/** @type {number} */ (o.at)) : undefined);
         const host = planSessionHost();
         if (host) host.markRead(o.bid, o.cid);
       }, { label: 'Count it', durationMs: 8000 });

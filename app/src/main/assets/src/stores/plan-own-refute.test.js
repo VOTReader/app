@@ -7,7 +7,8 @@ import { renderHook, act } from '@testing-library/react';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
 import { newRun } from '../data/plan-engine.js';
-import { _resetPlanSessionForTests } from '../utils/plan-session.js';
+import { usePlanCountOffer, COUNT_TOAST } from '../utils/plan-runs-view.js';
+import { setPlanSessionHost, _resetPlanSessionForTests } from '../utils/plan-session.js';
 import { useReadProgress } from '../hooks/useMarkAsRead.js';
 import { _resetToasts } from '../utils/toast.js';
 
@@ -71,5 +72,23 @@ describe('a merge keeps a deliberate Count reading from anywhere choice', () => 
     const ours = { ...base, countAnywhere: true, updated: base.updated + 500 };
     const theirs = { ...base, ticks: { 'genesis:1': '2026-10-23' }, updated: base.updated + 1000 };
     expect(mergePlanStore([base], [ours], [theirs])[0].countAnywhere).toBe(true);
+  });
+});
+
+describe('Count it dates the tick by the read, not by the tap', () => {
+  it('read at 23:59:58, Count it tapped at 00:00:03: the tick is the read\'s day, once, and the read record is written once', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at('2026-10-23', 23, 59, 58));
+    const off = mk(['genesis:1', 'genesis:2'], { countAnywhere: false });
+    ReadingPlanStore.put(off);
+    const markRead = vi.fn();
+    setPlanSessionHost(/** @type {any} */ ({ move() {}, open() {}, back() {}, openPlans() {}, openNote() {}, unmarkRead() {}, isRead: () => false, markRead }));
+    renderHook(() => usePlanCountOffer());
+    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    vi.setSystemTime(at('2026-10-24', 0, 0, 3));
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById(COUNT_TOAST).querySelector('.vot-undo-btn'));
+    act(() => { btn.click(); btn.click(); });
+    expect(ReadingPlanStore.get(off.id).ticks).toEqual({ 'genesis:1': '2026-10-23' });
+    expect(markRead).toHaveBeenCalledTimes(1);
   });
 });
