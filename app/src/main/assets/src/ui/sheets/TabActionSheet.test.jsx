@@ -27,6 +27,12 @@ function renderSheet(overrides = {}) {
 }
 
 describe('TabActionSheet bulk-close confirm gates', () => {
+  it("Rename's field says a name is optional (an empty one goes back to the tab's own name)", () => {
+    renderSheet();
+    fireEvent.click(screen.getByText('Rename tab…'));
+    expect(screen.getByRole('textbox', { name: 'Tab name' }).getAttribute('placeholder')).toBe('Tab name (optional)');
+  });
+
   it('is exposed as a labelled modal dialog', () => {
     renderSheet();
     const dialog = screen.getByRole('dialog', { name: 'Tab actions' });

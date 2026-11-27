@@ -629,6 +629,12 @@ describe('JournalEditorScreen — P1-7: blank entries prune on exit', () => {
     expect(JournalStore.get(entry.id)).not.toBeNull();
   });
 
+  it("the title field says it is optional, as Citation and Caption do (an untitled entry is kept as 'Untitled')", () => {
+    const entry = JournalStore.add({ title: '', blocks: [JournalHelpers.newBlock('p', { text: 'x' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    expect(document.querySelector('.jrn-editor-title').getAttribute('placeholder')).toBe('Title (optional)');
+  });
+
   // id-datasafe 178: later text blocks had no placeholder and no name a screen reader could tell apart.
   it('every text block invites more and is named by its place', () => {
     const entry = JournalStore.add({ title: 't', blocks: [

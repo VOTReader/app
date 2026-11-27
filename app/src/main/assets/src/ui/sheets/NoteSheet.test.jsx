@@ -93,6 +93,13 @@ describe('NoteSheet empty-note action', () => {
     expect(container.querySelector('.note-sheet-empty-btn')).toBeNull();
   });
 
+  it("the note box says the note is optional (Corbin 11-26: 'Text should also say optional')", () => {
+    setupStores({ body: '' });
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    fireEvent.click(screen.getByText('Add note text'));
+    expect(container.querySelector('.note-sheet-textarea').getAttribute('placeholder')).toBe('Write your note (optional)');
+  });
+
   it('read mode on a note WITH a body renders the body, not the button', () => {
     setupStores({ body: 'my reflection' });
     const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);

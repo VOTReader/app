@@ -74,6 +74,7 @@ describe('PlanBuilder', () => {
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Number of days' }), { target: { value: '4' } });
     expect(within(screen.getByRole('list', { name: 'This plan' })).getByText('reading days').previousSibling.textContent).toBe('4');
     fireEvent.click(within(share).getByRole('radio', { name: /One after the other/ }));
+    expect(screen.getByRole('heading', { name: 'Name (optional)' })).toBeTruthy();   // empty keeps the name it shows
     fireEvent.change(screen.getByRole('textbox', { name: 'Plan name' }), { target: { value: 'Ruth, then Seven' } });
     // Back goes to step 1 with the picks kept, and forward again
     fireEvent.click(screen.getByRole('button', { name: 'Back to Reading plans' }));
