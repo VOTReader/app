@@ -353,7 +353,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
         </section>
       ) : null}
       <section className="build-card" aria-label="Name">
-        <h2 className="build-card-title">Name</h2>
+        <h2 className="build-card-title">Name (optional)</h2>
         <input className="build-input build-name" type="text" aria-label="Plan name" maxLength={60} value={name}
           placeholder={defaultName(picks, src)} onChange={(e) => setName(e.target.value)} />
       </section>

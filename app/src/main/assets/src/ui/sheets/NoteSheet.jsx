@@ -294,7 +294,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
               className="note-sheet-textarea"
               value={body}
               onChange={e => setBody(e.target.value)}
-              placeholder="Write your note…"
+              placeholder="Write your note (optional)"
               aria-label="Note text"
               onFocus={() => {
                 const t = setTimeout(() => {

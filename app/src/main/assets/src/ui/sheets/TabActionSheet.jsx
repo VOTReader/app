@@ -60,7 +60,7 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
                   type="text"
                   value={renaming}
                   maxLength={60}
-                  placeholder="Tab name"
+                  placeholder="Tab name (optional)"
                   aria-label="Tab name"
                   autoFocus
                   onChange={(e) => setRenaming(e.target.value)}

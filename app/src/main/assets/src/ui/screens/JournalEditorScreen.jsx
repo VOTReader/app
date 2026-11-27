@@ -1487,7 +1487,7 @@ export function JournalEditorScreen(props) {
             className="jrn-editor-title"
             type="text"
             value={title}
-            placeholder="Title"
+            placeholder="Title (optional)"
             aria-label="Entry title"
             onChange={function(e) { setTitle(e.target.value); scheduleSave(); }}
             onBlur={function() { commitSave(); }}
