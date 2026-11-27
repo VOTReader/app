@@ -5,6 +5,7 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ReadingPlanStore } from './reading-plan-store.js';
+import { mergePlanStore } from './store-merge.js';
 import { newRun } from '../data/plan-engine.js';
 import { _resetPlanSessionForTests } from '../utils/plan-session.js';
 import { useReadProgress } from '../hooks/useMarkAsRead.js';
@@ -50,5 +51,25 @@ describe("the plan's Listen counts listens, not every read of its portion that d
     renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: false }));
     act(() => { /** @type {any} */ (window).__votAudioListened('bible-kjv', 'genesis', 1); });
     expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
+  });
+});
+
+describe('a merge keeps a deliberate Count reading from anywhere choice', () => {
+  it('turned OFF in one tab, then a stale tab ticks (newer): the merge keeps OFF', () => {
+    const base = mk(['genesis:1', 'genesis:2']);
+    const ours = { ...base, countAnywhere: false, updated: base.updated + 500 };
+    const theirs = { ...base, ticks: { 'genesis:1': '2026-10-23' }, updated: base.updated + 1000 };
+    const m = mergePlanStore([base], [ours], [theirs]);
+    expect(m[0].countAnywhere).toBe(false);
+    expect(m[0].ticks).toEqual({ 'genesis:1': '2026-10-23' });
+    const m2 = mergePlanStore([base], [theirs], [ours]);
+    expect(m2[0].countAnywhere).toBe(false);
+  });
+
+  it('turned ON over a new plan\'s OFF, then a stale tab ticks: ON stays', () => {
+    const base = mk(['genesis:1', 'genesis:2'], { countAnywhere: false });
+    const ours = { ...base, countAnywhere: true, updated: base.updated + 500 };
+    const theirs = { ...base, ticks: { 'genesis:1': '2026-10-23' }, updated: base.updated + 1000 };
+    expect(mergePlanStore([base], [ours], [theirs])[0].countAnywhere).toBe(true);
   });
 });

@@ -288,6 +288,17 @@ export function mergePlanStore(base, ours, theirs) {
   return merged.map((/** @type {any} */ r) => {
     const o = O.get(r && r.id), t = T.get(r && r.id);
     if (!o || !t) return r;
+    // plan-own r7: the counting choice (countAnywhere) is the side's that changed it since the base, as a field of its
+    // own: a stale tab's later tick makes its copy the newer record, which must not take back a switch turned elsewhere.
+    const bRec = B.get(r.id);
+    if (bRec) {
+      const bv = bRec.countAnywhere, ov = o.countAnywhere, tv = t.countAnywhere;
+      const pick = ov !== bv && tv === bv ? ov : tv !== bv && ov === bv ? tv : r.countAnywhere;
+      if (pick !== r.countAnywhere) {
+        r = { ...r };
+        if (typeof pick === 'boolean') r.countAnywhere = pick; else delete r.countAnywhere;
+      }
+    }
     const b = (B.get(r.id) || {}).ticks || {}, ot = o.ticks || {}, tt = t.ticks || {}, rt = r.ticks || {};
     /** @type {Record<string, string>} */
     const ticks = {};
