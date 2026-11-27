@@ -3097,6 +3097,19 @@
     .vot-large-text .ui-row-meta:has(> .ui-meta-cut) { display: block; }
     .vot-large-text .ui-meta-keep { white-space: normal; } .ui-meta-cut { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .ui-meta-keep { flex: none; white-space: pre; }
     .root-row-count, .ui-row-value { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); }
+    /* A short title beside a long value lost its letters ("V…" beside "The one Listen plays", Collection Download's
+       Voice row from 155 % on a 360 px phone): the value never shrank and the words had min-width 0. Below large text
+       the value gives way, wrapping at its spaces, right-aligned, and the words keep a floor of their own longest word,
+       but never more than half the row. width: 50% with min-width: auto spells that floor: a flex item's automatic
+       minimum is the lesser of its min-content and its width, so this is the min(min-content, 50%) that min() cannot
+       take. The words' basis stays 0, so the width feeds only that minimum, and a row whose words already fit is laid
+       out exactly as before (a fixed 8 em floor reserved room a short word never needed and wrapped the value at
+       100 %). A typed name with no space is held at half the row and is still cut. The Scripture index's words size
+       from their content (.rd-bindex, flex 1 0 auto), where the width would become the basis, so it is left out.
+       Listen's and Downloads' own 50 % words still win; the Library root's 50 % now holds only at large text, since
+       beside a value that gives way it wrapped "None yet" for a chevron that only sat 5 px over. */
+    :where(:root:not(.vot-large-text) :has(> :is(.ui-row-value, .root-row-count)):not(.rd-bindex *)) > :is(.ui-row-text, .root-row-text) { width: 50%; min-width: auto; }
+    :where(:root:not(.vot-large-text)) :is(.ui-row-value, .root-row-count) { flex: 0 1 auto; text-align: right; }
     .ui-row-value.is-none { color: var(--text-2); }   /* "None yet" is read: muted, not tertiary (LIGHT1: --text-3 read 4.11:1 dark, 3.13 light) */
     ::placeholder { color: var(--text-2); opacity: 1; }   /* a field without its own: Chrome's grey read 3.6:1 on a sheet */
     .root-row-chev { flex: none; padding: 0 2px; color: var(--text-3); font-size: var(--fs-24); line-height: 1; transition: transform 0.15s ease; }
@@ -3239,7 +3252,7 @@
        ellipsis. "A Return to The Garden" was cut from 130 % on a 360 px phone and "Install VOTReader" from 160 %; at
        100 % every name still fits on one line, so nothing moves there. */
     .ws1-settings.is-root :is(.ui-row-title, .ui-row-meta) { white-space: normal; overflow-wrap: break-word; }
-    .library-root .ui-row-text { min-width: 50%; }
+    .vot-large-text .library-root .ui-row-text { min-width: 50%; }   /* below large text the rows' own floor (beside .ui-row-value) */
     .library-root .ui-row-value { white-space: normal; text-align: right; }
     /* Fix list 20 (Listen's share): Saved's and Letter voice's subtitles and Downloads' 'Voice to download' were cut
        beside their value; the words wrap and the value gives room, as on the Library root. */
