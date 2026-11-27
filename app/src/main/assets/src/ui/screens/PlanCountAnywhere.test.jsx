@@ -71,6 +71,19 @@ describe('Manage plan: Count reading from anywhere', () => {
   });
 });
 
+describe("the plan page's Listen names its plan", () => {
+  it('Listen to today hands over the run id, so the listens count for a plan that counts only its own reading', () => {
+    const run = { ...startCatalogPlan('bible-year', null, new Date()), countAnywhere: false };
+    ReadingPlanStore.put(run);
+    const onListen = vi.fn();
+    const planTracks = (refs) => refs.map((r) => ({ url: 'https://x.test/' + r.bid + '-' + r.cid + '.mp3', key: r.bid + ':' + r.cid, title: r.bid }));
+    render(<PlansHub {...base({ onListen, planTracks })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: (On track|Not started)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Listen to today: / }));
+    expect(onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 1 }, { bid: 'genesis', cid: 2 }, { bid: 'genesis', cid: 3 }], 'Bible in a Year', run.id);
+  });
+});
+
 describe('the Count it line', () => {
   function App() { usePlanCountOffer(); return null; }
 

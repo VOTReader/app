@@ -124,6 +124,40 @@ describe('the offer: a plan item finished from elsewhere', () => {
   });
 });
 
+describe("the plan's own Listen is opened from the plan", () => {
+  afterEach(() => { ReadingPlanStore.setListening(null); });
+
+  it('a full listen of a reading its Listen is playing ticks the OFF run, once; a later listen of it elsewhere is elsewhere', () => {
+    const off = mk(['genesis:1', 'genesis:2', 'genesis:3'], { countAnywhere: false });
+    ReadingPlanStore.put(off);
+    ReadingPlanStore.setListening({ runId: off.id, keys: ['genesis:1', 'genesis:2'] });
+    const seen = [];
+    const stop = ReadingPlanStore.onOffer((o) => seen.push(o));
+    expect(ReadingPlanStore.noteRead('genesis', 1)).toBe(true);
+    expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
+    expect(ReadingPlanStore.noteRead('genesis', 3)).toBe(false);                    // not in the portion it plays
+    expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
+    stop();
+    expect(seen.map((o) => o.cid)).toEqual([3]);
+  });
+
+  it("another plan's Listen counts nothing for an OFF run, and null forgets it", () => {
+    const a = mk(['genesis:1'], { countAnywhere: false });
+    const b = mk(['genesis:1'], { countAnywhere: false });
+    ReadingPlanStore.put(a); ReadingPlanStore.put(b);
+    ReadingPlanStore.setListening({ runId: a.id, keys: ['genesis:1'] });
+    ReadingPlanStore.noteRead('genesis', 1);
+    expect(Object.keys(ReadingPlanStore.get(a.id).ticks)).toEqual(['genesis:1']);
+    expect(ReadingPlanStore.get(b.id).ticks).toEqual({});
+    const c = mk(['exodus:1'], { countAnywhere: false });
+    ReadingPlanStore.put(c);
+    ReadingPlanStore.setListening({ runId: c.id, keys: ['exodus:1'] });
+    ReadingPlanStore.setListening(null);
+    expect(ReadingPlanStore.noteRead('exodus', 1)).toBe(false);
+    expect(ReadingPlanStore.get(c.id).ticks).toEqual({});
+  });
+});
+
 describe('the switch survives a merge, a backup and every new run made from a plan', () => {
   it('two copies with different values: the newer copy (updated) wins, as remind and autoAudio do; the ticks of both stay', () => {
     const base = mk(['genesis:1', 'genesis:2']);
