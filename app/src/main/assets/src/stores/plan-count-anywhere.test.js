@@ -11,7 +11,7 @@ import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
 import { newRun, replaceContents, freshFromDated, countsAnywhere } from '../data/plan-engine.js';
 import { startOverRun } from '../utils/plan-runs-view.js';
-import { beginPlanSession, endPlanSession, notePlanSessionPlace, sessionReachedEnd, setPlanSessionHost,
+import { beginPlanSession, endPlanSession, notePlanSessionPlace, sessionReachedEnd, setPlanSessionHost, planSession,
   _resetPlanSessionForTests } from '../utils/plan-session.js';
 import { useReadProgress } from '../hooks/useMarkAsRead.js';
 
@@ -236,6 +236,88 @@ describe('a plan sitting tells the store it is open', () => {
     sessionReachedEnd('genesis:1');
     expect(marked).toEqual(['genesis:1']);
     expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
+  });
+});
+
+/* hub 11-26 (plan-own r2): with the switch off a sitting is the one door that counts reading, so a sitting that never
+   ended would count the day's readings wherever they were read. What ends (pauses) one: leaving the plan's reader for
+   any screen that is not one of the day's readings, and a reload (it comes back paused). The app going to the
+   background ends nothing: nothing is read while hidden, and it comes back on the same reading, strip and all. */
+describe('what ends a sitting, with the switch off', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).ReadingPlanStore = ReadingPlanStore;
+    _resetPlanSessionForTests();
+  });
+  afterEach(() => { _resetPlanSessionForTests(); delete (/** @type {any} */ (globalThis)).ReadingPlanStore; vi.useRealTimers(); });
+
+  // Day 1 is Genesis 1 and 2; day 2 is Genesis 3 and 4.
+  const begin = () => {
+    const off = { ...newRun({ plan: 'x', tracks: [{ kind: 'bible', by: 'count', items: ['genesis:1', 'genesis:2', 'genesis:3', 'genesis:4'].map((k) => ({ k, w: 600 })) }],
+      pace: { mode: 'days', n: 2 } }, new Date()), countAnywhere: false };
+    ReadingPlanStore.put(off);
+    beginPlanSession({ runId: off.id, day: 0, name: 'X' });
+    notePlanSessionPlace('genesis', 1);
+    return off;
+  };
+  const offers = () => { const seen = []; const stop = ReadingPlanStore.onOffer((o) => seen.push(o)); return { seen, stop }; };
+
+  it('paused, then the same chapter read elsewhere: the offer shows, nothing is ticked until Count it', () => {
+    const off = begin();
+    notePlanSessionPlace(null);                       // left by a link, search or a tab
+    vi.runAllTimers();
+    expect(planSession()).toBeNull();
+    notePlanSessionPlace('genesis', 1);               // the same chapter, opened from the Bible
+    expect(planSession()).toBeNull();                 // stays outside the plan
+    const { seen, stop } = offers();
+    expect(ReadingPlanStore.noteRead('genesis', 1)).toBe(false);
+    stop();
+    expect(seen).toEqual([{ bid: 'genesis', cid: 1, runIds: [off.id] }]);
+    expect(ReadingPlanStore.get(off.id).ticks).toEqual({});
+    ReadingPlanStore.countRead(seen[0].runIds, 'genesis', 1);
+    expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
+  });
+
+  it("leaving the plan's reader pauses it: a screen that is not a reader, another chapter, the next day's reading", () => {
+    for (const place of [[null], ['exodus', 1], ['genesis', 3]]) {
+      _resetPlanSessionForTests();
+      const off = begin();
+      notePlanSessionPlace(.../** @type {[any, any?]} */ (place));
+      vi.runAllTimers();
+      expect(planSession()).toBeNull();
+      expect(ReadingPlanStore.noteRead('genesis', 2)).toBe(false);
+      expect(ReadingPlanStore.get(off.id).ticks).toEqual({});
+    }
+  });
+
+  it('a reload brings it back paused: a read of the day from Home counts nothing; reopening on its reading is back inside', () => {
+    const off = begin();
+    _resetPlanSessionForTests({ keepStorage: true });  // the app starts again over what was saved
+    notePlanSessionPlace(null);                       // its first screen is Home
+    notePlanSessionPlace('genesis', 2);               // then the day's reading, opened from the Bible
+    expect(planSession()).toBeNull();
+    expect(ReadingPlanStore.noteRead('genesis', 2)).toBe(false);
+    expect(ReadingPlanStore.get(off.id).ticks).toEqual({});
+
+    _resetPlanSessionForTests({ keepStorage: true });
+    notePlanSessionPlace('genesis', 1);               // the app reopens on the sitting's reading
+    expect(planSession()).not.toBeNull();
+    expect(ReadingPlanStore.noteRead('genesis', 2)).toBe(true);
+    expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:2']);
+  });
+
+  it('the app going to the background ends nothing: back in front on the same reading, it still counts', () => {
+    const off = begin();
+    const was = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('pagehide'));
+    vi.runAllTimers();
+    if (was) Object.defineProperty(document, 'visibilityState', was); else delete (/** @type {any} */ (document)).visibilityState;
+    notePlanSessionPlace('genesis', 1);
+    expect(planSession()).not.toBeNull();
+    expect(ReadingPlanStore.noteRead('genesis', 2)).toBe(true);
+    expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:2']);
   });
 });
 
