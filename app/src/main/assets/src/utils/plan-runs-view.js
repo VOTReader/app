@@ -234,6 +234,7 @@ export function startOverRun(run, now) {
   const fresh = newRun({ plan: run.plan, name: run.name, tracks: run.tracks, share: run.share, pace: againPace(run), weekdays: run.weekdays }, now);
   if (run.remind) fresh.remind = run.remind;
   if (run.autoAudio === false) fresh.autoAudio = false;
+  if (typeof run.countAnywhere === 'boolean') fresh.countAnywhere = run.countAnywhere;
   const old = run.status === 'stopped' ? run : { ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) };
   return [old, fresh];
 }

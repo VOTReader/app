@@ -100,9 +100,15 @@ function _hydrate() {
   _fromStorage = true;
 }
 const _subs = new Set();
-const _bump = () => { _version++; _save(); for (const f of _subs) f(); };
-
 const _store = () => { const s = /** @type {any} */ (globalThis).ReadingPlanStore; return s && typeof s.get === 'function' ? s : null; };
+/** plan-own: the run store hears which sitting is open (none while paused), so a plan that counts only its own reading
+    counts what is read inside it. Bundle-b cannot import this module, so it is told. */
+function _tellStore() {
+  const st = _store();
+  if (st && typeof st.setSitting === 'function') st.setSitting(_s && !_paused ? { runId: _s.runId, keys: _s.keys } : null);
+}
+const _bump = () => { _version++; _save(); _tellStore(); for (const f of _subs) f(); };
+
 /** '<bid>:<cid>' as { bid, cid } (a numeric chapter as a number). @param {string} k */
 export const refOf = (k) => { const i = k.lastIndexOf(':'); const c = k.slice(i + 1); return { bid: k.slice(0, i), cid: /^\d+$/.test(c) ? Number(c) : c }; };
 
@@ -306,5 +312,5 @@ export function usePlanSession() {
 export function _resetPlanSessionForTests(o) {
   _s = null; _host = null; _shown = false; _placeKey = null; _at = null; _paused = false; _fromStorage = false; _hydrated = false;
   if (_placeTimer) { clearTimeout(_placeTimer); _placeTimer = null; }
-  if (o && o.keepStorage) { _version++; for (const f of _subs) f(); } else _bump();
+  if (o && o.keepStorage) { _version++; _tellStore(); for (const f of _subs) f(); } else _bump();
 }

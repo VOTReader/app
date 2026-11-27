@@ -16,6 +16,14 @@
    'matthew' while the Bible plans hold 'matthew-plain' (bug 2), so a
    'matthew' read ticks both.
 
+   plan-own (Corbin 11-26 18:20): a run with countAnywhere false counts a
+   read only when it was opened from that plan: the open plan sitting
+   (utils/plan-session.js, bundle-d) tells this store which run and which
+   readings it holds (setSitting), since bundle-b cannot import it. A read
+   from anywhere else ticks nothing in such a run and is offered instead
+   (onOffer: the "In Bible in a Year · Count it" line); countRead is that
+   line's Count it.
+
    Registered like every user-data store: idb-adapter STORE_NAMES (+ DB
    version), _entry-b window map, import-validators, backup-flow export,
    user-data-size, data-safety summarize/mergeForRestore.
@@ -23,7 +31,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergePlanStore } from './store-merge.js';
-import { tickItem, todayKey } from '../data/plan-engine.js';
+import { tickItem, todayKey, countsAnywhere } from '../data/plan-engine.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun} PlanRun */
 
@@ -42,6 +50,18 @@ const _keysFor = (/** @type {string} */ bid, /** @type {any} */ cid) =>
 /** Whether a run's start date has come (a 'YYYY-MM-DD' key compares as text). Reads made before a later start are
     counted only when the reader asks (Count my N, a session, a tick on the plan page), never on their own (C6). */
 const _begun = (/** @type {any} */ r, /** @type {string} */ key) => !(typeof r.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.start) && r.start > key);
+
+/** @typedef {{ runId: string, keys: string[] }} PlanSitting the plan sitting open now: its run and the readings of its day(s) */
+/** @typedef {{ bid: string, cid: string | number, runIds: string[] }} PlanOffer a plan item finished from elsewhere, not counted */
+/** @type {PlanSitting | null} */
+let _sitting = null;
+/** @type {Set<(o: PlanOffer) => void>} */
+const _offerSubs = new Set();
+
+/** The keys of (bid, cid) this run counts now: all of them when it counts reading from anywhere, else the ones its open sitting holds.
+    @param {any} r @param {string[]} keys */
+const _countable = (r, keys) => (countsAnywhere(r) ? keys
+  : _sitting && _sitting.runId === r.id ? keys.filter((k) => /** @type {PlanSitting} */ (_sitting).keys.includes(k)) : []);
 
 export const ReadingPlanStore = extendStore(
   CachedStore('vot-reading-plans', /** @type {PlanRun[]} */ ([]), { idb: true, crossTabMerge: mergePlanStore }),
@@ -104,21 +124,75 @@ export const ReadingPlanStore = extendStore(
       // P2 3.8: a paused plan counts nothing while paused, so only a running run ticks, or holds the read.
       const when = now || new Date();
       const key = todayKey(when);
-      const held = this.all().some((r) => r.status === 'running' && _begun(r, key) && r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
+      const live = this.all().filter((r) => r.status === 'running' && _begun(r, key));
+      const hasIt = (/** @type {any} */ r) => r.tracks.some((/** @type {any} */ t) => t.items.some((/** @type {any} */ it) => keys.includes(it.k)));
+      const ticked = (/** @type {any} */ r) => keys.some((k) => r.ticks && k in r.ticks);
+      // plan-own: a run that counts only its own reading holds this read when it counts it (its sitting) or already
+      // has it ticked; one it does not count is offered instead, and does not stand in for Mark as read.
+      const held = live.some((r) => hasIt(r) && (_countable(r, keys).length > 0 || ticked(r)));
+      const offer = live.filter((r) => hasIt(r) && !countsAnywhere(r) && !_countable(r, keys).length && !ticked(r)).map((r) => r.id);
       if (this._shouldDefer('noteRead', bid, cid, now)) return held;
       let changed = false;
       const next = this._load().map((r) => {
         if (!_valid(r) || r.status !== 'running' || !_begun(r, key)) return r;
         let out = r;
+        for (const k of _countable(r, keys)) out = tickItem(out, k, key, when.getTime());
+        if (out !== r) changed = true;
+        return out;
+      });
+      if (changed) {
+        this._cache = next;
+        this._save();
+        this._bump();
+      }
+      // Once per read: a call queued before the store loaded is applied at once (to the pending copy) and replayed later.
+      if (offer.length && !(/** @type {any} */ (this))._replaying) {
+        const o = { bid: String(bid), cid, runIds: offer };
+        for (const f of [..._offerSubs]) { try { f(o); } catch (e) { console.warn('plan offer failed', e); } }
+      }
+      return held;
+    },
+
+    /**
+     * The plan sitting open now (utils/plan-session.js sets it on every change; null when none, or paused): an OFF
+     * run counts the readings it holds.
+     * @param {PlanSitting | null} s
+     */
+    setSitting(s) {
+      _sitting = s && typeof s.runId === 'string' && Array.isArray(s.keys) ? { runId: s.runId, keys: s.keys.slice() } : null;
+    },
+
+    /**
+     * Hear each plan item finished from elsewhere that a plan counting only its own reading did not count.
+     * @param {(o: PlanOffer) => void} fn @returns {() => void} stop listening
+     */
+    onOffer(fn) {
+      _offerSubs.add(fn);
+      return () => { _offerSubs.delete(fn); };
+    },
+
+    /**
+     * Count it: tick (bid, cid) in these runs (running ones), dated today, as the reader asked.
+     * @param {string[]} runIds @param {string} bid @param {string | number} cid @param {Date} [now]
+     */
+    countRead(runIds, bid, cid, now) {
+      if (!Array.isArray(runIds) || !runIds.length || !bid || cid == null || cid === '') return;
+      if (this._shouldDefer('countRead', runIds, bid, cid, now)) return;
+      const keys = _keysFor(String(bid), cid);
+      const when = now || new Date();
+      const key = todayKey(when);
+      let changed = false;
+      const next = this._load().map((r) => {
+        if (!_valid(r) || r.status !== 'running' || !runIds.includes(r.id)) return r;
+        let out = r;
         for (const k of keys) out = tickItem(out, k, key, when.getTime());
         if (out !== r) changed = true;
         return out;
       });
-      if (!changed) return held;
+      if (!changed) return;
       this._cache = next;
       this._save();
       this._bump();
-      return held;
     },
 
     /**

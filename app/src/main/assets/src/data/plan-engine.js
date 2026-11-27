@@ -55,8 +55,10 @@ export const WORDS_PER_MIN = 200;
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
  *   rested?: { until: string, ranges?: string[][], dates?: string[], off?: string[][] },
  *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean, credited?: number,
- *   seen?: boolean }} PlanRun
+ *   seen?: boolean, countAnywhere?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
+ *   countAnywhere: false counts only reading opened from the plan or ticked in it (plan-own, Corbin 11-26); absent
+ *   (every run before it) or true counts a finished read wherever it was opened. A new plan starts with false.
  *   credited: how many reads from before the start were counted (plans2; their ticks carry no date)
  *   seen: a finished run's finish page was opened or its Home row dismissed (plans2); false is written at the finish
  *   (FIXB), and a run with no seen (finished before plans2) counts as seen
@@ -893,7 +895,7 @@ export function readCount(/** @type {PlanTrack[]} */ tracks, /** @type {(bid: st
  * A custom plan with new contents (2310, Corbin 11-16 "change it"): a NEW run of `spec` from today (or the old run's
  * later start), never a re-cut of the old one, so nothing stored changes shape. Every tick of an item still in the plan
  * carries over by its key with its own date (an undated, credited tick stays undated and counted); the reminder and the
- * download choice carry too. What is left is then cut at the plan's pace by changePace, so a length stays the whole
+ * download choice carry too, and so does the counting choice (countAnywhere). What is left is then cut at the plan's pace by changePace, so a length stays the whole
  * plan's ("90 days" with 40 read leaves 50) and a Finish by date stays that date; a paused plan stays paused. Day
  * notes are keyed by day number and stay on the old run, and so do its pinned rest days (pinRests): the new run's
  * days start today. The caller keeps the old run, stopped, under Past plans.
@@ -912,6 +914,7 @@ export function replaceContents(run, spec, now) {
   if (credited) next.credited = credited;
   if (run.remind) next.remind = run.remind;
   if (run.autoAudio === false) next.autoAudio = false;
+  if (typeof run.countAnywhere === 'boolean') next.countAnywhere = run.countAnywhere;
   if (carried) {
     next = finishIfDone(next, todayKey(now));
     // A length counts the days the reader has read on the OLD run (its days done), never the new cut's: added books
@@ -931,7 +934,7 @@ export function replaceContents(run, spec, now) {
  * (credited > 0, plans2's Count my N) starts again from today as a NEW run of the same plan, tracks, days and pace
  * (againPace: a Finish by date becomes the plan's own length, or a restart would cram), holding only the old run's
  * DATED ticks: what was read for the plan stays read, the credited (undated) ones go, and `credited` with them. The
- * reminder and the download choice carry; a paused plan stays paused; day notes stay on the old run, which the caller
+ * reminder, the download choice and the counting choice carry; a paused plan stays paused; day notes stay on the old run, which the caller
  * keeps, stopped, under Past plans. Never for an rp1 run (its undated ticks are its own reading) or one with no credit:
  * null then. @param {PlanRun} run @param {Date} now @returns {PlanRun | null}
  */
@@ -943,10 +946,14 @@ export function freshFromDated(run, now) {
   next = { ...next, ticks };
   if (run.remind) next.remind = run.remind;
   if (run.autoAudio === false) next.autoAudio = false;
+  if (typeof run.countAnywhere === 'boolean') next.countAnywhere = run.countAnywhere;
   next = finishIfDone(next, todayKey(now));
   if (next.status !== 'finished' && (run.status === 'paused' || run.paused)) next = pauseRun(next, now);
   return next;
 }
+
+/** Whether a finished read counts for the run wherever it was opened (plan-own: only false says no). @param {PlanRun} run */
+export const countsAnywhere = (run) => !run || run.countAnywhere !== false;
 
 /** Whether a run offers "Count only this plan's reading": it counts reads from before it began, and is not an rp1 run. @param {PlanRun} run */
 export function canCountOwnOnly(run) {
