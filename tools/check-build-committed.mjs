@@ -12,8 +12,10 @@
      node tools/check-build-committed.mjs [path ...]   default: app/src/main/assets/
    Exit 0 = the build left the tree as committed; 1 = it did not (the files are named). */
 
-import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, openSync, closeSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const BUILD_PATHS = ['app/src/main/assets/'];
@@ -27,7 +29,7 @@ export const BUILD_PATHS = ['app/src/main/assets/'];
  * @returns {{ changed: string[], untracked: string[] }}
  */
 export function buildDrift(paths = BUILD_PATHS, cwd = process.cwd(), env = process.env) {
-  const out = execFileSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths], { cwd, encoding: 'utf8', env });
+  const out = gitToFile(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths], cwd, env);
   const changed = [];
   const untracked = [];
   const entries = out.split('\0').filter(Boolean);
@@ -39,6 +41,29 @@ export function buildDrift(paths = BUILD_PATHS, cwd = process.cwd(), env = proce
     if (xy[0] === 'R' || xy[0] === 'C') i++;   // -z puts a rename's source path in the next entry
   }
   return { changed, untracked };
+}
+
+/** git's stdout as a string, read from a file rather than a pipe: a sync spawn with a stdout pipe waits for EOF, and on
+ *  Windows any process the same parent spawns meanwhile (a vitest worker thread beside the test, 11-26) inherits the
+ *  pipe's write end and holds it until that process exits. Throws like execFileSync on a non-zero exit.
+ * @param {string[]} args @param {string} cwd @param {NodeJS.ProcessEnv} env */
+function gitToFile(args, cwd, env) {
+  const dir = mkdtempSync(join(tmpdir(), 'vot-drift-'));
+  try {
+    const out = openSync(join(dir, 'out'), 'w');
+    const err = openSync(join(dir, 'err'), 'w');
+    let r;
+    try {
+      r = spawnSync('git', args, { cwd, env, stdio: ['ignore', out, err] });
+    } finally {
+      closeSync(out); closeSync(err);
+    }
+    if (r.error) throw r.error;
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed (${r.status}): ${readFileSync(join(dir, 'err'), 'utf8')}`);
+    return readFileSync(join(dir, 'out'), 'utf8');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
