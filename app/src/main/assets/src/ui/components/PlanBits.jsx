@@ -164,7 +164,7 @@ export function PlanCountLine({ on, onChange }) {
         <span className="plan-opt-text">Count reading from anywhere</span>
         <PlanSwitch on={on} label="Count reading from anywhere" onChange={onChange} />
       </div>
-      <p className="plan-opt-note">{on ? 'A chapter or letter in this plan counts wherever you read it.' : 'Only what you open from this plan counts toward it.'}</p>
+      <p className="plan-opt-note">{on ? 'Its readings count wherever you read them.' : 'Only what you open from this plan counts.'}</p>
     </>
   );
 }
