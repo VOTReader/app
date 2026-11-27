@@ -2369,7 +2369,9 @@
     .poetry-line { font-size:var(--fs-16); line-height:1.9; color:var(--cream); font-style:italic; display:block; white-space:nowrap; }
     @media (max-width:480px) { .poetry-line { font-size:var(--fs-16); white-space:normal; } }
     .stanza-break { height:0.9rem; display:block; }
-    .letter-closing { text-align:center; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; color:var(--cream-dim); margin-top:2rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
+    /* No line above a closing (Corbin 2026-11-26: nothing drawn inside the text but footnotes and references).
+       It had a hairline with 2rem of padding under it; the space above stays, the line and its padding go. */
+    .letter-closing { text-align:center; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; color:var(--cream-dim); margin-top:2rem; }
     .letter-closing-fn { text-align:center; margin-top:0.5rem; }
     /* A closing with more of the letter after it (an addendum, the next word of the same letter):
        clear space, so what follows reads as a new section (mw-close, Corbin 2026-10-24). */
