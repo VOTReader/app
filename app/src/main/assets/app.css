@@ -3446,6 +3446,9 @@
     .plan-opt-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
     .plan-opt-text { flex: 1 1 auto; color: var(--cream); font-size: var(--fs-16); }
     .plan-opt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+    /* plan-own: the Counting switch stays beside its words at large text; the words wrap instead (200%: it dropped to a line of its own) */
+    .plan-count-line { flex-wrap: nowrap; }
+    .plan-count-line > .plan-opt-text { flex: 1 1 0; min-width: 0; }
     .plan-own-only-text { flex-basis: 100%; margin: 0; font-family: var(--pl-ui); font-size: var(--fs-15); line-height: 1.4; }
     .plan-opt-note { width: 100%; margin: 2px 0 0; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.4; }
     .plan-days { display: flex; flex-wrap: nowrap; gap: 10px; }   /* 0450: a 44 px pitch, so each day's 44 px press is its own */

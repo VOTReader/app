@@ -160,7 +160,7 @@ export function PlanSwitch({ on, label, onChange }) {
 export function PlanCountLine({ on, onChange }) {
   return (
     <>
-      <div className="plan-opt-line">
+      <div className="plan-opt-line plan-count-line">
         <span className="plan-opt-text">Count reading from anywhere</span>
         <PlanSwitch on={on} label="Count reading from anywhere" onChange={onChange} />
       </div>
