@@ -132,10 +132,11 @@ import { ReadingPlanStore } from '../stores/reading-plan-store.js';
  * record: true when a plan being followed holds the item, and then the read
  * record is written too even with Mark as read off (following a plan is
  * asking for it); only reads outside plans stay unmarked with the switch off.
- * @param {string} bid @param {string | number} cid @returns {boolean}
+ * @param {string} bid @param {string | number} cid @param {boolean} [listen] a full listen (plan-own: a plan's own Listen counts it)
+ * @returns {boolean}
  */
-function notePlans(bid, cid) {
-  try { return ReadingPlanStore.noteRead(bid, cid) === true; }
+function notePlans(bid, cid, listen) {
+  try { return ReadingPlanStore.noteRead(bid, cid, undefined, listen ? { listen: true } : undefined) === true; }
   catch (e) { console.warn('reading-plan tick failed', e); return false; }
 }
 
@@ -272,7 +273,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
           // Listening Library, but no chapter is claimed read.
           const chapter = Math.floor(Number(chapterNum) || 0);
           if (chapter > 0) {
-            const inPlan = notePlans(itemId, chapter);
+            const inPlan = notePlans(itemId, chapter, true);
             if (enabledRef.current !== false || inPlan) credit(getReadKey(itemId, chapter));
           }
           return;
@@ -280,7 +281,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
         const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY) ? COL_BY_KEY.get(volKey) : null;
         const rk = col && col.readKey;
         if (!rk) return;
-        const inPlan = notePlans(rk, itemId);
+        const inPlan = notePlans(rk, itemId, true);
         if (enabledRef.current === false && !inPlan) return;
         credit(getReadKey(rk, itemId));
       } catch (e) { console.warn('listen count failed', e); }

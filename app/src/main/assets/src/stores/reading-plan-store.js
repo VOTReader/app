@@ -61,11 +61,13 @@ let _listening = null;
 /** @type {Set<(o: PlanOffer) => void>} */
 const _offerSubs = new Set();
 
-/** The keys of (bid, cid) this run counts now: all of them when it counts reading from anywhere, else the ones its open sitting holds.
-    @param {any} r @param {string[]} keys */
-const _countable = (r, keys) => (countsAnywhere(r) ? keys : keys.filter((k) =>
+/** The keys of (bid, cid) this run counts now: all of them when it counts reading from anywhere, else the ones its open
+    sitting holds, and, for a full listen (listen), the ones its own Listen is playing today. A READ of a Listen portion's
+    item outside the plan is elsewhere (r7: the portion outlived a stopped listen and counted any read of it that day).
+    @param {any} r @param {string[]} keys @param {boolean} listen @param {string} day */
+const _countable = (r, keys, listen, day) => (countsAnywhere(r) ? keys : keys.filter((k) =>
   (_sitting && _sitting.runId === r.id && _sitting.keys.includes(k))
-  || (_listening && _listening.runId === r.id && _listening.on === todayKey(new Date()) && _listening.keys.includes(k))));
+  || (listen && _listening && _listening.runId === r.id && _listening.on === day && _listening.keys.includes(k))));
 
 export const ReadingPlanStore = extendStore(
   CachedStore('vot-reading-plans', /** @type {PlanRun[]} */ ([]), { idb: true, crossTabMerge: mergePlanStore }),
@@ -119,10 +121,11 @@ export const ReadingPlanStore = extendStore(
      * A chapter or letter was read (or listened to the end, or marked): tick it in
      * every running run that holds it (a paused one counts nothing). Dated by the reader's local date.
      * @param {string} bid @param {string | number} cid @param {Date} [now]
+     * @param {{ listen?: boolean }} [opts] listen: a full listen the player reported (a plan's own Listen counts only these)
      * @returns {boolean} whether a plan being followed holds it (plans2: such a read is a plan tick, and every plan
      *   tick writes the read record too, Mark as read on or off)
      */
-    noteRead(bid, cid, now) {
+    noteRead(bid, cid, now, opts) {
       if (!bid || cid == null || cid === '') return false;
       const keys = _keysFor(String(bid), cid);
       // P2 3.8: a paused plan counts nothing while paused, so only a running run ticks, or holds the read.
@@ -133,19 +136,21 @@ export const ReadingPlanStore = extendStore(
       const ticked = (/** @type {any} */ r) => keys.some((k) => r.ticks && k in r.ticks);
       // plan-own: a run that counts only its own reading holds this read when it counts it (its sitting) or already
       // has it ticked; one it does not count is offered instead, and does not stand in for Mark as read.
-      const held = live.some((r) => hasIt(r) && (_countable(r, keys).length > 0 || ticked(r)));
-      const offer = live.filter((r) => hasIt(r) && !countsAnywhere(r) && !_countable(r, keys).length && !ticked(r)).map((r) => r.id);
-      if (this._shouldDefer('noteRead', bid, cid, now)) return held;
+      const listen = !!(opts && opts.listen);
+      const countable = (/** @type {any} */ r) => _countable(r, keys, listen, key);
+      const held = live.some((r) => hasIt(r) && (countable(r).length > 0 || ticked(r)));
+      const offer = live.filter((r) => hasIt(r) && !countsAnywhere(r) && !countable(r).length && !ticked(r)).map((r) => r.id);
+      if (this._shouldDefer('noteRead', bid, cid, now, opts)) return held;
       let changed = false;
       const next = this._load().map((r) => {
         if (!_valid(r) || r.status !== 'running' || !_begun(r, key)) return r;
         let out = r;
-        for (const k of _countable(r, keys)) out = tickItem(out, k, key, when.getTime());
+        for (const k of countable(r)) out = tickItem(out, k, key, when.getTime());
         if (out !== r) changed = true;
         return out;
       });
       // A reading of the plan's Listen counted once is done with: a later read of it elsewhere is elsewhere.
-      if (_listening && !(/** @type {any} */ (this))._replaying) {
+      if (listen && _listening && !(/** @type {any} */ (this))._replaying) {
         const l = _listening;
         _listening = { ...l, keys: l.keys.filter((k) => !keys.includes(k) || !live.some((r) => r.id === l.runId && hasIt(r))) };
         if (!_listening.keys.length) _listening = null;

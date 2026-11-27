@@ -133,9 +133,9 @@ describe("the plan's own Listen is opened from the plan", () => {
     ReadingPlanStore.setListening({ runId: off.id, keys: ['genesis:1', 'genesis:2'] });
     const seen = [];
     const stop = ReadingPlanStore.onOffer((o) => seen.push(o));
-    expect(ReadingPlanStore.noteRead('genesis', 1)).toBe(true);
+    expect(ReadingPlanStore.noteRead('genesis', 1, undefined, { listen: true })).toBe(true);
     expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
-    expect(ReadingPlanStore.noteRead('genesis', 3)).toBe(false);                    // not in the portion it plays
+    expect(ReadingPlanStore.noteRead('genesis', 3, undefined, { listen: true })).toBe(false);                    // not in the portion it plays
     expect(Object.keys(ReadingPlanStore.get(off.id).ticks)).toEqual(['genesis:1']);
     stop();
     expect(seen.map((o) => o.cid)).toEqual([3]);
@@ -146,14 +146,14 @@ describe("the plan's own Listen is opened from the plan", () => {
     const b = mk(['genesis:1'], { countAnywhere: false });
     ReadingPlanStore.put(a); ReadingPlanStore.put(b);
     ReadingPlanStore.setListening({ runId: a.id, keys: ['genesis:1'] });
-    ReadingPlanStore.noteRead('genesis', 1);
+    ReadingPlanStore.noteRead('genesis', 1, undefined, { listen: true });
     expect(Object.keys(ReadingPlanStore.get(a.id).ticks)).toEqual(['genesis:1']);
     expect(ReadingPlanStore.get(b.id).ticks).toEqual({});
     const c = mk(['exodus:1'], { countAnywhere: false });
     ReadingPlanStore.put(c);
     ReadingPlanStore.setListening({ runId: c.id, keys: ['exodus:1'] });
     ReadingPlanStore.setListening(null);
-    expect(ReadingPlanStore.noteRead('exodus', 1)).toBe(false);
+    expect(ReadingPlanStore.noteRead('exodus', 1, undefined, { listen: true })).toBe(false);
     expect(ReadingPlanStore.get(c.id).ticks).toEqual({});
   });
 });
