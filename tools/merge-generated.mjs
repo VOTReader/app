@@ -14,7 +14,7 @@
  * lines is left to git exactly as a normal merge would (exit 1, conflict markers in %A).
  * The generated directories (dist/**, tools/*.generated.*) use merge.votgen-ours.driver = true: keep ours, rebuild.
  */
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, openSync, closeSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,10 +66,21 @@ export function mergeGenerated(base, ours, theirs) {
     writeFileSync(join(dir, 'base'), mb.text);
     writeFileSync(join(dir, 'ours'), mo.text);
     writeFileSync(join(dir, 'theirs'), mt.text);
-    const r = spawnSync('git', ['merge-file', '-p', '-L', 'ours', '-L', 'base', '-L', 'theirs',
-      join(dir, 'ours'), join(dir, 'base'), join(dir, 'theirs')], { encoding: 'utf8' });
-    if (r.status < 0 || r.status === null || r.error) throw new Error(`git merge-file failed: ${r.error || r.stderr}`);
-    return { clean: r.status === 0, text: unmask(r.stdout, mo.values, mt.values) };
+    // No pipes: merge-file writes the result into 'ours' and its stderr goes to a file. A sync spawn with a stdout
+    // pipe waits for EOF, and on Windows any process spawned meanwhile by the same parent (a vitest worker thread
+    // beside this one, 11-26) inherits the pipe's write end and holds it until it exits: 20-72 s a merge.
+    const errFd = openSync(join(dir, 'err'), 'w');
+    let r;
+    try {
+      r = spawnSync('git', ['merge-file', '-L', 'ours', '-L', 'base', '-L', 'theirs',
+        join(dir, 'ours'), join(dir, 'base'), join(dir, 'theirs')], { stdio: ['ignore', 'ignore', errFd] });
+    } finally {
+      closeSync(errFd);
+    }
+    if (r.status < 0 || r.status === null || r.error) {
+      throw new Error(`git merge-file failed: ${r.error || readFileSync(join(dir, 'err'), 'utf8')}`);
+    }
+    return { clean: r.status === 0, text: unmask(readFileSync(join(dir, 'ours'), 'utf8'), mo.values, mt.values) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
