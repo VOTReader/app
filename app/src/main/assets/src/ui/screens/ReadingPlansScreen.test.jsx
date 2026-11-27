@@ -154,9 +154,11 @@ describe('Reading plans: the preview (3.2)', () => {
     expect(st.behind).toBe(0);
     expect(st.doneToday).toBe(false);
     expect(screen.getByText(/^Today · Genesis 1-3/)).toBeTruthy();
-    act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+    // plan-own: a new plan counts only its own reading, so the read afterwards is one opened from the plan (its sitting).
+    act(() => { ReadingPlanStore.setSitting({ runId: run.id, keys: ['genesis:1', 'genesis:2', 'genesis:3'] }); ReadingPlanStore.noteRead('genesis', 1); });
     expect(runs()[0].ticks).toEqual({ 'genesis:1': todayKey(new Date()) });
     expect(dayItems(runs()[0], 0).map((it) => it.k)).toEqual(['genesis:1', 'genesis:2', 'genesis:3']);   // day 1
+    act(() => { ReadingPlanStore.setSitting(null); });
   });
 
   it('a plan that starts tomorrow counts nothing read today: its card still says Day 1 (0245, C6)', () => {

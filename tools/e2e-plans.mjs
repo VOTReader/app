@@ -247,7 +247,11 @@ try {
     const home = await page.evaluate(() => { const r = document.querySelector('.upnext [data-plan]'); return { eyebrow: (r.querySelector('.upnext-eyebrow') || r).textContent.trim(), text: r.textContent }; });
     await shot('start-home');
     const today = await page.evaluate(async () => {
+      // plan-own: a new plan counts only its own reading, so the read is one opened from the plan (its sitting)
+      const r0 = window.ReadingPlanStore.active()[0];
+      window.ReadingPlanStore.setSitting({ runId: r0.id, keys: ['genesis:1', 'genesis:2', 'genesis:3'] });
       window.ReadingPlanStore.noteRead('genesis', 1);
+      window.ReadingPlanStore.setSitting(null);
       await window.ReadingPlanStore.whenSaved();
       const d = new Date();
       return { ticks: window.ReadingPlanStore.active()[0].ticks, key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') };
