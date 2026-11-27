@@ -9,7 +9,7 @@ import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
 import { tickItem, todayKey } from '../../data/plan-engine.js';
 import { usePlanCountOffer, COUNT_TOAST } from '../../utils/plan-runs-view.js';
-import { setPlanSessionHost, _resetPlanSessionForTests } from '../../utils/plan-session.js';
+import { setPlanSessionHost, beginPlanSession, notePlanSessionPlace, sessionReachedEnd, _resetPlanSessionForTests } from '../../utils/plan-session.js';
 import { _resetPlanNavForTests } from '../../utils/plan-nav.js';
 import { _resetToasts } from '../../utils/toast.js';
 
@@ -105,6 +105,39 @@ describe('the Count it line', () => {
     expect(Object.keys(ReadingPlanStore.get(run.id).ticks)).toEqual(['genesis:1']);
     expect(host.markRead).toHaveBeenCalledWith('genesis', 1);
     expect(toast.classList.contains('show')).toBe(false);
+  });
+
+/* hub 11-26 (plan-own r2): the 8 s line is the only way to count a read made elsewhere without going back to the
+     plan. Once it has gone, the plan page still counts the reading: its Today row opens it inside the plan (reaching
+     its end ticks it), and the day sheet's Mark day as read ticks the day. */
+  it('the line goes after 8 s with nothing ticked; then the Today row opens the reading inside the plan and its end ticks it', () => {
+    vi.useFakeTimers();
+    try {
+      const run = { ...startCatalogPlan('bible-year', null, new Date()), countAnywhere: false };
+      ReadingPlanStore.put(run);
+      const host = { move() {}, open() {}, back() {}, openPlans() {}, openNote() {}, unmarkRead() {}, isRead: () => false,
+        markRead: vi.fn((bid, cid) => { ReadingPlanStore.noteRead(bid, cid); }) };
+      setPlanSessionHost(host);
+      render(<App />);
+      act(() => { ReadingPlanStore.noteRead('genesis', 1); });
+      const toast = document.getElementById(COUNT_TOAST);
+      expect(toast.classList.contains('show')).toBe(true);
+      act(() => { vi.advanceTimersByTime(7900); });
+      expect(toast.classList.contains('show')).toBe(true);
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(toast.classList.contains('show')).toBe(false);
+      expect(ReadingPlanStore.get(run.id).ticks).toEqual({});
+
+      const onStartSession = vi.fn((runId, day) => { beginPlanSession({ runId, day, name: 'Bible in a Year' }); notePlanSessionPlace('genesis', 1); });
+      render(<PlansHub {...base({ onStartSession })} />);
+      fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: (On track|Not started)/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 1' }));
+      expect(onStartSession).toHaveBeenLastCalledWith(run.id, 0, 'genesis:1');
+      act(() => { sessionReachedEnd('genesis:1'); });
+      expect(Object.keys(ReadingPlanStore.get(run.id).ticks)).toEqual(['genesis:1']);
+      expect(host.markRead).toHaveBeenCalledWith('genesis', 1);
+      expect(screen.getByRole('button', { name: 'Read Genesis 1, read' })).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 
   it('no line for a plan that counts reading from anywhere, and two plans that do not are named as a count', () => {
