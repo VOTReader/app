@@ -61,3 +61,12 @@ describe('D02: a letter\'s preamble has no hairline above it', () => {
     expect(lines('meta-preamble', 'top')).toEqual([]);
   });
 });
+
+describe('D03: a section intro has no gold bar down its left side', () => {
+  it('.section-intro-quote draws no left border and keeps no indent that only made room for one', () => {
+    const rules = rulesFor('section-intro-quote');
+    expect(rules.length).toBeGreaterThan(0);
+    expect(lines('section-intro-quote', 'left')).toEqual([]);
+    for (const r of rules) expect(r.block).not.toMatch(/padding(-left)?:[^;]*var\(--sp-4\)/);
+  });
+});

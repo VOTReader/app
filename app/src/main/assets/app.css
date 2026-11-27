@@ -2328,7 +2328,7 @@
 
     /* The words a section opens on (studies pass 3): set as an epigraph, a measured block beside a rule in the
        body's italic, where it was a screen of centred 18 px italics before the page began. */
-    .section-intro-quote { margin:var(--sp-2) 0 var(--sp-8); padding:2px 0 2px var(--sp-4); border-left:2px solid var(--gold-border); text-align:left; }
+    .section-intro-quote { margin:var(--sp-2) 0 var(--sp-8); text-align:left; } /* text-plain D03: no bar beside the intro, so no indent for one (Corbin 2026-11-26) */
     .section-intro-text { font-family:var(--font-body); font-size:var(--fs-16); line-height:1.7; color:var(--text-1); font-style:italic; margin:0 0 0.9rem; }
     .section-intro-text:last-child { margin-bottom:0; }
     .section-intro-text .letter-link-ref { font-style:italic; }
