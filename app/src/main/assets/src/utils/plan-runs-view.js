@@ -15,6 +15,8 @@ import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
 import { openPlanNav } from './plan-nav.js';
+import { showUndoToast } from './toast.js';
+import { planSessionHost } from './plan-session.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun} PlanRun */
 /** @typedef {import('../data/plan-catalog.js').LetterSource} LetterSource */
@@ -267,6 +269,30 @@ export function editRun(run, spec, now) {
   }
   // stopped as stopRun stops a plan, so Past plans and Continue read it the same way
   return [{ ...run, status: /** @type {'stopped'} */ ('stopped'), updated: now.getTime(), stopped: todayKey(now) }, fresh];
+}
+
+export const COUNT_TOAST = 'vot-toast-plan-count';
+
+/**
+ * plan-own (Corbin 11-26): a plan item finished from outside a plan that counts only its own reading. One quiet line
+ * with one action, "In Bible in a Year · Count it"; nothing is counted unless it is tapped. Count it ticks the item in
+ * those plans and writes the read record, as every plan tick does (Mark as read on or off). Mounted once at the app.
+ */
+export function usePlanCountOffer() {
+  const store = _store();
+  React.useEffect(() => {
+    if (!store || typeof store.onOffer !== 'function') return undefined;
+    return store.onOffer((/** @type {{ bid: string, cid: any, runIds: string[] }} */ o) => {
+      const runs = o.runIds.map((id) => store.get(id)).filter(Boolean);
+      if (!runs.length) return;
+      const text = runs.length === 1 ? 'In ' + runName(runs[0], letterSource()) : 'In ' + runs.length + ' of your plans';
+      showUndoToast(COUNT_TOAST, text, () => {
+        store.countRead(runs.map((r) => r.id), o.bid, o.cid);
+        const host = planSessionHost();
+        if (host) host.markRead(o.bid, o.cid);
+      }, { label: 'Count it', durationMs: 8000 });
+    });
+  }, [store]);
 }
 
 /**
