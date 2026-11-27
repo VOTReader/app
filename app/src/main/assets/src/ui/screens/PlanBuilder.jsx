@@ -18,7 +18,7 @@ import { BIBLE_BOOKS } from '../../data/reading-plans.js';
 import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview, builderFromRun } from '../../data/plan-builder.js';
 import { LETTER_CHAIN, bookTitle } from '../../data/plan-catalog.js';
 import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel, replaceContents, runStatus, minutesFor } from '../../data/plan-engine.js';
-import { PlanSec, PlanDays, dayDate, minText } from '../components/PlanBits.jsx';
+import { PlanSec, PlanDays, PlanCountLine, dayDate, minText } from '../components/PlanBits.jsx';
 import { letterSource, saveRun, editRun, finishDate } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
@@ -70,6 +70,8 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
   const [order, setOrder] = React.useState(/** @type {'picked' | 'canonical'} */ ('picked'));
   const [share, setShare] = React.useState(/** @type {'side' | 'serial'} */ (init ? init.share : 'side'));
   const [name, setName] = React.useState(init ? init.name : '');
+  // plan-own: a new plan counts only its own reading unless asked (an edit keeps the plan's own choice: Manage)
+  const [anywhere, setAnywhere] = React.useState(false);
   // The phone's Back steps back through the builder, as the screen's Back does.
   useModalRegistry({ id: 'plan-builder', dismiss: () => onStep(step === 2 ? 1 : 0) });
 
@@ -140,6 +142,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
       return;
     }
     const run = newRun(from ? { ...spec, tracks: startFrom(spec.tracks, from) } : spec, new Date());
+    run.countAnywhere = anywhere;
     saveRun(run);
     if (onStarted) onStarted(run);
     onStep(0);
@@ -357,6 +360,12 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead, edi
         <input className="build-input build-name" type="text" aria-label="Plan name" maxLength={60} value={name}
           placeholder={defaultName(picks, src)} onChange={(e) => setName(e.target.value)} />
       </section>
+      {edit ? null : (
+        <section className="build-card" aria-label="Counting">
+          <h2 className="build-card-title">Counting</h2>
+          <PlanCountLine on={anywhere} onChange={setAnywhere} />
+        </section>
+      )}
       <div className="plan-start">
         <button type="button" className="ui-btn is-primary is-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>{edit ? 'Save changes' : 'Start plan'}</button>
         {resume ? (

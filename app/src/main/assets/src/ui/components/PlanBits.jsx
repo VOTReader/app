@@ -153,6 +153,22 @@ export function PlanSwitch({ on, label, onChange }) {
   );
 }
 
+/**
+ * plan-own (Corbin 11-26): the plan's "Count reading from anywhere" switch and what it means, said for the side it is on.
+ * Off, a read counts for the plan only when it was opened from the plan (or ticked in it). @param {{ on: boolean, onChange: (v: boolean) => void }} props
+ */
+export function PlanCountLine({ on, onChange }) {
+  return (
+    <>
+      <div className="plan-opt-line">
+        <span className="plan-opt-text">Count reading from anywhere</span>
+        <PlanSwitch on={on} label="Count reading from anywhere" onChange={onChange} />
+      </div>
+      <p className="plan-opt-note">{on ? 'A chapter or letter in this plan counts wherever you read it.' : 'Only what you open from this plan counts toward it.'}</p>
+    </>
+  );
+}
+
 /** One labelled row of the Make it yours / settings card. @param {{ label: string, children: any }} props */
 export function PlanOptRow({ label, children }) {
   return (

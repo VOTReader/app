@@ -17,7 +17,7 @@ import { startCatalogPlan, catalogResume, planDef, PLAN_GROUPS, LETTER_CHAIN, ru
 import { schedule, itemsLabel, itemKinds, todayKey, dayNum, dateOf } from '../../data/plan-engine.js';
 import { letterSource, saveRun, finishDate } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, askForReminders, isReminderTime } from '../../utils/plan-reminder.js';
-import { PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, dayDate, minText, countOf, clockTime, paceChoices } from '../components/PlanBits.jsx';
+import { PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, PlanCountLine, dayDate, minText, countOf, clockTime, paceChoices } from '../components/PlanBits.jsx';
 
 const ALL_WEEK = [true, true, true, true, true, true, true];
 const REMIND_AT = '07:30';
@@ -56,7 +56,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
   const defPace = def ? def.pace.mode + ':' + def.pace.n : '';
   const [choice, setChoice] = React.useState(() => ({
     start: 'today', on: '', from: '', volKey: (opt && opt.volKey) || 'one',
-    paceId: defPace, weekdays: (def && def.weekdays) || ALL_WEEK, remind: reminderSupported(), at: REMIND_AT,
+    paceId: defPace, weekdays: (def && def.weekdays) || ALL_WEEK, remind: reminderSupported(), at: REMIND_AT, anywhere: false,
   }));
   const [status, setStatus] = React.useState('');
   const set = (/** @type {any} */ patch) => setChoice((c) => ({ ...c, ...patch }));
@@ -85,6 +85,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
       run.remind = choice.at;
       askForReminders(() => {});
     }
+    run.countAnywhere = !!choice.anywhere;   // plan-own: a new plan counts only its own reading unless asked
     saveRun(run);
     onStarted(run.id);
   };
@@ -152,6 +153,9 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
             <PlanSwitch on={choice.remind} label="Remind me each day" onChange={(v) => set({ remind: v })} />
           </PlanOptRow>
         ) : null}
+        <PlanOptRow label="Counting">
+          <PlanCountLine on={choice.anywhere} onChange={(v) => set({ anywhere: v })} />
+        </PlanOptRow>
       </div>
 
       <div className="plan-start">

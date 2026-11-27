@@ -33,7 +33,7 @@ import { supported as reminderSupported, reminderStatus, askForReminders, openRe
 import { canTell } from '../../utils/download-gate.js';
 import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
 import { PlanListen } from '../components/TodayCard.jsx';
-import { PlanRing, PlanTick, PlanSheet, PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, dayDate, monthDay, minText, countOf, paceChoices, WEEK_LETTERS, WEEK_NAMES } from '../components/PlanBits.jsx';
+import { PlanRing, PlanTick, PlanSheet, PlanSec, PlanChips, PlanDays, PlanSwitch, PlanOptRow, PlanCountLine, dayDate, monthDay, minText, countOf, paceChoices, WEEK_LETTERS, WEEK_NAMES } from '../components/PlanBits.jsx';
 
 const REMIND_AT = '07:30';
 const QUIET_ASKED = 'vot-plan-quiet-asked';
@@ -173,6 +173,10 @@ export function PlanSettings({ run, now, tracksOf, onClose, onStopped, onStartOv
               ) : null}
             </PlanOptRow>
           ) : null}
+          {/* plan-own: absent is on (every plan before the switch); turning it off unticks nothing */}
+          <PlanOptRow label="Counting">
+            <PlanCountLine on={run.countAnywhere !== false} onChange={(v) => saveRun({ ...run, countAnywhere: v, updated: Date.now() })} />
+          </PlanOptRow>
           {tracksOf ? <WeekAudio plan={run} from={st.day} tracksOf={tracksOf} /> : null}
           {/* 0450: what the tap does is said before it (hub: it starts again, keeps the plan's own reading, gives up being ahead) */}
           {onOwnOnly && canCountOwnOnly(run) ? (
