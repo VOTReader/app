@@ -627,7 +627,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       into.push(para);
     }
     flush();
-    if (String((ps[end - 1] && ps[end - 1].text) || '').trim() !== '✦') out.push(<p key="orn" className="ans-orn" aria-hidden="true">✦</p>);
+    // text-plain D12 (Corbin 2026-11-26: "Go and do the star"): no ✦ of the app's own after the last line; the foot's 40px holds the space.
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id names it
   }, [entry.id, meta, ready, landedPara, ts2, folded, openSecs, rows, byId]);

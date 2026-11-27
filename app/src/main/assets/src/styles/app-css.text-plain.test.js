@@ -115,3 +115,11 @@ describe('D05: no star divider after the last line of a reading (Corbin 2026-11-
     expect(gap[0].block).not.toMatch(/border|background/);
   });
 });
+
+describe('D12: an Answers topic ends on its own last line, with no ✦ the app adds (Corbin 2026-11-26: "Go and do the star")', () => {
+  it('AnswersTopic.jsx appends no ✦ after the topic; the source\'s own ✦ paragraphs still render as .ans-orn', () => {
+    const s = readFileSync(resolve(here, '..', 'ui', 'components', 'AnswersTopic.jsx'), 'utf8');
+    expect(s).not.toMatch(/className="ans-orn"[^>]*>✦</);
+    expect(s).toMatch(/case 'orn':/);
+  });
+});
