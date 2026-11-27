@@ -13,4 +13,7 @@ describe('the Counting line (plan-own)', () => {
     expect(block('.plan-count-line')).toBe('flex-wrap: nowrap;');
     expect(block('.plan-count-line > .plan-opt-text')).toBe('flex: 1 1 0; min-width: 0;');
   });
+  it('the note under it uses the UI font in the custom builder too (no --pl-ui there)', () => {
+    expect(block('.plan-opt-note')).toContain('font-family: var(--pl-ui, var(--font-ui));');
+  });
 });
