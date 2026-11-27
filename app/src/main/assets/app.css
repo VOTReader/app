@@ -2187,7 +2187,7 @@
       .bottom-nav-card.next { text-align: right; }
       .bottom-nav-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); overflow-wrap: break-word; }
       .bottom-nav-title { font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); line-height: 1.35; margin-top: 3px; }
-      /* ── ORNAMENT DIVIDER ── */
+      /* ── END OF A READING ── */
       /* text-plain D05 (Corbin 2026-11-26): the ✦ divider after the last line is gone; its space stays. min-height keeps
          the two margins from collapsing into one on an empty box. */
       .reading-end-gap { min-height: 1px; margin: 2.5rem 0 1.5rem; }
@@ -8477,7 +8477,7 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 .ans-fd-truth > strong:not(.ans-lead){min-width:0}
 .ans-fd-truth .ans-chev{margin-left:auto;align-self:center}
 
-/* A24. One rule between blocks: a bordered row right before a section head gives its bottom rule to the head's top rule */
+/* A24 (retired, text-plain D10): a section head draws no rule above it, so a bordered row before one keeps its own bottom rule */
 
 /* A25. Text Size 2 and up: a tablet row starts at the left like every other row */
 /* (in the Text Size 2 tablet rule) */
