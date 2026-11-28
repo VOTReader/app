@@ -1,43 +1,27 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   InstallCard — "Keep VOTReader on your home screen" (ip1, 2026-09-25)
+   InstallCard.jsx — installing VOTReader from the browser
    ═══════════════════════════════════════════════════════════════════════
-   Built to lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png (two ChatGPT
-   image rounds), then (UX wave 3, U01.3/U06.5) folded to one line UNDER the
-   prev/next cards: "Keep VOTReader on your home screen · Install · Not now".
-   The card sat between the text and Next letter, about 2,700 px tall at
-   300%, so reaching the next letter meant scrolling past it. Part of the
-   page, never a popup over the reading.
-   utils/install-offer.js decides (installFlow, shouldOffer, dismiss):
-     - browser only: never in the APK, an installed app, Firefox desktop or
-       an in-app browser;
-     - after a finished chapter (a read item, or the reader scrolled to
-       this chapter's end with mark-as-read off: their own scroll, not a
-       search jump that lands there, search200 UX B1);
-     - one place a session; Not now snoozes it 21 days and then it is
-       offered again, for as long as the app is not installed; after an
-       install it waits 21 days and looks again (install-offer).
-   Chromium that handed over beforeinstallprompt gets a real INSTALL
-   VOTREADER button (the browser's own dialog). Everyone else gets SHOW ME
-   HOW: numbered steps, each with a picture (install/*.jpg, cropped from
-   the image rounds with the app's own icon pasted in). Per-browser state
-   lives in localStorage: an install is this browser's, not the reader's
-   data, so it is neither synced nor in a backup. No offline-audio promise
-   (the PWA does not keep recordings the way the APK does).
+   InstallPopup   the offer, on Home, once it is earned (utils/install-offer.js earned/shouldOffer) and the session
+                  is its to speak in (utils/unasked.js). Never over a reading page.
+   InstallRow     Settings > Install VOTReader, always there where this browser can install.
+   InstallSteps   numbered steps with a picture each (install/*.jpg), for a browser that keeps its install to itself.
+   The end-of-chapter card (ip1, 2026-09-25) left the reading flow in 814baf2f6 and was deleted with the newcomer
+   work (2026-11-27). Per-browser state lives in localStorage ('vot-install-offer'): an install is this browser's,
+   not the reader's data, so it is neither synced nor in a backup. Never in the APK, an installed app, Firefox on a
+   computer; an in-app browser is told to open the page in the phone's own browser.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
-import { watchReaderScroll } from '../../utils/reader-hand.js';
+import { want, claim, canShow, finishedReadings, readOnEarlierDay, isFirstRunSession, subscribeUnasked, unaskedVersion } from '../../utils/unasked.js';
+import { installFlow, shouldOffer, earned, noteShown, dismiss, seemsInstalled, markStandalone, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
 
 const STATE_KEY = 'vot-install-offer';
 
-/** The unit (chapter/letter) that showed the card this session; null until one has. */
-let _sessionUnit = /** @type {string | null} */ (null);
 /** Whether this session has shown "Almost done" (one sheet, whoever saw the install first). */
 let _afterTold = false;
 /** Whether this session has written down that the browser said "installed" (once, whoever heard it first). */
 let _installNoted = false;
 /** Tests only. */
-export function _resetInstallCardSession() { _sessionUnit = null; _afterTold = false; _installNoted = false; }
+export function _resetInstallCardSession() { _afterTold = false; _installNoted = false; }
 
 /** @returns {import('../../utils/install-offer.js').InstallOfferState} */
 function _readState() {
@@ -75,18 +59,8 @@ function _flow() {
   });
 }
 
-function _readCount() {
-  const g = /** @type {any} */ (globalThis);
-  try {
-    const s = g.StateStore && g.StateStore.get();
-    return s && s.readItems ? Object.keys(s.readItems).length : 0;
-  } catch (_e) { return 0; }
-}
-
 const _ua = () => (typeof navigator !== 'undefined' && navigator.userAgent) || '';
 const _isAndroid = () => /Android/.test(_ua());
-/** The end-of-chapter card never shows in an in-app browser; the Settings row does, to say where to go instead. */
-const _cardFlow = () => { const f = _flow(); return f && /^in-app/.test(f) ? null : f; };
 
 const IN_APP_INTRO = 'This is the browser inside another app, such as Messenger or Facebook. It cannot add VOTReader to your phone.';
 
@@ -203,113 +177,6 @@ const STEPS = {
 const PROMPT_FALLBACK = () => (/Android/.test((typeof navigator !== 'undefined' && navigator.userAgent) || '') ? 'android-chrome' : 'desktop');
 
 /**
- * @param {{ unitKey: string, inert?: boolean }} props
- */
-export function InstallCard({ unitKey, inert = false }) {
-  React.useSyncExternalStore(subscribeInstall, hasInstallPrompt);
-  const [state, setState] = React.useState(_readState);
-  const [stepsFor, setStepsFor] = React.useState(/** @type {string | null} */ (null));
-  const [gone, setGone] = React.useState(false);
-  // The unit whose end the reader scrolled to (null until one): another unit's end is not this one's.
-  const [reachedEnd, setReachedEnd] = React.useState(/** @type {string | null} */ (null));
-  const sentinel = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-
-  const flow = inert ? null : _cardFlow();
-  const engaged = reachedEnd === unitKey || _readCount() > 0;
-  const otherUnit = _sessionUnit != null && _sessionUnit !== unitKey;
-  const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
-  const show = !gone && !installed && !otherUnit && shouldOffer(state, { flow, engaged, shownThisSession: false, now: Date.now() });
-
-  // Mark-as-read off leaves no read item: arriving at this chapter's end after scrolling is the finished chapter.
-  // The scroll must be the reader's own (search200 UX B1): a search hit near the end lands the end on screen,
-  // and that jump is a look, not a finished chapter. Once the reader has moved this page (utils/reader-hand.js),
-  // its end counts, a fling's momentum included.
-  React.useEffect(() => {
-    const el = sentinel.current;
-    const scroller = el && el.closest('.screen-scroll');
-    if (inert || !el || !scroller || typeof IntersectionObserver === 'undefined') return undefined;
-    let readerScrolled = false;
-    let atEnd = false;
-    const check = () => { if (atEnd && readerScrolled && scroller.scrollTop > 0) setReachedEnd(unitKey); };
-    const stopWatch = watchReaderScroll(scroller, () => { readerScrolled = true; check(); });
-    const io = new IntersectionObserver((entries) => {
-      if (entries.length) atEnd = entries[entries.length - 1].isIntersecting;
-      check();
-    });
-    io.observe(el);
-    scroller.addEventListener('scroll', check, { passive: true });
-    return () => {
-      io.disconnect();
-      stopWatch();
-      scroller.removeEventListener('scroll', check);
-    };
-  }, [inert, unitKey]);
-
-  // One place a session: the card claims the session when it is on screen (or at once without an observer).
-  React.useEffect(() => {
-    if (!show || _sessionUnit === unitKey) return undefined;
-    const el = sentinel.current;
-    if (!el || typeof IntersectionObserver === 'undefined') { _sessionUnit = unitKey; return undefined; }
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting) && _sessionUnit == null) _sessionUnit = unitKey;
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [show, unitKey]);
-
-  const end = React.useCallback((/** @type {'later'|'installed'} */ how) => {
-    let next;
-    if (how === 'installed') next = _noteInstalled();
-    else { next = dismiss(_readState(), 'later', Date.now()); _writeState(next); }
-    setState(next);
-    setStepsFor(null);
-    setGone(true);
-  }, []);
-
-  /* W56: an install from the browser's own menu (or the address-bar icon) fires appinstalled and nothing
-     else; the card only lost its event and fell back to SHOW ME HOW for an app already installed, then asked
-     again in the browser tab every session. An install this window saw hides the card at once (`show`) and
-     is written down, here or on the next card to mount: the offer waits 21 days and then looks again. */
-  React.useEffect(() => {
-    if (installed && !inert && !_installNoted) end('installed');
-  }, [installed, inert, end]);
-
-  const onPrimary = React.useCallback(async () => {
-    if (flow !== 'prompt') { setStepsFor(flow); return; }
-    const outcome = await promptInstall();
-    if (outcome === 'accepted') end('installed');
-    else if (outcome === 'dismissed') end('later');
-    else setStepsFor(PROMPT_FALLBACK());
-  }, [flow, end]);
-
-  // A swipe peek keeps the sentinel's line (TABS2: the page under the finger is laid out as the page it becomes).
-  if (inert) return <div className="install-card-sentinel" aria-hidden="true" />;
-  const desktop = flow === 'desktop' || (flow === 'prompt' && !/Android|iPhone|iPad/.test(navigator.userAgent || ''));
-  return (
-    <>
-      <div ref={sentinel} className="install-card-sentinel" aria-hidden="true" />
-      {show && (
-        <section className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
-          <img className="install-card-icon" src="icons/icon-192.png" alt="" width="28" height="28" />
-          <span className="install-card-title" id={'install-card-title-' + unitKey}>
-            {desktop ? 'Keep VOTReader on this computer' : 'Keep VOTReader on your home screen'}
-          </span>
-          <span className="install-card-actions">
-            <button type="button" className="install-card-primary" onClick={onPrimary}>
-              {flow === 'prompt' ? 'Install' : 'Show me how'}
-            </button>
-            <button type="button" className="install-card-later" onClick={() => end('later')}>Not now</button>
-          </span>
-        </section>
-      )}
-      {stepsFor && STEPS[/** @type {keyof typeof STEPS} */ (stepsFor)] && (
-        <InstallSteps flow={/** @type {keyof typeof STEPS} */ (stepsFor)} onDone={() => end('later')} onClose={() => setStepsFor(null)} />
-      )}
-    </>
-  );
-}
-
-/**
  * Settings > Help > "Install VOTReader" (PO2 item 19). The end-of-chapter card is gone from the reading flow;
  * this row is where a reader installs. Never in the APK or an installed app (installFlow says null).
  * A Chromium that handed over beforeinstallprompt opens the browser's own dialog; everyone else gets the steps;
@@ -365,9 +232,12 @@ export function InstallRow({ Row = null }) {
    that day: with beforeinstallprompt left alone, nothing appears), so the popup those sites show is their own,
    and this is ours: it comes up by itself on Home once the browser has said the app can be installed. Install
    opens the browser's own dialog, and that is the whole install. Not on a reading page (PO2 19), not over the
-   tour or another dialog, once a session. Not now waits 21 days and then it asks again, for as long as the app
-   is not installed (Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers
-   it, then reoffers it every so often"); what a page can know of "installed" is install-offer's seemsInstalled.
+   tour or another dialog. When (newcomer, Corbin 2026-11-27: "Move the PWA install icon to a popup that shows
+   after using the app for an hour, instead of immediately, or whatever is most professional"): never in the first
+   session; after that, a later-day return with one finished reading, or three finished readings; and only in a
+   session nothing else has spoken in (utils/unasked.js). A showing counts when it shows, answered or not: the offer
+   then waits 21 days, and after two showings not ended by an install it stops (install-offer's DECLINES_TO_STOP;
+   Settings > Install VOTReader stays). What a page can know of "installed" is install-offer's seemsInstalled.
    A computer's Chrome or Edge is asked only with the button in hand: no install event from it means the app is
    there already, so it is not told about the address bar.
    In an in-app browser (Messenger, Facebook) nothing can be installed, and a link tapped in Messenger opens
@@ -470,10 +340,16 @@ export function InstallPopup({ screen }) {
   React.useSyncExternalStore(subscribeInstall, hasInstallPrompt);
   const [kind, setKind] = React.useState(/** @type {string | null} */ (null));
   const [stepsFor, setStepsFor] = React.useState(/** @type {string | null} */ (null));
+  React.useSyncExternalStore(subscribeUnasked, unaskedVersion);
   const flow = _flow();
   const offer = flow;   // every browser with a way to install: a button where the browser gives one, a line where not
-  const due = !kind && !_popupSeen && screen === 'home' && !!offer && !_driven()
-    && shouldOffer(_readState(), { flow: offer, engaged: true, shownThisSession: false, now: Date.now() });
+  // Due this session (wherever the reader is): the offer is earned and not resting. Shown only on Home, and only
+  // when the session is the popup's to speak in; while it is due, the plan offer and the tip wait their turn.
+  const engaged = earned({ firstRun: isFirstRunSession(), finished: finishedReadings(), laterDay: readOnEarlierDay() });
+  const wanted = !kind && !_popupSeen && !!offer && !_driven()
+    && shouldOffer(_readState(), { flow: offer, engaged, shownThisSession: false, now: Date.now() });
+  const due = wanted && screen === 'home' && canShow('install', { pause: true });
+  React.useEffect(() => { want('install', wanted); }, [wanted]);
   // Ask the browser once whether the app is installed here; a run from the app's own icon is written down, so a
   // tab of the same browser knows not to ask a reader who has it.
   React.useEffect(() => {
@@ -487,8 +363,10 @@ export function InstallPopup({ screen }) {
     if (!due) return undefined;
     const t = setTimeout(() => {
       if (_popupSeen || _screenTaken()) return;   // the next arrival on Home asks instead
-      if (seemsInstalled(_readState(), { now: Date.now(), related: _related, hasPrompt: hasInstallPrompt(), android: _isAndroid(), flow: offer })) return;
+      if (seemsInstalled(_readState(), { now: Date.now(), related: _related, hasPrompt: hasInstallPrompt(), android: _isAndroid(), flow: offer })) { want('install', false); return; }
+      if (!claim('install', { pause: true })) return;
       _popupSeen = true;
+      _writeState(noteShown(_readState(), Date.now()));
       setKind(offer);
     }, _eventMayCome(offer) ? POPUP_EVENT_WAIT_MS : POPUP_DELAY_MS);
     return () => clearTimeout(t);

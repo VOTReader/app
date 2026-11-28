@@ -79,6 +79,7 @@ import { PlatformBridge } from './platform-bridge.js';
 import { getBuildVersion, fetchServerBuildVersion } from './build-version.js';
 import { showToast, hideToast } from './toast.js';
 import { takeNewItems, openWhatsNew } from './whats-new.js';
+import { note } from './unasked.js';
 
 /** localStorage key. Listed in cached-store.js's LS_SKIP_LIST so the one-time
  *  vot-* sweep leaves it alone. */
@@ -234,6 +235,7 @@ async function announce() {
   const items = await takeNewItems();
   if (listenShown) return 'shown';   // the player asked for the tap while the list was read: that toast stays
   if (!items.length) return 'quiet';
+  note('whats-new');   // shown on any screen (Corbin 09-10), and nothing else unasked follows it this session
   showActionToast(UPDATED_TOAST_TEXT, UPDATED_TOAST_MS, () => { void openWhatsNew(items); });
   return 'shown';
 }

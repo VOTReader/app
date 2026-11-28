@@ -14,15 +14,16 @@
                  for an in-app browser, which cannot install and is told to
                  open the page in the phone's own browser; else null (never
                  offered: the APK, an installed app, Firefox desktop).
-   shouldOffer   the trigger rules: engaged first (a finished chapter), at
-                 most once a session, and not inside the 21 days after the
-                 last answer. Nothing ends it: Corbin 2026-11-21, "detects
-                 somehow if the pwa is installed on the device, and if not
-                 offers it, then reoffers it every so often".
-   dismiss       the next persisted state after "Not now" or an install:
-                 either way the offer waits 21 days and then looks again.
-                 "I already have it" (asked only where the browser cannot
-                 say) waits 180 days.
+   earned        whether the reader has shown they are staying (newcomer, Corbin 2026-11-27: not "after an hour" on
+                 a clock, which the app would have to count): never in the session the welcome ran in; after that, a
+                 return on a later day with one finished reading, or three finished readings.
+   shouldOffer   the trigger rules: earned, at most once a session (utils/unasked.js), not inside the 21 days after
+                 the last showing, and never again after two showings the reader did not end with an install (the
+                 Settings row stays the way in). Each showing counts when it shows, answered or not.
+   noteShown / dismiss
+                 the persisted state after a showing, and after its answer: "Not now" or no answer waits 21 days;
+                 an install waits 21 days and looks again (a phone's yes is not yet an icon); "I already have it"
+                 (asked only where the browser cannot say) waits 180 days.
    seemsInstalled / markStandalone
                  a browser tab does not ask a reader who has the app already.
    capture       holds the deferred beforeinstallprompt event, from boot.
@@ -34,6 +35,21 @@ export const SNOOZE_DAYS = 21;
    leave itself a note: the reader's word is all there is (Corbin 2026-11-21: "Be careful with firefox and safari,
    we don't want to install over a preexisting pwa"). Half a year, not for ever: an app can be removed. */
 export const HAVE_DAYS = 180;
+/* Showings the reader did not end with an install, after which the popup does not come back (newcomer, Corbin
+   2026-11-27 "I agree with your takes"; it replaces his 11-21 "reoffers it every so often"). */
+export const DECLINES_TO_STOP = 2;
+/* Finished readings that earn the offer without a return on a later day. */
+export const READINGS_TO_EARN = 3;
+
+/**
+ * Never in the first session; after that, a later-day return with one finished reading, or three finished readings.
+ * @param {{ firstRun: boolean, finished: number, laterDay: boolean }} r
+ * @returns {boolean}
+ */
+export function earned(r) {
+  if (r.firstRun) return false;
+  return r.finished >= READINGS_TO_EARN || (r.finished >= 1 && r.laterDay);
+}
 
 /**
  * @param {string} ua
@@ -69,11 +85,12 @@ export function installFlow(ua, env) {
 }
 
 /**
- * dismissals: how many times the reader said "Not now" (kept as a count; it ends nothing). installedAt: the last
+ * dismissals: showings not ended by an install (counted when the popup shows; DECLINES_TO_STOP ends the offer).
+ * pending: a showing is up and not yet answered (an install or "I already have it" takes its count back). installedAt: the last
  * time this browser said the app was installed. haveAt: the last time the reader said so. never: written until 2026-11-21 for "installed", read by nothing
  * now: an install was ended "for good" on Chrome's word alone, and Chrome says yes on a phone before the icon
  * exists (and where the phone then added none, the reader was never asked again).
- * @typedef {{ dismissals?: number, snoozeUntil?: number, installedAt?: number, haveAt?: number, standaloneAt?: number, real?: boolean, never?: boolean }} InstallOfferState
+ * @typedef {{ dismissals?: number, pending?: boolean, snoozeUntil?: number, installedAt?: number, haveAt?: number, standaloneAt?: number, real?: boolean, never?: boolean }} InstallOfferState
  */
 
 /**
@@ -84,6 +101,7 @@ export function installFlow(ua, env) {
 export function shouldOffer(state, ctx) {
   const s = state || {};
   if (!ctx.flow || !ctx.engaged || ctx.shownThisSession) return false;
+  if ((s.dismissals || 0) >= DECLINES_TO_STOP) return false;
   return !(s.snoozeUntil && ctx.now < s.snoozeUntil);
 }
 
@@ -96,10 +114,28 @@ export function shouldOffer(state, ctx) {
 export function dismiss(state, how, now) {
   const s = Object.assign({}, state || {});
   delete s.never;
+  const pending = !!s.pending;
+  delete s.pending;
   s.snoozeUntil = now + (how === 'have' ? HAVE_DAYS : SNOOZE_DAYS) * 86400000;
   if (how === 'have') s.haveAt = now;
   else if (how === 'installed') s.installedAt = now;
-  else s.dismissals = (s.dismissals || 0) + 1;
+  if (how === 'later') { if (!pending) s.dismissals = (s.dismissals || 0) + 1; }   // a showing counted itself
+  else if (pending) s.dismissals = Math.max(0, (s.dismissals || 0) - 1);           // it ended in an install: no decline
+  return s;
+}
+
+/**
+ * The popup is up: the showing counts now, answered or not, and the offer waits 21 days from it.
+ * @param {InstallOfferState | null | undefined} state
+ * @param {number} now
+ * @returns {InstallOfferState}
+ */
+export function noteShown(state, now) {
+  const s = Object.assign({}, state || {});
+  delete s.never;
+  s.dismissals = (s.dismissals || 0) + 1;
+  s.pending = true;
+  s.snoozeUntil = now + SNOOZE_DAYS * 86400000;
   return s;
 }
 

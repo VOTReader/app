@@ -17,7 +17,7 @@
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
-import { TourPrompt } from '../components/TourPrompt.jsx';
+import { useUnasked } from '../../hooks/use-unasked.js';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 import { historyEntryWords } from '../components/HistoryEntryCard.jsx';
@@ -105,8 +105,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   // the card offers one; × (Not now) hides the offer on this device.
   const [offerHidden, setOfferHidden] = React.useState(() => { try { return localStorage.getItem(PLAN_OFFER_KEY) === '1'; } catch (_e) { return false; } });
   const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
-  const offerPlan = !offerHidden && !todayRows.length && !(Array.isArray(readingPlans) && readingPlans.length)
+  const planWanted = !offerHidden && !todayRows.length && !(Array.isArray(readingPlans) && readingPlans.length)
     && !!planStore && (typeof planStore.getState !== 'function' || planStore.getState() === 'loaded');
+  // newcomer (2026-11-27): an unasked offer, so it waits for the first finished reading and for a session nothing
+  // else has spoken in (utils/unasked.js).
+  const offerPlan = useUnasked('plan', planWanted);
   const hideOffer = () => { setOfferHidden(true); try { localStorage.setItem(PLAN_OFFER_KEY, '1'); } catch (_e) { /* private window: hidden for this visit */ } };
 
   /** @type {Record<string, { eyebrow: string, title: string, detail: string }>} */
@@ -221,8 +224,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           </>
         ) : null}
         <p className="home-status" role="status">{homeStatus}</p>
-        {/* The tour's offer: an inline card at the end of the Read tab only (the UI pass, U §4); never a float. */}
-        <TourPrompt screen="home" />
+        {/* newcomer (2026-11-27): the tour is offered once, on the welcome; after that it is Settings' and About's
+            "Show me around". Home carries no "New here?" card. */}
       </div>
     </ScreenLayout>
   );

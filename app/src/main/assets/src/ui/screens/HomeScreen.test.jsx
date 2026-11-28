@@ -9,6 +9,7 @@ import { render, cleanup, fireEvent, screen, act } from '@testing-library/react'
 import { HomeScreen, continueLabel, readTileOrder, READ_TILES } from './HomeScreen.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
 import { ThemeBtn } from '../components/ThemeBtn.jsx';
+import { _resetUnasked } from '../../utils/unasked.js';
 
 const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'translationLabel', 'NavButtons'];
 
@@ -154,7 +155,11 @@ describe('HomeScreen — the Read root', () => {
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
     cleanup();
     ReadingPlanStore.replaceAll([]);
+    // newcomer: the offer is unasked, so it waits for a finished reading (utils/unasked.js) and comes a tick later.
+    _resetUnasked();
+    globalThis.StateStore = { get: () => ({ readItems: { 'v1:x:0': 1 } }) };
     const bare = renderHome({ readingPlans: [], isRead: () => false });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(bare.container.querySelector('.upnext').textContent).toContain('Start a reading plan');
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(bare.container.querySelector('.upnext')).toBeNull();   // nothing else to show: no empty card
@@ -162,6 +167,26 @@ describe('HomeScreen — the Read root', () => {
     expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.upnext')).toBeNull();
     localStorage.removeItem('vot-plans-offer-hidden');
     delete window.ReadingPlanStore;
+    delete globalThis.StateStore;
+    _resetUnasked();
+  });
+
+  /* newcomer (2026-11-27): Home for someone who has read nothing carries no plan offer and no "New here?" card. */
+  it('a reader who has finished nothing is offered no plan, and Home has no tour card', async () => {
+    setupGlobals();
+    const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    window.ReadingPlanStore = ReadingPlanStore;
+    _resetUnasked();
+    globalThis.StateStore = { get: () => ({ readItems: {} }) };
+    const { container } = renderHome({ readingPlans: [], isRead: () => false });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(container.textContent).not.toContain('Start a reading plan');
+    expect(container.querySelector('.tour-prompt')).toBeNull();
+    expect(container.textContent).not.toMatch(/New here/i);
+    delete window.ReadingPlanStore;
+    delete globalThis.StateStore;
   });
 });
 

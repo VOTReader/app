@@ -1,15 +1,16 @@
 // @ts-nocheck
-/* THE INSTALL CARD (ip1, 2026-09-25; mockups lanes/myweb/out/mockups/ip1/ip1-r2-*.png).
-   At the end of a chapter or letter, in the browser only, once the reader has finished a chapter: "Keep VOTReader on
-   your home screen". Chromium that handed over its install event gets a real INSTALL VOTREADER button; iPhone Safari,
-   Samsung Internet, Android Chrome without the event and desktop Chrome/Edge get SHOW ME HOW, a sheet of numbered
-   steps with a picture each. Never in the APK, an installed app, Firefox desktop or an in-app browser. Maybe later
-   (or the X) snoozes it 21 days, Don't ask again ends it, and it shows in one place a session. */
+/* INSTALLING FROM THE BROWSER: the popup on Home (once earned, newcomer 2026-11-27), the Settings row and its steps.
+   The end-of-chapter card these tests began with (ip1, 2026-09-25) left the reading flow in 814baf2f6 and was deleted
+   on 2026-11-27, with its tests; the steps sheet's tests moved to the Settings row, which opens the same sheet. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { InstallCard, InstallRow, InstallPopup, ownBrowserUrl, _resetInstallCardSession, _resetInstallPopupSession } from './InstallCard.jsx';
+import { InstallRow, InstallPopup, ownBrowserUrl, _resetInstallCardSession, _resetInstallPopupSession as _resetPopupOnly } from './InstallCard.jsx';
+import { _resetUnasked, markFirstRunSession } from '../../utils/unasked.js';
+
+/** A new session: the popup's own memory and the one-a-session gate both start again. */
+const _resetInstallPopupSession = () => { _resetPopupOnly(); _resetUnasked(); };
 import { attachInstallCapture, _resetInstallCapture } from '../../utils/install-offer.js';
 
 const UA = {
@@ -27,8 +28,11 @@ const UA = {
 const KEY = 'vot-install-offer';
 let ua = UA.iphone;
 let readItems = { 'v1:genesis:1': 1 };
+/** Three finished readings: the install offer is earned (install-offer's READINGS_TO_EARN). */
+const EARNED = { 'v1:genesis:1': 1, 'v1:genesis:2': 1, 'v1:genesis:3': 1 };
 
 beforeEach(() => {
+  _resetUnasked();
   globalThis.ReactDOM = ReactDOM;   // the app's global (bundle-a)
   ua = UA.iphone;
   readItems = { 'v1:genesis:1': 1 };
@@ -46,68 +50,27 @@ afterEach(() => {
   localStorage.removeItem(KEY);
 });
 
-const card = (c) => c.querySelector('.install-card');
 
-describe('InstallCard: who sees it', () => {
-  it('an iPhone reader who has finished a chapter sees the card with SHOW ME HOW and the app\'s own icon', () => {
-    const { container } = render(<InstallCard unitKey="genesis:1" />);
-    expect(card(container)).not.toBeNull();
-    expect(card(container).querySelector('.install-card-title').textContent).toBe('Keep VOTReader on your home screen');
-    expect(card(container).querySelector('.install-card-primary').textContent).toBe('Show me how');
-    expect(card(container).querySelector('img.install-card-icon').getAttribute('src')).toBe('icons/icon-192.png');
-  });
-
-  it('nobody in the APK, in an installed app, in Firefox desktop, or before a finished chapter', () => {
-    globalThis.PlatformBridge.isAndroid = true;
-    let v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container)).toBeNull(); cleanup();
-    globalThis.PlatformBridge.isAndroid = false;
-    globalThis.StorageHealth._isStandalone = () => true;
-    v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container)).toBeNull(); cleanup();
-    globalThis.StorageHealth._isStandalone = () => false;
-    ua = UA.firefoxDesktop;
-    v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container)).toBeNull(); cleanup();
-    ua = UA.iphone; readItems = {};
-    v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container)).toBeNull();
-  });
-
-  it('inert (the swipe preview) renders nothing', () => {
-    const { container } = render(<InstallCard unitKey="a" inert />);
-    expect(card(container)).toBeNull();
-  });
-
-  it('once a session: a second chapter does not show it again', () => {
-    const one = render(<InstallCard unitKey="genesis:1" />);
-    expect(card(one.container)).not.toBeNull();
-    const two = render(<InstallCard unitKey="genesis:2" />);
-    expect(card(two.container)).toBeNull();
-  });
-});
-
-describe('InstallCard: the steps', () => {
-  it('iPhone: SHOW ME HOW opens four numbered steps with pictures; Done closes and asks again later', () => {
-    const { container } = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(container).querySelector('.install-card-primary')); });
+/* The steps sheet, opened from the Settings row (it was opened from the end-of-chapter card until that card was
+   deleted, newcomer 2026-11-27; these three tests moved with the sheet, unchanged in what they check). */
+describe('InstallSteps: the numbered steps', () => {
+  const openRow = () => { const v = render(<InstallRow />); act(() => { fireEvent.click(v.getByRole('button', { name: /Install VOTReader/ })); }); return v; };
+  it('iPhone: four numbered steps with pictures; Done closes them', () => {
+    openRow();
     const sheet = document.querySelector('.install-steps');
     expect(sheet.getAttribute('role')).toBe('dialog');
     expect([...sheet.querySelectorAll('.install-step img')].map((i) => i.getAttribute('src')))
       .toEqual(['install/ios-1.jpg', 'install/ios-2.jpg', 'install/ios-3.jpg', 'install/ios-4.jpg']);
-    expect([...sheet.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+    expect([...sheet.querySelectorAll('.install-step-title')].map((x) => x.textContent))
       .toEqual(['Tap the ••• button', 'Tap Share', 'Tap Add to Home Screen', 'Tap Add']);
     act(() => { fireEvent.click(sheet.querySelector('.install-steps-done')); });
     expect(document.querySelector('.install-steps')).toBeNull();
-    expect(card(container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
   });
 
   /* Focus used to go to Done, the first control, at the sheet's foot: a sheet taller than the screen opened
      scrolled to its last step (seen at 200% text, 2026-11-20). The sheet takes focus itself. */
   it('opens at its first step: focus is on the sheet, not on Done at its foot', () => {
-    const { container } = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(container).querySelector('.install-card-primary')); });
+    openRow();
     const sheet = document.querySelector('.install-steps');
     expect(document.activeElement).toBe(sheet);
     expect(sheet.getAttribute('aria-labelledby')).toBe(sheet.querySelector('.install-steps-title').id);
@@ -115,211 +78,19 @@ describe('InstallCard: the steps', () => {
 
   it('Samsung Internet and Android Chrome without the install event get their own steps', () => {
     ua = UA.samsung;
-    let v = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(v.container).querySelector('.install-card-primary')); });
+    openRow();
     expect(document.querySelectorAll('.install-step img')[0].getAttribute('src')).toBe('install/samsung-1.jpg');
-    cleanup(); _resetInstallCardSession();
+    cleanup();
     ua = UA.android;
-    v = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(v.container).querySelector('.install-card-primary')); });
+    openRow();
     // Walked on a real Chrome (2026-11-20): four taps, and the last one is the phone's own box.
     expect([...document.querySelectorAll('.install-step img')].map((i) => i.getAttribute('src')))
       .toEqual(['install/android-1.jpg', 'install/android-2.jpg', 'install/android-3.jpg', 'install/android-4.jpg']);
-    expect([...document.querySelectorAll('.install-step-title')].map((t) => t.textContent))
+    expect([...document.querySelectorAll('.install-step-title')].map((x) => x.textContent))
       .toEqual(['Tap the menu', 'Tap Add to Home screen', 'Tap Install', 'Tap Add to home screen']);
   });
-
-  it('never in an in-app browser (the Settings row is where that reader is told what to do)', () => {
-    ua = UA.messengerAndroid;
-    const { container } = render(<InstallCard unitKey="a" />);
-    expect(card(container)).toBeNull();
-  });
 });
 
-describe('InstallCard: the browser\'s own install', () => {
-  it('Chromium handed over its event: INSTALL VOTREADER opens the browser\'s dialog; accepted ends the offer', async () => {
-    ua = UA.android;
-    attachInstallCapture(window);
-    const prompt = vi.fn(() => Promise.resolve());
-    const e = new Event('beforeinstallprompt');
-    e.prompt = prompt; e.userChoice = Promise.resolve({ outcome: 'accepted' });
-    act(() => { window.dispatchEvent(e); });
-    const { container } = render(<InstallCard unitKey="a" />);
-    const btn = card(container).querySelector('.install-card-primary');
-    expect(btn.textContent).toBe('Install');
-    await act(async () => { fireEvent.click(btn); await Promise.resolve(); await Promise.resolve(); });
-    expect(prompt).toHaveBeenCalledTimes(1);
-    expect(card(container)).toBeNull();
-    const s = JSON.parse(localStorage.getItem(KEY));
-    expect(s.never).toBeUndefined();
-    expect(s.installedAt).toBeGreaterThan(0);
-    expect(s.snoozeUntil).toBeGreaterThan(Date.now());
-  });
-
-  /* W56 (sweep 2026-10-13): an install from the browser's own menu (or the address-bar icon) fires appinstalled
-     and nothing else. The card only lost its event, so it fell back to SHOW ME HOW for an app already on the
-     home screen, and with nothing stored it asked again in the browser tab every session. */
-  it('installed from the browser menu while the card is up: it goes, later sessions do not ask for 21 days, and then it looks again', () => {
-    ua = UA.android;
-    attachInstallCapture(window);
-    const e = new Event('beforeinstallprompt');
-    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'accepted' });
-    act(() => { window.dispatchEvent(e); });
-    let v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container).querySelector('.install-card-primary').textContent).toBe('Install');
-    act(() => { window.dispatchEvent(new Event('appinstalled')); });
-    expect(card(v.container), 'no SHOW ME HOW for an app already installed').toBeNull();
-    const s = JSON.parse(localStorage.getItem(KEY));
-    expect(s.never).toBeUndefined();
-    expect(s.installedAt).toBeGreaterThan(0);
-    cleanup(); _resetInstallCardSession(); _resetInstallCapture();
-    v = render(<InstallCard unitKey="b" />);
-    expect(card(v.container), 'the browser tab, next session').toBeNull();
-    // 21 days on, a phone whose icon never came (nothing says the app is there) is offered it again
-    cleanup(); _resetInstallCardSession(); _resetInstallCapture();
-    localStorage.setItem(KEY, JSON.stringify({ ...s, snoozeUntil: Date.now() - 1000 }));
-    v = render(<InstallCard unitKey="c" />);
-    expect(card(v.container), '21 days later').not.toBeNull();
-  });
-
-  it('installed while no card was on screen: the next card to mount records it and stays away', () => {
-    ua = UA.android;
-    attachInstallCapture(window);
-    act(() => { window.dispatchEvent(new Event('appinstalled')); });
-    const v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY)).installedAt).toBeGreaterThan(0);
-    expect(JSON.parse(localStorage.getItem(KEY)).never).toBeUndefined();
-  });
-});
-
-describe('InstallCard: saying no', () => {
-  it('Not now hides it and snoozes it, and counts the dismissal', () => {
-    let v = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(v.container).querySelector('.install-card-later')); });
-    expect(card(v.container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY)).snoozeUntil).toBeGreaterThan(Date.now());
-    cleanup(); _resetInstallCardSession();
-    v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container), 'snoozed').toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
-  });
-
-  /* U01.3/U06.5: the card is one line under Next now: the offer, Install (or Show me how) and Not now. */
-  it('is one line: the offer, its one action and Not now, nothing else to read', () => {
-    const v = render(<InstallCard unitKey="a" />);
-    const c = card(v.container);
-    expect([...c.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Show me how', 'Not now']);
-    expect(c.querySelector('.install-card-body')).toBeNull();
-  });
-});
-
-/* search200 UX B1: a search jump is not the reader finishing the chapter.
-   With no read item (mark-as-read off, or a first visit) the card's one signal is "the reader scrolled to
-   this chapter's end". A search hit near the end landed the end on screen with the page already scrolled, so
-   the jump itself offered the card, and the long-press tip then sat on its heading. The end now counts only
-   when the reader's own hand moved the page: a drag, a wheel, a scroll key, the scrollbar. A tap (the find
-   pill's next, a link) and a programmatic scroll (a jump, a restore) are not. */
-describe('InstallCard: the end of the chapter is the reader\'s own scroll (search200 UX B1)', () => {
-  let ios; let now; let scroller; let top;
-  class FakeIO {
-    constructor(cb) { this.cb = cb; this.els = []; ios.push(this); }
-    observe(el) { this.els.push(el); }
-    unobserve(el) { this.els = this.els.filter((e) => e !== el); }
-    disconnect() { this.els = []; }
-  }
-  /** The observer reports `el` entering (or leaving) the screen. */
-  const onScreen = (el, on) => act(() => { for (const io of ios.slice()) if (io.els.includes(el)) io.cb([{ target: el, isIntersecting: on }]); });
-  const scrollTo = (y) => act(() => { top = y; fireEvent.scroll(scroller); });
-  const mount = () => {
-    const v = render(<InstallCard unitKey="genesis:1" />, { container: scroller });
-    return { ...v, sentinel: scroller.querySelector('.install-card-sentinel') };
-  };
-  const newScroller = () => {
-    scroller = document.createElement('div');
-    scroller.className = 'screen-scroll';
-    document.body.appendChild(scroller);
-    top = 0;
-    Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => top, set: (y) => { top = y; } });
-  };
-  beforeEach(() => {
-    ios = []; now = 1_000_000; readItems = {};
-    globalThis.IntersectionObserver = FakeIO;
-    vi.spyOn(Date, 'now').mockImplementation(() => now);
-    newScroller();
-  });
-  afterEach(() => {
-    delete globalThis.IntersectionObserver;
-    vi.restoreAllMocks();
-    if (scroller.parentNode) scroller.parentNode.removeChild(scroller);
-  });
-
-  it('a search jump that lands at the end does not offer the card', () => {
-    const { container, sentinel } = mount();
-    scrollTo(1800);                     // the jump to the hit
-    onScreen(sentinel, true);
-    expect(card(container), 'the jump is not the reader at the end').toBeNull();
-  });
-
-  it('the reader dragging the page to the end offers it', () => {
-    const { container, sentinel } = mount();
-    fireEvent.touchMove(scroller); scrollTo(600);
-    expect(card(container), 'not at the end yet').toBeNull();
-    fireEvent.touchMove(scroller); scrollTo(1800);
-    onScreen(sentinel, true);
-    expect(card(container)).not.toBeNull();
-  });
-
-  it('landed at the end by the jump, then the reader scrolls: that is the reader at the end', () => {
-    const { container, sentinel } = mount();
-    scrollTo(1800); onScreen(sentinel, true);
-    expect(card(container), 'the jump alone').toBeNull();
-    fireEvent.wheel(scroller); scrollTo(1760);
-    expect(card(container), 'the reader moved the page at the end').not.toBeNull();
-  });
-
-  it('a fling carries on after the finger lifts: its momentum is still the reader\'s', () => {
-    const { container, sentinel } = mount();
-    fireEvent.touchMove(scroller); now += 100; scrollTo(400);
-    now += 2500; scrollTo(1800);        // momentum, long after the last touch
-    onScreen(sentinel, true);
-    expect(card(container)).not.toBeNull();
-  });
-
-  it('a tap (the find pill\'s next, a link) and a scroll long after the last touch are not the reader\'s', () => {
-    const { container, sentinel } = mount();
-    const next = document.createElement('button'); scroller.appendChild(next);
-    fireEvent.touchStart(next); fireEvent.pointerDown(next); fireEvent.keyDown(next, { key: 'Enter' });
-    scrollTo(1800); onScreen(sentinel, true);
-    expect(card(container), 'a tap that jumps').toBeNull();
-    onScreen(sentinel, false);
-    fireEvent.touchMove(scroller); now += 2000; scrollTo(1700); onScreen(sentinel, true);
-    expect(card(container), 'a restore two seconds after the last touch').toBeNull();
-  });
-
-  it('the scroll keys and the scrollbar are the reader\'s too', () => {
-    let v = mount();
-    fireEvent.keyDown(scroller, { key: 'End' }); scrollTo(1800); onScreen(v.sentinel, true);
-    expect(card(v.container), 'End').not.toBeNull();
-    cleanup(); _resetInstallCardSession();
-    newScroller();
-    v = mount();
-    fireEvent.pointerDown(scroller); scrollTo(1800); onScreen(v.sentinel, true);
-    expect(card(v.container), 'the scrollbar').not.toBeNull();
-  });
-
-  it('typing in a field is not a scroll key', () => {
-    const { container, sentinel } = mount();
-    const field = document.createElement('input'); scroller.appendChild(field);
-    fireEvent.keyDown(field, { key: ' ' }); scrollTo(1800); onScreen(sentinel, true);
-    expect(card(container)).toBeNull();
-  });
-});
-
-/* PO2 19: the offer left the reading flow; Settings > Help carries the one install row. */
-/* THE INSTALL POPUP (Corbin 2026-11-20: "many apps these days or websites simply have the popup to install on
-   home screen as app happen automatically", "no walkthrough's or rigamarole"). It comes up by itself on Home
-   when the browser has handed over its install event; Install opens the browser's own dialog. */
 describe('InstallPopup: it comes up by itself', () => {
   const handOver = (outcome = 'accepted') => {
     attachInstallCapture(window);
@@ -329,7 +100,7 @@ describe('InstallPopup: it comes up by itself', () => {
     return e;
   };
   const ask = () => document.querySelector('.install-ask');
-  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); ua = UA.android; });
+  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); ua = UA.android; readItems = EARNED; });
   afterEach(() => { vi.useRealTimers(); delete globalThis.TourController; });
 
   it('on Home, a moment after the browser says the app can be installed: the icon, one line, Install and Not now', () => {
@@ -373,9 +144,10 @@ describe('InstallPopup: it comes up by itself', () => {
     expect(s.snoozeUntil).toBeGreaterThan(Date.now());
   });
 
-  /* Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers it, then reoffers
+  /* newcomer (Corbin 2026-11-27, "I agree with your takes"): a showing counts when it shows, answered or not; the
+     offer then rests 21 days, and after two showings not ended by an install it stops. It replaced his 11-21 "reoffers
      it every so often". */
-  describe('it comes back every 21 days for as long as the app is not installed', () => {
+  describe('two showings, then it stops', () => {
     const DAY = 86400000;
     const popupAfter = (state, wait = 1600) => {
       cleanup(); _resetInstallPopupSession(); _resetInstallCapture();
@@ -385,25 +157,71 @@ describe('InstallPopup: it comes up by itself', () => {
       act(() => { vi.advanceTimersByTime(wait); });
       return ask();
     };
-    it('a reader who has said Not now seven times is asked again once the 21 days are up', () => {
-      expect(popupAfter({ dismissals: 7, snoozeUntil: Date.now() + DAY })).toBeNull();
-      expect(popupAfter({ dismissals: 7, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+    it('one showing, rested 21 days: asked once more; after the second, never again', () => {
+      expect(popupAfter({ dismissals: 1, snoozeUntil: Date.now() + DAY })).toBeNull();
+      expect(popupAfter({ dismissals: 1, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+      expect(JSON.parse(localStorage.getItem(KEY)).dismissals).toBe(2);
+      expect(popupAfter({ dismissals: 2, snoozeUntil: Date.now() - 1000 })).toBeNull();
+      expect(popupAfter({ dismissals: 7, snoozeUntil: Date.now() - 365 * DAY })).toBeNull();
     });
-    it('a browser the old rules had ended "for good" (three Not nows, or one "installed") is asked again', () => {
-      expect(popupAfter({ dismissals: 3, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
-      expect(popupAfter({ never: true })).not.toBeNull();
+    it('an unanswered showing counts: it needs no tap to stop being new', () => {
+      expect(popupAfter({})).not.toBeNull();
+      const s = JSON.parse(localStorage.getItem(KEY));
+      expect(s).toMatchObject({ dismissals: 1, pending: true });
+      expect(s.snoozeUntil).toBeGreaterThan(Date.now() + 20 * DAY);
+      expect(popupAfter(s, 5000), 'the next session, inside the 21 days').toBeNull();
     });
-    it('a phone that said "installed" 21 days ago and has never run from an icon is asked again; one that has is not', async () => {
+    it('Not now after the showing is the same one decline, not two', () => {
+      expect(popupAfter({})).not.toBeNull();
+      act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
+      expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+      expect(JSON.parse(localStorage.getItem(KEY)).pending).toBeUndefined();
+    });
+    it('a showing ended by an install is no decline', async () => {
+      ua = UA.chromeDesktop;
+      expect(popupAfter({ dismissals: 1, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
+      await act(async () => { fireEvent.click(ask().querySelector('.install-ask-go')); await Promise.resolve(); await Promise.resolve(); });
+      expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
+    });
+    it('a phone that said "installed" 21 days ago and has never run from an icon is asked again; one that has is not', () => {
       const said = { installedAt: Date.now() - 22 * DAY, snoozeUntil: Date.now() - DAY };
       expect(popupAfter(said), 'no icon was ever used').not.toBeNull();
       expect(popupAfter({ ...said, standaloneAt: Date.now() - 2 * DAY, real: false }), 'the icon was used two days ago').toBeNull();
     });
-    it('each Not now is another 21 days, not an end', () => {
-      expect(popupAfter({ dismissals: 5, snoozeUntil: Date.now() - 1000 })).not.toBeNull();
-      act(() => { fireEvent.click(ask().querySelector('.install-steps-done')); });
-      const s = JSON.parse(localStorage.getItem(KEY));
-      expect(s.dismissals).toBe(6);
-      expect(s.snoozeUntil).toBeGreaterThan(Date.now() + 20 * DAY);
+    it('the Settings row stays the way in after it stops', () => {
+      cleanup(); localStorage.setItem(KEY, JSON.stringify({ dismissals: 2 }));
+      const v = render(<InstallRow />);
+      expect(v.container.querySelector('.settings-help-install')).not.toBeNull();
+    });
+  });
+
+  /* newcomer: the offer is earned. Never in the session the welcome ran in; after that, a later-day return with one
+     finished reading, or three finished readings. */
+  describe('earned, not on a clock', () => {
+    const popup = (wait = 9000) => { cleanup(); handOver(); render(<InstallPopup screen="home" />); act(() => { vi.advanceTimersByTime(wait); }); return ask(); };
+    afterEach(() => { delete globalThis.HistoryStore; });
+    it('not with fewer than three finished readings and no earlier day', () => {
+      readItems = { a: 1, b: 1 };
+      expect(popup()).toBeNull();
+    });
+    it('three finished readings earn it', () => {
+      readItems = EARNED;
+      expect(popup()).not.toBeNull();
+    });
+    it('one finished reading and a reading on an earlier day earn it; none finished does not', () => {
+      globalThis.HistoryStore = { list: () => [{ key: 'x', ts: Date.now() - 2 * 86400000 }] };
+      readItems = { a: 1 };
+      expect(popup()).not.toBeNull();
+      _resetInstallPopupSession(); localStorage.removeItem(KEY);
+      readItems = {};
+      expect(popup()).toBeNull();
+    });
+    it('never in the session the welcome ran in, however much was read', () => {
+      readItems = EARNED;
+      markFirstRunSession();
+      expect(popup()).toBeNull();
+      _resetInstallPopupSession();
+      expect(popup(), 'the next session').not.toBeNull();
     });
   });
 
@@ -646,14 +464,14 @@ describe('InstallPopup: it comes up by itself', () => {
     });
   });
 
-  it('goes when the screen changes under it, and that is not a "Not now"', () => {
+  it('goes when the screen changes under it: no answer, but the showing has counted (newcomer: it needs no tap)', () => {
     handOver();
     const v = render(<InstallPopup screen="home" />);
     act(() => { vi.advanceTimersByTime(1600); });
     expect(ask()).not.toBeNull();
     v.rerender(<InstallPopup screen="letter" />);
     expect(ask()).toBeNull();
-    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1, pending: true });
     v.rerender(<InstallPopup screen="home" />);
     act(() => { vi.advanceTimersByTime(20000); });
     expect(ask()).toBeNull();                          // once a session
@@ -876,7 +694,7 @@ describe('InstallPopup: where the browser cannot say whether the app is installe
     act(() => { vi.advanceTimersByTime(9000); });
     return ask();
   };
-  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); });
+  beforeEach(() => { vi.useFakeTimers(); _resetInstallPopupSession(); readItems = EARNED; });
   afterEach(() => { vi.useRealTimers(); });
 
   it('Safari on an iPhone warns that adding it again makes a second, empty copy', () => {
@@ -895,11 +713,11 @@ describe('InstallPopup: where the browser cannot say whether the app is installe
   });
   it('"I already have it" closes the popup, is written down, and is no Not now', () => {
     ua = UA.iphone;
-    popup({ dismissals: 2 });
+    popup({ dismissals: 1 });
     act(() => { fireEvent.click(have()); });
     expect(ask()).toBeNull();
     const s = JSON.parse(localStorage.getItem(KEY));
-    expect(s.dismissals).toBe(2);
+    expect(s.dismissals).toBe(1);   // the showing counted itself, and "I already have it" takes it back
     expect(s.haveAt).toBeGreaterThan(0);
     expect(s.snoozeUntil).toBeGreaterThan(Date.now() + 179 * DAY);
   });

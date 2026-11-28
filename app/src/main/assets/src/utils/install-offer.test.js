@@ -2,8 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   installFlow, shouldOffer, dismiss, seemsInstalled, markStandalone, SNOOZE_DAYS, HAVE_DAYS, attachInstallCapture, hasInstallPrompt, wasInstalled,
-  subscribeInstall, promptInstall, _resetInstallCapture,
-} from './install-offer.js';
+  subscribeInstall, promptInstall, _resetInstallCapture, noteShown, earned, DECLINES_TO_STOP, READINGS_TO_EARN } from './install-offer.js';
 
 const UA = {
   androidChrome: 'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36',
@@ -75,29 +74,45 @@ describe('shouldOffer + dismiss', () => {
     expect(shouldOffer(null, { ...ctx, shownThisSession: true })).toBe(false);
     expect(shouldOffer(null, { ...ctx, flow: null })).toBe(false);
   });
-  /* Corbin 2026-11-21: "detects somehow if the pwa is installed on the device, and if not offers it, then reoffers
-     it every so often". Until then the third "Not now" ended the offer for good, and so did one "installed" from
-     the browser, which a phone says before any icon exists. */
-  it('"Not now" waits 21 days and then it is offered again, however often the reader has said it', () => {
-    let s = dismiss(null, 'later', now);
+  /* newcomer (Corbin 2026-11-27, "I agree with your takes"): a showing counts when it shows; 21 days' rest after
+     it; two showings not ended by an install end the offer (the Settings row stays). It replaced 11-21's "reoffers it
+     every so often", under which no count ever ended it. */
+  it('a showing rests it 21 days; after two showings it is not offered again', () => {
+    let s = noteShown(null, now);
+    expect(s).toMatchObject({ dismissals: 1, pending: true });
     expect(shouldOffer(s, { ...ctx, now: now + (SNOOZE_DAYS - 1) * 86400000 })).toBe(false);
     expect(shouldOffer(s, { ...ctx, now: now + SNOOZE_DAYS * 86400000 })).toBe(true);
-    let at = now;
-    for (let i = 0; i < 6; i++) { at += SNOOZE_DAYS * 86400000; s = dismiss(s, 'later', at); }
-    expect(s.dismissals).toBe(7);
-    expect(shouldOffer(s, { ...ctx, now: at + (SNOOZE_DAYS - 1) * 86400000 })).toBe(false);
-    expect(shouldOffer(s, { ...ctx, now: at + SNOOZE_DAYS * 86400000 })).toBe(true);
+    s = dismiss(s, 'later', now);                         // its Not now: the same decline, not a second
+    expect(s.dismissals).toBe(1);
+    expect(s.pending).toBeUndefined();
+    s = noteShown(s, now + SNOOZE_DAYS * 86400000);
+    expect(s.dismissals).toBe(DECLINES_TO_STOP);
+    expect(shouldOffer(s, { ...ctx, now: now + 400 * 86400000 })).toBe(false);
   });
-  it('an install waits 21 days too, is written down, and ends nothing', () => {
-    const s = dismiss({ dismissals: 2 }, 'installed', now);
-    expect(s).toEqual({ dismissals: 2, installedAt: now, snoozeUntil: now + SNOOZE_DAYS * 86400000 });
+  it('a Not now with no showing up (an old state) still counts one', () => {
+    expect(dismiss(null, 'later', now).dismissals).toBe(1);
+  });
+  it('a showing ended by an install or "I already have it" is no decline; an install rests it 21 days and ends nothing', () => {
+    const s = dismiss(noteShown({ dismissals: 1 }, now), 'installed', now);
+    expect(s).toEqual({ dismissals: 1, installedAt: now, snoozeUntil: now + SNOOZE_DAYS * 86400000 });
     expect(shouldOffer(s, ctx)).toBe(false);
     expect(shouldOffer(s, { ...ctx, now: now + SNOOZE_DAYS * 86400000 })).toBe(true);   // whether it IS installed is seemsInstalled's to say
+    expect(dismiss(noteShown(null, now), 'have', now).dismissals).toBe(0);
   });
-  it('a browser that was ended "for good" before 2026-11-21 is offered again', () => {
+  it('the old "never" mark is not read', () => {
     expect(shouldOffer({ never: true }, ctx)).toBe(true);
-    expect(shouldOffer({ dismissals: 3, snoozeUntil: now - 1 }, ctx)).toBe(true);
     expect(dismiss({ never: true }, 'later', now).never).toBeUndefined();
+  });
+});
+
+/* newcomer: earned by what the reader keeps, not by a clock. */
+describe('earned', () => {
+  it('never in the first session; then three finished readings, or one and a later day', () => {
+    expect(earned({ firstRun: true, finished: 9, laterDay: true })).toBe(false);
+    expect(earned({ firstRun: false, finished: READINGS_TO_EARN, laterDay: false })).toBe(true);
+    expect(earned({ firstRun: false, finished: READINGS_TO_EARN - 1, laterDay: false })).toBe(false);
+    expect(earned({ firstRun: false, finished: 1, laterDay: true })).toBe(true);
+    expect(earned({ firstRun: false, finished: 0, laterDay: true })).toBe(false);
   });
 });
 

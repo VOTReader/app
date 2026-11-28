@@ -37,6 +37,7 @@ import { ListRow, SectionLabel, UiButton } from '../components/UiParts.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { useBuildInfo, versionWords, LinkRow, tourMeta } from '../components/about-parts.jsx';
 import { openWhatsNew } from '../../utils/whats-new.js';
+import { markFirstRunSession } from '../../utils/unasked.js';
 
 const LIBRARY_POINTS = [
   'Every volume and letter of The Volumes of Truth.',
@@ -169,6 +170,8 @@ const WELCOME_POINTS = [
 
 export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = null, onTour = null }) {
   const [page, setPage] = React.useState(/** @type {number | string} */ (1));
+  // The welcome ran in this session: nothing unasked follows it until the next one (utils/unasked.js).
+  React.useEffect(() => { if (firstRun) markFirstRunSession(); }, [firstRun]);
   useSongCatalog();
   // WS4 settings (fr-1, fr-2): Back on page 2 or on Credits returns to page 1, the phone's Back too.
   useInnerBack(firstRun && page !== 1 ? () => setPage(1) : null);
