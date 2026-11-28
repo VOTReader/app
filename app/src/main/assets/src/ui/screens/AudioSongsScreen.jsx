@@ -53,6 +53,12 @@ const SHELVES = [
   { v: 'shelf:bible', title: 'Bible songs', cols: ['bible'] },
   { v: 'shelf:originals', title: 'Flock originals and prayers', cols: ['originals', 'prayers'] },
 ];
+/* songs-sort (Corbin 2026-11-27, Timothy's two playlists: songs that use the Letters' actual words, and the spoken
+   ones): the sorted sets, first on the hub. What each holds is SongCatalog.songsInSet's to say (utils/song-catalog.js). */
+const SETS = [
+  { v: 'set:words', name: 'words', title: 'The Letters’ words, sung', about: 'Songs that sing a Letter’s own words.' },
+  { v: 'set:spoken', name: 'spoken', title: 'Spoken word', about: 'Read aloud rather than sung.' },
+];
 
 /** @returns {any} the catalog store, or null before bundle-d published it */
 function catalog() {
@@ -103,6 +109,34 @@ function letterOrder(fams, col) {
     const fa = firstSeen(a), fb = firstSeen(b);
     return fa < fb ? -1 : fa > fb ? 1 : 0;
   });
+}
+
+/**
+ * Families from all over the catalog in reading order: each letter collection's in its letters' order, the
+ * collections in LETTER_COLS order, then any family of another shelf in catalog order.
+ * @param {any[]} fams @returns {any[]}
+ */
+function byLetters(fams) {
+  const out = [];
+  for (const col of LETTER_COLS) {
+    const here = fams.filter((f) => f.col === col);
+    if (here.length) out.push(...letterOrder(here, col));
+  }
+  return out.concat(fams.filter((f) => LETTER_COLS.indexOf(f.col) < 0));
+}
+
+/** A set's families, in reading order. @param {string} name @returns {any[]} */
+function setFamilies(name) {
+  const cat = catalog();
+  const seen = new Set();
+  const fams = [];
+  for (const s of cat.songsInSet(name)) {
+    if (seen.has(s.f)) continue;
+    seen.add(s.f);
+    const fam = cat.familyById(s.f);
+    if (fam) fams.push(fam);
+  }
+  return byLetters(fams);
 }
 
 /** The newest visible songs by first-seen date (a tie keeps the later catalog row first). @param {number} n */
@@ -180,7 +214,7 @@ function songLine(song) {
 /**
  * What a list frame shows: its words, and either families or single songs.
  * @param {string} v @param {any} library
- * @returns {{ eyebrow: string, title: string, families: any[] | null, songs: any[] | null, empty: string }}
+ * @returns {{ eyebrow: string, title: string, about?: string, families: any[] | null, songs: any[] | null, empty: string }}
  */
 function listContent(v, library) {
   const cat = catalog();
@@ -226,6 +260,8 @@ function listContent(v, library) {
     const letter = songLetterOf({ src: { k: 'letter', id: key, c: 'h' } });
     return { eyebrow: 'Songs from this letter', title: (letter && letter.title) || 'Songs from this letter', families: fams, songs: null, empty: 'No songs from this letter yet.' };
   }
+  const set = SETS.find((x) => x.v === v);
+  if (set) return { eyebrow: 'Playlists', title: set.title, about: set.about, families: setFamilies(set.name), songs: null, empty: 'No songs here yet.' };
   const shelf = SHELVES.find((x) => x.v === v);
   if (shelf) {
     /** @type {any[]} */
@@ -536,8 +572,10 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, onB
 
   // The shelves are sorts over the whole catalog: work them out again only when the catalog or the letters change.
   const corpusVersion = typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0;
-  const { newest, readings, tiles, shelves } = React.useMemo(() => ({
+  const { newest, readings, tiles, shelves, sets } = React.useMemo(() => ({
     newest: newestSongs(NEW_TOTAL),
+    // Only a set the catalog has songs for is offered; its count is its songs, one per family, as its page says.
+    sets: SETS.map((set) => ({ set, n: setFamilies(set.name).length })).filter((x) => x.n > 0),
     readings: readingLetters(),
     // The biggest collections first (ties keep reading order); the rest one tap away.
     tiles: LETTER_COLS.map((col, i) => {
@@ -624,6 +662,13 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, onB
         </section>
       ) : (
         <>
+          {sets.length ? (
+            <ListGroup label="Playlists" className="songs-cols songs-sets">
+              {sets.map(({ set, n }) => (
+                <ListRow key={set.v} noLead one title={set.title} value={songCountLabel(n)} onClick={() => open({ k: 'list', v: set.v })} />
+              ))}
+            </ListGroup>
+          ) : null}
           {tallyReady && loved.length >= LOVED_MIN ? (
             <section className="songs-section songs-top-shelf">
               <SectionLabel aside="See all" asideLabel="See all all-time loved songs" onAside={() => open({ k: 'list', v: 'top:loved' })}>All-time loved</SectionLabel>
@@ -742,12 +787,16 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   const letterKey = frame.v.indexOf('letter:') === 0 ? frame.v.slice(7) : '';
   // The letter card's list ('sung:') holds only the versions that sing the letter's words, each family's vfeat first.
   const sungKey = frame.v.indexOf('sung:') === 0 ? frame.v.slice(5) : '';
-  const sungSongs = sungKey ? cat.songsForLetter(sungKey, { verbatim: true }) : null;
-  const versionsHere = (fam) => (sungSongs ? sungSongs.filter((s) => s.f === fam.id) : cat.versionsOf(fam));
-  const leadFor = (fam) => (sungSongs ? versionsHere(fam)[0] || null
+  // A sorted set (songs-sort) holds only its own versions, each family's lead first, as the letter card's list does.
+  const set = SETS.find((x) => x.v === frame.v) || null;
+  const onlySongs = sungKey ? cat.songsForLetter(sungKey, { verbatim: true }) : set ? cat.songsInSet(set.name) : null;
+  const versionsHere = (fam) => (onlySongs ? onlySongs.filter((s) => s.f === fam.id) : cat.versionsOf(fam));
+  const leadFor = (fam) => (onlySongs ? versionsHere(fam)[0] || null
     : (letterKey ? cat.versionsOf(fam).find((s) => s.src && s.src.id === letterKey) : null) || cat.featuredOf(fam));
   const leads = fams ? fams.map(leadFor).filter(Boolean) : content.songs || [];
-  const count = fams ? (sungSongs ? sungSongs.length : songsIn(fams)) : leads.length;
+  const count = fams ? (onlySongs ? onlySongs.length : songsIn(fams)) : leads.length;
+  // Spoken word: the whole Letters read with music sit one tap away, beside the spoken songs.
+  const readings = set && set.name === 'spoken' ? readingLetters() : [];
   const seconds = (fams ? fams.reduce((sum, fam) => sum + versionsHere(fam).reduce((a, s) => a + s.d, 0), 0) : leads.reduce((a, s) => a + s.d, 0));
   const hours = seconds >= 3600 ? (Math.round(seconds / 360) / 10) + ' h' : Math.max(1, Math.round(seconds / 60)) + ' min';
   const ids = leads.map((s) => s.id);
@@ -764,6 +813,7 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   return (
     <>
       <header className="songs-hero songs-list-hero">
+        {content.about ? <p className="songs-intro songs-set-about">{content.about}</p> : null}
         {count ? <p className="songs-intro">{fams && count > fams.length
           // n3-09: Play all plays one version per song, so the songs and their versions are counted apart
           ? songCountLabel(fams.length) + ' · ' + songCountLabel(count, 'version', 'versions')
@@ -774,6 +824,9 @@ function SongsList({ frame, library, playingId, active, onPush }) {
             {ids.length > 1 ? <UiButton icon="shuffle" onClick={() => play(null, true)}>Shuffle</UiButton> : null}
           </div>
         ) : null}
+        {/* songs-sort: a set keeps what Play all plays, one version of each song; "Keep the other N" once some are
+            here, "All N on this phone" once all are (SongKeepAction, the letter card's keep line). */}
+        {set && ids.length ? <SongKeepAction ids={ids} noteKey={'keep-set-' + set.name} label={'Keep all ' + songCountLabel(ids.length)} /> : null}
         {keptList && missing.length ? (
           <div className="song-keep-restore">
             <p>{'Your backup lists ' + songCountLabel(missing.length) + ' kept on this phone that are not on it now.'}</p>
@@ -794,7 +847,13 @@ function SongsList({ frame, library, playingId, active, onPush }) {
           )
         ) : null}
       </header>
+      {readings.length ? (
+        <ListGroup label="Whole Letters" className="songs-cols">
+          <ListRow noLead one title="Letters read with music" value={songCountLabel(readings.length, 'letter', 'letters')} onClick={() => onPush({ k: 'readings' })} />
+        </ListGroup>
+      ) : null}
       <section className="songs-section" aria-label={content.title}>
+        {readings.length && fams && fams.length ? <SectionLabel>Spoken songs</SectionLabel> : null}
         {fams && fams.length ? (
           <div className="ui-group songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={playRow} onOpen={openFamily} inList />)}</div>
         ) : content.songs && content.songs.length ? (

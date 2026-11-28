@@ -573,6 +573,43 @@ export function songsForLetter(letterKey, opts) {
 }
 
 /**
+ * The sorted sets the Songs hub offers as playlists (songs-sort, Corbin 2026-11-27: "if I want all the letters that
+ * are spoken ... download that playlist"). They read only the catalog's own fields, so a corrected catalog fills them
+ * with no app build. This is the one place that says what a set holds:
+ *   words   the Letters' own words, sung: the verbatim gate (`vs`), sung, linked to a shown Letter (a song verbatim to
+ *           the Bible is not the Letters' words);
+ *   spoken  every song spoken rather than sung (`dl`), from a Letter or not.
+ */
+export const SONG_SETS = Object.freeze(['words', 'spoken']);
+
+/** @param {string} name @param {Song} s @returns {boolean} */
+function _inSet(name, s) {
+  if (name === 'words') return isVerbatimSong(s) && s.dl === 'sung' && s.src.k === 'letter' && _shown(s.src);
+  return name === 'spoken' && s.dl === 'spoken';
+}
+
+/**
+ * The visible songs of one set, grouped by family in catalog order, each family's lead first: for `words` its
+ * `vfeat` when that is in the set (the version "Hear it sung" plays), otherwise its featured order. [] for a set
+ * this build does not know, or before the catalog loads.
+ * @param {unknown} name @returns {Song[]}
+ */
+export function songsInSet(name) {
+  if (typeof name !== 'string' || SONG_SETS.indexOf(name) < 0) return [];
+  /** @type {Song[]} */
+  const out = [];
+  for (const fam of families()) {
+    let list = versionsOf(fam).filter((s) => _inSet(name, s));
+    if (name === 'words') {
+      const at = list.findIndex((s) => s.id === fam.vfeat);
+      if (at > 0) list = [list[at]].concat(list.slice(0, at), list.slice(at + 1));
+    }
+    for (const s of list) out.push(s);
+  }
+  return out;
+}
+
+/**
  * The shelf a song belongs to, as the media card's album line: its family's
  * letter collection, or Bible / Inspired / originals / prayers.
  * @param {Song | null | undefined} song @returns {string}
@@ -790,6 +827,7 @@ export const SongCatalog = {
   versionsOf,
   featuredOf,
   songsForLetter,
+  songsInSet,
   isVerbatimSong,
   songAlbumLabel,
   songAssetUrl,

@@ -1954,10 +1954,13 @@
       .song-keep-cancel:focus-visible, .song-keep-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */
       .reading-list { display: grid; gap: .6rem; }
-      .reading-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem .95rem; border: 1px solid var(--gold-border); border-radius: 10px; }
+      .reading-row { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem .95rem; border: 1px solid var(--gold-border); border-radius: 10px; }
       .reading-row.is-current { border-color: var(--gold); }
-      .reading-row .songs-row-main { gap: .6rem; }
-      .reading-row .songs-row-copy small { white-space: normal; }
+      /* songs-sort: the row's base layout went with the Songs redesign (0cc7d6476) and left a bare grey button. */
+      .reading-row .songs-row-main { flex: 1 1 10em; min-width: 0; display: flex; align-items: center; gap: .6rem; min-height: var(--tap); padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .reading-row .songs-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .reading-row .songs-row-copy strong { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: var(--fw-name); line-height: var(--lh-headline); }
+      .reading-row .songs-row-copy small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); white-space: normal; }
       .reading-along { position: relative; flex: none; min-height: 34px; padding: 0 .7rem; border: 1px solid var(--gold); border-radius: 8px; background: transparent; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-11); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
       .reading-along::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px); }
       .reading-along:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
