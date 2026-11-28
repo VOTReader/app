@@ -163,9 +163,13 @@ function AboutHome({ onBack, onYourData }) {
 /** "three" -> 3, for the tour button's short "· 3 min". @param {string} w */
 const minutesOf = (w) => ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'].indexOf(String(w || '').toLowerCase());
 
+/** A narrow phone at 180% breaks the site's address before ".com", not mid-word (hub 18:05). @param {string} t */
+const breakBeforeCom = (t) => { const i = t.indexOf('.com'); return i < 0 ? t : <>{t.slice(0, i)}<wbr />{t.slice(i)}</>; };
+
 /* The first run's points (fr-1). newcomer (2026-11-27, mock 3-first-run-B, cleared by the hub): the welcome is one
    page, and the two points that keep the app from passing for the official source stay on it, word for word. The
    third, "Yours stays yours", moved to About's What you can do with its words unchanged (WELCOME_KEEP below). */
+
 const WELCOME_POINTS = [
   ['pen', 'Made for personal study.', 'This reader was made by a disciple; it is not the canonical source.'],
   ['out', 'The source.', 'For the canonical text, audio, video, and PDFs, visit thevolumesoftruth.com.'],
@@ -212,7 +216,7 @@ export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = 
           {WELCOME_POINTS.map(([icon, head, text]) => (
             <div key={icon} className="ws4-fr-point">
               <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span>
-              <p><b>{head}</b> {text}</p>
+              <p><b>{head}</b> {breakBeforeCom(text)}</p>
             </div>
           ))}
         </div>
