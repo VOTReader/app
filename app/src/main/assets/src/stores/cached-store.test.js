@@ -1382,7 +1382,8 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
     expect(LS_SKIP_LIST).toContain('vot-plan-session');         // utils/plan-session.js: today's paused plan sitting
-    expect(LS_SKIP_LIST.length).toBe(35);   // data-1 added vot-media-orphans-seen; plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session; data-rest-n3 added vot-no-stats
+    expect(LS_SKIP_LIST).toContain('vot-safari-7day');          // utils/storage-health.js: the answer to "Before you start saving" (newcomer)
+    expect(LS_SKIP_LIST.length).toBe(36);   // data-1 added vot-media-orphans-seen; plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×); 11-19 added vot-plan-session; data-rest-n3 added vot-no-stats; newcomer added vot-safari-7day
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

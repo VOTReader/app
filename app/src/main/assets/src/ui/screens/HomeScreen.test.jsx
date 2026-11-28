@@ -185,7 +185,7 @@ describe('HomeScreen — the Read root', () => {
     expect(container.textContent).not.toContain('Start a reading plan');
     expect(container.querySelector('.tour-prompt')).toBeNull();
     expect(container.textContent).not.toMatch(/New here/i);
-    expect(container.querySelector('.home-sub').textContent).toBe('The Volumes of Truth and the Bible, to read and to hear.');
+    expect(container.querySelector('.home-holds').textContent).toBe('The Volumes of Truth and the Bible, to read and to hear.');
     delete window.ReadingPlanStore;
     delete globalThis.StateStore;
   });

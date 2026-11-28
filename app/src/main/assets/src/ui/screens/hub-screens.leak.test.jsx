@@ -144,9 +144,10 @@ describe('leaks — Volumes, Scriptures, a genre, Studies', () => {
 });
 
 describe('leaks — About', () => {
-  it('both pages', async () => {
+  // newcomer (2026-11-27): the welcome is one page; its other page is Credits and privacy.
+  it('the welcome and its Credits page', async () => {
     await leakFree('AboutScreen', () => render(<AboutScreen onContinue={noop} onBack={noop} onSearch={noop} onHistory={noop} theme="dark" onThemeChange={noop} />),
-      (r) => { fireEvent.click(r.getByRole('button', { name: 'Continue' })); });
+      (r) => { fireEvent.click(r.getByRole('button', { name: 'Credits and privacy' })); });
   });
 });
 

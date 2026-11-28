@@ -284,10 +284,11 @@ describe('the detector isolates its storage instead of deleting it', () => {
       }
     }
 
-    // The walk has four text-driven navigation steps: Continue, Begin Reading,
-    // Prophetic Letters, Volume One. If this number drops, the scanner stopped
-    // seeing steps — it does not mean the steps became correct.
-    expect(steps.length).toBe(4);
+    // The walk has three text-driven navigation steps: Begin Reading, Prophetic
+    // Letters, Volume One (the welcome's Continue went with its second page,
+    // newcomer 2026-11-27). If this number drops, the scanner stopped seeing
+    // steps — it does not mean the steps became correct.
+    expect(steps.length).toBe(3);
     for (const step of steps) {
       expect(`${step.label} waits on: ${step.wait}`).toBe(`${step.label} waits on: ${step.click}`);
     }
