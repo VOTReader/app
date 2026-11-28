@@ -7,7 +7,7 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { StorageHealth } from './storage-health.js';
+import { StorageHealth, SAFARI_ANSWER_KEY, SAFARI_REST_DAYS } from './storage-health.js';
 import { PlatformBridge } from './platform-bridge.js';
 // D5: spy on the toast primitive so onWriteFailure tests don't touch real DOM
 // and the dedup behavior is assertable.
@@ -1016,6 +1016,34 @@ describe('checkFirstDataCreation', () => {
     StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
     StorageHealth.dismissScenario('safari-7day');
     expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
+  });
+
+  /* newcomer (2026-11-27): the walk saw it at every session's first save. The reader's answer is kept. */
+  describe('the answer outlasts the session', () => {
+    afterEach(() => { localStorage.removeItem(SAFARI_ANSWER_KEY); vi.useRealTimers(); });
+    it('Back or Escape (no answer): this session only, as before', () => {
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      StorageHealth.dismissScenario('safari-7day');
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(true);
+    });
+    it('"I understand the risk": not asked again on this browser', () => {
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      StorageHealth.checkFirstDataCreation();
+      StorageHealth.dismissScenario('safari-7day', 'understood');
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
+    });
+    it('"Not now": not asked for SAFARI_REST_DAYS, then asked again', () => {
+      vi.useFakeTimers({ now: Date.UTC(2026, 10, 27) });
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      StorageHealth.dismissScenario('safari-7day', 'later');
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
+      vi.setSystemTime(Date.UTC(2026, 10, 27) + SAFARI_REST_DAYS * 86400000);
+      StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+      expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(true);
+    });
   });
 
   it('Safari PWA → shouldBlock false (PWA is safe from 7-day eviction)', () => {

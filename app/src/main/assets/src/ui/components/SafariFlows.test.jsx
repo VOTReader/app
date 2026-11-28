@@ -104,7 +104,24 @@ describe('Safari7DayModal', () => {
     var btns = container.querySelectorAll('.sh-modal-btn');
     var riskBtn = Array.from(btns).find((b) => b.textContent.includes('I understand'));
     act(() => { /** @type {HTMLElement} */ (riskBtn).click(); });
-    expect(/** @type {any} */ (globalThis).StorageHealth.dismissScenario).toHaveBeenCalledWith('safari-7day');
+    expect(/** @type {any} */ (globalThis).StorageHealth.dismissScenario).toHaveBeenCalledWith('safari-7day', 'understood');
+  });
+
+  /* newcomer (2026-11-27): a plain way out beside the warning, and the answer outlasts the session (storage-health). */
+  it('"Not now" sits beside it and answers for a while', () => {
+    _report = _makeReport({ safariGateBlocked: true });
+    var { container } = render(<Safari7DayModal />);
+    var labels = Array.from(container.querySelectorAll('.sh-modal-btn')).map((b) => b.textContent.trim());
+    expect(labels).toEqual(['How to add to Home Screen', 'I understand the risk', 'Not now']);
+    var later = Array.from(container.querySelectorAll('.sh-modal-btn')).find((b) => b.textContent.trim() === 'Not now');
+    act(() => { /** @type {HTMLElement} */ (later).click(); });
+    expect(/** @type {any} */ (globalThis).StorageHealth.dismissScenario).toHaveBeenCalledWith('safari-7day', 'later');
+  });
+
+  it('keeps its data-safety sentences word for word', () => {
+    _report = _makeReport({ safariGateBlocked: true });
+    var { container } = render(<Safari7DayModal />);
+    expect(container.querySelector('.sh-modal-text').textContent).toBe("Safari may delete your saved notes and highlights if you don't visit for 7 days. To keep your data safe, add VOTReader to your Home Screen.");
   });
 
   it('"How to add to Home Screen" shows instructions', () => {

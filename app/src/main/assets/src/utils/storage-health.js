@@ -768,6 +768,7 @@ function _checkFirstDataCreation(resume) {
   if (_isStandalone()) return { shouldBlock: false };
   if (_safariWarningShownThisSession) return { shouldBlock: false };
   if (_sessionDismissals.has('safari-7day')) return { shouldBlock: false };
+  if (_safariAnswered(Date.now())) return { shouldBlock: false };
   _safariWarningShownThisSession = true;
   _safariGateBlocked = true;
   _safariResume = typeof resume === 'function' ? resume : null;
@@ -777,14 +778,34 @@ function _checkFirstDataCreation(resume) {
   return { shouldBlock: true, reason: 'safari-7day' };
 }
 
+/* The reader's answer to "Before you start saving" outlasts the session (newcomer, 2026-11-27: the walk found it
+   came back at every session's first save). "I understand the risk" ends it on this browser; "Not now" rests it
+   SAFARI_REST_DAYS. Its own vot-* key, so Clear All wipes it and no backup carries it. */
+export const SAFARI_ANSWER_KEY = 'vot-safari-7day';
+export const SAFARI_REST_DAYS = 21;
+/** @param {number} now */
+function _safariAnswered(now) {
+  try {
+    var a = JSON.parse(localStorage.getItem(SAFARI_ANSWER_KEY) || 'null');
+    return !!a && (a.done === true || (typeof a.until === 'number' && now < a.until));
+  } catch (_e) { return false; }
+}
+
 /**
  * Mark a scenario as dismissed for this session. Bumps version so
  * banner components re-render without the dismissed scenario.
+ * For 'safari-7day', `how` writes the reader's answer down: 'understood' for good, 'later' for SAFARI_REST_DAYS.
  *
  * @param {string} scenarioId
+ * @param {'understood' | 'later'} [how]
  */
-function _dismissScenario(scenarioId) {
+function _dismissScenario(scenarioId, how) {
   _sessionDismissals.add(scenarioId);
+  if (scenarioId === 'safari-7day' && how) {
+    try {
+      localStorage.setItem(SAFARI_ANSWER_KEY, JSON.stringify(how === 'understood' ? { done: true } : { until: Date.now() + SAFARI_REST_DAYS * 86400000 }));
+    } catch (_e) { /* no storage: the session's answer is all there is */ }
+  }
   if (scenarioId === 'safari-7day') {
     _safariGateBlocked = false;
     if (_report) _report = Object.assign({}, _report, { safariGateBlocked: false });

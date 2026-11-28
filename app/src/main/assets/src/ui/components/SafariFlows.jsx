@@ -2,13 +2,16 @@
    SafariFlows — W2.7e Safari-specific storage modals
    ═══════════════════════════════════════════════════════════════════════
    Two components:
-   1. Safari7DayModal — fires once per session on first data-creating
-      gesture in Safari tabs. Warns about 7-day eviction.
+   1. Safari7DayModal — fires on the first data-creating gesture in a
+      Safari tab, until the reader answers it (newcomer 2026-11-27: the
+      answer is stored; it no longer returns every session). Warns about
+      7-day eviction.
    2. IosPwaWelcomeCard — shows on boot in iOS PWA with empty storage.
       Guides user to import data from Safari.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useStoreVersion } from '../../hooks/use-store-version.js';
+import { note } from '../../utils/unasked.js';
 
 export function Safari7DayModal() {
   useStoreVersion(StorageHealth);
@@ -19,9 +22,17 @@ export function Safari7DayModal() {
 
   useModalRegistry({ id: 'safari-7day-modal', dismiss: _dismiss, active: visible });
 
+  /* Back or Escape: this session only. The two buttons are the reader's answer and outlast it (newcomer,
+     2026-11-27): "I understand the risk" for good, "Not now" for a while (storage-health's SAFARI_REST_DAYS). */
   function _dismiss() {
     StorageHealth.dismissScenario('safari-7day');
   }
+  /** @param {'understood' | 'later'} how */
+  function _answer(how) {
+    StorageHealth.dismissScenario('safari-7day', how);
+  }
+  // It answers the reader's own first save, so it is never held back; nothing else unasked follows it this session.
+  React.useEffect(() => { if (visible) note('safari-save'); }, [visible]);
 
   var [showInstructions, setShowInstructions] = React.useState(false);
 
@@ -54,8 +65,11 @@ export function Safari7DayModal() {
               How to add to Home Screen
             </button>
           )}
-          <button className="ui-btn sh-modal-btn sh-modal-btn-secondary" onClick={_dismiss}>
+          <button className="ui-btn sh-modal-btn sh-modal-btn-secondary" onClick={() => _answer('understood')}>
             I understand the risk
+          </button>
+          <button className="ui-btn sh-modal-btn sh-modal-btn-secondary sh-modal-btn-later" onClick={() => _answer('later')}>
+            Not now
           </button>
         </div>
       </div>
