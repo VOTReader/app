@@ -99,7 +99,7 @@ function useInnerBack(up) {
 }
 
 /* WS3 settings (ab-about, ab-credits): About reached from Settings is a page of rows, with Credits and privacy and
-   What you can do as pages of their own. The first run keeps the two-page welcome below (fr-1, fr-2 are next). */
+   What you can do as pages of their own. The first run is the one-page welcome below. */
 function AboutHome({ onBack, onYourData }) {
   const [page, setPage] = React.useState('about');
   const [buildInfo, refresh] = useBuildInfo();
@@ -152,6 +152,7 @@ function AboutHome({ onBack, onYourData }) {
             {points(LIBRARY_POINTS)}
             <SectionLabel>Your tools</SectionLabel>
             {points(TOOL_POINTS)}
+            <p className="ws3-about-line"><b>{WELCOME_KEEP[0]}</b> {WELCOME_KEEP[1]}</p>
           </>
         )}
       </div>
@@ -162,27 +163,33 @@ function AboutHome({ onBack, onYourData }) {
 /** "three" -> 3, for the tour button's short "· 3 min". @param {string} w */
 const minutesOf = (w) => ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'].indexOf(String(w || '').toLowerCase());
 
+/* The first run's points (fr-1). newcomer (2026-11-27, mock 3-first-run-B, cleared by the hub): the welcome is one
+   page, and the two points that keep the app from passing for the official source stay on it, word for word. The
+   third, "Yours stays yours", moved to About's What you can do with its words unchanged (WELCOME_KEEP below). */
 const WELCOME_POINTS = [
   ['pen', 'Made for personal study.', 'This reader was made by a disciple; it is not the canonical source.'],
-  ['data', 'Yours stays yours.', 'Your notes, journal, and highlights stay on this device. Back them up from Settings › Your data.'],
   ['out', 'The source.', 'For the canonical text, audio, video, and PDFs, visit thevolumesoftruth.com.'],
 ];
+const WELCOME_KEEP = ['Yours stays yours.', 'Your notes, journal, and highlights stay on this device. Back them up from Settings › Your data.'];
+/* What the app holds, in one line, from LIBRARY_POINTS (newcomer; the hub cleared the wording 2026-11-27). */
+const WELCOME_HOLDS = 'Every letter of The Volumes of Truth, the whole Bible in eleven translations, the studies, and the Letters and the Bible read aloud.';
 
+/**
+ * The first run: one page (newcomer, Corbin 2026-11-27: "Make sure new users aren't bombarded with info, only what is
+ * essential to use the app"). What the app is, what it holds, the two source points, Begin reading, and the tour as a
+ * quiet link: the one place the tour is offered unasked. The nine "What you can do" lines live in About.
+ * @param {{ onContinue: () => void, onBack: () => void, firstRun?: boolean, onYourData?: (() => void) | null, onTour?: (() => void) | null }} props
+ */
 export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = null, onTour = null }) {
   const [page, setPage] = React.useState(/** @type {number | string} */ (1));
+  useSongCatalog();
   // The welcome ran in this session: nothing unasked follows it until the next one (utils/unasked.js).
   React.useEffect(() => { if (firstRun) markFirstRunSession(); }, [firstRun]);
-  useSongCatalog();
-  // WS4 settings (fr-1, fr-2): Back on page 2 or on Credits returns to page 1, the phone's Back too.
+  // Back on Credits returns to the welcome, the phone's Back too.
   useInnerBack(firstRun && page !== 1 ? () => setPage(1) : null);
   if (!firstRun) return <AboutHome onBack={onBack} onYourData={onYourData} />;
   const tour = typeof TourController !== 'undefined' ? TourController : null;
   const mins = tour && typeof tour.minutesWord === 'function' ? minutesOf(tour.minutesWord()) : -1;
-  const dots = (
-    <div className="ws4-fr-dots" role="status" aria-label={`Page ${page === 2 ? 2 : 1} of 2`}>
-      <span className={page !== 2 ? 'is-on' : ''} /><span className={page === 2 ? 'is-on' : ''} />
-    </div>
-  );
   if (page === 'credits') {
     return (
       <ScreenLayout utility={{ title: 'Credits and privacy', onBack: () => setPage(1), backLabel: 'Back to Welcome' }} hideTabsBtn>
@@ -191,49 +198,31 @@ export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = 
     );
   }
   return (
-    <ScreenLayout utility={page === 2 ? { title: '', onBack: () => setPage(1), backLabel: 'Back to Welcome' } : null} hideTabsBtn>
-      <div className={'ws4-fr is-page-' + page} key={page}>
-        {page === 1 ? (
-          <>
-            <div className="ws4-fr-top">
-              <div className="ws4-fr-orn" aria-hidden="true">◆</div>
-              <p className="ui-label ws4-fr-kicker">Welcome to</p>
-              <h1 className="ws4-fr-name">VOTReader</h1>
-              <p className="ws4-fr-lead">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
+    <ScreenLayout utility={null} hideTabsBtn>
+      <div className="ws4-fr is-page-1">
+        <div className="ws4-fr-top">
+          <div className="ws4-fr-orn" aria-hidden="true">◆</div>
+          <p className="ui-label ws4-fr-kicker">Welcome to</p>
+          <h1 className="ws4-fr-name">VOTReader</h1>
+          <p className="ws4-fr-lead">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
+          <p className="ws4-fr-holds">{WELCOME_HOLDS}</p>
+        </div>
+        <div className="ws4-fr-points">
+          {WELCOME_POINTS.map(([icon, head, text]) => (
+            <div key={icon} className="ws4-fr-point">
+              <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span>
+              <p><b>{head}</b> {text}</p>
             </div>
-            <div className="ws4-fr-points">
-              {WELCOME_POINTS.map(([icon, head, text]) => (
-                <div key={icon} className="ws4-fr-point">
-                  <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span>
-                  <p><b>{head}</b> {text}</p>
-                </div>
-              ))}
-            </div>
-            <div className="ws4-fr-foot">
-              {dots}
-              <UiButton kind="primary" wide onClick={() => setPage(2)}>Continue</UiButton>
-              <UiButton kind="text" wide onClick={() => setPage('credits')}>Credits and privacy</UiButton>
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="ws4-fr-title">What you can do</h1>
-            <div className="about-features">
-              <SectionLabel>The library</SectionLabel>
-              <div className="ui-group">{LIBRARY_POINTS.map((t) => <div key={t} className="ws3-check-row"><UiIcon name="check" size="sm" /><span>{t}</span></div>)}</div>
-              <SectionLabel>Your tools</SectionLabel>
-              <div className="ui-group">{TOOL_POINTS.map((t) => <div key={t} className="ws3-check-row"><UiIcon name="check" size="sm" /><span>{t}</span></div>)}</div>
-            </div>
-            <div className="ws4-fr-foot">
-              {dots}
-              {/* The e2e walks and tools/first-run.mjs find this button by its name "Begin Reading" (21 tools). */}
-              <UiButton kind="primary" wide ariaLabel="Begin Reading" onClick={onContinue}>Begin reading</UiButton>
-              {typeof onTour === 'function' ? (
-                <UiButton kind="secondary" wide icon="help" onClick={onTour}>{'Show me around first' + (mins > 0 ? ' · ' + mins + ' min' : '')}</UiButton>
-              ) : null}
-            </div>
-          </>
-        )}
+          ))}
+        </div>
+        <div className="ws4-fr-foot">
+          {/* The e2e walks and tools/first-run.mjs find this button by its name "Begin Reading" (21 tools). */}
+          <UiButton kind="primary" wide ariaLabel="Begin Reading" onClick={onContinue}>Begin reading</UiButton>
+          {typeof onTour === 'function' ? (
+            <UiButton kind="text" wide onClick={onTour}>{'Show me around first' + (mins > 0 ? ' · ' + mins + ' min' : '')}</UiButton>
+          ) : null}
+          <UiButton kind="text" wide onClick={() => setPage('credits')}>Credits and privacy</UiButton>
+        </div>
       </div>
     </ScreenLayout>
   );

@@ -241,7 +241,7 @@ try {
   // for "Begin Reading" while page 1 sat there showing "Continue" — run
   // 33945493524, green on this machine and on the pre-rebase base. Every step
   // below waits for the button it is about to click; this one now does too.
-  await waitThenClick('the onboarding Continue button', /Continue/);
+  // newcomer (2026-11-27): the welcome is one page; its Begin Reading is the one onboarding click.
   await waitThenClick('the Begin Reading button', /Begin Reading/);
   // First run's Begin Reading opens Volume One, Letter 1 (n114, 52553a0c7), not Home: wait for that
   // letter's text, then take the Home button so the walk below starts where it always has.

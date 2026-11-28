@@ -458,6 +458,10 @@ The Kotlin host calls these through `JsBridge.callOptional` (`window.__x && wind
 - **Setter:** `src/utils/install-offer.js` — the deferred install prompt and its subscribers, one per page whatever copy of the module asks
 - **Consumers:** `src/utils/install-offer.js`
 
+### `__votUnasked`
+- **Setter:** `src/utils/unasked.js` — what spoke unasked this session, whether the welcome ran, which surfaces are due; one per page whatever bundle's copy of the module asks
+- **Consumers:** `src/utils/unasked.js`
+
 ### `__votInstallCapture`
 - **Setter:** `src/utils/install-offer.js` — marks that beforeinstallprompt is already captured on this window
 - **Consumers:** `src/utils/install-offer.js` (`attachInstallCapture`)

@@ -170,6 +170,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     <ScreenLayout root navChildren={rootNavStart({ title: 'VOTReader' })}
       navEnd={<RootGear onSettings={onSettings} />}>
       <div className="root-screen home-root">
+        {/* newcomer (walk #77, 2026-11-27): one line saying what the app holds, under the title. Wording cleared by the hub. */}
+        <p className="home-sub">The Volumes of Truth and the Bible, to read and to hear.</p>
         {searchEnabled !== false ? (
           <button type="button" className="root-search" onClick={onSearch} aria-label="Search the letters and the Bible">
             {SEARCH_ICON}<span aria-hidden="true">Search the letters and the Bible</span>

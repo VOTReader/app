@@ -265,12 +265,11 @@ async function main() {
     });
 
     await step('onboarding', async () => {
-      await clickText(/^Continue$/); await check('onboarding');
-      // Begin Reading opens the first letter; the tour offer is no longer over it (U §4) but a card at
-      // the end of the Read tab, so the walk goes Home for it.
+      // newcomer (2026-11-27): the welcome is one page, and it is where the tour is offered: Home carries no
+      // "New here?" card, so the walk photographs the welcome and goes on.
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Begin Reading'), { timeout: 30000 });
+      await check('onboarding');
       await clickText(/Begin Reading/); await check('first-letter');
-      await goHome(); await check('home-tour');
-      await clickText(/^Maybe later$/);
     });
     await step('home', async () => { await goHome(); await check('home'); });
     // The three-tab bar is the replacement for Home's old More menu: three tabs, none a stub, Read lit on Home.

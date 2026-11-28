@@ -1,11 +1,5 @@
 // @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
-/* AboutScreen tests — Wave 0 MISC-SCREENS item (4).
-   ──────────────────────────────────────
-   The first-run final page CTA was a flat "Continue" — the last step of
-   onboarding should be warm and action-oriented ("Begin Reading"). Page
-   1 keeps "Continue" (it genuinely continues to page 2); only the final
-   page changes.
-*/
+/* AboutScreen tests: the first run's one-page welcome, and About's own pages. */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
@@ -42,74 +36,51 @@ const renderAbout = (props = {}) => render(
   />
 );
 
-describe('AboutScreen — page-aware CTA', () => {
-  it('says "Continue" on page 1 (it advances to page 2)', () => {
-    setupGlobals();
-    renderAbout();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
-  });
-
-  it('says "Begin Reading" on the final page and fires onContinue', () => {
+/* newcomer (Corbin 2026-11-27: "Make sure new users aren't bombarded with info, only what is essential to use the
+   app"; mock 3-first-run-B, cleared by the hub): the welcome is one page. What the app is, what it holds, the two
+   points that keep it from passing for the official source (word for word), Begin reading, the tour as a quiet link,
+   Credits and privacy. The nine "What you can do" lines and "Yours stays yours" live in About. */
+describe('AboutScreen — the one-page welcome', () => {
+  it('is one page: Begin Reading fires onContinue; there is no Continue and no second page', () => {
     setupGlobals();
     const onContinue = vi.fn();
-    renderAbout({ onContinue });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    const cta = screen.getByRole('button', { name: 'Begin Reading' });
-    fireEvent.click(cta);
+    const { container } = renderAbout({ onContinue });
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+    expect(container.querySelector('.ws4-fr-dots')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Begin Reading' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
-});
 
-/* B1 (2026-08-10). Page 2 is the app's own account of itself, and it had gone
-   stale in the one direction that matters: it promised "nothing is downloaded
-   except the Garden images" months after every Listen began streaming an MP3
-   from a GitHub release. The privacy promise underneath it (nothing of YOURS
-   leaves the device) was always true and stays; the download claim is now the
-   truth, and the Listening Library is named where the rest of the library is. */
-describe('AboutScreen — page 2 describes the app that actually shipped', () => {
-  const page2 = () => {
-    setupGlobals();
-    renderAbout();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    return document.querySelector('.about-features').textContent;
-  };
-
-  it('no longer claims the Garden images are the only thing fetched', () => {
-    const text = page2();
-    expect(text).not.toMatch(/nothing is downloaded/i);
-    expect(text).toMatch(/Listening needs a connection/i);   // WS4 (fr-2): the mock's shorter line
-  });
-
-  // Downloads brief 2026-10-23, section 7 item 21: it said only "Tapping Listen streams that recording".
-  it('says a downloaded recording plays with no connection', () => {
-    expect(page2()).toMatch(/needs a connection unless you download it/i);
-  });
-
-  it('still promises the reader that their own data stays on the device', () => {
-    expect(page2()).toMatch(/your notes never leave this device/i);
-  });
-
-  it('names listening among what the library holds', () => {
-    expect(page2()).toMatch(/The Letters and the Bible, read aloud/);
-  });
-
-  // A08.6 / s40.1: no build words, no marketing, and the offline line says what needs a connection.
-  it('speaks plainly: no corpus, release files or feature suite; reading works offline', () => {
-    const text = page2();
-    expect(text).not.toMatch(/corpus|release files|feature suite/i);
-    expect(text).toMatch(/Reading works offline/);
-  });
-});
-
-describe('AboutScreen — page one (A08.6 / U02.3)', () => {
-  it('gives the backup path Settings really has', () => {
+  it('says what the app is and what it holds, in a line each', () => {
     setupGlobals();
     const { container } = renderAbout();
-    expect(container.querySelector('.ws4-fr-points').textContent).toContain('Back them up from Settings › Your data');
+    expect(container.querySelector('.ws4-fr-lead').textContent).toBe('The Volumes of Truth are the Word of The Lord, given through His servant Timothy.');
+    expect(container.querySelector('.ws4-fr-holds').textContent).toBe('Every letter of The Volumes of Truth, the whole Bible in eleven translations, the studies, and the Letters and the Bible read aloud.');
   });
 
-  // WS4 (fr-1): Credits and privacy is a text button under Continue that opens its own page, privacy first.
-  it('opens Credits and privacy as its own page from page one, and Back returns to page one', () => {
+  it('keeps the two points that say it is not the official source, word for word, and nothing else', () => {
+    setupGlobals();
+    const { container } = renderAbout();
+    expect([...container.querySelectorAll('.ws4-fr-point p')].map((p) => p.textContent)).toEqual([
+      'Made for personal study. This reader was made by a disciple; it is not the canonical source.',
+      'The source. For the canonical text, audio, video, and PDFs, visit thevolumesoftruth.com.',
+    ]);
+    expect(container.textContent).not.toMatch(/What you can do|Highlight, underline|Full-text search/);
+  });
+
+  it('offers the tour once, as a quiet link under Begin reading', () => {
+    setupGlobals();
+    const onTour = vi.fn();
+    const { container } = renderAbout({ onTour });
+    const foot = [...container.querySelectorAll('.ws4-fr-foot button')].map((b) => b.textContent);
+    expect(foot[0]).toBe('Begin reading');
+    expect(foot[1]).toMatch(/^Show me around first/);
+    fireEvent.click(screen.getByRole('button', { name: /^Show me around first/ }));
+    expect(onTour).toHaveBeenCalledTimes(1);
+  });
+
+  // WS4 (fr-1): Credits and privacy is a text button that opens its own page, privacy first.
+  it('opens Credits and privacy as its own page, and Back returns to the welcome', () => {
     setupGlobals();
     const { container } = renderAbout();
     expect(container.querySelector('.about-credit')).toBeNull();
@@ -118,16 +89,49 @@ describe('AboutScreen — page one (A08.6 / U02.3)', () => {
     expect(container.querySelector('.about-songs-credit')).toBeTruthy();
     expect(container.querySelector('a[href$="privacy.html"]')).toBeTruthy();
     act(() => { window.__screenBack(); });
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Begin Reading' })).toBeTruthy();
+  });
+});
+
+/* B1 (2026-08-10): the app's own account of itself, kept true. Since the one-page welcome (newcomer, 2026-11-27) it is
+   About's "What you can do" page, its words unchanged, with "Yours stays yours" from the old welcome under it. */
+describe('About — What you can do describes the app that actually shipped', () => {
+  const features = () => {
+    setupGlobals();
+    renderAbout({ firstRun: false });
+    fireEvent.click(screen.getByRole('button', { name: 'What you can do' }));
+    return document.querySelector('.ws3-about').textContent;
+  };
+
+  it('no longer claims the Garden images are the only thing fetched', () => {
+    const text = features();
+    expect(text).not.toMatch(/nothing is downloaded/i);
+    expect(text).toMatch(/Listening needs a connection/i);
   });
 
-  it('ends page two with Show me around first when the tour can start', () => {
-    setupGlobals();
-    const onTour = vi.fn();
-    renderAbout({ onTour });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    fireEvent.click(screen.getByRole('button', { name: /^Show me around first/ }));
-    expect(onTour).toHaveBeenCalledTimes(1);
+  // Downloads brief 2026-10-23, section 7 item 21: it said only "Tapping Listen streams that recording".
+  it('says a downloaded recording plays with no connection', () => {
+    expect(features()).toMatch(/needs a connection unless you download it/i);
+  });
+
+  it('still promises the reader that their own data stays on the device', () => {
+    expect(features()).toMatch(/your notes never leave this device/i);
+  });
+
+  it('names listening among what the library holds', () => {
+    expect(features()).toMatch(/The Letters and the Bible, read aloud/);
+  });
+
+  // A08.6 / s40.1: no build words, no marketing, and the offline line says what needs a connection.
+  it('speaks plainly: no corpus, release files or feature suite; reading works offline', () => {
+    const text = features();
+    expect(text).not.toMatch(/corpus|release files|feature suite/i);
+    expect(text).toMatch(/Reading works offline/);
+  });
+
+  // A08.6 / U02.3, moved with its words: the backup path Settings really has.
+  it('carries "Yours stays yours" word for word, with the backup path Settings really has', () => {
+    expect(features()).toContain('Yours stays yours. Your notes, journal, and highlights stay on this device. Back them up from Settings › Your data.');
   });
 });
 

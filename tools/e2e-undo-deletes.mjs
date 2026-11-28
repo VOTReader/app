@@ -95,7 +95,7 @@ async function main() {
 
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
-    await clickText(/^Continue$/);
+    // newcomer (2026-11-27): the welcome is one page; Begin Reading is on it.
     await clickText(/Begin Reading/);
     await clickText(/^Maybe later$/).catch(() => {});
     await loaded();

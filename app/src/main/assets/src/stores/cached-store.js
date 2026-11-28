@@ -1500,6 +1500,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-plan-quiet-asked',         // PlanPage: the plans already asked about going quiet
   'vot-install-offer',            // InstallCard: the reader's answer to the install offer
   'vot-ios-pwa-welcomed',         // SafariFlows: the Home Screen app's welcome, shown once
+  'vot-safari-7day',              // utils/storage-health.js: the reader's answer to "Before you start saving"
   'vot-tabs-hint-seen',           // TabsNavBtn: the tabs hint, shown once
   'vot-tour-later-at',            // utils/tour-controller.js: "Later" on the tour, and when
   'vot-weekly-copy-fail',         // utils/data-safety.js WEEKLY_FAIL_KEY: the weekly copy's last failure

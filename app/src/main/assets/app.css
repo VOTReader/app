@@ -2995,6 +2995,8 @@
        Usage: R/build/COMPONENTS.md. ── */
     .root-screen { width: 100%; max-width: 36rem; margin: 0 auto; padding: var(--sp-2) var(--gutter) var(--sp-2); box-sizing: border-box; font-family: var(--font-serif); color: var(--text-1); }
     .root-screen .upnext { max-width: none; margin: var(--sp-3) 0 0; }
+    /* newcomer (walk #77): Home's one line on what the app holds, under the bar's title (mock 4-home-newcomer). */
+    .home-sub { margin: 0 2px var(--sp-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-value); line-height: 1.4; }
     /* the search field (entry): a 48 px pill, surface-1, muted icon and words; focused, a 1.5 px gold ring */
     .root-search, .ui-field { display: flex; align-items: center; gap: var(--sp-3); width: 100%; height: var(--field-h); padding: 0 var(--sp-4); border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-control); text-align: left; cursor: pointer; box-sizing: border-box; }
     .root-search svg, .ui-field svg { flex: none; width: var(--icon); height: var(--icon); color: var(--text-2); }
@@ -6001,21 +6003,18 @@
     body.light .ws3-verify:not(.is-warn) .ui-sheet-head::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a5c10' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); }
     .ws3-verify:not(.is-warn) .ui-sheet-head > * { grid-column:2; }
     .ws4-fr { display:flex; flex-direction:column; min-height:100%; padding:0 var(--sp-7) var(--sp-4); }
-    .ws4-fr.is-page-2 { padding:0 var(--gutter) var(--sp-4); }
     .ws4-fr-top { margin-top:auto; padding-top:var(--sp-8); text-align:center; }
     .ws4-fr-orn { color:var(--accent); font-size:var(--ts-label); }
     .ws4-fr-kicker { margin:var(--sp-1) 0 0; color:var(--accent); }
     .ws4-fr-name { margin:var(--sp-2) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:calc(var(--ts-display) * 1.27); line-height:1.1; font-weight:600; }
     .ws4-fr-lead { margin:var(--sp-4) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-style:italic; }
+    /* newcomer (2026-11-27): the one line on what the app holds, under the lead (mock 3-first-run-B). */
+    .ws4-fr-holds { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-serif); font-size:var(--ts-value); line-height:1.45; }
     .ws4-fr-points { margin:clamp(var(--sp-7), 9vh, 96px) 0 auto; padding-bottom:var(--sp-6); }
     .ws4-fr-point { display:flex; gap:14px; align-items:flex-start; padding:10px 0; }
     .ws4-fr-point p { flex:1; margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); line-height:1.45; }
     .ws4-fr-point b { color:var(--text-1); font-weight:600; }
-    .ws4-fr-title { margin:0 2px; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-display); line-height:1.15; font-weight:600; }
     .ws4-fr-foot { display:flex; flex-direction:column; gap:var(--sp-2); margin-top:auto; padding-top:var(--sp-5); }
-    .ws4-fr-dots { display:flex; justify-content:center; gap:6px; margin-bottom:var(--sp-3); }
-    .ws4-fr-dots span { width:6px; height:6px; border-radius:3px; background:var(--surface-3); }
-    .ws4-fr-dots span.is-on { width:18px; background:var(--accent); }
     /* ── end WS4 settings ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family

@@ -532,7 +532,7 @@ async function main() {
   try {
     await open();
     // onboarding, then tab 1 = a letter scrolled into its text
-    await clickText(/^Continue$/); await clickText(/Begin Reading/); await goHome();
+    await clickText(/Begin Reading/); await goHome();   // newcomer: the welcome is one page
     await clickText(/^Maybe later$/).catch(() => {});
     await goHome(); await clickText(/Prophetic Letters/); await clickText(/^Volume One/); await clickText(/A Word of Warning/);
     await scrollTo(900);

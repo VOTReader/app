@@ -27,6 +27,7 @@ import { EditionCompare } from '../components/EditionCompare.jsx';
 import { AddendumHeadLines } from '../components/AddendumHead.jsx';
 import { addendumHeadLines, closingMid } from '../../utils/closing-breaks.js';
 import { BgDrawContext } from '../components/bg-draw.js';
+import { ReadingTip } from '../components/ReadingTip.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -643,6 +644,7 @@ export function LetterView(props) {
             {!studyMode && markAsReadEnabled && onMarkRead && isRead ? (
               <MarkReadRow read={isRead(letter.id)} onMark={() => onMarkRead()} onUndo={onUnmark} />
             ) : null}
+            {!studyMode && markAsReadEnabled && isRead ? <ReadingTip unitKey={letter.id} finished={!!isRead(letter.id)} inert={inert} /> : null}
             {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? (
               <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={letter.id} inert={inert} />
             ) : null}

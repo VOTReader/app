@@ -84,7 +84,7 @@ async function main() {
     };
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
-    await clickText(/^Continue$/);
+    // newcomer (2026-11-27): the welcome is one page; Begin Reading is on it.
     await clickText(/Begin Reading/);
     // to the letter by the Read tab (the onboarding's first letter may change; this one is fixed)
     await page.evaluate(() => { const b = [...document.querySelectorAll('.tabbar-tab, button[title="Home"]')].find((x) => /^(Read|)$/.test((x.textContent || '').trim()) || x.title === 'Home'); if (b) b.click(); });

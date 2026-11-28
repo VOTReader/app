@@ -34,7 +34,7 @@ import { studyCoverage, studyCoverageDetail } from '../../utils/audio-coverage.j
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import { ModeToggle } from '../components/ModeToggle.jsx';
 import { PlanRibbon } from '../components/PlanRibbon.jsx';
-import { InstallCard, _resetInstallCardSession } from '../components/InstallCard.jsx';
+import { InstallRow, _resetInstallCardSession } from '../components/InstallCard.jsx';
 import { WhatsNewSheet } from '../components/WhatsNewSheet.jsx';
 import { SettingsRow } from '../components/SettingsRow.jsx';
 import { SelectField } from '../components/SelectField.jsx';
@@ -182,10 +182,13 @@ describe('axe — Volumes, Scriptures, a genre, Studies', () => {
 });
 
 describe('axe — About', () => {
-  it('both pages', async () => {
-    const { getByRole } = render(<AboutScreen onContinue={noop} onBack={noop} onSearch={noop} onHistory={noop} theme="dark" onThemeChange={noop} />);
+  // newcomer (2026-11-27): the welcome is one page; About's What you can do holds what page two said.
+  it('the welcome, and About\'s What you can do', async () => {
+    render(<AboutScreen onContinue={noop} onBack={noop} onSearch={noop} onHistory={noop} theme="dark" onThemeChange={noop} />);
     await check();
-    fireEvent.click(getByRole('button', { name: 'Continue' }));
+    cleanup();
+    const { getByRole } = render(<AboutScreen firstRun={false} onContinue={noop} onBack={noop} onSearch={noop} onHistory={noop} theme="dark" onThemeChange={noop} />);
+    fireEvent.click(getByRole('button', { name: 'What you can do' }));
     await check();
   });
 });
@@ -341,16 +344,17 @@ describe('axe — the hub components on their own', () => {
     await check();
   });
 
-  it('InstallCard and its steps sheet', async () => {
+  /* The end-of-chapter InstallCard was deleted (newcomer 2026-11-27); its steps sheet opens from the Settings row. */
+  it('InstallRow and its steps sheet', async () => {
     Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1' });
     put('StateStore', { get: () => ({ readItems: { 'v1:genesis:1': 1 } }), subscribe: () => () => {}, getVersion: () => 1 });
     put('StorageHealth', { _isStandalone: () => false });
     put('PlatformBridge', { isAndroid: false });
     _resetInstallCardSession();
-    const { getByRole } = render(<main><InstallCard unitKey="genesis:1" /></main>);
-    expect(document.querySelector('.install-card')).not.toBeNull();
+    const { getByRole } = render(<main><InstallRow /></main>);
+    expect(document.querySelector('.settings-help-install')).not.toBeNull();
     await check();
-    act(() => { fireEvent.click(getByRole('button', { name: 'Show me how' })); });
+    act(() => { fireEvent.click(getByRole('button', { name: /Install VOTReader/ })); });
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     await check();
   });
