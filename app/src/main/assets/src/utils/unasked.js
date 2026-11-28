@@ -104,19 +104,20 @@ export function want(kind, on) {
 }
 
 /**
- * Whether `kind` may show now, from the live state.
- * @param {string} kind @param {{ pause: boolean }} where
+ * Whether `kind` may show now, from the live state. `where.finished`: a reading the caller knows is finished that the
+ * stored read marks may not hold yet (a mark is on screen at once and written a moment later).
+ * @param {string} kind @param {{ pause: boolean, finished?: number }} where
  */
 export function canShow(kind, where) {
   const s = _slot();
   // The tip is due from the session's start, not only at a reading's end, so the plan offer waits for it.
   const wanting = tipDue() && kind !== 'tip' ? [...s.wanting, 'tip'] : s.wanting;
-  return mayShow(kind, { spoke: s.spoke, firstRun: s.firstRun, pause: where.pause, finished: finishedReadings(), wanting });
+  return mayShow(kind, { spoke: s.spoke, firstRun: s.firstRun, pause: where.pause, finished: Math.max(finishedReadings(), where.finished || 0), wanting });
 }
 
 /**
  * Take the session for `kind` if it may show; true when it is `kind`'s to show.
- * @param {string} kind @param {{ pause: boolean }} where
+ * @param {string} kind @param {{ pause: boolean, finished?: number }} where
  */
 export function claim(kind, where) {
   const s = _slot();

@@ -32,7 +32,8 @@ export function ReadingTip({ unitKey, finished, inert = false }) {
   const [gone, setGone] = React.useState(false);
   const here = _tipUnit == null || _tipUnit === unitKey;
   const wanted = !inert && !gone && finished && hintWanted && !tourDone && here;
-  const show = useUnasked('tip', wanted, true);
+  // This reading is finished even before its read mark is stored (the mark is written a moment after the tap).
+  const show = useUnasked('tip', wanted, true, 1);
   React.useEffect(() => {
     if (!show) return undefined;
     _tipUnit = unitKey;

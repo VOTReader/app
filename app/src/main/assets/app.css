@@ -6009,11 +6009,28 @@
     .ws4-fr-name { margin:var(--sp-2) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:calc(var(--ts-display) * 1.27); line-height:1.1; font-weight:600; }
     .ws4-fr-lead { margin:var(--sp-4) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-style:italic; }
     /* newcomer (2026-11-27): the one line on what the app holds, under the lead (mock 3-first-run-B). */
-    .ws4-fr-holds { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-serif); font-size:var(--ts-value); line-height:1.45; }
+    .ws4-fr-holds { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-serif); font-size:var(--ts-value); line-height:1.45; text-align:center; }
     .ws4-fr-points { margin:clamp(var(--sp-7), 9vh, 96px) 0 auto; padding-bottom:var(--sp-6); }
     .ws4-fr-point { display:flex; gap:14px; align-items:flex-start; padding:10px 0; }
     .ws4-fr-point p { flex:1; margin:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); line-height:1.45; }
     .ws4-fr-point b { color:var(--text-1); font-weight:600; }
+    /* newcomer (2026-11-27): at large text both source points stay on the first screen, above the fold (the hub's
+       check at 180%): the welcome's air shrinks before its words go below. */
+    .vot-large-text .ws4-fr-top { padding-top:var(--sp-4); }
+    .vot-large-text .ws4-fr-orn { display:none; }
+    .vot-large-text .ws4-fr-points { margin-top:var(--sp-4); padding-bottom:0; }
+    .vot-large-text .ws4-fr-point { padding:6px 0; }
+    .vot-large-text .ws4-fr-holds { order:1; margin-bottom:var(--sp-4); }
+    .vot-large-text .ws4-fr-foot { order:2; }
+    /* A short screen asks the same at any text size. */
+    @media (max-height: 760px) {
+      .ws4-fr-top { padding-top:var(--sp-4); }
+      .ws4-fr-orn { display:none; }
+      .ws4-fr-points { margin-top:var(--sp-4); padding-bottom:0; }
+      .ws4-fr-point { padding:6px 0; }
+      .ws4-fr-holds { order:1; margin-bottom:var(--sp-4); }
+      .ws4-fr-foot { order:2; }
+    }
     .ws4-fr-foot { display:flex; flex-direction:column; gap:var(--sp-2); margin-top:auto; padding-top:var(--sp-5); }
     /* ── end WS4 settings ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.

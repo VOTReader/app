@@ -37,6 +37,14 @@ describe('ReadingTip', () => {
     expect([...tip().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Got it']);
     expect(spokeThisSession()).toBe('tip');
   });
+  /* Walked 2026-11-27: Mark as read shows "Read" at once but the stored read marks follow a moment later; the tip
+     asked the gate in between, was told "nothing finished" and never came. Its own finished page counts. */
+  it('a page just marked read counts before the read mark is stored', async () => {
+    globalThis.StateStore = { get: () => ({ readItems: {} }) };
+    render(<ReadingTip unitKey="L1" finished />);
+    await tick();
+    expect(tip()).not.toBeNull();
+  });
   it('not before the reading is finished, not after the tour, not once something is saved', async () => {
     let v = render(<ReadingTip unitKey="L1" finished={false} />); await tick(); expect(tip()).toBeNull(); v.unmount();
     flags.tour = true; v = render(<ReadingTip unitKey="L1" finished />); await tick(); expect(tip()).toBeNull(); v.unmount(); flags.tour = false;

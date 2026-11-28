@@ -205,8 +205,9 @@ export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = 
           <p className="ui-label ws4-fr-kicker">Welcome to</p>
           <h1 className="ws4-fr-name">VOTReader</h1>
           <p className="ws4-fr-lead">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
-          <p className="ws4-fr-holds">{WELCOME_HOLDS}</p>
         </div>
+        {/* Its own row of the page, so at large text it can follow the source points (app.css .vot-large-text). */}
+        <p className="ws4-fr-holds">{WELCOME_HOLDS}</p>
         <div className="ws4-fr-points">
           {WELCOME_POINTS.map(([icon, head, text]) => (
             <div key={icon} className="ws4-fr-point">

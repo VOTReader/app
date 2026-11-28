@@ -6,15 +6,16 @@ import { claim, spokeThisSession, subscribeUnasked, unaskedVersion } from '../ut
 
 /**
  * @param {string} kind @param {boolean} wanted @param {boolean} [pause]
+ * @param {number} [finished] readings the caller knows are finished (its own, before the read mark is stored)
  * @returns {boolean}
  */
-export function useUnasked(kind, wanted, pause = true) {
+export function useUnasked(kind, wanted, pause = true, finished = 0) {
   const v = React.useSyncExternalStore(subscribeUnasked, unaskedVersion);
   const [, setMine] = React.useState(false);
   React.useEffect(() => {
     if (!wanted || !pause || spokeThisSession() === kind) return undefined;
-    const t = setTimeout(() => { if (claim(kind, { pause })) setMine(true); }, 0);
+    const t = setTimeout(() => { if (claim(kind, { pause, finished })) setMine(true); }, 0);
     return () => clearTimeout(t);
-  }, [kind, wanted, pause, v]);
+  }, [kind, wanted, pause, finished, v]);
   return wanted && spokeThisSession() === kind;
 }
