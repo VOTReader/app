@@ -294,13 +294,13 @@ async function runTheme(theme) {
   const want = (...names) => !ONLY || names.some((n) => ONLY.has(n));
 
   // first run and the tour
-  await step('firstrun', async () => { await stop('firstrun-1'); await tap('^continue$'); await stop('firstrun-2'); });
+  // the welcome is one page since the newcomer change (01dfed4a9): one stop, then Begin Reading
+  await step('firstrun', async () => { await stop('firstrun-1'); });
   await throughFirstRun(page).catch((e) => results.push({ stop: 'first-run', theme, unreached: e.message }));
   await sleep(800);
-  if (want('tour-offer', 'tour')) await step('tour', async () => {
-    await tab('Read');
-    await ev(() => { const s = document.querySelector('.screen-scroll'); if (s) s.scrollTop = s.scrollHeight; }); await sleep(600);
-    await stop('tour-offer');
+  // Home no longer offers the tour (01dfed4a9 deleted its card): a reader starts it from Settings' Show me around
+  if (want('tour')) await step('tour', async () => {
+    await tab('Read'); await tap('^quick settings$'); await tap('^settings$');   // GEAR1: the gear opens Quick settings
     await tap('^show me around'); await sleep(1200); await stop('tour');
     // the stops after the first card (LIGHT2): the primary button walks on; a stop that waits on its target is pressed for it
     const primary = () => ev(() => { const b = document.querySelector('.tour-card .tour-btn.primary'); if (!b) return null; const t = b.textContent.trim(); b.click(); return t; });
